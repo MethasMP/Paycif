@@ -45,6 +45,48 @@ class ApiService {
     };
   }
 
+  // Get User Profile
+  Future<Map<String, dynamic>?> getUserProfile() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return null;
+
+      final response = await Supabase.instance.client
+          .from('profiles')
+          .select('preferred_payment_method_id, preferred_payment_method_type')
+          .eq('id', user.id)
+          .single();
+
+      return response;
+    } catch (e) {
+      debugPrint('Error fetching profile: $e');
+      return null;
+    }
+  }
+
+  // Update Preferred Payment Method
+  Future<void> updatePaymentPreference(
+    String methodId,
+    String methodType,
+  ) async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return;
+
+      await Supabase.instance.client
+          .from('profiles')
+          .update({
+            'preferred_payment_method_id': methodId,
+            'preferred_payment_method_type': methodType,
+          })
+          .eq('id', user.id);
+
+      debugPrint('✅ Payment preference updated: $methodId ($methodType)');
+    } catch (e) {
+      debugPrint('Error updating payment preference: $e');
+    }
+  }
+
   // Get Wallet Balance
   Future<Map<String, dynamic>> getBalance(String currency) async {
     final headers = await _getHeaders();
@@ -312,6 +354,9 @@ class ApiService {
   // ============================================================================
   static List<SavedCard>? _cachedSavedCards;
 
+  // Get Cached Cards (Manual Access)
+  static List<SavedCard>? getCachedCards() => _cachedSavedCards;
+
   Future<List<SavedCard>> getSavedCards({bool forceRefresh = false}) async {
     // 1. Return cached data if available and not forced to refresh
     if (_cachedSavedCards != null && !forceRefresh) {
@@ -346,6 +391,31 @@ class ApiService {
     } catch (e) {
       debugPrint('Error getting saved cards: $e');
       return [];
+    }
+  }
+
+  // Delete Card
+  Future<void> deleteCard(String cardId) async {
+    final supabase = Supabase.instance.client;
+    try {
+      debugPrint('🗑️ Deleting card: $cardId');
+      final response = await supabase.functions.invoke(
+        'manage-payment-methods',
+        body: {'action': 'delete-card', 'card_id': cardId},
+      );
+
+      if (response.status != 200) {
+        final errorData = response.data as Map<String, dynamic>?;
+        final errorMessage = errorData?['message'] ?? 'Failed to delete card';
+        throw Exception(errorMessage);
+      }
+
+      // Successfully deleted, clear cache to force refresh
+      _cachedSavedCards = null;
+      debugPrint('✅ Card deleted successfully');
+    } catch (e) {
+      debugPrint('❌ Delete card error: $e');
+      rethrow;
     }
   }
 }

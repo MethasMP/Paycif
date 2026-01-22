@@ -106,7 +106,7 @@ class _TopUpViewState extends State<TopUpView> {
 
   void _showOpnPaymentSheet() {
     // Local state for the sheet's autovalidation mode
-    var _sheetAutovalidateMode = AutovalidateMode.disabled;
+    var sheetAutovalidateMode = AutovalidateMode.disabled;
 
     showModalBottomSheet(
       context: context,
@@ -176,7 +176,7 @@ class _TopUpViewState extends State<TopUpView> {
                       child: Form(
                         key: _formKey,
                         autovalidateMode:
-                            _sheetAutovalidateMode, // Controlled by state
+                            sheetAutovalidateMode, // Controlled by state
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -197,10 +197,12 @@ class _TopUpViewState extends State<TopUpView> {
                               icon: Icons.credit_card_rounded,
                               formatters: [CardNumberInputFormatter()],
                               validator: (value) {
-                                if (value == null || value.isEmpty)
+                                if (value == null || value.isEmpty) {
                                   return 'Required';
-                                if (value.replaceAll(' ', '').length < 16)
+                                }
+                                if (value.replaceAll(' ', '').length < 16) {
                                   return 'Invalid card number';
+                                }
                                 return null;
                               },
                               maxLength: 19,
@@ -218,29 +220,34 @@ class _TopUpViewState extends State<TopUpView> {
                                     icon: Icons.calendar_today_rounded,
                                     formatters: [ExpiryDateInputFormatter()],
                                     validator: (value) {
-                                      if (value == null || value.isEmpty)
+                                      if (value == null || value.isEmpty) {
                                         return 'Required';
+                                      }
                                       if (!RegExp(
                                         r'^\d{2}/\d{2}$',
-                                      ).hasMatch(value))
+                                      ).hasMatch(value)) {
                                         return 'Invalid format';
+                                      }
 
                                       final parts = value.split('/');
                                       final month = int.tryParse(parts[0]) ?? 0;
                                       final year = int.tryParse(parts[1]) ?? 0;
 
-                                      if (month < 1 || month > 12)
+                                      if (month < 1 || month > 12) {
                                         return 'Invalid month';
+                                      }
 
                                       final now = DateTime.now();
                                       final currentYear = now.year % 100;
                                       final currentMonth = now.month;
 
-                                      if (year < currentYear)
+                                      if (year < currentYear) {
                                         return 'Card expired';
+                                      }
                                       if (year == currentYear &&
-                                          month < currentMonth)
+                                          month < currentMonth) {
                                         return 'Card expired';
+                                      }
 
                                       return null;
                                     },
@@ -260,10 +267,12 @@ class _TopUpViewState extends State<TopUpView> {
                                     ],
                                     maxLength: 3,
                                     validator: (value) {
-                                      if (value == null || value.isEmpty)
+                                      if (value == null || value.isEmpty) {
                                         return 'Required';
-                                      if (value.length < 3)
+                                      }
+                                      if (value.length < 3) {
                                         return 'Invalid CVV';
+                                      }
                                       return null;
                                     },
                                   ),
@@ -286,8 +295,9 @@ class _TopUpViewState extends State<TopUpView> {
                                 UpperCaseTextFormatter(),
                               ],
                               validator: (value) {
-                                if (value == null || value.isEmpty)
+                                if (value == null || value.isEmpty) {
                                   return 'Required';
+                                }
                                 return null;
                               },
                             ),
@@ -306,7 +316,7 @@ class _TopUpViewState extends State<TopUpView> {
                                   } else {
                                     HapticFeedback.heavyImpact(); // Feedback on error
                                     setSheetState(() {
-                                      _sheetAutovalidateMode =
+                                      sheetAutovalidateMode =
                                           AutovalidateMode.onUserInteraction;
                                     });
                                   }
@@ -759,6 +769,9 @@ class _TopUpViewState extends State<TopUpView> {
         HapticFeedback.heavyImpact();
         _showSuccessDialog();
         context.read<DashboardController>().init();
+
+        // Save this as the preferred method (Transition from First-Time to Returning)
+        _apiService.updatePaymentPreference('card', 'card');
 
         // Refresh saved card status (in case first time)
         _checkSavedCard();

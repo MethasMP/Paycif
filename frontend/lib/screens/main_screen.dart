@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
 
 import 'home_view.dart';
-import 'wallet_screen.dart';
+import 'payment_method_screen.dart';
 import 'history_screen.dart';
 import 'profile_page.dart';
 import 'scan_page.dart';
@@ -16,12 +17,34 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
+  final ApiService _apiService = ApiService();
+
+  @override
+  void initState() {
+    super.initState();
+    // 🚀 PRE-WARM CACHE: Start fetching data in the background immediately
+    // so it's ready before the user clicks on the Payment tab.
+    _prewarmCache();
+  }
+
+  Future<void> _prewarmCache() async {
+    try {
+      debugPrint('🔥 Pre-warming caches (Background)...');
+      await Future.wait([
+        _apiService.getUserProfile(),
+        _apiService.getSavedCards(),
+      ]);
+      debugPrint('🔥 Caches pre-warmed successfully.');
+    } catch (e) {
+      debugPrint('⚠️ Pre-warm failed (non-critical): $e');
+    }
+  }
 
   List<Widget> get _screens => [
     const HomeView(),
     const HistoryScreen(),
     ScanPage(onBack: () => _onItemTapped(0)), // Position 2 with Callback
-    const WalletScreen(),
+    const PaymentMethodScreen(),
     const ProfilePage(),
   ];
 

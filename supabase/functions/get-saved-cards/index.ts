@@ -148,13 +148,13 @@ serve(async (req: Request) => {
     console.log(`[Auth] User verified: ${userId}`);
 
     // =========================================================================
-    // 2. Get Omise Customer ID from Profile (Using Admin Client for reliability)
+    // 2. Get Profile info (Using Admin Client)
     // =========================================================================
     const adminClient = createAdminClient();
 
     const { data: profile, error: profileError } = await adminClient
       .from('profiles')
-      .select('omise_customer_id')
+      .select('omise_customer_id, preferred_payment_method_id')
       .eq('id', userId)
       .single();
 
@@ -175,7 +175,29 @@ serve(async (req: Request) => {
     }
 
     // =========================================================================
-    // 3. Fetch Cards from Omise
+    // 3. CACHE LOOKUP (Redis-like experience)
+    // =========================================================================
+    const { data: cachedData } = await adminClient
+      .from('cache_saved_cards')
+      .select('cards_json, updated_at')
+      .eq('user_id', userId)
+      .single();
+
+    const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes cache
+    if (cachedData) {
+      const updatedAt = new Date(cachedData.updated_at).getTime();
+      const now = new Date().getTime();
+      if (now - updatedAt < CACHE_TTL_MS) {
+        console.log(`[Cache] Returning cached cards for ${userId} (Speed: <10ms)`);
+        return new Response(
+          JSON.stringify({ cards: cachedData.cards_json }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+    }
+
+    // =========================================================================
+    // 4. Fetch Customer & Cards from Omise (Cache Miss or Expired)
     // =========================================================================
     const omiseSecretKey = Deno.env.get('OMISE_SECRET_KEY');
     if (!omiseSecretKey) {
@@ -186,11 +208,64 @@ serve(async (req: Request) => {
       );
     }
 
-    const opnClient = new OpnClient(omiseSecretKey);
-    const cards = await opnClient.listCards(profile.omise_customer_id);
+    const authHeaderOpn = `Basic ${btoa(omiseSecretKey + ':')}`;
+
+    console.log(`[Omise] Cache miss/expired. Fetching from API for ${userId}...`);
+    // Fetch Customer object to get default_card and cards list
+    const customerResp = await fetch(
+      `https://api.omise.co/customers/${profile.omise_customer_id}`,
+      {
+        headers: { 'Authorization': authHeaderOpn },
+      },
+    );
+
+    if (!customerResp.ok) {
+      const err = await customerResp.text();
+      console.error('[get-saved-cards] Omise Customer fetch failed:', err);
+      throw new Error(`Omise API error: ${customerResp.status}`);
+    }
+
+    const customerData = await customerResp.json();
+    const omiseDefaultCard = customerData.default_card;
+    const cardsData = customerData.cards.data as OpnCard[];
+
+    // Transform to PCI DSS compliant format
+    const cards: SavedCard[] = cardsData.map((card) => ({
+      id: card.id,
+      brand: card.brand,
+      last_digits: card.last_digits,
+      expiration_month: card.expiration_month,
+      expiration_year: card.expiration_year,
+    }));
 
     // =========================================================================
-    // 4. Return PCI DSS Compliant Response
+    // 5. UPDATE CACHE
+    // =========================================================================
+    console.log(`[Cache] Updating card cache for ${userId}`);
+    await adminClient.from('cache_saved_cards').upsert({
+      user_id: userId,
+      cards_json: cards,
+      updated_at: new Date().toISOString(),
+    });
+
+    // =========================================================================
+    // 6. AUTO-SYNC LOGIC (Sync preference if NULL but Omise has a default)
+    // =========================================================================
+    if (!profile.preferred_payment_method_id && omiseDefaultCard) {
+      console.log(
+        `[AutoSync] Syncing preference for ${userId} from Omise default card: ${omiseDefaultCard}`,
+      );
+      await adminClient
+        .from('profiles')
+        .update({
+          preferred_payment_method_id: omiseDefaultCard,
+          preferred_payment_method_type: 'card',
+        })
+        .eq('id', userId);
+    }
+
+    // =========================================================================
+    // 7. Return Response
     // =========================================================================
     return new Response(
       JSON.stringify({ cards }),

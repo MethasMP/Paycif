@@ -315,6 +315,24 @@ serve(async (req) => {
     console.log(`[DB] RPC Success:`, rpcData);
 
     // ========================================================================
+    // 8.5 UPDATE USER PREFERENCE & INVALIDATE CACHE (Returning User Pattern)
+    // ========================================================================
+    if (charge.card?.id) {
+      console.log(`[Preference] Updating preferred_payment_method for ${userId}...`);
+      await adminClient
+        .from('profiles')
+        .update({
+          preferred_payment_method_id: charge.card.id,
+          preferred_payment_method_type: 'card',
+        })
+        .eq('id', userId);
+    }
+
+    // Invalidate Card Cache (Redis-like experience)
+    console.log(`[Cache] Invalidating card cache for ${userId} (Top-up success)`);
+    await adminClient.from('cache_saved_cards').delete().eq('user_id', userId);
+
+    // ========================================================================
     // 9. SUCCESS RESPONSE
     // ========================================================================
     return jsonResponse({
