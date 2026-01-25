@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../models/saved_card.dart'; // Correct import for SavedCard, CardBrand
 import 'package:frontend/l10n/generated/app_localizations.dart';
+import '../services/omise_service.dart';
+import '../services/api_service.dart';
+import '../utils/pay_notify.dart';
+import '../utils/payment_utils.dart';
+import '../utils/error_translator.dart';
 
 class AddCardScreen extends StatefulWidget {
   const AddCardScreen({super.key});
@@ -12,11 +16,31 @@ class AddCardScreen extends StatefulWidget {
 
 class _AddCardScreenState extends State<AddCardScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _omiseService = OmiseService();
+  final _apiService = ApiService();
+
   String cardNumber = '';
   String expiryDate = '';
   String cardHolderName = '';
   String cvvCode = '';
   bool isCvvFocused = false;
+  bool _isLoading = false;
+  String _loadingMessage = '';
+  AutovalidateMode _autovalidateMode = AutovalidateMode.disabled;
+
+  final _cardNumberFocus = FocusNode();
+  final _expiryFocus = FocusNode();
+  final _cvvFocus = FocusNode();
+  final _nameFocus = FocusNode();
+
+  @override
+  void dispose() {
+    _cardNumberFocus.dispose();
+    _expiryFocus.dispose();
+    _cvvFocus.dispose();
+    _nameFocus.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -55,23 +79,31 @@ class _AddCardScreenState extends State<AddCardScreen> {
               // Form
               Form(
                 key: _formKey,
+                autovalidateMode: _autovalidateMode,
                 child: Column(
                   children: [
                     _buildTextField(
                       label: l10n.cardNumber,
                       hint: '0000 0000 0000 0000',
-                      icon: Icons.credit_card,
+                      icon: PaymentUtils.getCardIcon(
+                        PaymentUtils.getCardType(cardNumber),
+                      ),
                       keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(16),
-                        _CardNumberFormatter(),
-                      ],
-                      onChanged: (value) => setState(() => cardNumber = value),
+                      focusNode: _cardNumberFocus,
+                      inputFormatters: [_CardNumberFormatter()],
+                      onChanged: (value) {
+                        setState(() => cardNumber = value);
+                        if (value.replaceAll(' ', '').length == 16) {
+                          _expiryFocus.requestFocus();
+                        }
+                      },
                       validator: (value) {
-                        if (value == null ||
-                            value.replaceAll(' ', '').length < 16) {
+                        final cleanNumber = value?.replaceAll(' ', '') ?? '';
+                        if (cleanNumber.length < 16) {
                           return l10n.cardInvalidNumber;
+                        }
+                        if (!PaymentUtils.isValidLuhn(cleanNumber)) {
+                          return l10n.cardInvalidLuhn;
                         }
                         return null;
                       },
@@ -86,13 +118,14 @@ class _AddCardScreenState extends State<AddCardScreen> {
                             hint: l10n.cardExpiryHint,
                             icon: Icons.calendar_today,
                             keyboardType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                              LengthLimitingTextInputFormatter(4),
-                              _ExpiryDateFormatter(),
-                            ],
-                            onChanged: (value) =>
-                                setState(() => expiryDate = value),
+                            focusNode: _expiryFocus,
+                            inputFormatters: [_ExpiryDateFormatter()],
+                            onChanged: (value) {
+                              setState(() => expiryDate = value);
+                              if (value.length == 5) {
+                                _cvvFocus.requestFocus();
+                              }
+                            },
                             validator: (value) {
                               if (value == null || value.isEmpty) {
                                 return l10n.cardInvalidDate;
@@ -100,7 +133,24 @@ class _AddCardScreenState extends State<AddCardScreen> {
                               if (!RegExp(r'^\d{2}/\d{2}$').hasMatch(value)) {
                                 return l10n.cardUseMMYY;
                               }
-                              // Basic date check could be added here
+                              final parts = value.split('/');
+                              final month = int.tryParse(parts[0]) ?? 0;
+                              final year = int.tryParse(parts[1]) ?? 0;
+
+                              if (month < 1 || month > 12) {
+                                return l10n.cardInvalidMonth;
+                              }
+
+                              final now = DateTime.now();
+                              final currentYear = now.year % 100;
+                              final currentMonth = now.month;
+
+                              if (year < currentYear) {
+                                return l10n.cardExpired;
+                              }
+                              if (year == currentYear && month < currentMonth) {
+                                return l10n.cardExpired;
+                              }
                               return null;
                             },
                           ),
@@ -112,12 +162,17 @@ class _AddCardScreenState extends State<AddCardScreen> {
                             hint: '123',
                             icon: Icons.lock_outline,
                             keyboardType: TextInputType.number,
+                            focusNode: _cvvFocus,
                             inputFormatters: [
                               FilteringTextInputFormatter.digitsOnly,
                               LengthLimitingTextInputFormatter(3),
                             ],
-                            onChanged: (value) =>
-                                setState(() => cvvCode = value),
+                            onChanged: (value) {
+                              setState(() => cvvCode = value);
+                              if (value.length == 3) {
+                                _nameFocus.requestFocus();
+                              }
+                            },
                             validator: (value) {
                               if (value == null || value.length < 3) {
                                 return l10n.cardInvalidCVV;
@@ -133,8 +188,13 @@ class _AddCardScreenState extends State<AddCardScreen> {
                       label: l10n.cardHolder,
                       hint: l10n.cardHolderHint,
                       icon: Icons.person_outline,
+                      focusNode: _nameFocus,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z ]')),
+                        _UpperCaseTextFormatter(),
+                      ],
                       onChanged: (value) =>
-                          setState(() => cardHolderName = value.toUpperCase()),
+                          setState(() => cardHolderName = value),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return l10n.commonRequired;
@@ -153,50 +213,71 @@ class _AddCardScreenState extends State<AddCardScreen> {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: () {
-                    if (_formKey.currentState!.validate()) {
-                      // Detect card brand from number
-                      final cleanNumber = cardNumber.replaceAll(' ', '');
-                      CardBrand brand = CardBrand.unknown;
-                      if (cleanNumber.startsWith('4')) {
-                        brand = CardBrand.visa;
-                      } else if (cleanNumber.startsWith('5') ||
-                          cleanNumber.startsWith('2')) {
-                        brand = CardBrand.mastercard;
-                      } else if (cleanNumber.startsWith('34') ||
-                          cleanNumber.startsWith('37')) {
-                        brand = CardBrand.amex;
-                      } else if (cleanNumber.startsWith('35')) {
-                        brand = CardBrand.jcb;
-                      }
+                  onPressed: _isLoading
+                      ? null
+                      : () async {
+                          if (_formKey.currentState!.validate()) {
+                            // 0. Capture necessary values BEFORE async gaps
+                            final navigator = Navigator.of(context);
+                            final localL10n = l10n;
 
-                      final parts = expiryDate.split('/');
-                      final month = int.tryParse(parts[0]) ?? 0;
-                      final year = int.tryParse('20${parts[1]}') ?? 0;
+                            setState(() {
+                              _isLoading = true;
+                              _loadingMessage = 'Securing card data...';
+                            });
+                            try {
+                              final parts = expiryDate.split('/');
+                              final month = parts[0];
+                              final year = '20${parts[1]}';
 
-                      final savedCard = SavedCard(
-                        id: DateTime.now().millisecondsSinceEpoch.toString(),
-                        brand: brand
-                            .toString()
-                            .split('.')
-                            .last
-                            .toUpperCase(), // e.g. VISA
-                        lastDigits: cleanNumber.substring(
-                          cleanNumber.length - 4,
-                        ),
-                        expirationMonth: month,
-                        expirationYear: year,
-                      );
+                              // 1. Tokenize Card details
+                              final token = await _omiseService.createToken(
+                                name: cardHolderName,
+                                number: cardNumber.replaceAll(' ', ''),
+                                expiryMonth: month,
+                                expiryYear: year,
+                                securityCode: cvvCode,
+                              );
 
-                      Navigator.pop(context, savedCard);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(l10n.cardAddedSuccess),
-                          backgroundColor: const Color(0xFF10B981),
-                        ),
-                      );
-                    }
-                  },
+                              if (!mounted) return;
+
+                              setState(
+                                () => _loadingMessage = 'Registering card...',
+                              );
+
+                              // 2. Save card to backend
+                              await _apiService.saveCard(token);
+
+                              if (!mounted || !context.mounted) return;
+
+                              PayNotify.success(
+                                context,
+                                localL10n.cardAddedSuccess,
+                              );
+                              navigator.pop(true); // Sign success
+                            } catch (e) {
+                              if (!mounted || !context.mounted) return;
+                              setState(() {
+                                _isLoading = false;
+                                _loadingMessage = '';
+                              });
+                              PayNotify.error(
+                                context,
+                                ErrorTranslator.translate(l10n, e.toString()),
+                              );
+                            }
+                          } else {
+                            HapticFeedback.heavyImpact();
+                            setState(() {
+                              _autovalidateMode =
+                                  AutovalidateMode.onUserInteraction;
+                            });
+                            PayNotify.error(
+                              context,
+                              l10n.commonValidationFailed,
+                            );
+                          }
+                        },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF1A1F71),
                     shape: RoundedRectangleBorder(
@@ -205,14 +286,37 @@ class _AddCardScreenState extends State<AddCardScreen> {
                     elevation: 8,
                     shadowColor: const Color(0xFF1A1F71).withValues(alpha: 0.5),
                   ),
-                  child: Text(
-                    l10n.cardAddBtn,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
+                  child: _isLoading
+                      ? Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              _loadingMessage,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        )
+                      : Text(
+                          l10n.cardAddBtn,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
                 ),
               ),
             ],
@@ -228,15 +332,22 @@ class _AddCardScreenState extends State<AddCardScreen> {
       width: double.infinity,
       height: 220,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0F172A), Color(0xFF334155)], // Premium Dark
+        gradient: LinearGradient(
+          colors: [
+            PaymentUtils.getCardColor(PaymentUtils.getCardType(cardNumber)),
+            PaymentUtils.getCardColor(
+              PaymentUtils.getCardType(cardNumber),
+            ).withValues(alpha: 0.8),
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.5),
+            color: PaymentUtils.getCardColor(
+              PaymentUtils.getCardType(cardNumber),
+            ).withValues(alpha: 0.5),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -250,7 +361,9 @@ class _AddCardScreenState extends State<AddCardScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                l10n.cardPreviewTitle,
+                PaymentUtils.getCardType(cardNumber) == 'Unknown'
+                    ? l10n.cardPreviewTitle
+                    : PaymentUtils.getCardType(cardNumber),
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -341,6 +454,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
     List<TextInputFormatter>? inputFormatters,
     required Function(String) onChanged,
     String? Function(String?)? validator,
+    FocusNode? focusNode,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -368,6 +482,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
             ],
           ),
           child: TextFormField(
+            focusNode: focusNode,
             keyboardType: keyboardType,
             inputFormatters: inputFormatters,
             onChanged: onChanged,
@@ -410,21 +525,25 @@ class _CardNumberFormatter extends TextInputFormatter {
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
-    if (newValue.selection.baseOffset == 0) {
-      return newValue;
-    }
-    String inputData = newValue.text;
-    StringBuffer buffer = StringBuffer();
-    for (var i = 0; i < inputData.length; i++) {
-      buffer.write(inputData[i]);
-      int index = i + 1;
-      if (index % 4 == 0 && inputData.length != index) {
-        buffer.write("  "); // Double space for better spacing
+    if (newValue.selection.baseOffset == 0) return newValue;
+
+    // Allow digits only and limit to 16 digits
+    var text = newValue.text.replaceAll(RegExp(r'\D'), '');
+    if (text.length > 16) text = text.substring(0, 16);
+
+    final buffer = StringBuffer();
+    for (int i = 0; i < text.length; i++) {
+      buffer.write(text[i]);
+      // Add space after every 4 digits, but not at the end
+      if ((i + 1) % 4 == 0 && i != text.length - 1) {
+        buffer.write(' ');
       }
     }
-    return TextEditingValue(
-      text: buffer.toString(),
-      selection: TextSelection.collapsed(offset: buffer.toString().length),
+
+    final string = buffer.toString();
+    return newValue.copyWith(
+      text: string,
+      selection: TextSelection.collapsed(offset: string.length),
     );
   }
 }
@@ -435,22 +554,38 @@ class _ExpiryDateFormatter extends TextInputFormatter {
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
-    var text = newValue.text;
-    if (newValue.selection.baseOffset == 0) {
-      return newValue;
-    }
-    var buffer = StringBuffer();
+    if (newValue.selection.baseOffset == 0) return newValue;
+
+    // Allow digits only and limit to 4 digits (MMYY)
+    var text = newValue.text.replaceAll(RegExp(r'\D'), '');
+    if (text.length > 4) text = text.substring(0, 4);
+
+    final buffer = StringBuffer();
     for (int i = 0; i < text.length; i++) {
       buffer.write(text[i]);
-      var nonZeroIndex = i + 1;
-      if (nonZeroIndex % 2 == 0 && nonZeroIndex != text.length) {
+      // Add slash after 2nd digit
+      if (i == 1 && i != text.length - 1) {
         buffer.write('/');
       }
     }
-    var string = buffer.toString();
+
+    final string = buffer.toString();
     return newValue.copyWith(
       text: string,
       selection: TextSelection.collapsed(offset: string.length),
+    );
+  }
+}
+
+class _UpperCaseTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    return TextEditingValue(
+      text: newValue.text.toUpperCase(),
+      selection: newValue.selection,
     );
   }
 }

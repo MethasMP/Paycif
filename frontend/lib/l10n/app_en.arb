@@ -1,6 +1,6 @@
 {
   "@@locale": "en",
-  "appTitle": "Paysif",
+  "appTitle": "Paycif",
   "navHome": "Home",
   "navHistory": "History",
   "navPayment": "Payment",
@@ -38,7 +38,7 @@
   "sheetAddPayment": "Add Payment Method",
   "sheetCreditCard": "Credit or Debit Card",
   "sheetCreditCardDesc": "Visa, Mastercard, JCB, Amex",
-  "sheetTopUp": "Top Up Paysif Balance",
+  "sheetTopUp": "Top Up Paycif Balance",
   "sheetTopUpDesc": "Via Bank Transfer or PromptPay",
   "sheetDigitalWallet": "Connect Digital Wallet",
   "sheetDigitalWalletDesc": "PayPal, Alipay, WeChat Pay",
@@ -57,6 +57,13 @@
   "commonGotIt": "Got it!",
   "commonRequired": "Required",
   "commonInvalid": "Invalid",
+  "commonValidationFailed": "Please check the highlighted fields.",
+  "commonDefault": "Default",
+  "commonEdit": "Edit",
+  "commonDone": "Done",
+  "commonContinue": "Continue",
+  "commonNext": "Next",
+  "commonConfirm": "Confirm",
 
   "homeTopUp": "Top Up",
   "homeInfo": "Info",
@@ -65,7 +72,7 @@
   "homeShow": "Show",
   "homeHide": "Hide",
   "homeWorldMember": "WORLD MEMBER",
-  "homePaysifPremier": "Paysif PREMIER",
+  "homePaycifPremier": "Paycif PREMIER",
   "homeRecentTransactions": "Recent Transactions",
   "homeViewAll": "View All",
   "homeNoTransactions": "No transactions yet",
@@ -98,9 +105,12 @@
   "cardTitle": "Add New Card",
   "cardNumber": "Card Number",
   "cardInvalidNumber": "Invalid card number",
+  "cardInvalidLuhn": "Invalid card number (Luhn Check failed)",
   "cardExpiry": "Expiry Date",
   "cardExpiryHint": "MM/YY",
-  "cardInvalidDate": "Invalid",
+  "cardInvalidDate": "Invalid Date",
+  "cardInvalidMonth": "Month must be 01-12",
+  "cardExpired": "Card is expired",
   "cardUseMMYY": "Use MM/YY",
   "cardCVV": "CVV",
   "cardInvalidCVV": "Invalid CVV",
@@ -126,5 +136,207 @@
 
   "scanUnknownRecipient": "Unknown Recipient",
 
-  "profileGuestUser": "Guest User"
+  "profileGuestUser": "Guest User",
+  "noInternetTitle": "No Connection",
+  "noInternetMessage": "Please check your internet settings.",
+  "noInternetRetry": "Retry",
+  "splashLoading": "Connecting to services...",
+
+  "paymentSuccessTitle": "Payment Successful!",
+  "commonSomethingWentWrong": "Something went wrong.",
+  "transactionDetailsTitle": "Transaction Details",
+  "transactionHelp": "Need help with this transaction?",
+  "loginAppleComingSoon": "Apple ID Integration coming soon",
+  "commonSessionExpired": "Session Expired",
+  "commonLogIn": "Log In",
+  "topUpEnterAmountError": "Please enter an amount",
+  "confirmPaymentFailed": "Payment Failed",
+  "commonOk": "OK",
+  "errorCardInvalid": "The card information is incorrect. Please check and try again.",
+  "errorInsufficientFunds": "Insufficient funds in your account.",
+  "errorProcessingFailed": "We couldn't process this payment. Please try again later.",
+  "errorConnectionFailed": "Connection error. Please check your internet and try again.",
+  "errorUnknown": "Something went wrong. Please try again later.",
+  "errorAuthenticationFailed": "Verification failed. Please try again.",
+  "errorExpiredCard": "This card has expired. Please use a different card.",
+  "errorBrandNotSupported": "This card brand is not supported yet.",
+  "paymentFailedSetDefault": "Failed to set default method",
+  "cardDeleteTitle": "Delete Card",
+  "commonDelete": "Delete",
+  "cardDeleteSuccess": "Card deleted successfully",
+  "cardDeleteConfirm": "Are you sure you want to delete the card ending in {lastDigits}?",
+  "@cardDeleteConfirm": {
+    "placeholders": {
+      "lastDigits": {
+        "type": "String"
+      }
+    }
+  },
+  "paymentSettingsTitle": "Payment Settings",
+  "paymentPayWithApple": "Pay with Apple Pay",
+  "paymentPayWith": "Pay with {method}",
+  "@paymentPayWith": {
+    "placeholders": {
+      "method": {
+        "type": "String"
+      }
+    }
+  },
+  "transactionReceivedFrom": "Received from",
+  "transactionPaidTo": "Paid to",
+  "transactionMerchantPayment": "Merchant Payment",
+  "transactionTopUpLabel": "Top Up",
+  "transactionStatus": "Status",
+  "transactionStatusCompleted": "Completed",
+  "transactionTime": "Time",
+  "transactionId": "Transaction ID",
+  "transactionMethod": "Method",
+  "transactionBankTransfer": "Bank Transfer",
+  "transactionPaycifWallet": "Paycif Wallet",
+  "transactionSupportTicketCreated": "Support ticket created. We will contact you soon.",
+  "confirmReason": "Confirm payment of ฿{amount}",
+  "@confirmReason": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "confirmAuthFailed": "Authentication failed: {error}",
+  "@confirmAuthFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "confirmPaymentTo": "Payment to {recipient}",
+  "@confirmPaymentTo": {
+    "placeholders": {
+      "recipient": {
+        "type": "String"
+      }
+    }
+  },
+  "confirmAmountToPay": "Amount to Pay",
+  "confirmAmountSetByMerchant": "Amount set by merchant",
+  "confirmPayWith": "Pay with",
+  "confirmPaycifBalance": "Paycif Balance",
+  "confirmPayingTo": "Paying to",
+  "confirmFindingBestRoute": "Finding best route...",
+  "confirmOptimizedRoute": "Optimized Route",
+  "confirmAmount": "Amount",
+  "confirmFee": "Fee",
+  "confirmSwipeToPay": "Swipe to Pay",
+  "confirmProcessing": "Processing...",
+  "topUpPayAmount": "Pay ฿{amount}",
+  "@topUpPayAmount": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "topUpCardNumber": "Card Number",
+  "topUpExpiry": "Expiry",
+  "topUpCVV": "CVV",
+  "topUpNameOnCard": "Name on Card",
+  "topUpPayNow": "Pay Now",
+  "topUpTestCardHint": "Test Card: 4242 4242... (Any future date)",
+
+  "biometricLabel": "Biometric",
+  "biometricSettingsUpdated": "Biometric settings updated",
+  "biometricNotAvailable": "Biometric not available on this device",
+  "biometricNotEnrolled": "No biometrics enrolled. Please set up in device settings.",
+  "biometricConfirmManage": "Confirm to manage biometric settings",
+
+  "kycStatusVerified": "Verified",
+  "kycStatusPending": "Pending",
+  "kycStatusUnverified": "Not Verified",
+
+  "aboutApp": "ABOUT",
+  "termsOfService": "Terms of Service",
+  "privacyPolicy": "Privacy Policy",
+
+  "signOutConfirmTitle": "Sign Out",
+  "signOutConfirmMessage": "Are you sure you want to sign out?",
+
+  "helpSearchHint": "Search for help...",
+  "helpNoResults": "No results found",
+  "helpStillNeedHelp": "Still need help?",
+  "helpContactTeam": "Our support team is here for you 24/7",
+  "helpWalletTitle": "Wallet & Balance",
+  "helpWalletQ1": "How do I top up my wallet?",
+  "helpWalletA1": "You can top up your wallet using credit/debit cards or bank transfer. Go to Home > Top Up and choose your preferred method.",
+  "helpWalletQ2": "What is the maximum balance limit?",
+  "helpWalletA2": "The maximum balance depends on your verification level. Verified users can hold up to ฿500,000. Unverified users are limited to ฿50,000.",
+  "helpWalletQ3": "How long does top-up take?",
+  "helpWalletA3": "Card top-ups are instant. Bank transfers typically take 1-2 business hours during banking hours.",
+  "helpPaymentTitle": "Payments & Transfers",
+  "helpPaymentQ1": "How do I scan a QR code to pay?",
+  "helpPaymentA1": "Tap the scan button in the center of the navigation bar. Point your camera at the QR code and the payment details will appear automatically.",
+  "helpPaymentQ2": "Are there any transaction fees?",
+  "helpPaymentA2": "Paycif charges zero fees for QR payments and transfers between Paycif users. Some top-up methods may have minimal fees.",
+  "helpPaymentQ3": "What is the daily transaction limit?",
+  "helpPaymentA3": "Verified users can transact up to ฿200,000 per day. Unverified users are limited to ฿20,000 per day.",
+  "helpSecurityTitle": "Security & Privacy",
+  "helpSecurityQ1": "Is my money safe?",
+  "helpSecurityA1": "Yes. Your funds are protected by bank-grade encryption and stored in regulated partner banks. We also offer biometric authentication for extra security.",
+  "helpSecurityQ2": "How do I enable biometric login?",
+  "helpSecurityA2": "Go to Profile > Account Security > Biometric and toggle it on. You'll need to verify with your fingerprint or face to enable this feature.",
+  "helpCardTitle": "Cards & Payment Methods",
+  "helpCardQ1": "Which cards are supported?",
+  "helpCardA1": "We support Visa, Mastercard, JCB, and American Express. Both credit and debit cards are accepted.",
+  "helpCardQ2": "How do I remove a saved card?",
+  "helpCardA2": "Go to Payment > Your saved card > Swipe left or tap the menu icon > Delete. You'll be asked to confirm before removal.",
+
+  "supportHeaderTitle": "We're here to help",
+  "supportHeaderSubtitle": "Usually responds within 2 hours",
+  "supportSelectCategory": "What can we help you with?",
+  "supportCategoryGeneral": "General",
+  "supportCategoryPayment": "Payment",
+  "supportCategoryAccount": "Account",
+  "supportCategoryTechnical": "Technical",
+  "supportSubject": "Subject",
+  "supportSubjectHint": "Brief description of your issue",
+  "supportMessage": "Message",
+  "supportMessageHint": "Please describe your issue in detail. Include any relevant transaction IDs if applicable.",
+  "supportMessageMinLength": "Please provide more details (minimum 20 characters)",
+  "supportSubmit": "Submit Request",
+  "supportTicketSubmitted": "Support ticket submitted. We'll respond within 24 hours.",
+  "supportAlternativeContact": "Or reach us directly at",
+
+  "termsLastUpdated": "Last updated: January 2026",
+  "termsSection1Title": "1. Acceptance of Terms",
+  "termsSection1Content": "By accessing or using Paycif services, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our services. We reserve the right to modify these terms at any time.",
+  "termsSection2Title": "2. Account Registration",
+  "termsSection2Content": "You must be at least 18 years old to create an account. You are responsible for maintaining the confidentiality of your account credentials. You must provide accurate and complete information during registration.",
+  "termsSection3Title": "3. Payment Services",
+  "termsSection3Content": "Paycif provides digital wallet and payment services. All transactions are final and non-reversible unless otherwise stated. We may impose limits on transaction amounts based on verification status and regulatory requirements.",
+  "termsSection4Title": "4. Prohibited Activities",
+  "termsSection4Content": "You may not use Paycif for illegal activities, money laundering, fraud, or any purpose that violates applicable laws. We reserve the right to suspend or terminate accounts engaged in prohibited activities.",
+  "termsSection5Title": "5. Limitation of Liability",
+  "termsSection5Content": "Paycif is not liable for any indirect, incidental, or consequential damages arising from the use of our services. Our liability is limited to the amount of funds in your account at the time of the incident.",
+  "termsSection6Title": "6. Governing Law",
+  "termsSection6Content": "These terms are governed by the laws of Thailand. Any disputes shall be resolved through arbitration in Bangkok, Thailand, in accordance with the rules of the Thai Arbitration Institute.",
+  "termsContact": "For questions about these terms, please contact legal@paycif.com",
+
+  "privacyLastUpdated": "Last updated: January 2026",
+  "privacyHighlightsTitle": "Privacy at a Glance",
+  "privacyHighlight1": "We never sell your personal data to third parties",
+  "privacyHighlight2": "Your payment data is encrypted end-to-end",
+  "privacyHighlight3": "You can request deletion of your data at any time",
+  "privacyHighlight4": "We only collect data necessary for our services",
+  "privacySection1Title": "Information We Collect",
+  "privacySection1Content": "We collect information you provide directly: name, email, phone number, government ID for verification, and payment information. We also collect usage data such as transaction history and app analytics.",
+  "privacySection2Title": "How We Use Your Information",
+  "privacySection2Content": "We use your information to provide and improve our services, process transactions, verify your identity, prevent fraud, and communicate with you about your account and promotions.",
+  "privacySection3Title": "Information Sharing",
+  "privacySection3Content": "We share information with payment processors and banks to complete transactions, regulatory authorities as required by law, and service providers who help us operate our platform under strict confidentiality agreements.",
+  "privacySection4Title": "Data Security",
+  "privacySection4Content": "We implement bank-grade encryption (AES-256) for all sensitive data. Our systems are regularly audited by third-party security firms. We use multi-factor authentication and biometric security options.",
+  "privacySection5Title": "Your Rights",
+  "privacySection5Content": "You have the right to access, correct, or delete your personal data. You can opt out of marketing communications. You may request a copy of your data in a portable format.",
+  "privacyContactTitle": "Privacy Inquiries",
+  "privacyContactContent": "If you have questions about our privacy practices or wish to exercise your data rights, please contact our Data Protection Officer:"
 }

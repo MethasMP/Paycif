@@ -16,17 +16,13 @@ var DB *sql.DB
 // Connect initializes the database connection using DATABASE_URL env var.
 func Connect() error {
 	connStr := os.Getenv("DATABASE_URL")
+	// Verify connection string presence
 	if connStr == "" {
 		return fmt.Errorf("DATABASE_URL environment variable is not set")
 	}
 
-	// FIX: Supabase "Transaction Mode" (Port 6543) does not support prepared statements
-	// used by lib/pq. We must use "Session Mode" (Port 5432) for this Go backend.
-	// We automatically patch the port if it is set to 6543.
-	if strings.Contains(connStr, ":6543") {
-		connStr = strings.Replace(connStr, ":6543", ":5432", 1)
-		log.Println("Patch: Switched to Session Mode (Port 5432) for lib/pq compatibility")
-	}
+	// Logging connection attempt (Redacted for security)
+	log.Printf("Connecting to database at: %s", _redactConnStr(connStr))
 
 	var err error
 	DB, err = sql.Open("postgres", connStr)
@@ -35,9 +31,10 @@ func Connect() error {
 	}
 
 	// Set connection pool settings
+	// 🛡️ Resilience: Set lifetime < 5 mins (AWS LB Default) to avoid "Connection Reset by Peer"
 	DB.SetMaxOpenConns(25)
-	DB.SetMaxIdleConns(5)
-	DB.SetConnMaxLifetime(5 * time.Minute)
+	DB.SetMaxIdleConns(1)             // Keep minimal idle connections for local worker
+	DB.SetConnMaxLifetime(3 * time.Minute) // Rotate before server kills it
 
 	// Verify connection
 	if err := DB.Ping(); err != nil {
@@ -53,4 +50,24 @@ func Close() {
 	if DB != nil {
 		DB.Close()
 	}
+}
+
+// _redactConnStr masks the password in a postgres connection string for safe logging.
+func _redactConnStr(conn string) string {
+	// Simple redaction: postgres://user:password@host:port/db -> postgres://user:****@host:port/db
+	importStrings := "strings" // Just to remind me I need the import
+	_ = importStrings
+
+	if !strings.Contains(conn, "@") {
+		return "[MALFORMED]"
+	}
+
+	atSplit := strings.Split(conn, "@")
+	prefix := atSplit[0]
+	lastColon := strings.LastIndex(prefix, ":")
+	if lastColon != -1 {
+		prefix = prefix[:lastColon] + ":****"
+	}
+
+	return prefix + "@" + atSplit[1]
 }

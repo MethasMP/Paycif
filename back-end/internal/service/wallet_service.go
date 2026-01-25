@@ -6,9 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
-	"zappay/internal/models"
+	"paysif/internal/models"
 
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
@@ -335,7 +336,7 @@ func (s *WalletService) GetBalance(ctx context.Context, userID uuid.UUID, curren
 		SELECT id, balance 
 		FROM wallets 
 		WHERE profile_id = $1 AND currency = $2
-	`, userID, currency).Scan(&walletID, &balance)
+	`, userID, strings.ToUpper(currency)).Scan(&walletID, &balance)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -432,13 +433,17 @@ func (s *WalletService) GetExchangeRate(ctx context.Context, fromCurr, toCurr st
 	var rate float64
 	var updatedAt time.Time
 
-	// 2. Query DB
-	err := s.DB.QueryRowContext(ctx, `
-		SELECT provider_rate, updated_at
-		FROM exchange_rates 
-		WHERE from_currency = $1 AND to_currency = $2
-	`, fromCurr, toCurr).Scan(&rate, &updatedAt)
+	// Stateless Query Logic: Bypassing Prepared Statements for PGBouncer Compatibility
+	// We interpolate manually to force Simple Protocol.
+	// Safety: Inputs are strictly cast to Upper Case and we trust standard currency codes (3 chars usually)
+	// Additional safety: Escape quotes although unlikely in currency codes.
+	safeFrom := strings.ReplaceAll(strings.ToUpper(fromCurr), "'", "''")
+	safeTo := strings.ReplaceAll(strings.ToUpper(toCurr), "'", "''")
 
+	query := fmt.Sprintf("SELECT provider_rate, updated_at FROM exchange_rates WHERE from_currency = '%s' AND to_currency = '%s'", safeFrom, safeTo)
+	
+	// No transaction needed for simple read
+	err := s.DB.QueryRowContext(ctx, query).Scan(&rate, &updatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("rate not found for %s/%s", fromCurr, toCurr)

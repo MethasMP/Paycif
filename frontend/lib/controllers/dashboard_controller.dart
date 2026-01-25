@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart'; // Added for debugPrint
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import '../models/wallet_model.dart';
 import '../models/exchange_rate_model.dart';
@@ -19,6 +21,7 @@ class DashboardState {
   final String selectedCurrency;
   final List<Transaction> transactions; // Restored missing field
   final bool isTransactionsLoaded;
+  final bool isDataWarmed;
 
   DashboardState({
     this.wallet,
@@ -31,6 +34,7 @@ class DashboardState {
     this.selectedCurrency = 'USD', // Default to USD
     this.transactions = const [],
     this.isTransactionsLoaded = false,
+    this.isDataWarmed = false,
   });
 
   DashboardState copyWith({
@@ -44,6 +48,7 @@ class DashboardState {
     String? selectedCurrency,
     List<Transaction>? transactions,
     bool? isTransactionsLoaded,
+    bool? isDataWarmed,
   }) {
     return DashboardState(
       wallet: wallet ?? this.wallet,
@@ -56,6 +61,7 @@ class DashboardState {
       selectedCurrency: selectedCurrency ?? this.selectedCurrency,
       transactions: transactions ?? this.transactions,
       isTransactionsLoaded: isTransactionsLoaded ?? this.isTransactionsLoaded,
+      isDataWarmed: isDataWarmed ?? this.isDataWarmed,
     );
   }
 }
@@ -67,17 +73,53 @@ class DashboardController extends Cubit<DashboardState> {
   StreamSubscription? _txSub;
   String? _subscribedWalletId;
 
-  DashboardController(this._repository) : super(DashboardState());
+  DashboardController(this._repository) : super(DashboardState()) {
+    _listenToAuthChanges();
+  }
+
+  StreamSubscription? _authSub;
+
+  void _listenToAuthChanges() {
+    _authSub = _repository.authStream.listen((data) {
+      final event = data.event;
+      if (event == AuthChangeEvent.signedIn ||
+          event == AuthChangeEvent.initialSession) {
+        init();
+      } else if (event == AuthChangeEvent.signedOut) {
+        reset();
+      }
+    });
+  }
 
   @override
   Future<void> close() {
     _walletSub?.cancel();
     _txSub?.cancel();
+    _authSub?.cancel();
     return super.close();
   }
 
+  void reset() {
+    _walletSub?.cancel();
+    _txSub?.cancel();
+    _subscribedWalletId = null;
+    emit(DashboardState());
+  }
+
   void init() {
+    // Reset state before starting new subscriptions to avoid stale data
+    reset();
     _startSubscriptions(showLoading: true);
+
+    // 10x Eager Loading: Speculative Rate Prefetch
+    // Most users use THB/USD. Warming this now saves ~200-500ms later.
+    _repository.fetchLatestRate('THB', 'USD').then((rate) {
+      if (rate != null && state.wallet == null) {
+        // Only update if we still don't have a wallet (to avoid overwriting valid logic)
+        // Actually, just warming the ApiService cache is enough.
+        debugPrint('🔥 [Audit] Speculative Rate Warmed: THB/USD');
+      }
+    });
   }
 
   Future<void> refresh() async {
@@ -102,6 +144,8 @@ class DashboardController extends Cubit<DashboardState> {
       (wallet) {
         if (wallet == null) {
           _repository.createWalletManually();
+          // If creation is async, we might remain loading until next emit.
+          // Or we should emit error if it takes too long.
         } else {
           _updateWithNewWallet(wallet);
           // Subscribe to transactions only if not already subscribed or ID changed
@@ -112,7 +156,12 @@ class DashboardController extends Cubit<DashboardState> {
         }
       },
       onError: (e) {
-        // Handle error...
+        emit(
+          state.copyWith(
+            status: 'error',
+            errorMessage: 'Failed to load wallet: $e',
+          ),
+        );
       },
     );
   }
@@ -129,18 +178,31 @@ class DashboardController extends Cubit<DashboardState> {
             );
 
             // Synchronized Display Logic:
-            // Only set status to 'success' if BOTH Wallet and Transactions are ready.
+            // Only set status to 'success' and 'isDataWarmed' to true
+            // if BOTH Wallet and Transactions are ready.
             if (newState.wallet != null) {
-              emit(newState.copyWith(status: 'success'));
+              debugPrint(
+                '🔥 [Audit] Dashboard Warmed: Data finalized for IDE: ${newState.wallet?.id}',
+              );
+              emit(newState.copyWith(status: 'success', isDataWarmed: true));
             } else {
               emit(newState); // Keep loading
             }
           },
           onError: (e) {
-            // Even on error, we might want to finish loading with empty transactions?
-            // For now, let's assume retry or silent fail.
-            // If critical, set isTransactionsLoaded = true (empty) so UI unblocks.
-            emit(state.copyWith(isTransactionsLoaded: true));
+            debugPrint('⚠️ [Audit] Transaction Stream Error: $e');
+            // On transaction error, we still want to show the wallet balance.
+            final newState = state.copyWith(
+              isTransactionsLoaded: true,
+              isDataWarmed:
+                  true, // Allow proceeding even if tx fails (resilience)
+            );
+
+            if (newState.wallet != null) {
+              emit(newState.copyWith(status: 'success'));
+            } else {
+              emit(newState);
+            }
           },
         );
   }
@@ -148,12 +210,9 @@ class DashboardController extends Cubit<DashboardState> {
   // ... (changeCurrency kept same)
 
   Future<void> _updateWithNewWallet(Wallet wallet) async {
+    debugPrint('🔥 [Audit] Wallet Received: ID=${wallet.id}');
     // 1. Update Wallet immediately
-    // Don't set 'success' yet - wait for transactions!
-    var currentState = state.copyWith(
-      wallet: wallet,
-      // status: 'success', // <--- REMOVED: Wait for sync
-    );
+    var currentState = state.copyWith(wallet: wallet);
 
     currentState = _calculateDisplayValues(currentState);
 

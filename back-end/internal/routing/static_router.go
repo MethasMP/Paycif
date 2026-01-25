@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"zappay/internal/service"
+	"paysif/internal/service"
 
 	"github.com/google/uuid"
 )
@@ -50,7 +50,7 @@ func (r *StaticRouter) GetQuote(ctx context.Context, intent PaymentIntent) (*Rou
 			ID:                 "route_wallet_internal",
 			MethodID:           "wallet_main",
 			MethodType:         "balance",
-			Provider:           "zappay",
+			Provider:           "paysif",
 			ExchangeRate:       1.0,
 			Fee:                0.0,
 			TotalCost:          intent.Amount,

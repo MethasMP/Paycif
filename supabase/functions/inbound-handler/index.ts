@@ -122,31 +122,37 @@ serve(async (req) => {
     // ========================================================================
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
+      console.error('[Auth] Missing Authorization header');
       return jsonError('Missing Authorization header', 401);
     }
 
-    const jwtToken = authHeader.replace('Bearer ', '');
-    const userResp = await fetch(`${supabaseUrl}/auth/v1/user`, {
-      headers: {
-        'Authorization': `Bearer ${jwtToken}`,
-        'apikey': supabaseAnonKey,
-      },
-    });
+    // 🛡️ Permissive Header Parsing: Handle "Bearer <token>" case-insensitively with regex
+    const authMatch = authHeader.match(/^Bearer\s+(.*)$/i);
+    if (!authMatch) {
+      console.error('[Auth] Malformed Authorization header:', authHeader);
+      return jsonError('Invalid Authorization format', 401);
+    }
+    const jwtToken = authMatch[1].trim();
 
-    if (!userResp.ok) {
-      const errorText = await userResp.text();
-      console.error('Auth failed:', errorText);
-      return jsonError('Unauthorized', 401);
+    // 🛡️ World-Class Logging: Log first 10 chars of JWT for trace visibility
+    console.log(`[Auth] Validating JWT with AdminClient (Prefix: ${jwtToken.substring(0, 10)}...)`);
+
+    // 🎯 Use Admin Client for robust verification (Bypasses brittle raw fetch)
+    const { data: { user }, error: authError } = await adminClient.auth.getUser(jwtToken);
+
+    if (authError || !user) {
+      console.error('[Auth] Validation failed:', authError);
+      return jsonError('Unauthorized: Session is invalid or poisoned. Please log in again.', 401);
     }
 
-    const { id: userId, email: userEmail } = await userResp.json();
-    console.log(`[Auth] User verified: ${userId}`);
+    const { id: userId, email: userEmail } = user;
+    console.log(`[Auth] User verified: ${userId} (${userEmail})`);
 
     // ========================================================================
     // 2. INPUT PARSING
     // ========================================================================
     const body: InboundRequest = await req.json();
-    const { amount_satang, token, reference_id, description } = body;
+    const { amount_satang, token, card_id, is_apple_pay, reference_id, description } = body;
 
     if (!amount_satang || !reference_id) {
       return jsonError('Missing required fields (amount_satang, reference_id)', 400);
@@ -231,8 +237,13 @@ serve(async (req) => {
         console.log(`[Vault] Attaching new card to customer`);
         const updated = await opn.attachCard(omiseCustomerId, token);
         chargeCard = updated.default_card || undefined;
+      } else if (card_id) {
+        // 🎯 EXACT FIX: Use the specific card ID passed from the app
+        console.log(`[Vault] Using specific card selection: ${card_id}`);
+        chargeCard = card_id;
       } else {
-        // Use default card
+        // Use default card as a final fallback
+        console.log(`[Vault] No specific card_id, fetching default card`);
         const customer = await opn.getCustomer(omiseCustomerId);
         chargeCard = customer.default_card || undefined;
 

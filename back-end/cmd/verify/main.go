@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"zappay/database"
-	"zappay/models"
+	"paysif/database"
+	"paysif/models"
 )
 
 func main() {

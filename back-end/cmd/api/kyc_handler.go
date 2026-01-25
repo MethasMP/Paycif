@@ -2,7 +2,7 @@ package main
 
 import (
 	"net/http"
-	"zappay/internal/service"
+	"paysif/internal/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"

@@ -11,6 +11,9 @@ class DashboardRepository {
 
   DashboardRepository(this._client);
 
+  /// Exposes the auth state change stream from Supabase.
+  Stream<AuthState> get authStream => _client.auth.onAuthStateChange;
+
   /// Streams the user's primary wallet.
   /// For V1/V2 transition, we fetch the first wallet found for the user.
   Stream<Wallet?> fetchUserWallet() {
@@ -109,7 +112,7 @@ class DashboardRepository {
         await _client.from('profiles').insert({
           'id': user.id,
           'email': user.email,
-          'full_name': user.userMetadata?['full_name'] ?? 'ZapPay User',
+          'full_name': user.userMetadata?['full_name'] ?? 'Paycif User',
           'updated_at': DateTime.now().toIso8601String(),
         });
         debugPrint("✅ Profile manually created.");

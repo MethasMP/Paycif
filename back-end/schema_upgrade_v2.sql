@@ -1,4 +1,4 @@
--- Upgrading ZapPay Schema to Production-Grade Financial System (V2)
+-- Upgrading Paysif Schema to Production-Grade Financial System (V2)
 
 -- ==========================================
 -- Task 1: FX Rate Engine

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"paysif/database"
 	"strings"
 	"time"
-	"zappay/database"
 
 	"github.com/MicahParks/keyfunc/v2"
 	"github.com/gin-gonic/gin"
@@ -66,23 +66,32 @@ func AuthMiddleware() gin.HandlerFunc {
 					if database.DB == nil {
 						return
 					}
-					// 1. Ensure Profile Exists
-					// We use a dummy username if creating for the first time
-					_, err := database.DB.Exec(`
-						INSERT INTO profiles (id, username, full_name) 
-						VALUES ($1, $2, $3) 
-						ON CONFLICT (id) DO NOTHING`,
-						uid, "user_"+uid[:8], "ZapPay User",
-					)
+					
+					// Start transaction for atomic auto-healing
+					tx, err := database.DB.Begin()
+					if err != nil {
+						log.Printf("⚠️ Auth Transaction Error: %v\n", err)
+						return
+					}
+					defer tx.Rollback()
+
+					// 1. Ensure Profile Exists - STATELESS (Simple Protocol)
+					// Safe Interploation: uid is from trusted JWT sub claims (UUID format implied), others are hardcoded/derived.
+					// We escape strings just in case.
+					safeUID := strings.ReplaceAll(uid, "'", "''")
+					safeUsername := strings.ReplaceAll("user_"+uid[:8], "'", "''")
+					
+					profileSQL := fmt.Sprintf("INSERT INTO profiles (id, username, full_name) VALUES ('%s', '%s', 'Paysif User') ON CONFLICT (id) DO NOTHING", safeUID, safeUsername)
+					_, err = tx.Exec(profileSQL)
 					if err != nil {
 						log.Printf("⚠️ Auto-Heal Profile Error: %v\n", err)
 						return
 					}
 
-					// 2. Ensure Wallet Exists
-					// Check if wallet exists for this user
+					// 2. Ensure Wallet Exists - STATELESS
 					var exists bool
-					err = database.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM wallets WHERE profile_id = $1)", uid).Scan(&exists)
+					checkWalletSQL := fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM wallets WHERE profile_id = '%s')", safeUID)
+					err = tx.QueryRow(checkWalletSQL).Scan(&exists)
 					if err != nil {
 						log.Printf("⚠️ Check Wallet Error: %v\n", err)
 						return
@@ -90,17 +99,16 @@ func AuthMiddleware() gin.HandlerFunc {
 
 					if !exists {
 						log.Printf("🔧 Auto-Healing: Creating missing wallet for %s\n", uid)
-						_, err := database.DB.Exec(`
-							INSERT INTO wallets (profile_id, currency, balance) 
-							VALUES ($1, 'THB', 0)`,
-							uid,
-						)
+						createWalletSQL := fmt.Sprintf("INSERT INTO wallets (profile_id, currency, balance) VALUES ('%s', 'THB', 0)", safeUID)
+						_, err := tx.Exec(createWalletSQL)
 						if err != nil {
 							log.Printf("❌ Failed to create wallet: %v\n", err)
 						} else {
 							log.Printf("✅ Wallet created successfully for %s\n", uid)
 						}
 					}
+					
+					_ = tx.Commit()
 				}(sub)
 
 				c.Next()

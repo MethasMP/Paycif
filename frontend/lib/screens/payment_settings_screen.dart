@@ -1,109 +1,98 @@
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:frontend/l10n/generated/app_localizations.dart';
 import 'add_card_screen.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../models/saved_card.dart';
-import '../services/api_service.dart';
+import '../controllers/payment_controller.dart';
+import 'package:provider/provider.dart';
 
 /// ─────────────────────────────────────────────────────────────────────────────
-/// PAYMENT METHOD SCREEN
-/// Refactored for flat hierarchy, swipe-to-delete, and visual consistency
+/// PAYMENT SETTINGS SCREEN
+/// "Tap. Pay. Done." Philosophy
+/// - Removed "Noise" (PayPal, Alipay, etc.)
+/// - No Radio Buttons (Implicit selection via "Default" badge & Checkmark)
+/// - Focus on Saved Cards & Apple/Google Pay
 /// ─────────────────────────────────────────────────────────────────────────────
 
-class PaymentMethodScreen extends StatefulWidget {
-  const PaymentMethodScreen({super.key});
+class PaymentSettingsScreen extends StatefulWidget {
+  const PaymentSettingsScreen({super.key});
 
   @override
-  State<PaymentMethodScreen> createState() => _PaymentMethodScreenState();
+  State<PaymentSettingsScreen> createState() => _PaymentSettingsScreenState();
 }
 
-class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
-  String? _selectedMethodId;
-  String? _preferredMethodId;
-  String? _preferredMethodType;
-  List<SavedCard> _savedCards = [];
-  bool _isLoading = true;
+class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
   bool _isEditMode = false;
-  bool _isProcessing = false; // Guard for rapid clicks
-  final ApiService _apiService = ApiService();
+  bool _isProcessing = false;
 
   // ─── DESIGN CONSTANTS ───
   static const double _iconSize = 40.0;
   static const double _iconRadius = 10.0;
-  static const double _radioSize = 22.0;
+  // static const double _radioSize = 22.0; // Removed in favor of checkmark
   static const double _itemSpacing = 14.0;
   static const double _tilePadding = 14.0;
 
   @override
   void initState() {
     super.initState();
-    _fetchInitialData();
+    // 🚀 Proactive Fetch: Ensure we have the latest defaults immediately
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<PaymentController>().fetchData(silent: true);
+      }
+    });
   }
 
-  Future<void> _fetchInitialData() async {
-    // 1. Optimistic Check: If we already have cached cards, show them immediately!
-    final cachedCards = ApiService.getCachedCards();
-    if (cachedCards != null && cachedCards.isNotEmpty) {
-      setState(() {
-        _savedCards = cachedCards;
-        _isLoading = false; // "Instant Load" experience
-      });
-      debugPrint('🚀 Instant Load from Frontend Cache');
-    } else {
-      setState(() => _isLoading = true);
-    }
+  /// ─── ID NORMALIZATION ───
+  /// Ensures consistent ID format for selection comparison.
+  /// Prevents "double-prefixing" like card_card_test_...
+  String _normalizeId(String id, String? type) {
+    if (id == 'apple_pay') return id;
+    if (type == 'card' && !id.startsWith('card_')) return 'card_$id';
+    return id;
+  }
+
+  Future<void> _selectMethod(String methodId) async {
+    final l10n = AppLocalizations.of(context)!;
+    if (_isProcessing) return;
+
+    final controller = context.read<PaymentController>();
+    if (controller.preferredMethodId == methodId) return;
+
+    _isProcessing = true;
+    HapticFeedback.selectionClick();
 
     try {
-      // 2. Fetch both Profile and Saved Cards in parallel
-      // getSavedCards will return data from PostgreSQL Cache (<10ms) if available
-      final results = await Future.wait([
-        _apiService.getUserProfile(),
-        _apiService.getSavedCards(),
-      ]);
+      String type = 'card';
+      String realId = methodId;
 
-      final profile = results[0] as Map<String, dynamic>?;
-      final cards = results[1] as List<SavedCard>;
-
-      if (profile != null) {
-        _preferredMethodId = profile['preferred_payment_method_id'];
-        _preferredMethodType = profile['preferred_payment_method_type'];
+      if (methodId.startsWith('card_')) {
+        final strippedOnce = methodId.replaceFirst('card_', '');
+        if (strippedOnce.startsWith('card_')) {
+          realId = strippedOnce;
+        } else {
+          realId = strippedOnce;
+        }
+        type = 'card';
+      } else {
+        type = methodId;
       }
+
+      await controller.updatePreference(realId, type);
 
       if (mounted) {
-        setState(() {
-          _savedCards = cards;
-          _isLoading = false;
-          _selectedMethodId = _preferredMethodId;
-        });
+        setState(() => _isProcessing = false);
       }
     } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
-      debugPrint('Error fetching data: $e');
-    }
-  }
-
-  void _selectMethod(String methodId) {
-    if (_isProcessing) return;
-    _isProcessing = true;
-
-    HapticFeedback.selectionClick();
-    setState(() => _selectedMethodId = methodId);
-    debugPrint('Selected payment method: $methodId');
-
-    // Reset processing shortly after to allow new selection if needed,
-    // or keep locked if you're navigating away.
-    if (methodId == 'add_new_card') {
-      Future.delayed(const Duration(milliseconds: 200), () {
-        _isProcessing = false;
-        _navigateToAddCard();
-      });
-    } else {
-      // In a real flow, you might wait for a "Continue" button,
-      // but if selection triggers an action, keep it guarded.
-      Future.delayed(const Duration(milliseconds: 300), () {
-        _isProcessing = false;
-      });
+      debugPrint("Failed to update preference: $e");
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.paymentFailedSetDefault)));
+      }
     }
   }
 
@@ -113,8 +102,7 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
       MaterialPageRoute(builder: (_) => const AddCardScreen()),
     );
     if (result != null) {
-      final cards = await _apiService.getSavedCards(forceRefresh: true);
-      if (mounted) setState(() => _savedCards = cards);
+      // PaymentController handles refresh after add
     }
   }
 
@@ -123,23 +111,69 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
     setState(() => _isEditMode = !_isEditMode);
   }
 
+  Future<bool?> _confirmDeleteCard(SavedCard card) async {
+    final l10n = AppLocalizations.of(context)!;
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.cardDeleteTitle),
+        content: Text(l10n.cardDeleteConfirm(card.lastDigits)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(l10n.commonCancel),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(l10n.commonDelete),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteCard(String cardId, {bool silent = false}) async {
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      await context.read<PaymentController>().deleteCard(cardId);
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.cardDeleteSuccess)));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final paymentController = context.watch<PaymentController>();
+
+    final savedCards = paymentController.savedCards;
+    final isLoading = paymentController.isLoading;
 
     return Scaffold(
-      backgroundColor: isDark
-          ? const Color(0xFF0F172A)
-          : const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Payment Method'),
+        title: Text(l10n.paymentSettingsTitle),
         centerTitle: true,
         actions: [
-          if (_savedCards.isNotEmpty)
+          if (savedCards.isNotEmpty)
             TextButton(
               onPressed: _toggleEditMode,
               child: Text(
-                _isEditMode ? 'Done' : 'Edit',
+                _isEditMode ? l10n.commonDone : l10n.commonEdit,
                 style: TextStyle(
                   color: isDark ? Colors.white70 : const Color(0xFF3B82F6),
                   fontWeight: FontWeight.w500,
@@ -148,95 +182,95 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
             ),
         ],
       ),
-      body: _isLoading && _savedCards.isEmpty
+      body: isLoading && savedCards.isEmpty
           ? _buildSkeletonLoader(isDark)
           : ListView(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
-              children: _buildPaymentList(isDark),
+              children: _buildPaymentList(isDark, paymentController),
             ),
     );
   }
 
-  List<Widget> _buildPaymentList(bool isDark) {
+  List<Widget> _buildPaymentList(bool isDark, PaymentController controller) {
+    final l10n = AppLocalizations.of(context)!;
     final List<Widget> items = [];
+    final prefType = controller.preferredMethodType;
+    final prefId = controller.preferredMethodId;
+    final savedCards = controller.savedCards;
 
-    // 1. Apple Pay (iOS only)
-    if (Platform.isIOS) {
+    // 💎 World-Class Selection Resolver
+    // 1. Apple Pay available?
+    final isApplePayAvailable = (Platform.isIOS || Platform.isMacOS);
+
+    // 2. Is anything explicitly set?
+    final hasExactApplePay = prefType == 'apple_pay';
+    final exactCardIndex = savedCards.indexWhere(
+      (c) =>
+          prefType == 'card' &&
+          (_normalizeId(prefId ?? '', 'card') == _normalizeId(c.id, 'card') ||
+              prefId == c.id),
+    );
+
+    // 3. Determine the "Effective" Selection
+    String effectiveType;
+    String? effectiveCardId;
+
+    if (hasExactApplePay) {
+      effectiveType = 'apple_pay';
+    } else if (exactCardIndex != -1) {
+      effectiveType = 'card';
+      effectiveCardId = savedCards[exactCardIndex].id;
+    } else {
+      // 🔄 Fallback Logic (Matching TopUp View)
+      if (isApplePayAvailable) {
+        effectiveType = 'apple_pay';
+      } else if (savedCards.isNotEmpty) {
+        effectiveType = 'card';
+        effectiveCardId = savedCards.first.id;
+      } else {
+        effectiveType = 'none';
+      }
+    }
+
+    // 1. Apple/Google Pay Row
+    if (isApplePayAvailable) {
+      final isSelected = effectiveType == 'apple_pay';
       items.add(
         _buildMethodTile(
           id: 'apple_pay',
           icon: Icons.apple,
           title: 'Apple Pay',
-          subtitle: 'Fast and secure',
+          subtitle: l10n.paymentReliable,
           isDark: isDark,
-          isRecommended: _preferredMethodId == 'apple_pay',
+          isRecommended: isSelected,
+          isSelected: isSelected,
         ),
       );
       items.add(_buildDivider(isDark));
     }
 
     // 2. Saved Cards (Swipeable)
-    for (int i = 0; i < _savedCards.length; i++) {
-      final card = _savedCards[i];
-      items.add(_buildSwipeableCardTile(card, isDark));
-      if (i < _savedCards.length - 1 || true) {
+    for (int i = 0; i < savedCards.length; i++) {
+      final card = savedCards[i];
+      items.add(
+        _buildSwipeableCardTile(
+          card,
+          isDark,
+          controller,
+          effectiveType,
+          effectiveCardId,
+        ),
+      );
+      if (i < savedCards.length - 1) {
         items.add(_buildDivider(isDark));
       }
     }
 
-    // 3. Digital Wallets
-    items.add(
-      _buildMethodTile(
-        id: 'paypal',
-        icon: Icons.paypal_outlined,
-        title: 'PayPal',
-        subtitle: 'Pay with balance or card',
-        isDark: isDark,
-        isRecommended: _preferredMethodId == 'paypal',
-      ),
-    );
-    items.add(_buildDivider(isDark));
-
-    items.add(
-      _buildMethodTile(
-        id: 'alipay',
-        icon: Icons.account_balance_wallet_outlined,
-        title: 'Alipay',
-        subtitle: 'Popular in China',
-        isDark: isDark,
-        isRecommended: _preferredMethodId == 'alipay',
-      ),
-    );
-    items.add(_buildDivider(isDark));
-
-    items.add(
-      _buildMethodTile(
-        id: 'wechat_pay',
-        icon: Icons.chat_bubble_outline,
-        title: 'WeChat Pay',
-        subtitle: 'Popular in Asia',
-        isDark: isDark,
-        isRecommended: _preferredMethodId == 'wechat_pay',
-      ),
-    );
-    items.add(_buildDivider(isDark));
-
-    items.add(
-      _buildMethodTile(
-        id: 'kakao_pay',
-        icon: Icons.chat_rounded,
-        title: 'KakaoPay',
-        subtitle: 'Popular in Korea',
-        isDark: isDark,
-        isRecommended: _preferredMethodId == 'kakao_pay',
-      ),
-    );
-
-    // 4. Add New Card (at the very bottom)
+    // 3. Add New Card (at the very bottom)
     items.add(const SizedBox(height: 24));
     items.add(_buildAddNewCardTile(isDark));
 
-    // 5. Trust Footer
+    // 4. Trust Footer
     items.add(const SizedBox(height: 32));
     items.add(_buildTrustFooter(isDark));
 
@@ -251,23 +285,25 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
     );
   }
 
-  Widget _buildSwipeableCardTile(SavedCard card, bool isDark) {
-    final id = 'card_${card.id}';
-    final isSelected = _selectedMethodId == id;
-    final isRecommended =
-        _preferredMethodId == id ||
-        (_preferredMethodType == 'card' && _preferredMethodId == card.id);
+  Widget _buildSwipeableCardTile(
+    SavedCard card,
+    bool isDark,
+    PaymentController controller,
+    String effectiveType,
+    String? effectiveCardId,
+  ) {
+    final id = _normalizeId(card.id, 'card');
+    final isSelected =
+        effectiveType == 'card' &&
+        (effectiveCardId == card.id ||
+            _normalizeId(effectiveCardId ?? '', 'card') == id);
+    final isRecommended = isSelected;
 
     return Dismissible(
       key: Key(card.id),
       direction: DismissDirection.endToStart,
       confirmDismiss: (_) => _confirmDeleteCard(card),
       onDismissed: (_) {
-        // Essential: Remove from local state IMMEDIATELY after dismissal
-        // to prevent "A dismissed Dismissible widget is still part of the tree"
-        setState(() {
-          _savedCards.removeWhere((c) => c.id == card.id);
-        });
         _deleteCard(card.id, silent: true);
       },
       background: Container(
@@ -280,10 +316,9 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
         onTap: () => _selectMethod(id),
         child: Container(
           padding: EdgeInsets.all(_tilePadding),
-          color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+          color: Theme.of(context).scaffoldBackgroundColor,
           child: Row(
             children: [
-              // Icon Container
               Container(
                 width: _iconSize,
                 height: _iconSize,
@@ -298,7 +333,6 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
                 ),
               ),
               SizedBox(width: _itemSpacing),
-              // Title & Subtitle
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -322,16 +356,16 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
                             ),
                             decoration: BoxDecoration(
                               color: const Color(
-                                0xFF3B82F6,
-                              ).withValues(alpha: 0.15),
+                                0xFF10B981,
+                              ).withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: const Text(
-                              'Default',
-                              style: TextStyle(
-                                color: Color(0xFF3B82F6),
+                            child: Text(
+                              AppLocalizations.of(context)!.commonDefault,
+                              style: const TextStyle(
+                                color: Color(0xFF10B981),
                                 fontSize: 10,
-                                fontWeight: FontWeight.w500,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
@@ -349,7 +383,6 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
                   ],
                 ),
               ),
-              // Edit Mode: Show Delete Icon
               if (_isEditMode)
                 IconButton(
                   icon: const Icon(
@@ -365,69 +398,12 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
                   },
                 )
               else
-                _buildRadioIndicator(isSelected, isDark),
+                _buildSelectionIndicator(isSelected, isDark),
             ],
           ),
         ),
       ),
     );
-  }
-
-  Future<bool?> _confirmDeleteCard(SavedCard card) async {
-    return showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Card'),
-        content: Text(
-          'Are you sure you want to delete the card ending in ${card.lastDigits}?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _deleteCard(String cardId, {bool silent = false}) async {
-    if (!silent) setState(() => _isLoading = true);
-    try {
-      await _apiService.deleteCard(cardId);
-
-      // If NOT silent, we refresh everything.
-      // If silent (from Dismissible), we already removed it from the list locally.
-      if (!silent) {
-        await _fetchInitialData();
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Card deleted successfully')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        if (!silent) {
-          setState(() => _isLoading = false);
-          // If it failed on server, it might still be in our local list if we deleted it silently?
-          // Actually if it failed, we should probably re-fetch to be safe.
-          _fetchInitialData();
-        }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString().replaceAll('Exception: ', '')),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
-    }
   }
 
   Widget _buildMethodTile({
@@ -437,17 +413,15 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
     required String subtitle,
     required bool isDark,
     bool isRecommended = false,
+    bool isSelected = false,
   }) {
-    final isSelected = _selectedMethodId == id;
-
     return GestureDetector(
       onTap: () => _selectMethod(id),
       child: Container(
         padding: EdgeInsets.all(_tilePadding),
-        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+        color: Theme.of(context).scaffoldBackgroundColor,
         child: Row(
           children: [
-            // Icon Container
             Container(
               width: _iconSize,
               height: _iconSize,
@@ -462,7 +436,6 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
               ),
             ),
             SizedBox(width: _itemSpacing),
-            // Title & Subtitle
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -486,16 +459,16 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
                           ),
                           decoration: BoxDecoration(
                             color: const Color(
-                              0xFF3B82F6,
-                            ).withValues(alpha: 0.15),
+                              0xFF10B981,
+                            ).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          child: const Text(
-                            'Default',
-                            style: TextStyle(
-                              color: Color(0xFF3B82F6),
+                          child: Text(
+                            AppLocalizations.of(context)!.commonDefault,
+                            style: const TextStyle(
+                              color: Color(0xFF10B981),
                               fontSize: 10,
-                              fontWeight: FontWeight.w500,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),
@@ -513,42 +486,35 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
                 ],
               ),
             ),
-            _buildRadioIndicator(isSelected, isDark),
+            _buildSelectionIndicator(isSelected, isDark),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildRadioIndicator(bool isSelected, bool isDark) {
+  Widget _buildSelectionIndicator(bool isSelected, bool isDark) {
+    if (!isSelected) return const SizedBox(width: 26, height: 26);
+    // 💎 World-Class Emerald Checkmark (Brand Signature)
     return Container(
-      width: _radioSize,
-      height: _radioSize,
-      decoration: BoxDecoration(
+      width: 26,
+      height: 26,
+      decoration: const BoxDecoration(
+        color: Color(0xFF10B981),
         shape: BoxShape.circle,
-        color: isSelected ? const Color(0xFF3B82F6) : Colors.transparent,
-        border: Border.all(
-          color: isSelected
-              ? const Color(0xFF3B82F6)
-              : (isDark ? Colors.white30 : Colors.grey[300]!),
-          width: 2,
-        ),
       ),
-      child: isSelected
-          ? const Icon(Icons.check, color: Colors.white, size: 14)
-          : null,
+      child: const Icon(Icons.check_rounded, color: Colors.white, size: 16),
     );
   }
 
   Widget _buildAddNewCardTile(bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
     return GestureDetector(
       onTap: _navigateToAddCard,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: isDark
-              ? const Color(0xFF1E293B).withValues(alpha: 0.5)
-              : Colors.white,
+          color: Theme.of(context).cardColor.withValues(alpha: 0.5),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isDark ? Colors.white12 : Colors.grey[200]!,
@@ -564,7 +530,7 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
             ),
             const SizedBox(width: 10),
             Text(
-              'Add New Card',
+              l10n.sheetAddPayment,
               style: TextStyle(
                 color: isDark ? Colors.white70 : Colors.grey[800],
                 fontWeight: FontWeight.w500,
@@ -578,18 +544,19 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
   }
 
   Widget _buildTrustFooter(bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Icon(Icons.lock_outline, size: 14, color: Colors.grey[500]),
         const SizedBox(width: 6),
         Text(
-          'Secure payment',
+          l10n.biometricLogin,
           style: TextStyle(color: Colors.grey[500], fontSize: 12),
         ),
       ],
     );
-  } // Added missing '}' here to close _buildTrustFooter
+  }
 
   Widget _buildSkeletonLoader(bool isDark) {
     final bgColor = isDark ? const Color(0xFF1E293B) : Colors.grey[200];
@@ -606,13 +573,10 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
             Container(
               padding: EdgeInsets.all(_tilePadding),
               decoration: BoxDecoration(
-                color: isDark
-                    ? const Color(0xFF0F172A)
-                    : const Color(0xFFF8FAFC),
+                color: Theme.of(context).scaffoldBackgroundColor,
               ),
               child: Row(
                 children: [
-                  // Icon Placeholder
                   Container(
                         width: 40,
                         height: 40,
@@ -624,7 +588,6 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
                       .animate(onPlay: (controller) => controller.repeat())
                       .shimmer(duration: 1200.ms, color: shimmerBase),
                   const SizedBox(width: 14),
-                  // Text Placeholder
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -665,7 +628,6 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
                       ],
                     ),
                   ),
-                  // Radio Placeholder
                   Container(
                         width: 22,
                         height: 22,

@@ -25,6 +25,13 @@ class OmiseService {
     final url = Uri.parse('$_vaultUrl/tokens');
 
     try {
+      final month = int.tryParse(expiryMonth);
+      final year = int.tryParse(expiryYear);
+
+      if (month == null || year == null) {
+        throw const FormatException('Invalid expiry date format');
+      }
+
       final response = await http.post(
         url,
         headers: {
@@ -35,8 +42,8 @@ class OmiseService {
           'card': {
             'name': name,
             'number': number.replaceAll(' ', ''),
-            'expiration_month': int.parse(expiryMonth),
-            'expiration_year': int.parse(expiryYear),
+            'expiration_month': month,
+            'expiration_year': year,
             'security_code': securityCode,
           },
         }),

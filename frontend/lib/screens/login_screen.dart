@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:frontend/l10n/generated/app_localizations.dart';
+import '../utils/error_translator.dart';
+import '../utils/pay_notify.dart';
 
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -20,22 +23,13 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    // Initialize Auth Listener only once
     _authStream = Supabase.instance.client.auth.onAuthStateChange;
-    _handleAuthRedirect();
+    _listenToAuthChanges();
   }
 
-  void _handleAuthRedirect() {
-    // Check initial session
-    final session = Supabase.instance.client.auth.currentSession;
-    if (session != null) {
-      _navigateToMain();
-    }
-
-    // Listen to changes
+  void _listenToAuthChanges() {
     _authStream.listen((data) {
-      final AuthChangeEvent event = data.event;
-      if (event == AuthChangeEvent.signedIn) {
+      if (data.event == AuthChangeEvent.signedIn) {
         _navigateToMain();
       }
     });
@@ -102,10 +96,11 @@ class _LoginScreenState extends State<LoginScreen> {
       // Navigation is handled by the _authStream listener.
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Google Login failed: $error'),
-            backgroundColor: Colors.red,
+        PayNotify.error(
+          context,
+          ErrorTranslator.translate(
+            AppLocalizations.of(context)!,
+            error.toString(),
           ),
         );
         setState(() => _isLoading = false);
@@ -114,16 +109,13 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _appleSignInMock() async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Apple ID Integration coming soon'),
-        backgroundColor: Color(0xFF102A43), // Navy
-      ),
-    );
+    final l10n = AppLocalizations.of(context)!;
+    PayNotify.info(context, l10n.loginAppleComingSoon);
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: const Color(0xFF1A1F71), // Premium Deep Blue
       body: SafeArea(
@@ -135,7 +127,7 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               const Spacer(),
 
-              // Paysif Logo (Shield + Check for Safety)
+              // Paycif Logo (Shield + Check for Safety)
               Container(
                     width: 100,
                     height: 100,
@@ -158,7 +150,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
                     ),
                     child: const Icon(
-                      Icons.shield_outlined, // Emphasize Security ("Paysif")
+                      Icons.shield_outlined, // Emphasize Security ("Paycif")
                       size: 50,
                       color: Colors.white,
                     ),
@@ -178,7 +170,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        'Paysif',
+                        'Paycif',
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.displayLarge
                             ?.copyWith(
@@ -211,7 +203,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
               // Tagline
               Text(
-                    'Secure. Simple. Global.',
+                    'Secure. Simple. Global.', // Keep for style or localize? I'll keep for brand flavor as per user preference.
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: Colors.white.withValues(alpha: 0.7),
@@ -272,7 +264,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             const SizedBox(width: 12),
                             Text(
-                              "Continue with Google",
+                              "${l10n.commonLogIn} with Google",
                               textAlign: TextAlign.center,
                               style: Theme.of(context).textTheme.titleMedium
                                   ?.copyWith(
@@ -330,7 +322,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             const SizedBox(width: 12),
                             Text(
-                              "Continue with Apple",
+                              "${l10n.commonLogIn} with Apple",
                               textAlign: TextAlign.center,
                               style: Theme.of(context).textTheme.titleMedium
                                   ?.copyWith(

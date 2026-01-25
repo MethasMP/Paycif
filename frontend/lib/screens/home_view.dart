@@ -9,6 +9,8 @@ import '../models/transaction.dart';
 
 import '../widgets/transaction_item.dart';
 import 'top_up_view.dart';
+import 'transaction_detail_screen.dart';
+import 'history_screen.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({super.key});
@@ -124,7 +126,15 @@ class _HomeViewState extends State<HomeView> {
                                           ),
                                     ),
                                     TextButton(
-                                      onPressed: () {},
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                const HistoryScreen(),
+                                          ),
+                                        );
+                                      },
                                       child: Text(
                                         l10n.homeViewAll,
                                         style: Theme.of(context)
@@ -264,7 +274,7 @@ class _HomeViewState extends State<HomeView> {
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                AppLocalizations.of(context)!.homePaysifPremier,
+                                AppLocalizations.of(context)!.homePaycifPremier,
                                 style: Theme.of(context).textTheme.labelMedium
                                     ?.copyWith(
                                       color: const Color(0xFFF59E0B),
@@ -496,7 +506,7 @@ class _HomeViewState extends State<HomeView> {
             label,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
               fontWeight: FontWeight.w600,
-              color: isDark ? Colors.grey[400] : const Color(0xFF374151),
+              color: isDark ? Colors.white60 : const Color(0xFF374151),
               fontSize: isSmall ? 12 : 13,
             ),
           ),
@@ -564,7 +574,12 @@ class _HomeViewState extends State<HomeView> {
         return TransactionItem(
           transaction: tx,
           onTap: () {
-            // TODO: Navigate to details if needed
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => TransactionDetailScreen(transaction: tx),
+              ),
+            );
           },
         );
       },
@@ -572,8 +587,15 @@ class _HomeViewState extends State<HomeView> {
   }
 
   // Premium Skeleton Loader
-  // Premium Skeleton Loader
   Widget _buildSkeletonDashboard(BuildContext context, double screenWidth) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final skeletonColor = isDark
+        ? Colors.white.withValues(alpha: 0.05)
+        : Colors.black.withValues(alpha: 0.05);
+    final shimmerBase = isDark
+        ? Colors.white.withValues(alpha: 0.05)
+        : Colors.grey.withValues(alpha: 0.1);
+
     return SingleChildScrollView(
       padding: EdgeInsets.all(screenWidth * 0.05),
       physics: const NeverScrollableScrollPhysics(),
@@ -585,15 +607,12 @@ class _HomeViewState extends State<HomeView> {
                 width: double.infinity,
                 height: 220,
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.05),
+                  color: skeletonColor,
                   borderRadius: BorderRadius.circular(24),
                 ),
               )
               .animate(onPlay: (c) => c.repeat())
-              .shimmer(
-                duration: 1.5.seconds,
-                color: Colors.grey.withValues(alpha: 0.1),
-              ),
+              .shimmer(duration: 1.5.seconds, color: shimmerBase),
 
           SizedBox(height: screenWidth * 0.08),
 
@@ -608,7 +627,7 @@ class _HomeViewState extends State<HomeView> {
                         width: 60,
                         height: 60,
                         decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.05),
+                          color: skeletonColor,
                           borderRadius: BorderRadius.circular(20),
                         ),
                       ),
@@ -616,17 +635,17 @@ class _HomeViewState extends State<HomeView> {
                       Container(
                         width: 40,
                         height: 12,
-                        color: Colors.black.withValues(alpha: 0.05),
+                        decoration: BoxDecoration(
+                          color: skeletonColor,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
                       ),
                     ],
                   ),
                 ),
               )
               .animate(onPlay: (c) => c.repeat())
-              .shimmer(
-                duration: 1.5.seconds,
-                color: Colors.grey.withValues(alpha: 0.1),
-              ),
+              .shimmer(duration: 1.5.seconds, color: shimmerBase),
 
           SizedBox(height: screenWidth * 0.06),
 
@@ -634,13 +653,13 @@ class _HomeViewState extends State<HomeView> {
           Container(
                 width: 150,
                 height: 24,
-                color: Colors.black.withValues(alpha: 0.05),
+                decoration: BoxDecoration(
+                  color: skeletonColor,
+                  borderRadius: BorderRadius.circular(4),
+                ),
               )
               .animate(onPlay: (c) => c.repeat())
-              .shimmer(
-                duration: 1.5.seconds,
-                color: Colors.grey.withValues(alpha: 0.1),
-              ),
+              .shimmer(duration: 1.5.seconds, color: shimmerBase),
 
           const SizedBox(height: 20),
 
@@ -656,7 +675,7 @@ class _HomeViewState extends State<HomeView> {
                           height: 48,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Colors.black.withValues(alpha: 0.05),
+                            color: skeletonColor,
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -667,13 +686,19 @@ class _HomeViewState extends State<HomeView> {
                               Container(
                                 width: 120,
                                 height: 16,
-                                color: Colors.black.withValues(alpha: 0.05),
+                                decoration: BoxDecoration(
+                                  color: skeletonColor,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
                               ),
                               const SizedBox(height: 8),
                               Container(
                                 width: 80,
                                 height: 12,
-                                color: Colors.black.withValues(alpha: 0.05),
+                                decoration: BoxDecoration(
+                                  color: skeletonColor,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
                               ),
                             ],
                           ),
@@ -684,10 +709,7 @@ class _HomeViewState extends State<HomeView> {
                 ),
               )
               .animate(onPlay: (c) => c.repeat())
-              .shimmer(
-                duration: 1.5.seconds,
-                color: Colors.grey.withValues(alpha: 0.1),
-              ),
+              .shimmer(duration: 1.5.seconds, color: shimmerBase),
         ],
       ),
     );

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import 'package:flutter/services.dart';
 
 import 'home_view.dart';
-import 'payment_method_screen.dart';
+import 'payment_settings_screen.dart';
 import 'history_screen.dart';
 import 'profile_page.dart';
 import 'scan_page.dart';
@@ -44,11 +45,14 @@ class _MainScreenState extends State<MainScreen> {
     const HomeView(),
     const HistoryScreen(),
     ScanPage(onBack: () => _onItemTapped(0)), // Position 2 with Callback
-    const PaymentMethodScreen(),
+    const PaymentSettingsScreen(),
     const ProfilePage(),
   ];
 
   void _onItemTapped(int index) {
+    // 🧠 Tactile Identity: Every interaction should feel "real"
+    HapticFeedback.lightImpact();
+
     if (index == 2) {
       Navigator.of(
         context,
@@ -67,7 +71,7 @@ class _MainScreenState extends State<MainScreen> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: _screens[_selectedIndex],
+      body: IndexedStack(index: _selectedIndex, children: _screens),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Theme.of(context).cardColor,
@@ -100,18 +104,25 @@ class _MainScreenState extends State<MainScreen> {
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Theme.of(
-                          context,
-                        ).primaryColor.withValues(alpha: 0.4),
+                        color: isDark
+                            ? const Color(0xFFF59E0B).withValues(alpha: 0.4)
+                            : Theme.of(
+                                context,
+                              ).primaryColor.withValues(alpha: 0.4),
                         blurRadius: 10,
                         offset: const Offset(0, 5),
                       ),
                     ],
-                    gradient: const LinearGradient(
-                      colors: [
-                        Color(0xFF1A1F71), // Deep Blue
-                        Color(0xFF2C3E50), // Lighter
-                      ],
+                    gradient: LinearGradient(
+                      colors: isDark
+                          ? [
+                              const Color(0xFFF59E0B), // Amber 500
+                              const Color(0xFFB45309), // Amber 700
+                            ]
+                          : [
+                              const Color(0xFF1A1F71), // Deep Blue
+                              const Color(0xFF2C3E50), // Lighter
+                            ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -135,18 +146,18 @@ class _MainScreenState extends State<MainScreen> {
             ),
           ],
           currentIndex: _selectedIndex,
-          selectedItemColor: Theme.of(
-            context,
-          ).colorScheme.primary, // #1A1F71 in Light
-          unselectedItemColor: isDark
-              ? Colors.grey[400]
-              : const Color(0xFF9CA3AF),
-          selectedLabelStyle: Theme.of(context).textTheme.labelSmall?.copyWith(
+          selectedItemColor: Theme.of(context).primaryColor,
+          unselectedItemColor: const Color(0xFF94A3B8), // Slate 400
+          selectedLabelStyle: TextStyle(
+            color: Theme.of(context).primaryColor,
             fontWeight: FontWeight.w600,
             fontSize: 12,
           ),
-          unselectedLabelStyle: Theme.of(context).textTheme.labelSmall
-              ?.copyWith(fontWeight: FontWeight.w500, fontSize: 12),
+          unselectedLabelStyle: const TextStyle(
+            color: Color(0xFF94A3B8),
+            fontWeight: FontWeight.w500,
+            fontSize: 12,
+          ),
           showUnselectedLabels: true,
           type: BottomNavigationBarType.fixed,
           backgroundColor: Theme.of(context).cardColor,

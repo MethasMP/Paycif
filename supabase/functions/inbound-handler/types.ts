@@ -7,6 +7,8 @@ export interface InboundRequest {
   amount_satang: number;
   currency: string;
   token?: string; // Optional: Opn card token (tokn_...). If omitted, uses saved card.
+  card_id?: string; // NEW: Specific card ID to charge (card_test_...)
+  is_apple_pay?: boolean; // NEW: Flag if payment is via Apple Pay
   description?: string;
   reference_id: string; // UUID from client for idempotency
 }

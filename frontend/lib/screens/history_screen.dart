@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../models/transaction.dart';
 import '../controllers/dashboard_controller.dart';
 import '../widgets/transaction_item.dart';
+import 'transaction_detail_screen.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
 
 class HistoryScreen extends StatelessWidget {
@@ -45,7 +46,9 @@ class HistoryScreen extends StatelessWidget {
                     child: Text(
                       dateKey.toUpperCase(),
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: Colors.grey,
+                        color: Theme.of(
+                          context,
+                        ).textTheme.bodySmall?.color?.withValues(alpha: 0.5),
                         fontWeight: FontWeight.bold,
                         letterSpacing: 1.2,
                       ),
@@ -55,7 +58,13 @@ class HistoryScreen extends StatelessWidget {
                     (tx) => TransactionItem(
                       transaction: tx,
                       onTap: () {
-                        // TODO: Navigate to details
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                TransactionDetailScreen(transaction: tx),
+                          ),
+                        );
                       },
                     ),
                   ),
@@ -105,12 +114,18 @@ class HistoryScreen extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.history_toggle_off, size: 60, color: Colors.grey[300]),
+          Icon(
+            Icons.history_toggle_off,
+            size: 60,
+            color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
+          ),
           const SizedBox(height: 16),
           Text(
             l10n.historyNoActivity,
             style: TextStyle(
-              color: Colors.grey[500],
+              color: Theme.of(
+                context,
+              ).textTheme.bodySmall?.color?.withValues(alpha: 0.5),
               fontSize: 16,
               fontWeight: FontWeight.bold,
             ),

@@ -1,4 +1,4 @@
-module zappay
+module paysif
 
 go 1.24.5
 

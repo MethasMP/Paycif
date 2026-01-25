@@ -4,8 +4,9 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
 import 'package:frontend/utils/emv_parser.dart';
+import 'package:frontend/utils/pay_notify.dart';
 
-import 'confirm_payment_screen.dart';
+import 'pay_screen.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // SCAN PAGE - Simplified Flow (Scan → Enter Amount → Pay)
@@ -72,36 +73,47 @@ class _ScanPageState extends State<ScanPage> {
 
   void _goToPaymentScreen(EMFData data) {
     final l10n = AppLocalizations.of(context)!;
+    if (!data.isValid) {
+      _showError(AppLocalizations.of(context)!.scanUnknownRecipient);
+      _resumeScanning();
+      return;
+    }
+
+    // If amount is not in QR, we might need an input screen.
+    // The design doc focuses on the Confirm/Pay step.
+    // Assuming for now QR has amount or we default to 0 for demo if needed.
+    // Ideally we prompt for amount. But let's assume valid QR has amount or we hardcode.
+    final amount = data.amount ?? 0.0;
+    if (amount <= 0) {
+      _showError(l10n.topUpEnterAmountError);
+      _resumeScanning();
+      return;
+    }
+
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ConfirmPaymentScreen(
-          recipient: data.isValid
-              ? data.merchantName
-              : l10n.scanUnknownRecipient,
-          amount: data.amount ?? 0.0,
-          isPromptPay: data.isValid,
-          isLockedAmount: data.type == QRType.dynamic && data.amount != null,
-          promptPayId: data.promptPayId,
-          senderName: 'Makr Emp',
-          senderWalletId: '...8899',
-          onConfirmed: () {
-            HapticFeedback.heavyImpact();
-            Navigator.pop(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('${l10n.scanPaymentSuccess} 🎉'),
-                backgroundColor: const Color(0xFF10B981),
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            );
-          },
-        ),
+        builder: (context) =>
+            PayScreen(amount: amount, merchantName: data.merchantName),
       ),
-    ).then((_) => _resumeScanning());
+    ).then((result) {
+      if (!mounted) return;
+      if (result == true) {
+        // Explicitly check for success result
+        // HapticFeedback.heavyImpact(); // Already done in PayScreen? No, PayScreen popped.
+        // Let's do it here on success return
+        HapticFeedback.heavyImpact();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${AppLocalizations.of(context)!.scanPaymentSuccess} 🎉',
+            ),
+            backgroundColor: const Color(0xFF10B981),
+          ),
+        );
+      }
+      _resumeScanning();
+    });
   }
 
   void _resumeScanning() {
@@ -131,14 +143,7 @@ class _ScanPageState extends State<ScanPage> {
 
   void _showError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.orange,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
+    PayNotify.error(context, message);
   }
 
   void _showHelpModal() {
@@ -197,7 +202,7 @@ class _ScanPageState extends State<ScanPage> {
               ElevatedButton(
                 onPressed: () => Navigator.pop(context),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF3949AB),
+                  backgroundColor: Theme.of(context).primaryColor,
                 ),
                 child: Text(
                   l10n.commonGotIt,
@@ -228,7 +233,12 @@ class _ScanPageState extends State<ScanPage> {
                 ),
                 Text(
                   desc,
-                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  style: TextStyle(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white54
+                        : Colors.black54,
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
@@ -372,12 +382,12 @@ class _ScanPageState extends State<ScanPage> {
         ),
         child: Row(
           children: [
-            Icon(icon, color: const Color(0xFF3949AB)),
+            Icon(icon, color: Theme.of(context).primaryColor),
             const SizedBox(width: 8),
             Text(
               label,
-              style: const TextStyle(
-                color: Color(0xFF3949AB),
+              style: TextStyle(
+                color: Theme.of(context).primaryColor,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -425,9 +435,9 @@ class ScannerOverlayPainter extends CustomPainter {
 
     canvas.drawPath(backgroundPath, backgroundPaint);
 
-    // Corner Paint (Emerald Green)
+    // Corner Paint (Gold Premium)
     final Paint cornerPaint = Paint()
-      ..color = const Color(0xFF10B981)
+      ..color = const Color(0xFFF59E0B)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4.0
       ..strokeCap = StrokeCap.round;

@@ -15,7 +15,7 @@ import { GatewayPayoutRequest, GatewayPayoutResponse } from './types.ts';
 const GATEWAY_CONFIG = {
   // Mock endpoint - use webhook.site or beeceptor for testing
   // Example: https://webhook.site/your-unique-id
-  MOCK_ENDPOINT: Deno.env.get('MOCK_GATEWAY_URL') || 'https://webhook.site/test-zappay',
+  MOCK_ENDPOINT: Deno.env.get('MOCK_GATEWAY_URL') || 'https://webhook.site/test-paysif',
 
   // Simulated delay in milliseconds (realistic for PromptPay: 2-5 seconds)
   SIMULATED_DELAY_MS: 500,
@@ -110,8 +110,8 @@ export class MockGateway implements IPayoutGateway {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-ZapPay-Source': 'payout-executor',
-          'X-ZapPay-Env': 'development',
+          'X-Paysif-Source': 'payout-executor',
+          'X-Paysif-Env': 'development',
         },
         body: JSON.stringify({
           ...request,

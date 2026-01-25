@@ -1,53 +1,278 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import '../models/saved_card.dart';
+import 'dart:async'; // Required for Completer
 
 class ApiService {
   // 1. Return to localhost for simulator access via 127.0.0.1 (Android uses 10.0.2.2 usually, iOS 127.0.0.1)
   static String get baseUrl {
+    final prodUrl = dotenv.env['BACKEND_URL'];
+    if (prodUrl != null && prodUrl.isNotEmpty) {
+      return prodUrl;
+    }
+
     if (Platform.isAndroid) {
-      // Android Emulator มอง localhost เป็น 10.0.2.2
       return 'http://10.0.2.2:8080/api/v1';
     } else {
-      // iOS Simulator และ macOS มอง localhost เป็น 127.0.0.1
       return 'http://127.0.0.1:8080/api/v1';
     }
   }
 
-  // 2. Helper to get headers
-  Future<Map<String, String>> _getHeaders() async {
-    // Get the current session's access token from Supabase Auth
-    final String token =
-        Supabase.instance.client.auth.currentSession?.accessToken ?? '';
+  // 🛡️ Helper: Ensure Session is Fresh (Proactive + Mutex Lock)
+  // Static Completer to handle concurrent refresh requests (The "Race Condition Killer")
+  static Completer<void>? _refreshCompleter;
 
-    if (token.isNotEmpty) {
-      if (JwtDecoder.isExpired(token)) {
-        debugPrint(
-          "❌ Token EXPIRED! Expired at: ${JwtDecoder.getExpirationDate(token)}",
-        );
-      } else {
-        debugPrint(
-          "✅ Token Valid. Expires: ${JwtDecoder.getExpirationDate(token)}",
-        );
-      }
-    } else {
-      debugPrint("⚠️ No Token Available");
+  Future<void> _ensureSessionValid({bool forceRefresh = false}) async {
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session == null) return;
+
+    final expirationDate = JwtDecoder.getExpirationDate(session.accessToken);
+    final timeUntilExpiration = expirationDate.difference(DateTime.now());
+
+    // Proactive refresh if expiring soon (< 5 mins) OR if forced by 401 interceptor
+    final needsRefresh = timeUntilExpiration.inMinutes < 5 || forceRefresh;
+
+    if (!needsRefresh) {
+      return;
     }
 
+    // 🔒 MUTEX START: If a refresh is already running, wait for it.
+    if (_refreshCompleter != null) {
+      debugPrint("⏳ [Universal] Waiting for ongoing refresh...");
+      await _refreshCompleter!.future;
+      return;
+    }
+
+    // 🔒 LOCK: Start new refresh
+    _refreshCompleter = Completer<void>();
+
+    debugPrint(
+      "⏳ [Universal] Token refresh triggered (force: $forceRefresh). Refreshing (SINGLE THREAD)...",
+    );
+
+    try {
+      await Supabase.instance.client.auth.refreshSession();
+      debugPrint("✅ [Universal] Token refreshed silently.");
+      _refreshCompleter?.complete();
+    } catch (e) {
+      debugPrint("⚠️ [Universal] Silent refresh failed: $e");
+      _refreshCompleter?.completeError(e);
+    } finally {
+      // 🔓 UNLOCK: Clear completer so next check runs fresh
+      _refreshCompleter = null;
+    }
+  }
+
+  // 🛡️ Helper: Robust Edge Function Invoker (Total Control Edition)
+  // Uses RAW HTTP to bypass any internal client state lag.
+  Future<FunctionResponse> _invokeEdgeFunction(
+    String functionName, {
+    Map<String, dynamic>? body,
+  }) async {
+    // 1. Proactive Health Check
+    await _ensureSessionValid();
+
+    try {
+      // 2. Initial Attempt (Raw HTTP)
+      return await _invokeRaw(functionName, body: body);
+    } on FunctionException catch (e) {
+      // 3. Catch 401 (Unauthorized) specifically
+      if (e.status == 401) {
+        debugPrint(
+          "🚨 [Interceptor] Caught 401 in $functionName. Force refreshing & Explicit retry...",
+        );
+
+        // 4. Force Refresh via Mutex Lock
+        try {
+          await _ensureSessionValid(forceRefresh: true);
+
+          final freshToken =
+              Supabase.instance.client.auth.currentSession?.accessToken;
+          debugPrint(
+            "✅ [Interceptor] Token refreshed. Retrying with explicit raw header...",
+          );
+
+          // 5. Retry with EXPLICIT Header Propagation (Raw HTTP)
+          return await _invokeRaw(functionName, body: body, token: freshToken);
+        } catch (refreshError) {
+          debugPrint(
+            "❌ [Interceptor] Resilience recovery failed: $refreshError",
+          );
+          // 🛡️ World-Class Self-Healing: If we can't refresh, the session is poisoned.
+          // Force a sign out to clear the bad local state.
+          await Supabase.instance.client.auth.signOut();
+          rethrow;
+        }
+      }
+      rethrow;
+    }
+  }
+
+  // 🛡️ Raw HTTP Invoker for Edge Functions
+  // This provides absolute control over headers.
+  Future<FunctionResponse> _invokeRaw(
+    String functionName, {
+    Map<String, dynamic>? body,
+    String? token,
+  }) async {
+    final client = Supabase.instance.client;
+    final jwt = token ?? client.auth.currentSession?.accessToken ?? '';
+    final sanitizedJwt = jwt.trim().replaceAll('\n', '').replaceAll('\r', '');
+
+    final supabaseUrlBase = dotenv.env['SUPABASE_URL'] ?? '';
+    final supabaseUrl = supabaseUrlBase.endsWith('/')
+        ? supabaseUrlBase.substring(0, supabaseUrlBase.length - 1)
+        : supabaseUrlBase;
+
+    final supabaseKeyBase = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+    final supabaseKey = supabaseKeyBase
+        .trim()
+        .replaceAll('\n', '')
+        .replaceAll('\r', '');
+
+    if (supabaseUrl.isEmpty || supabaseKey.isEmpty) {
+      throw Exception('Missing SUPABASE_URL or SUPABASE_ANON_KEY in .env');
+    }
+
+    // Construct URL manually to avoid any client internal logic
+    // Format: https://[project-id].supabase.co/functions/v1/[function-name]
+    final functionUrl = Uri.parse('$supabaseUrl/functions/v1/$functionName');
+
+    final response = await http.post(
+      functionUrl,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $sanitizedJwt',
+        'apikey': supabaseKey,
+      },
+      body: body != null ? jsonEncode(body) : null,
+    );
+
+    debugPrint(
+      '🌐 [RawInvoke] $functionName -> Status: ${response.statusCode}',
+    );
+
+    // Convert http.Response back to FunctionResponse to maintain compatibility
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      final decodedData = response.body.isNotEmpty
+          ? jsonDecode(response.body)
+          : null;
+      return FunctionResponse(data: decodedData, status: response.statusCode);
+    } else {
+      // Throw FunctionException to trigger the Interceptor
+      Map<String, dynamic>? details;
+      try {
+        if (response.body.isNotEmpty) {
+          details = jsonDecode(response.body);
+        }
+      } catch (e) {
+        // Fallback for non-JSON error bodies
+        details = {'error': response.body};
+      }
+
+      throw FunctionException(
+        status: response.statusCode,
+        reasonPhrase: response.reasonPhrase,
+        details: details,
+      );
+    }
+  }
+
+  // 🛡️ Global Request Interceptor (World-Class Resilience)
+  // Wraps any http request with 401 Catch-Refresh-Retry logic.
+  Future<http.Response> _safeRequest(
+    Future<http.Response> Function(Map<String, String> headers) request,
+  ) async {
+    final headers = await _getHeaders();
+    final response = await request(headers);
+
+    if (response.statusCode == 401) {
+      debugPrint("🚨 [Universal Interceptor] 401 detected. Recovery mode...");
+      try {
+        // 1. Synchronized Refresh
+        await _ensureSessionValid(forceRefresh: true);
+
+        // 2. Retry with pristine headers
+        final freshHeaders = await _getHeaders();
+        final retryResponse = await request(freshHeaders);
+
+        debugPrint(
+          "✅ [Universal Interceptor] Recovery successful. Status: ${retryResponse.statusCode}",
+        );
+        return retryResponse;
+      } catch (e) {
+        debugPrint("❌ [Universal Interceptor] Recovery failed: $e");
+        // 3. Hard Reset if refresh fails
+        await Supabase.instance.client.auth.signOut();
+        rethrow;
+      }
+    }
+    return response;
+  }
+
+  // 2. Helper to get headers
+  Future<Map<String, String>> _getHeaders() async {
+    await _ensureSessionValid(); // 🛡️ Universal Protection
+
+    final session = Supabase.instance.client.auth.currentSession;
+    final String token = session?.accessToken ?? '';
+    final sanitizedJwt = token.trim().replaceAll('\n', '').replaceAll('\r', '');
+
+    final supabaseKey = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+    final sanitizedApiKey = supabaseKey
+        .trim()
+        .replaceAll('\n', '')
+        .replaceAll('\r', '');
+
+    // 🛡️ World-Class: Always send both apikey and Authorization
     return {
       'Content-Type': 'application/json',
-      'Authorization': 'Bearer $token',
+      'Authorization': 'Bearer $sanitizedJwt',
+      'apikey': sanitizedApiKey,
     };
+  }
+
+  // --- Exponential Backoff Retry Helper ---
+  Future<T> _retry<T>(
+    Future<T> Function() action, {
+    int maxAttempts = 3,
+    Duration initialDelay = const Duration(seconds: 1),
+    bool Function(Object)? shouldRetry,
+  }) async {
+    int attempts = 0;
+    while (true) {
+      try {
+        attempts++;
+        return await action();
+      } catch (e) {
+        final isLastAttempt = attempts >= maxAttempts;
+        final worthRetrying =
+            shouldRetry?.call(e) ??
+            (e is SocketException || e is http.ClientException);
+
+        if (isLastAttempt || !worthRetrying) {
+          rethrow;
+        }
+
+        final delay = initialDelay * (1 << (attempts - 1)); // 1s, 2s, 4s...
+        debugPrint(
+          '⚠️ Network failure (Attempt $attempts). Retrying in ${delay.inSeconds}s...',
+        );
+        await Future.delayed(delay);
+      }
+    }
   }
 
   // Get User Profile
   Future<Map<String, dynamic>?> getUserProfile() async {
     try {
+      await _ensureSessionValid(); // 🛡️ Protect Profile
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) return null;
 
@@ -56,6 +281,9 @@ class ApiService {
           .select('preferred_payment_method_id, preferred_payment_method_type')
           .eq('id', user.id)
           .single();
+
+      _cachedPreferredMethodId = response['preferred_payment_method_id'];
+      _cachedPreferredMethodType = response['preferred_payment_method_type'];
 
       return response;
     } catch (e) {
@@ -69,6 +297,13 @@ class ApiService {
     String methodId,
     String methodType,
   ) async {
+    // 1. Update local cache IMMEDIATELY for instant UI feedback
+    _cachedPreferredMethodId = methodId;
+    _cachedPreferredMethodType = methodType;
+    debugPrint(
+      '⚡ Instant Sync: Payment preference cached: $methodId ($methodType)',
+    );
+
     try {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) return;
@@ -81,31 +316,29 @@ class ApiService {
           })
           .eq('id', user.id);
 
-      debugPrint('✅ Payment preference updated: $methodId ($methodType)');
+      debugPrint('✅ Payment preference persisted to DB: $methodId');
     } catch (e) {
       debugPrint('Error updating payment preference: $e');
     }
   }
 
   // Get Wallet Balance
+  // Example use in standard calls:
   Future<Map<String, dynamic>> getBalance(String currency) async {
-    final headers = await _getHeaders();
-    try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/balance?currency=$currency'),
-        headers: headers,
+    return _retry(() async {
+      final response = await _safeRequest(
+        (headers) => http.get(
+          Uri.parse('$baseUrl/balance?currency=$currency'),
+          headers: headers,
+        ),
       );
 
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        return json.decode(response.body);
       } else {
-        debugPrint("Backend Error: ${response.body}");
         throw Exception('Failed to load balance: ${response.statusCode}');
       }
-    } catch (e) {
-      debugPrint("Connection Error: $e");
-      throw Exception('Could not connect to Backend');
-    }
+    });
   }
 
   // Transfer Funds
@@ -117,7 +350,6 @@ class ApiService {
     required String idempotencyKey,
     String description = '',
   }) async {
-    final headers = await _getHeaders();
     final body = jsonEncode({
       'from_wallet_id': fromWalletId,
       'to_wallet_id': toWalletId,
@@ -127,10 +359,12 @@ class ApiService {
       'description': description,
     });
 
-    final response = await http.post(
-      Uri.parse('$baseUrl/transfer'),
-      headers: headers,
-      body: body,
+    final response = await _safeRequest(
+      (headers) => http.post(
+        Uri.parse('$baseUrl/transfer'),
+        headers: headers,
+        body: body,
+      ),
     );
 
     if (response.statusCode != 200) {
@@ -140,11 +374,12 @@ class ApiService {
 
   // Get Transactions
   Future<String> createPaymentIntent(double amount) async {
-    final headers = await _getHeaders();
-    final response = await http.post(
-      Uri.parse('$baseUrl/payments/create-intent'),
-      headers: headers,
-      body: jsonEncode({'amount': amount, 'currency': 'thb'}),
+    final response = await _safeRequest(
+      (headers) => http.post(
+        Uri.parse('$baseUrl/payments/create-intent'),
+        headers: headers,
+        body: jsonEncode({'amount': amount, 'currency': 'thb'}),
+      ),
     );
 
     if (response.statusCode == 200) {
@@ -156,11 +391,12 @@ class ApiService {
   }
 
   Future<List<dynamic>> getTransactions(String walletId) async {
-    final headers = await _getHeaders();
-    try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/transactions?wallet_id=$walletId'),
-        headers: headers,
+    return _retry(() async {
+      final response = await _safeRequest(
+        (headers) => http.get(
+          Uri.parse('$baseUrl/transactions?wallet_id=$walletId'),
+          headers: headers,
+        ),
       );
 
       if (response.statusCode == 200) {
@@ -169,19 +405,17 @@ class ApiService {
         debugPrint("Backend Error: ${response.body}");
         throw Exception('Failed to load transactions: ${response.statusCode}');
       }
-    } catch (e) {
-      debugPrint("Connection Error: $e");
-      throw Exception('Could not connect to Backend');
-    }
+    });
   }
 
   // Get Exchange Rate
   Future<Map<String, dynamic>> fetchExchangeRate(String homeCurrency) async {
-    final headers = await _getHeaders();
-    try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/rates/latest?home_currency=$homeCurrency'),
-        headers: headers,
+    return _retry(() async {
+      final response = await _safeRequest(
+        (headers) => http.get(
+          Uri.parse('$baseUrl/rates/latest?home_currency=$homeCurrency'),
+          headers: headers,
+        ),
       );
 
       if (response.statusCode == 200) {
@@ -190,10 +424,7 @@ class ApiService {
         debugPrint("Backend Error (Rates): ${response.body}");
         throw Exception('Failed to load rates: ${response.statusCode}');
       }
-    } catch (e) {
-      debugPrint("Connection Error (Rates): $e");
-      throw Exception('Could not connect to Backend for Rates');
-    }
+    });
   }
 
   // Smart Routing Quote
@@ -202,7 +433,6 @@ class ApiService {
     String currency, {
     String? merchantId,
   }) async {
-    final headers = await _getHeaders();
     try {
       final queryParams = {
         'amount': amount.toString(),
@@ -214,7 +444,9 @@ class ApiService {
         '$baseUrl/quote',
       ).replace(queryParameters: queryParams);
 
-      final response = await http.get(uri, headers: headers);
+      final response = await _safeRequest(
+        (headers) => http.get(uri, headers: headers),
+      );
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
@@ -247,29 +479,13 @@ class ApiService {
       throw Exception('User not authenticated');
     }
 
-    final session = supabase.auth.currentSession;
-    if (session == null) {
-      throw Exception('No active session found! Please login again.');
-    }
-
-    final token = session.accessToken;
-
-    // Check if token is expired
-    if (JwtDecoder.isExpired(token)) {
-      debugPrint('❌ Token is EXPIRED!');
-      throw Exception('Token expired. Please login again.');
-    } else {
-      debugPrint(
-        '✅ Token is Valid. Expires: ${JwtDecoder.getExpirationDate(token)}',
-      );
-    }
-
     try {
       debugPrint(
         '💸 Executing payout: $amountSatang satang to $targetType:$targetValue',
       );
 
-      final response = await supabase.functions.invoke(
+      // 🛡️ Use Robust Invoker
+      final response = await _invokeEdgeFunction(
         'payout-executor',
         body: {
           'user_id': user.id,
@@ -277,7 +493,7 @@ class ApiService {
           'amount_satang': amountSatang.toInt(),
           'target_type': targetType,
           'target_value': targetValue,
-          'description': description ?? 'ZapPay Payment',
+          'description': description ?? 'Paycif Payment',
         },
       );
 
@@ -305,6 +521,8 @@ class ApiService {
   Future<Map<String, dynamic>> executeOpnTopUp({
     required int amountSatang,
     String? token, // Now optional for Saved Cards
+    String? cardId,
+    bool isApplePay = false,
     required String referenceId,
     String? description,
   }) async {
@@ -315,18 +533,25 @@ class ApiService {
 
     try {
       debugPrint(
-        '💸 Executing Opn TopUp: $amountSatang satang (Token: ${token ?? "SAVED_CARD"})',
+        '💸 Executing Opn TopUp: $amountSatang satang (Token: ${token ?? "SAVED_CARD"}, Card: $cardId, ApplePay: $isApplePay)',
       );
 
-      final response = await supabase.functions.invoke(
+      final payload = {
+        'amount_satang': amountSatang.toInt(),
+        if (token != null) 'token': token,
+        if (cardId != null) 'card_id': cardId,
+        if (isApplePay) 'is_apple_pay': true,
+        'reference_id': referenceId,
+        'description': description ?? 'Wallet Top Up',
+        'currency': 'thb',
+      };
+
+      debugPrint('🚀 [ApiService] Sending Payload to Edge Function: $payload');
+
+      // 🛡️ Use Robust Invoker
+      final response = await _invokeEdgeFunction(
         'inbound-handler', // inbound-handler
-        body: {
-          'amount_satang': amountSatang.toInt(),
-          if (token != null) 'token': token,
-          'reference_id': referenceId,
-          'description': description ?? 'Wallet Top Up',
-          'currency': 'thb',
-        },
+        body: payload,
       );
 
       if (response.status != 200) {
@@ -348,14 +573,24 @@ class ApiService {
   // Get Saved Cards (calls get-saved-cards Edge Function)
   // Implements in-memory caching ("Frontend Redis-like experience")
   // ============================================================================
-  // ============================================================================
-  // Get Saved Cards (calls get-saved-cards Edge Function)
-  // Implements in-memory caching ("Frontend Redis-like experience")
-  // ============================================================================
   static List<SavedCard>? _cachedSavedCards;
+  static String? _cachedPreferredMethodId;
+  static String? _cachedPreferredMethodType;
 
   // Get Cached Cards (Manual Access)
   static List<SavedCard>? getCachedCards() => _cachedSavedCards;
+
+  // Get Cached Preferred Method (Manual Access)
+  static String? getCachedPreferredMethodId() => _cachedPreferredMethodId;
+  static String? getCachedPreferredMethodType() => _cachedPreferredMethodType;
+
+  /// Clears all static caches. Call this on logout or account switch.
+  static void clearStaticCache() {
+    _cachedSavedCards = null;
+    _cachedPreferredMethodId = null;
+    _cachedPreferredMethodType = null;
+    debugPrint('🧹 ApiService static cache cleared.');
+  }
 
   Future<List<SavedCard>> getSavedCards({bool forceRefresh = false}) async {
     // 1. Return cached data if available and not forced to refresh
@@ -371,7 +606,8 @@ class ApiService {
 
     try {
       debugPrint('🌐 Fetching saved cards from Edge Function...');
-      final response = await supabase.functions.invoke('get-saved-cards');
+      // 🛡️ Use Robust Invoker
+      final response = await _invokeEdgeFunction('get-saved-cards');
 
       if (response.status != 200) {
         debugPrint('Failed to get saved cards: ${response.status}');
@@ -394,12 +630,37 @@ class ApiService {
     }
   }
 
+  // Save Card
+  Future<void> saveCard(String token) async {
+    try {
+      debugPrint('💳 Saving new card with token: $token');
+      // 🛡️ Use Robust Invoker
+      final response = await _invokeEdgeFunction(
+        'manage-payment-methods',
+        body: {'action': 'add-card', 'token': token},
+      );
+
+      if (response.status != 200) {
+        final errorData = response.data as Map<String, dynamic>?;
+        final errorMessage = errorData?['message'] ?? 'Failed to save card';
+        throw Exception(errorMessage);
+      }
+
+      // Clear cache to force refresh on next getSavedCards call
+      _cachedSavedCards = null;
+      debugPrint('✅ Card saved successfully (Cache cleared)');
+    } catch (e) {
+      debugPrint('❌ Save card error: $e');
+      rethrow;
+    }
+  }
+
   // Delete Card
   Future<void> deleteCard(String cardId) async {
-    final supabase = Supabase.instance.client;
     try {
       debugPrint('🗑️ Deleting card: $cardId');
-      final response = await supabase.functions.invoke(
+      // 🛡️ Use Robust Invoker
+      final response = await _invokeEdgeFunction(
         'manage-payment-methods',
         body: {'action': 'delete-card', 'card_id': cardId},
       );
@@ -410,9 +671,11 @@ class ApiService {
         throw Exception(errorMessage);
       }
 
-      // Successfully deleted, clear cache to force refresh
-      _cachedSavedCards = null;
-      debugPrint('✅ Card deleted successfully');
+      // 2. Optimistic Update: Update cache directly instead of clearing it
+      if (_cachedSavedCards != null) {
+        _cachedSavedCards!.removeWhere((card) => card.id == cardId);
+      }
+      debugPrint('✅ Card deleted successfully (Cache Updated)');
     } catch (e) {
       debugPrint('❌ Delete card error: $e');
       rethrow;

@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 	"log"
-	"zappay/cmd/api/middleware"
-	"zappay/database"
-	"zappay/internal/infrastructure/redis"
-	"zappay/internal/routing"
-	"zappay/internal/service"
+	"paysif/cmd/api/middleware"
+	"paysif/database"
+	"paysif/internal/infrastructure/redis"
+	"paysif/internal/routing"
+	"paysif/internal/service"
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/joho/godotenv/autoload" // Optional: for local .env

@@ -1,10 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:frontend/utils/pay_notify.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'login_screen.dart'; // For redirection after logout
+import 'help_center_screen.dart';
+import 'contact_support_screen.dart';
+import 'terms_of_service_screen.dart';
+import 'privacy_policy_screen.dart';
+import '../services/api_service.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
+import 'package:local_auth/local_auth.dart';
 import '../utils/theme_notifier.dart';
 import '../utils/language_notifier.dart';
+import '../utils/error_translator.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -17,10 +27,46 @@ class _ProfilePageState extends State<ProfilePage> {
   final _supabase = Supabase.instance.client;
   Map<String, dynamic>? _profile;
 
+  // Biometric
+  final LocalAuthentication _auth = LocalAuthentication();
+  bool _isBiometricEnabled = false;
+  bool _isBiometricAvailable = false;
+  bool _isBiometricLoading = true;
+  bool _isProcessingToggle = false;
+
+  static const String _biometricPrefKey = 'biometric_enabled';
+
   @override
   void initState() {
     super.initState();
     _fetchProfile();
+    _loadBiometricState();
+  }
+
+  Future<void> _loadBiometricState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final canCheck = await _auth.canCheckBiometrics;
+      final isSupported = await _auth.isDeviceSupported();
+
+      if (mounted) {
+        setState(() {
+          _isBiometricAvailable = canCheck && isSupported;
+          _isBiometricEnabled = prefs.getBool(_biometricPrefKey) ?? false;
+          _isBiometricLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading biometric state: $e');
+      if (mounted) {
+        setState(() => _isBiometricLoading = false);
+      }
+    }
+  }
+
+  Future<void> _saveBiometricState(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_biometricPrefKey, enabled);
   }
 
   Future<void> _fetchProfile() async {
@@ -48,6 +94,8 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _signOut() async {
+    // Clear global caches before signing out
+    ApiService.clearStaticCache();
     await _supabase.auth.signOut();
     if (mounted) {
       Navigator.pushAndRemoveUntil(
@@ -56,6 +104,34 @@ class _ProfilePageState extends State<ProfilePage> {
         (route) => false,
       );
     }
+  }
+
+  void _showSignOutConfirmation(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(l10n.signOutConfirmTitle),
+        content: Text(l10n.signOutConfirmMessage),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l10n.commonCancel),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _signOut();
+            },
+            child: Text(
+              l10n.signOut,
+              style: const TextStyle(color: Colors.redAccent),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showLanguageSheet(BuildContext context) {
@@ -148,12 +224,7 @@ class _ProfilePageState extends State<ProfilePage> {
             _buildSectionHeader(context, l10n.accountSecurity),
             const SizedBox(height: 16),
             _buildMenuContainer(context, [
-              _buildMenuItem(
-                Icons.fingerprint,
-                l10n.biometricLogin,
-                subtitle: l10n.commonEnabled,
-                isToggle: true,
-              ),
+              _buildBiometricTile(context, l10n),
               _buildMenuItem(Icons.lock_outline, l10n.changePin),
               _buildMenuItem(Icons.devices, l10n.linkedDevices),
             ]),
@@ -206,26 +277,73 @@ class _ProfilePageState extends State<ProfilePage> {
             _buildSectionHeader(context, l10n.support),
             const SizedBox(height: 16),
             _buildMenuContainer(context, [
-              _buildMenuItem(Icons.help_outline, l10n.helpCenter),
-              _buildMenuItem(Icons.chat_bubble_outline, l10n.contactSupport),
+              _buildMenuItem(
+                Icons.help_outline,
+                l10n.helpCenter,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const HelpCenterScreen()),
+                ),
+              ),
+              _buildMenuItem(
+                Icons.chat_bubble_outline,
+                l10n.contactSupport,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ContactSupportScreen(),
+                  ),
+                ),
+              ),
+            ]),
+
+            const SizedBox(height: 32),
+
+            // ─── About ─────────────────────────────────────────────
+            _buildSectionHeader(context, l10n.aboutApp),
+            const SizedBox(height: 16),
+            _buildMenuContainer(context, [
+              _buildMenuItem(
+                Icons.description_outlined,
+                l10n.termsOfService,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const TermsOfServiceScreen(),
+                  ),
+                ),
+              ),
+              _buildMenuItem(
+                Icons.privacy_tip_outlined,
+                l10n.privacyPolicy,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const PrivacyPolicyScreen(),
+                  ),
+                ),
+              ),
             ]),
 
             const SizedBox(height: 48),
 
             // ─── Sign Out ──────────────────────────────────────────
             Center(
-              child: TextButton(
-                onPressed: _signOut,
-                style: TextButton.styleFrom(
+              child: ElevatedButton.icon(
+                onPressed: () => _showSignOutConfirmation(context),
+                icon: const Icon(Icons.logout_rounded, size: 20),
+                label: Text(l10n.signOut),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red.shade50,
+                  foregroundColor: Colors.redAccent,
+                  elevation: 0,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 32,
                     vertical: 16,
                   ),
-                  foregroundColor: Colors.redAccent,
-                ),
-                child: Text(
-                  l10n.signOut,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                 ),
               ),
             ),
@@ -265,17 +383,19 @@ class _ProfilePageState extends State<ProfilePage> {
           end: Alignment.bottomRight,
           colors: isDark
               ? [
-                  const Color(0xFF1E1B4B),
-                  const Color(0xFF312E81),
-                ] // Indigo 950 -> 900
+                  const Color(0xFF0F172A), // Slate 900
+                  const Color(0xFF1E293B), // Slate 800
+                ]
               : [
-                  const Color(0xFF312E81),
-                  const Color(0xFF4338CA),
-                ], // Indigo 900 -> 700
+                  const Color(0xFF1A1F71), // Navy
+                  const Color(0xFF2C3E50), // Lighter Navy
+                ],
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF312E81).withValues(alpha: 0.4),
+            color: (isDark ? Colors.black : const Color(0xFF1A1F71)).withValues(
+              alpha: 0.2,
+            ),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -335,13 +455,44 @@ class _ProfilePageState extends State<ProfilePage> {
                         ],
                       ),
                     ),
-                    // Verification Badge
-                    if (isVerified)
-                      const Icon(
-                        Icons.verified,
-                        color: Color(0xFF10B981),
-                        size: 24,
+                    // KYC Status Badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
                       ),
+                      decoration: BoxDecoration(
+                        color: isVerified
+                            ? const Color(0xFF10B981).withValues(alpha: 0.2)
+                            : Colors.orange.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isVerified ? Icons.verified : Icons.pending,
+                            color: isVerified
+                                ? const Color(0xFF10B981)
+                                : Colors.orange,
+                            size: 14,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            isVerified
+                                ? l10n.kycStatusVerified
+                                : l10n.kycStatusPending,
+                            style: TextStyle(
+                              color: isVerified
+                                  ? const Color(0xFF10B981)
+                                  : Colors.orange,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
 
@@ -478,7 +629,6 @@ class _ProfilePageState extends State<ProfilePage> {
     String? subtitle,
     VoidCallback? onTap,
     Widget? trailing,
-    bool isToggle = false,
   }) {
     return ListTile(
       onTap: onTap,
@@ -498,22 +648,136 @@ class _ProfilePageState extends State<ProfilePage> {
       subtitle: subtitle != null
           ? Text(
               subtitle,
-              style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+              style: TextStyle(
+                fontSize: 13,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white54
+                    : Colors.black54,
+              ),
             )
           : null,
       trailing:
           trailing ??
-          (isToggle
-              ? Switch.adaptive(
-                  value: true,
-                  activeTrackColor: const Color(0xFF10B981),
-                  onChanged: (v) {},
-                )
-              : const Icon(
-                  Icons.chevron_right_rounded,
-                  color: Colors.grey,
-                  size: 20,
-                )),
+          const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
     );
+  }
+
+  Widget _buildBiometricTile(BuildContext context, AppLocalizations l10n) {
+    return ListTile(
+      onTap: () => _handleBiometricToggle(l10n),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(
+          Icons.fingerprint_rounded,
+          size: 20,
+          color: Theme.of(context).iconTheme.color,
+        ),
+      ),
+      title: Text(
+        l10n.biometricLabel,
+        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+      ),
+      subtitle: _isBiometricLoading
+          ? const SizedBox(
+              height: 13,
+              width: 50,
+              child: LinearProgressIndicator(
+                backgroundColor: Colors.transparent,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                minHeight: 1,
+              ),
+            )
+          : Text(
+              _isBiometricEnabled ? l10n.commonEnabled : l10n.commonDisabled,
+              style: TextStyle(
+                fontSize: 13,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white54
+                    : Colors.black54,
+              ),
+            ),
+      trailing: _isBiometricLoading
+          ? const SizedBox(
+              width: 40,
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                  ),
+                ),
+              ),
+            )
+          : Switch.adaptive(
+              value: _isBiometricEnabled,
+              activeTrackColor: const Color(0xFF10B981),
+              onChanged: _isBiometricAvailable && !_isProcessingToggle
+                  ? (v) => _handleBiometricToggle(l10n)
+                  : null,
+            ),
+    );
+  }
+
+  Future<void> _handleBiometricToggle(AppLocalizations l10n) async {
+    if (_isProcessingToggle) return;
+
+    try {
+      setState(() => _isProcessingToggle = true);
+
+      if (!_isBiometricAvailable) {
+        throw PlatformException(
+          code: 'NotAvailable',
+          message: l10n.biometricNotAvailable,
+        );
+      }
+
+      final authenticated = await _auth.authenticate(
+        localizedReason: l10n.biometricConfirmManage,
+        options: const AuthenticationOptions(
+          stickyAuth: true,
+          biometricOnly: true,
+        ),
+      );
+
+      if (!mounted) return;
+
+      if (authenticated) {
+        final newState = !_isBiometricEnabled;
+        await _saveBiometricState(newState);
+
+        if (!mounted) return;
+
+        setState(() {
+          _isBiometricEnabled = newState;
+        });
+
+        PayNotify.success(context, l10n.biometricSettingsUpdated);
+      }
+    } on PlatformException catch (e) {
+      if (!mounted) return;
+
+      String msg = e.message ?? e.code;
+      if (e.code == 'NotAvailable') {
+        msg = l10n.biometricNotAvailable;
+      }
+      if (e.code == 'NotEnrolled') {
+        msg = l10n.biometricNotEnrolled;
+      }
+      PayNotify.error(context, msg);
+    } catch (e) {
+      if (!mounted) return;
+      PayNotify.error(context, ErrorTranslator.translate(l10n, e.toString()));
+    } finally {
+      if (mounted) {
+        setState(() => _isProcessingToggle = false);
+      }
+    }
   }
 }

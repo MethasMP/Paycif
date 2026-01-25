@@ -100,12 +100,17 @@ class AppTheme {
       primaryColor: primaryBlue,
       scaffoldBackgroundColor: premiumLightGrey,
       cardColor: Colors.white,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: primaryBlue,
+        primary: primaryBlue,
+        secondary: accentGold,
+        surface: Colors.white,
+      ),
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: IconThemeData(color: premiumBlack),
         titleTextStyle: TextStyle(
-          // Will be overridden by textTheme but good fallback
           color: premiumBlack,
           fontSize: 22,
           fontWeight: FontWeight.w600,
@@ -128,7 +133,6 @@ class AppTheme {
         ),
       ),
       cardTheme: const CardThemeData(
-        // Corrected from CardTheme to CardThemeData
         elevation: 2,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(16)),
@@ -157,12 +161,21 @@ class AppTheme {
   // Dark Theme
   static ThemeData get darkTheme {
     final base = ThemeData.dark();
-    // Material 3 Dark scheme is usually Surface-based, but we customize
+    // Premium Slate Palette for Luxury Feel
+    const Color darkBg = Color(0xFF0F172A); // Deep Slate
+    const Color surfaceColor = Color(0xFF1E293B); // Lighter Slate for Cards
+
     return base.copyWith(
-      primaryColor: primaryBlue,
-      scaffoldBackgroundColor: const Color(0xFF121212), // Deep dark
-      cardColor: premiumDarkGrey,
-      canvasColor: const Color(0xFF121212),
+      primaryColor: accentGold, // Use Gold for major CTAs in dark mode
+      scaffoldBackgroundColor: darkBg,
+      cardColor: surfaceColor,
+      canvasColor: darkBg,
+      colorScheme: base.colorScheme.copyWith(
+        primary: accentGold,
+        onPrimary: Colors.black,
+        surface: surfaceColor,
+        onSurface: Colors.white,
+      ),
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -178,8 +191,8 @@ class AppTheme {
       ).apply(bodyColor: Colors.white, displayColor: Colors.white),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: accentGold, // Gold pops in dark mode
-          foregroundColor: Colors.black, // Text on Gold
+          backgroundColor: accentGold,
+          foregroundColor: Colors.black,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -190,16 +203,15 @@ class AppTheme {
         ),
       ),
       cardTheme: const CardThemeData(
-        // Corrected
         elevation: 4,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(16)),
         ),
-        color: premiumDarkGrey,
+        color: surfaceColor,
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: premiumDarkGrey,
+        fillColor: surfaceColor,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
@@ -213,6 +225,10 @@ class AppTheme {
           borderSide: const BorderSide(color: accentGold, width: 2),
         ),
         hintStyle: TextStyle(color: Colors.grey[500]),
+      ),
+      dividerTheme: DividerThemeData(
+        color: Colors.white.withValues(alpha: 0.1),
+        thickness: 1,
       ),
     );
   }

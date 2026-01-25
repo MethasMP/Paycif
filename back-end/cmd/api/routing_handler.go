@@ -3,7 +3,7 @@ package main
 import (
 	"net/http"
 	"strconv"
-	"zappay/internal/routing"
+	"paysif/internal/routing"
 
 	"github.com/gin-gonic/gin"
 )

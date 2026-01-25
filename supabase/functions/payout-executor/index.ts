@@ -88,7 +88,7 @@ function validateRequest(body: unknown): PayoutRequest {
     amount_satang: req.amount_satang as number,
     target_type: req.target_type as 'MOBILE' | 'NATID' | 'EWALLET',
     target_value: req.target_value as string,
-    description: (req.description as string) || 'ZapPay Payout',
+    description: (req.description as string) || 'Paysif Payout',
   };
 }
 
@@ -125,23 +125,24 @@ async function handlePayoutRequest(request: Request): Promise<Response> {
 
   // Verify JWT using Supabase client
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
 
   // Extract JWT
-  const jwt = authHeader.replace(/^Bearer\s+/i, '');
+  const authMatch = authHeader.match(/^Bearer\s+(.*)$/i);
+  if (!authMatch) {
+    console.error('[PayoutExecutor] Malformed Authorization header');
+    return new Response(
+      JSON.stringify({ success: false, error: 'Invalid Authorization format' }),
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    );
+  }
+  const jwt = authMatch[1].trim();
 
-  // Create a client specifically for this request
-  const authClient = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-      detectSessionInUrl: false,
-    },
-  });
+  // Create an admin client for robust verification
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
-  // Get the user from the token explicitly
-  // Passing jwt to getUser() is supported in Supabase JS v2
-  const { data: { user }, error: authError } = await authClient.auth.getUser(jwt);
+  // 🎯 Use Admin Client for robust verification (Bypasses brittle raw fetch)
+  const { data: { user }, error: authError } = await adminClient.auth.getUser(jwt);
 
   if (authError || !user) {
     console.error(
@@ -149,15 +150,13 @@ async function handlePayoutRequest(request: Request): Promise<Response> {
       authError?.message || 'No user found',
     );
     // Log truncated token for debugging
-    console.error('[PayoutExecutor] Token snippet:', jwt.substring(0, 10) + '...');
+    console.log(`[PayoutExecutor] Token Prefix: ${jwt.substring(0, 10)}...`);
 
     return new Response(
       JSON.stringify({
         success: false,
-        error: authError?.message || 'Auth session missing!',
-        debug: {
-          auth_header_len: authHeader.length,
-        },
+        error: 'Unauthorized: Session is invalid or poisoned.',
+        debug: { auth_header_len: authHeader.length },
       }),
       { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
@@ -231,7 +230,7 @@ async function handlePayoutRequest(request: Request): Promise<Response> {
       amount_satang: payoutRequest.amount_satang,
       target_type: gatewayTargetType,
       target_value: payoutRequest.target_value,
-      description: payoutRequest.description || 'ZapPay Payout',
+      description: payoutRequest.description || 'Paysif Payout',
       timestamp: new Date().toISOString(),
     };
 

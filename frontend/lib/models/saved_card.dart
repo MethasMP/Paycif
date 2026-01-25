@@ -6,6 +6,8 @@ class SavedCard {
   final String lastDigits;
   final int expirationMonth;
   final int expirationYear;
+  final DateTime? lastUsedAt;
+  final int healthScore;
 
   SavedCard({
     required this.id,
@@ -13,6 +15,8 @@ class SavedCard {
     required this.lastDigits,
     required this.expirationMonth,
     required this.expirationYear,
+    this.lastUsedAt,
+    this.healthScore = 100,
   });
 
   factory SavedCard.fromJson(Map<String, dynamic> json) {
@@ -22,6 +26,10 @@ class SavedCard {
       lastDigits: json['last_digits'] as String,
       expirationMonth: json['expiration_month'] as int,
       expirationYear: json['expiration_year'] as int,
+      lastUsedAt: json['last_used_at'] != null
+          ? DateTime.parse(json['last_used_at'])
+          : null,
+      healthScore: json['health_score'] as int? ?? 100,
     );
   }
 

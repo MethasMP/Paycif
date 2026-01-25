@@ -6,8 +6,8 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"zappay/database"
-	"zappay/internal/worker"
+	"paysif/database"
+	"paysif/internal/worker"
 
 	_ "github.com/joho/godotenv/autoload"
 )

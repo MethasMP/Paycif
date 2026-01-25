@@ -8,6 +8,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -57,12 +58,12 @@ func (s *FXService) SimulateRates(ctx context.Context) {
 	targetCurrency := "THB"
 
 	for _, fromCurr := range currencies {
-		// 1. Try to get current rate from DB
+		// Stateless Query for Simulation
 		var currentRateStr string
-		err := s.DB.QueryRowContext(ctx, `
-			SELECT mid_rate FROM exchange_rates 
-			WHERE from_currency = $1 AND to_currency = $2
-		`, fromCurr, targetCurrency).Scan(&currentRateStr)
+		safeFrom := strings.ReplaceAll(strings.ToUpper(fromCurr), "'", "''")
+		simQuery := fmt.Sprintf("SELECT mid_rate FROM exchange_rates WHERE from_currency = '%s' AND to_currency = 'THB'", safeFrom)
+		
+		err := s.DB.QueryRowContext(ctx, simQuery).Scan(&currentRateStr)
 
 		if err == sql.ErrNoRows || currentRateStr == "" {
 			// Init: Fetch from API if not exists
@@ -197,13 +198,13 @@ func (s *FXService) ConvertToBase(ctx context.Context, amount int64, currency st
 		return amount, decimal.NewFromInt(1), nil
 	}
 
-	// Fetch latest provider rate
+	// Stateless Query Logic: Bypassing Prepared Statements for PGBouncer Compatibility
+	// We interpolate manually to force Simple Protocol.
 	var rateStr string
-	err := s.DB.QueryRowContext(ctx, `
-		SELECT provider_rate 
-		FROM exchange_rates 
-		WHERE from_currency = $1 AND to_currency = 'THB'
-	`, currency).Scan(&rateStr)
+	safeCurrency := strings.ReplaceAll(strings.ToUpper(currency), "'", "''")
+	convQuery := fmt.Sprintf("SELECT provider_rate FROM exchange_rates WHERE from_currency = '%s' AND to_currency = 'THB'", safeCurrency)
+	
+	err := s.DB.QueryRowContext(ctx, convQuery).Scan(&rateStr)
 
 	if err != nil {
 		// FALLBACK: In production, we might want to fail hard or alert.

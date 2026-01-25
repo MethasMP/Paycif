@@ -5,9 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:frontend/l10n/generated/app_localizations.dart';
 import 'package:intl/intl.dart';
 import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
-import 'package:frontend/l10n/generated/app_localizations.dart';
+import '../utils/error_translator.dart';
+import '../utils/pay_notify.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/api_service.dart';
 // Digital wallet button can be used for future payment method display
@@ -59,6 +61,10 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
   bool _isProcessing = false;
   double _enteredAmount = 0.0;
 
+  // Biometric Detection
+  IconData _biometricIcon = Icons.fingerprint;
+  String _biometricName = 'Biometric';
+
   // Payment Method Selection
   String _selectedPaymentMethod =
       'balance'; // balance, apple_pay, google_pay, card
@@ -76,6 +82,37 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
       _fetchQuote();
     }
     _amountController.addListener(_onAmountChanged);
+    _checkBiometrics();
+  }
+
+  Future<void> _checkBiometrics() async {
+    try {
+      final List<BiometricType> availableBiometrics = await auth
+          .getAvailableBiometrics();
+
+      if (mounted) {
+        setState(() {
+          final hasFace = availableBiometrics.contains(BiometricType.face);
+          final hasFingerprint =
+              availableBiometrics.contains(BiometricType.fingerprint) ||
+              availableBiometrics.contains(BiometricType.strong) ||
+              availableBiometrics.contains(BiometricType.iris);
+
+          if (hasFace && hasFingerprint) {
+            _biometricIcon = Icons.verified_user_rounded;
+            _biometricName = 'Biometric';
+          } else if (hasFace) {
+            _biometricIcon = Icons.face_rounded;
+            _biometricName = 'Face ID';
+          } else if (hasFingerprint) {
+            _biometricIcon = Icons.fingerprint_rounded;
+            _biometricName = 'Touch ID';
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error checking biometrics: $e');
+    }
   }
 
   @override
@@ -125,25 +162,41 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
   }
 
   Future<void> _authenticate() async {
+    final l10n = AppLocalizations.of(context)!;
     if (_enteredAmount <= 0) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Please enter an amount')));
+      ).showSnackBar(SnackBar(content: Text(l10n.topUpEnterAmountError)));
       return;
     }
 
     setState(() => _isProcessing = true);
 
     try {
+      // 1. Hardware Check: Is biometric hardware available and supported?
+      final bool canAuthenticateWithBiometrics = await auth.canCheckBiometrics;
+      final bool isDeviceSupported = await auth.isDeviceSupported();
+
+      if (!canAuthenticateWithBiometrics || !isDeviceSupported) {
+        throw PlatformException(
+          code: 'NotAvailable',
+          message: 'Biometric authentication is not supported on this device.',
+        );
+      }
+
       final authenticated = await auth.authenticate(
-        localizedReason: 'Confirm payment of ฿${_formatNumber(_enteredAmount)}',
+        localizedReason: l10n.confirmReason(
+          '฿${_formatNumber(_enteredAmount)}',
+        ),
         options: const AuthenticationOptions(
           stickyAuth: true,
-          biometricOnly: false,
+          biometricOnly: true, // Use biometric only for high-stakes payment
         ),
       );
 
-      if (authenticated && mounted) {
+      if (!mounted || !context.mounted) return;
+
+      if (authenticated) {
         HapticFeedback.heavyImpact();
         await _executePayment();
       } else {
@@ -152,20 +205,39 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
           _isProcessing = false;
         });
       }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _slidePosition = 0.0;
-          _isProcessing = false;
-        });
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Authentication failed: $e')));
+    } on PlatformException catch (e) {
+      if (!mounted || !context.mounted) return;
+
+      setState(() {
+        _slidePosition = 0.0;
+        _isProcessing = false;
+      });
+
+      String errorMsg = l10n.confirmAuthFailed(e.message ?? e.code);
+
+      // Granular Error Handling
+      if (e.code == 'NotAvailable') {
+        errorMsg = 'Biometric hardware not available or disabled.';
+      } else if (e.code == 'NotEnrolled') {
+        errorMsg = 'No biometrics (Face/Fingerprint) set up on this device.';
+      } else if (e.code == 'LockedOut' || e.code == 'PermanentlyLockedOut') {
+        errorMsg =
+            'Too many attempts. Biometrics locked. Please use device passcode.';
       }
+
+      PayNotify.error(context, errorMsg);
+    } catch (e) {
+      if (!mounted || !context.mounted) return;
+      setState(() {
+        _slidePosition = 0.0;
+        _isProcessing = false;
+      });
+      PayNotify.error(context, ErrorTranslator.translate(l10n, e.toString()));
     }
   }
 
   Future<void> _executePayment() async {
+    final l10n = AppLocalizations.of(context)!;
     try {
       final supabase = Supabase.instance.client;
       final user = supabase.auth.currentUser;
@@ -192,14 +264,14 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
         amountSatang: _enteredAmount * 100,
         targetType: targetType,
         targetValue: targetValue,
-        description: 'Payment to ${widget.recipient}',
+        description: l10n.confirmPaymentTo(widget.recipient),
       );
 
       if (result['success'] == true && mounted) {
         HapticFeedback.heavyImpact();
         _showReceipt(transactionId: result['transaction_id'] as String?);
       } else {
-        throw Exception(result['error'] ?? 'Payment failed');
+        throw Exception(result['error'] ?? l10n.confirmPaymentFailed);
       }
     } catch (e) {
       if (mounted) {
@@ -207,7 +279,7 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
           _slidePosition = 0.0;
           _isProcessing = false;
         });
-        _showPaymentError(e.toString());
+        _showPaymentError(ErrorTranslator.translate(l10n, e.toString()));
       }
     }
   }
@@ -215,16 +287,19 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
   void _showPaymentError(String message) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Payment Failed'),
-        content: Text(message.replaceAll('Exception: ', '')),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
+      builder: (context) {
+        final l10n = AppLocalizations.of(context)!;
+        return AlertDialog(
+          title: Text(l10n.confirmPaymentFailed),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(l10n.commonOk),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -303,10 +378,10 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.fingerprint, size: 16, color: Colors.grey[500]),
+                  Icon(_biometricIcon, size: 16, color: Colors.grey[500]),
                   const SizedBox(width: 8),
                   Text(
-                    'Secured by Biometrics',
+                    _biometricName,
                     style: TextStyle(color: Colors.grey[500], fontSize: 13),
                   ),
                 ],
@@ -323,6 +398,7 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
     bool isDark,
     NumberFormat currencyFormat,
   ) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -345,7 +421,7 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
       child: Column(
         children: [
           Text(
-            'Amount to Pay',
+            l10n.confirmAmountToPay,
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.8),
               fontSize: 14,
@@ -407,13 +483,13 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
                 color: Colors.white.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.lock_rounded, size: 12, color: Colors.white70),
                   SizedBox(width: 4),
                   Text(
-                    'Amount set by merchant',
+                    l10n.confirmAmountSetByMerchant,
                     style: TextStyle(color: Colors.white70, fontSize: 12),
                   ),
                 ],
@@ -426,11 +502,12 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
   }
 
   Widget _buildPaymentMethodSection(bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Pay with',
+          l10n.confirmPayWith,
           style: TextStyle(
             color: isDark ? Colors.white70 : const Color(0xFF64748B),
             fontSize: 13,
@@ -446,7 +523,7 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
           children: [
             _buildPaymentMethodChip(
               id: 'balance',
-              label: 'Paysif Balance',
+              label: l10n.confirmPaycifBalance,
               icon: Icons.account_balance_wallet_rounded,
               color: const Color(0xFF10B981),
             ),
@@ -535,6 +612,7 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
   }
 
   Widget _buildRecipientCard(bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -561,7 +639,7 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Paying to',
+                  l10n.confirmPayingTo,
                   style: TextStyle(
                     color: isDark ? Colors.white54 : Colors.grey[500],
                     fontSize: 12,
@@ -602,6 +680,7 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
   }
 
   Widget _buildSummaryCard(bool isDark, NumberFormat currencyFormat) {
+    final l10n = AppLocalizations.of(context)!;
     // Extract fee from quote if available (Principal Engineer: Use data we fetch!)
     String feeDisplay = '฿0.00';
     String routeBadge = '';
@@ -648,7 +727,7 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'Finding best route...',
+                      l10n.confirmFindingBestRoute,
                       style: TextStyle(
                         color: isDark ? Colors.white54 : Colors.grey[500],
                         fontSize: 12,
@@ -677,7 +756,7 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
                           Text(
                             routeBadge.isNotEmpty
                                 ? routeBadge
-                                : 'Optimized Route',
+                                : l10n.confirmOptimizedRoute,
                             style: const TextStyle(
                               color: Color(0xFF10B981),
                               fontSize: 11,
@@ -693,11 +772,11 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
             ),
 
           _buildSummaryRow(
-            'Amount',
+            l10n.confirmAmount,
             '฿${currencyFormat.format(_enteredAmount)}',
           ),
           const SizedBox(height: 12),
-          _buildSummaryRow('Fee', feeDisplay, isFree: !hasFee),
+          _buildSummaryRow(l10n.confirmFee, feeDisplay, isFree: !hasFee),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 16),
             child: Divider(height: 1),
@@ -705,9 +784,9 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Total',
-                style: TextStyle(fontWeight: FontWeight.w600),
+              Text(
+                l10n.homeTotalBalance.split(' ').first, // Just "Total"
+                style: const TextStyle(fontWeight: FontWeight.w600),
               ),
               Text(
                 '฿${currencyFormat.format(_enteredAmount)}',
@@ -753,6 +832,7 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
   }
 
   Widget _buildSlideToPayButton() {
+    final l10n = AppLocalizations.of(context)!;
     const double trackHeight = 64.0;
     const double thumbSize = 56.0;
     final double maxSlide =
@@ -782,7 +862,7 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
           children: [
             Center(
               child: Text(
-                _isProcessing ? 'Processing...' : 'Swipe to Pay',
+                _isProcessing ? l10n.confirmProcessing : l10n.confirmSwipeToPay,
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -896,7 +976,7 @@ class _ReceiptScreenState extends State<ReceiptScreen>
 
     final now = DateTime.now();
     final rand = Random().nextInt(9999).toString().padLeft(4, '0');
-    _refNumber = 'ZAP${DateFormat('yyyyMMddHHmmss').format(now)}$rand';
+    _refNumber = 'PCF${DateFormat('yyyyMMddHHmmss').format(now)}$rand';
 
     _successController = AnimationController(
       vsync: this,
@@ -959,7 +1039,7 @@ class _ReceiptScreenState extends State<ReceiptScreen>
       await ImageGallerySaverPlus.saveImage(
         pngBytes,
         quality: 85,
-        name: 'ZapPay_$_refNumber',
+        name: 'Paysif_$_refNumber',
       );
 
       if (mounted) {
@@ -1152,7 +1232,7 @@ class _ReceiptScreenState extends State<ReceiptScreen>
                     Icon(Icons.bolt_rounded, size: 16, color: Colors.grey[400]),
                     const SizedBox(width: 4),
                     Text(
-                      'ZapPay Official Receipt',
+                      'Paysif Official Receipt',
                       style: TextStyle(
                         color: Colors.grey[400],
                         fontSize: 12,
