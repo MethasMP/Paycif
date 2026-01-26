@@ -141,4 +141,9 @@ class SecurityController extends ChangeNotifier {
       return false;
     }
   }
+
+  /// Checks if the user has a PIN correctly configured.
+  Future<bool> hasPin() async {
+    return await _repository.hasPin();
+  }
 }

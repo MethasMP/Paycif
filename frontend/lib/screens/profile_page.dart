@@ -15,6 +15,7 @@ import 'package:local_auth/local_auth.dart';
 import '../utils/theme_notifier.dart';
 import '../utils/language_notifier.dart';
 import '../utils/error_translator.dart';
+import '../features/security/presentation/widgets/pin_entry_widget.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -728,27 +729,16 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _handleBiometricToggle(AppLocalizations l10n) async {
     if (_isProcessingToggle) return;
 
-    try {
-      setState(() => _isProcessingToggle = true);
+    if (!_isBiometricAvailable) {
+      PayNotify.error(context, l10n.biometricNotAvailable);
+      return;
+    }
 
-      if (!_isBiometricAvailable) {
-        throw PlatformException(
-          code: 'NotAvailable',
-          message: l10n.biometricNotAvailable,
-        );
-      }
+    // 🔒 World-Class Security: Gating Biometric Settings with PIN
+    _showPinVerificationSheet(l10n, () async {
+      try {
+        setState(() => _isProcessingToggle = true);
 
-      final authenticated = await _auth.authenticate(
-        localizedReason: l10n.biometricConfirmManage,
-        options: const AuthenticationOptions(
-          stickyAuth: true,
-          biometricOnly: true,
-        ),
-      );
-
-      if (!mounted) return;
-
-      if (authenticated) {
         final newState = !_isBiometricEnabled;
         await _saveBiometricState(newState);
 
@@ -759,25 +749,67 @@ class _ProfilePageState extends State<ProfilePage> {
         });
 
         PayNotify.success(context, l10n.biometricSettingsUpdated);
+      } catch (e) {
+        if (!mounted) return;
+        PayNotify.error(context, ErrorTranslator.translate(l10n, e.toString()));
+      } finally {
+        if (mounted) {
+          setState(() => _isProcessingToggle = false);
+        }
       }
-    } on PlatformException catch (e) {
-      if (!mounted) return;
+    });
+  }
 
-      String msg = e.message ?? e.code;
-      if (e.code == 'NotAvailable') {
-        msg = l10n.biometricNotAvailable;
-      }
-      if (e.code == 'NotEnrolled') {
-        msg = l10n.biometricNotEnrolled;
-      }
-      PayNotify.error(context, msg);
-    } catch (e) {
-      if (!mounted) return;
-      PayNotify.error(context, ErrorTranslator.translate(l10n, e.toString()));
-    } finally {
-      if (mounted) {
-        setState(() => _isProcessingToggle = false);
-      }
-    }
+  void _showPinVerificationSheet(
+    AppLocalizations l10n,
+    VoidCallback onVerified,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.8,
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 32),
+            Text(
+              l10n.biometricConfirmManage,
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Please verify your PIN to continue.',
+              style: TextStyle(color: Colors.grey),
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: PinEntryWidget(
+                onSuccess: () {
+                  Navigator.pop(context);
+                  onVerified();
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

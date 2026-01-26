@@ -172,6 +172,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commonValidationFailed => 'Please check the highlighted fields.';
 
   @override
+  String get commonForgotPin => 'Forgot PIN?';
+
+  @override
   String get commonDefault => 'Default';
 
   @override

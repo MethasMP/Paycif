@@ -73,8 +73,8 @@ serve(async (req) => {
       password: pin,
       salt: salt,
       parallelism: 4,
-      iterations: 3,
-      memorySize: 65536, // 64 MB
+      iterations: 2, // Reduced from 3
+      memorySize: 32768, // Reduced from 64 MB to 32 MB
       hashLength: 32,
       outputType: 'encoded', // PHC String format
     });
@@ -98,55 +98,19 @@ serve(async (req) => {
     // Actually, client asked for "Transactional Update".
     // Writing to 'private.user_auth_secrets' requires Service Role.
 
-    console.log('[SetupPin] Saving to private secrets...');
+    console.log('[SetupPin] Establishing identity via RPC...');
+    const { error: rpcError } = await adminClient.rpc('setup_user_pin', {
+      p_user_id: user.id,
+      p_pin_hash: pinHash,
+    });
 
-    const { error: secretError } = await adminClient
-      .from('user_auth_secrets') // This table is in 'private' schema, usually need explicit schema select if not default
-      // Supabase JS defaults to 'public'. We must specify schema.
-      .upsert({
-        user_id: user.id,
-        pin_hash: pinHash,
-        failed_attempts: 0,
-        locked_until: null,
-        updated_at: new Date().toISOString(),
-      });
-
-    // NOTE: supabase-js client might need schema selection:
-    // const privateClient = createClient(..., { db: { schema: 'private' } });
-
-    // Let's instantiate a schema-specific client helper:
-    const privateDb = createClient(supabaseUrl, supabaseServiceKey, { db: { schema: 'private' } });
-
-    const { error: upsertError } = await privateDb
-      .from('user_auth_secrets')
-      .upsert({
-        user_id: user.id,
-        pin_hash: pinHash,
-        failed_attempts: 0,
-        locked_until: null,
-        updated_at: new Date().toISOString(),
-      });
-
-    if (upsertError) {
-      console.error('[SetupPin] Secret upsert failed:', upsertError);
-      throw new Error('Failed to save security data');
-    }
-
-    console.log('[SetupPin] Updating public profile...');
-    const { error: profileError } = await adminClient
-      .from('profiles')
-      .update({ pin_enabled: true })
-      .eq('id', user.id);
-
-    if (profileError) {
-      console.error('[SetupPin] Profile update failed:', profileError);
-      // Rollback technically not possible here without RPC, but this is a rare edge case.
-      // In "World-Class" we would use RPC. For now, this meets the requirement of linking them.
-      throw new Error('Failed to update profile status');
+    if (rpcError) {
+      console.error('[SetupPin] RPC failed:', rpcError);
+      return jsonError(`Identity registration failed: ${rpcError.message}`, 500);
     }
 
     return new Response(
-      JSON.stringify({ success: true, message: 'PIN setup complete' }),
+      JSON.stringify({ success: true, message: 'Identity Secured' }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   } catch (err) {

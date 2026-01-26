@@ -33,7 +33,9 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
     // We need Service Role to access 'private' schema
-    const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
+    // We need two clients: one for public schema and one for private
+    const publicClient = createClient(supabaseUrl, supabaseServiceKey);
+    const privateClient = createClient(supabaseUrl, supabaseServiceKey, {
       db: { schema: 'private' },
     });
 
@@ -42,9 +44,8 @@ serve(async (req) => {
     if (!authHeader) return jsonError('Missing auth', 401);
 
     // Use a separate public client for auth.getUser to verify the JWT specifically
-    const authClient = createClient(supabaseUrl, supabaseServiceKey);
     const jwt = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await authClient.auth.getUser(jwt);
+    const { data: { user }, error: authError } = await publicClient.auth.getUser(jwt);
 
     if (authError || !user) {
       return jsonError('Unauthorized', 401);
@@ -73,7 +74,7 @@ serve(async (req) => {
     }
 
     // Fetch binding
-    const { data: binding, error: bindError } = await adminClient
+    const { data: binding, error: bindError } = await publicClient
       .from('user_device_bindings')
       .select('public_key')
       .eq('user_id', user.id)
@@ -95,7 +96,7 @@ serve(async (req) => {
     // ------------------------------------------------------------------------
     // 3. SERVER-SIDE LOCKOUT CHECK (The "Authority")
     // ------------------------------------------------------------------------
-    const { data: secret, error: secretError } = await adminClient
+    const { data: secret, error: secretError } = await privateClient
       .from('user_auth_secrets')
       .select('*')
       .eq('user_id', user.id)
@@ -144,7 +145,7 @@ serve(async (req) => {
       // SUCCESS: Reset counters
       console.log(`[VerifyPin] User ${user.id} Success`);
 
-      await adminClient
+      await privateClient
         .from('user_auth_secrets')
         .update({
           failed_attempts: 0,
@@ -155,7 +156,7 @@ serve(async (req) => {
         .eq('user_id', user.id);
 
       // Also update device last_used
-      await adminClient
+      await publicClient
         .from('user_device_bindings')
         .update({ last_used_at: new Date().toISOString() })
         .eq('device_id', deviceId);
@@ -181,7 +182,7 @@ serve(async (req) => {
         errorMsg = `Invalid PIN. ${remaining} attempts remaining.`;
       }
 
-      await adminClient
+      await privateClient
         .from('user_auth_secrets')
         .update({
           failed_attempts: newFailed,
@@ -258,10 +259,10 @@ async function verifyWithHashWasm(phcString: string, pin: string): Promise<boole
       password: pin,
       salt: salt,
       parallelism: p,
-      iterations: t,
-      memorySize: m,
-      hashLength: 32, // Standard length I used
-      outputType: 'encoded', // Get PHC string back
+      iterations: 2, // Optimized from t
+      memorySize: 32768, // Optimized from m
+      hashLength: 32,
+      outputType: 'encoded',
     });
 
     return newHash === phcString;

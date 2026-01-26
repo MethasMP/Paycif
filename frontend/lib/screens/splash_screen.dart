@@ -4,9 +4,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../controllers/dashboard_controller.dart';
 import 'login_screen.dart';
-import 'main_screen.dart';
 import '../l10n/generated/app_localizations.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
+import '../features/security/presentation/pages/app_lock_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -72,7 +72,7 @@ class _SplashScreenState extends State<SplashScreen> {
       await Future.delayed(const Duration(milliseconds: 1500) - elapsed);
     }
 
-    _navigateTo(const MainScreen());
+    _navigateTo(const AppLockScreen());
   }
 
   Future<void> _delayedNavigateToLogin() async {

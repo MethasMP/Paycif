@@ -171,6 +171,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get commonValidationFailed => '강조 표시된 필드를 확인하십시오.';
 
   @override
+  String get commonForgotPin => 'Forgot PIN?';
+
+  @override
   String get commonDefault => '기본';
 
   @override

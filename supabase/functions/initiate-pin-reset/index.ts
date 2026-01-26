@@ -29,17 +29,17 @@ serve(async (req) => {
     // 1. Auth & Setup
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
-      db: { schema: 'private' }, // Needs access to user_auth_secrets
+    // We need two clients: one for public schema (profiles, device_bindings) and one for private (secrets)
+    const publicClient = createClient(supabaseUrl, supabaseServiceKey);
+    const privateClient = createClient(supabaseUrl, supabaseServiceKey, {
+      db: { schema: 'private' },
     });
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) return jsonError('Missing auth', 401);
 
-    // Verify User
-    const authClient = createClient(supabaseUrl, supabaseServiceKey);
     const jwt = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await authClient.auth.getUser(jwt);
+    const { data: { user }, error: authError } = await publicClient.auth.getUser(jwt);
 
     if (authError || !user) {
       return jsonError('Unauthorized', 401);
@@ -66,7 +66,7 @@ serve(async (req) => {
       return jsonError('Device authorization missing', 401);
     }
 
-    const { data: binding, error: bindError } = await adminClient
+    const { data: binding, error: bindError } = await publicClient
       .from('user_device_bindings')
       .select('public_key')
       .eq('user_id', user.id)
@@ -89,7 +89,7 @@ serve(async (req) => {
     // C. CHECK LOCKOUT
     // ------------------------------------------------------------------------
     // ... (existing lockout logic) ...
-    const { data: secret, error: secretError } = await adminClient
+    const { data: secret, error: secretError } = await privateClient
       .from('user_auth_secrets')
       .select('*')
       .eq('user_id', user.id)
@@ -127,7 +127,7 @@ serve(async (req) => {
     // ------------------------------------------------------------------------
     // D. VALIDATE CHALLENGE & RESET
     // ------------------------------------------------------------------------
-    const { data: kyc, error: kycError } = await authClient
+    const { data: kyc, error: kycError } = await publicClient
       .from('identity_verification')
       .select('passport_number')
       .eq('user_id', user.id)
@@ -149,13 +149,13 @@ serve(async (req) => {
       console.log(`[ResetPin] Challenge passed for ${user.id}`);
 
       // Update Device Last Used
-      await adminClient
+      await publicClient
         .from('user_device_bindings')
         .update({ last_used_at: new Date().toISOString() })
         .eq('device_id', deviceId);
 
       // A. Clear Secret Hash
-      const { error: resetSecretError } = await adminClient
+      const { error: resetSecretError } = await privateClient
         .from('user_auth_secrets') // in private schema
         .update({
           pin_hash: null,
@@ -168,9 +168,9 @@ serve(async (req) => {
       if (resetSecretError) throw resetSecretError;
 
       // B. Update Profile
-      const { error: profileError } = await authClient
+      const { error: profileError } = await publicClient
         .from('profiles')
-        .update({ pin_enabled: false })
+        .update({ has_pin: false })
         .eq('id', user.id);
 
       if (profileError) throw profileError;
@@ -196,7 +196,7 @@ serve(async (req) => {
           errorMsg = `Incorrect answer. ${3 - newFailed} attempts remaining.`;
         }
 
-        await adminClient
+        await privateClient
           .from('user_auth_secrets')
           .update({
             failed_attempts: newFailed,

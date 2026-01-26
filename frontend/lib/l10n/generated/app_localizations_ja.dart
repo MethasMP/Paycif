@@ -171,6 +171,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get commonValidationFailed => '入力内容を確認してください';
 
   @override
+  String get commonForgotPin => 'Forgot PIN?';
+
+  @override
   String get commonDefault => 'デフォルト';
 
   @override

@@ -100,6 +100,18 @@ class _PinEntryWidgetState extends State<PinEntryWidget> {
     });
   }
 
+  String _formatErrorMessage(String error) {
+    if (error.contains('FunctionException') ||
+        error.contains('500') ||
+        error.contains('Identity registration failed')) {
+      return 'Security service temporarily unavailable. Please try again.';
+    }
+    if (error.contains('Incorrect PIN') || error.contains('Invalid PIN')) {
+      return 'Incorrect passcode. Please verify and try again.';
+    }
+    return error;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<SecurityController>(
@@ -116,23 +128,56 @@ class _PinEntryWidgetState extends State<PinEntryWidget> {
             // Status / Prompt
             if (errorMsg != null && !isLocked)
               Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: Text(
-                  errorMsg,
-                  style: const TextStyle(
-                    color: Colors.red,
-                    fontWeight: FontWeight.bold,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 8,
+                ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
                   ),
-                ).animate().shake(),
-              ),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.red.shade100),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.lock_reset_rounded,
+                        size: 20,
+                        color: Colors.red.shade700,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _formatErrorMessage(errorMsg),
+                          style: TextStyle(
+                            color: Colors.red.shade700,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ).animate().shake(),
 
             if (widget.isSetupMode)
               Text(
-                _isConfirming ? 'Confirm your PIN' : 'Enter new PIN',
-                style: Theme.of(context).textTheme.titleMedium,
+                _isConfirming
+                    ? 'Verify Your Security PIN'
+                    : 'Set Your Security PIN',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).primaryColor,
+                  letterSpacing: 0.5,
+                ),
               ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
 
             // PIN Dots
             Row(
@@ -140,21 +185,27 @@ class _PinEntryWidgetState extends State<PinEntryWidget> {
               children: List.generate(6, (index) {
                 final isFilled = index < _pin.length;
                 return Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 8),
-                  width: 16,
-                  height: 16,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isFilled
-                        ? Theme.of(context).primaryColor
-                        : Colors.grey.shade300,
-                    border: isFilled ? null : Border.all(color: Colors.grey),
-                  ),
-                ).animate(target: isFilled ? 1 : 0).scale(duration: 100.ms);
+                      margin: const EdgeInsets.symmetric(horizontal: 10),
+                      width: 14,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isFilled
+                            ? Theme.of(context).primaryColor
+                            : Colors.grey.withValues(alpha: 0.2),
+                        border: isFilled
+                            ? null
+                            : Border.all(
+                                color: Colors.grey.withValues(alpha: 0.3),
+                              ),
+                      ),
+                    )
+                    .animate(target: isFilled ? 1 : 0)
+                    .scale(duration: 200.ms, curve: Curves.elasticOut);
               }),
             ),
 
-            const Spacer(),
+            const SizedBox(height: 24),
 
             // Keypad
             _buildKeypad(),
@@ -226,20 +277,30 @@ class _PinEntryWidgetState extends State<PinEntryWidget> {
   }
 
   Widget _buildDigitButton(String digit) {
-    return InkWell(
-      onTap: () => _onKeyPress(digit),
-      borderRadius: BorderRadius.circular(32),
-      child: Container(
-        width: 64,
-        height: 64,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: Colors.grey.shade100, // Light background
-        ),
-        child: Text(
-          digit,
-          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _onKeyPress(digit),
+        borderRadius: BorderRadius.circular(40),
+        child: Container(
+          width: 72,
+          height: 72,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white10
+                : Colors.grey.shade50,
+          ),
+          child: Text(
+            digit,
+            style: const TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w500,
+              fontFamily: 'Inter',
+            ),
+          ),
         ),
       ),
     );

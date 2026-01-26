@@ -69,4 +69,15 @@ class SecurityRemoteDataSource {
 
     return response != null;
   }
+
+  Future<Map<String, dynamic>?> getProfileStatus() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return null;
+
+    return await _supabase
+        .from('profiles')
+        .select('has_pin, kyc_status')
+        .eq('id', user.id)
+        .maybeSingle();
+  }
 }

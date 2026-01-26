@@ -17,6 +17,12 @@ import 'controllers/payment_controller.dart';
 import 'repositories/dashboard_repository.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+import 'features/security/data/datasources/security_remote_data_source.dart';
+import 'features/security/data/datasources/crypto_service.dart';
+import 'features/security/data/datasources/secure_storage_service.dart';
+import 'features/security/data/repositories/security_repository_impl.dart';
+import 'features/security/presentation/logic/security_controller.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
@@ -128,6 +134,17 @@ class _PaycifAppState extends State<PaycifApp> with WidgetsBindingObserver {
                   create: (context) => DashboardController(
                     DashboardRepository(Supabase.instance.client),
                   )..init(),
+                ),
+                ChangeNotifierProvider<SecurityController>(
+                  create: (context) => SecurityController(
+                    SecurityRepositoryImpl(
+                      remoteDataSource: SecurityRemoteDataSource(
+                        Supabase.instance.client,
+                      ),
+                      cryptoService: CryptoService(),
+                      secureStorage: SecureStorageService(),
+                    ),
+                  ),
                 ),
               ],
               child: MaterialApp(

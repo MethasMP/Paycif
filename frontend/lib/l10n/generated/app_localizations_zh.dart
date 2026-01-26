@@ -171,6 +171,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get commonValidationFailed => '请检查高亮显示的字段。';
 
   @override
+  String get commonForgotPin => 'Forgot PIN?';
+
+  @override
   String get commonDefault => '默认';
 
   @override

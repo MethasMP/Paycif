@@ -426,6 +426,12 @@ abstract class AppLocalizations {
   /// **'Please check the highlighted fields.'**
   String get commonValidationFailed;
 
+  /// No description provided for @commonForgotPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Forgot PIN?'**
+  String get commonForgotPin;
+
   /// No description provided for @commonDefault.
   ///
   /// In en, this message translates to:

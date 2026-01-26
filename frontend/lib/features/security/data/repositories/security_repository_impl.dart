@@ -137,4 +137,14 @@ class SecurityRepositoryImpl implements SecurityRepository {
       return false;
     }
   }
+
+  @override
+  Future<bool> hasPin() async {
+    try {
+      final status = await _remoteDataSource.getProfileStatus();
+      return status?['has_pin'] ?? false;
+    } catch (e) {
+      return false;
+    }
+  }
 }

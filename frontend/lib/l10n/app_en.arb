@@ -58,6 +58,7 @@
   "commonRequired": "Required",
   "commonInvalid": "Invalid",
   "commonValidationFailed": "Please check the highlighted fields.",
+  "commonForgotPin": "Forgot PIN?",
   "commonDefault": "Default",
   "commonEdit": "Edit",
   "commonDone": "Done",

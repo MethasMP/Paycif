@@ -13,4 +13,7 @@ abstract class SecurityRepository {
 
   /// Checks if the device is currently bound.
   Future<bool> isDeviceBound();
+
+  /// Checks if the user has a PIN set up.
+  Future<bool> hasPin();
 }
