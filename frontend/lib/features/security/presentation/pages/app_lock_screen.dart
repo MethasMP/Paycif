@@ -41,8 +41,14 @@ class _AppLockScreenState extends State<AppLockScreen> {
     }
 
     if (hasPin) {
-      _determineBiometricType();
-      _tryBiometricUnlock();
+      await _determineBiometricType();
+
+      // 🛡️ World-Class UX: Biometric-First Auto-Trigger
+      // Add a small delay to ensure UI is mounted and Navigation animations finished.
+      // This prevents the OS prompt from failing due to race conditions.
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) _tryBiometricUnlock(isAutoTrigger: true);
+      });
     }
   }
 
@@ -61,8 +67,9 @@ class _AppLockScreenState extends State<AppLockScreen> {
     }
   }
 
-  Future<void> _tryBiometricUnlock() async {
+  Future<void> _tryBiometricUnlock({bool isAutoTrigger = false}) async {
     final prefs = await SharedPreferences.getInstance();
+    await prefs.reload(); // Force reload from disk
     final bool isBiometricEnabled = prefs.getBool('biometric_enabled') ?? false;
 
     if (!isBiometricEnabled) {
@@ -71,12 +78,13 @@ class _AppLockScreenState extends State<AppLockScreen> {
 
     try {
       final canCheck = await _auth.canCheckBiometrics;
-      if (!canCheck) {
-        return;
-      }
+      if (!canCheck) return;
+
+      // 🧠 Tactile Feedback: Acknowledge the start of scanning
+      if (!isAutoTrigger) HapticFeedback.mediumImpact();
 
       final authenticated = await _auth.authenticate(
-        localizedReason: 'Please authenticate to unlock Paycif',
+        localizedReason: 'Secure access to your Paycif Wallet',
         options: const AuthenticationOptions(
           stickyAuth: true,
           biometricOnly: true,
@@ -84,21 +92,28 @@ class _AppLockScreenState extends State<AppLockScreen> {
       );
 
       if (authenticated) {
+        HapticFeedback.lightImpact();
         _unlockApp();
+      } else {
+        // User Canceled or didn't match.
+        // Fallback: Just stay on PIN pad.
+        debugPrint('🛡️ Biometric authentication unsuccessful or canceled.');
       }
-    } on PlatformException catch (_) {
-      // Error -> Fallback to PIN
+    } on PlatformException catch (e) {
+      debugPrint('⚠️ Biometric error: $e');
+      // Fallback: PIN pad is already visible.
     }
   }
 
   void _unlockApp() {
+    if (!mounted) return;
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (_) => const MainScreen()),
     );
   }
 
-  void _onPinSuccess() {
+  void _onPinSuccess(String pin) {
     _unlockApp();
   }
 

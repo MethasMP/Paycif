@@ -1,0 +1,11 @@
+[functions.bind-device]
+verify_jwt = false
+
+[functions.verify-pin]
+verify_jwt = false
+
+[functions.change-pin]
+verify_jwt = false
+
+[functions.setup-pin]
+verify_jwt = false

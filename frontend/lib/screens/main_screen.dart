@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../features/security/presentation/logic/security_controller.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'login_screen.dart' as import_login;
 import '../services/api_service.dart';
 import 'package:flutter/services.dart';
 
@@ -24,13 +28,41 @@ class _MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
     // 🚀 PRE-WARM CACHE: Start fetching data in the background immediately
-    // so it's ready before the user clicks on the Payment tab.
     _prewarmCache();
+
+    // 🛡️ World-Class Security: Global Auth Listener
+    // If the session expires or is killed by Sudo Mode (401),
+    // this listener ensures we INSTANTLY redirect to Login,
+    // closing all modals/sheets.
+    Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      if (data.event == AuthChangeEvent.signedOut) {
+        if (mounted) {
+          // Prevent double navigation if already on LoginScreen?
+          // Technically pushAndRemoveUntil clears everything.
+          // However, let's make sure we are not already going there.
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (context) => const import_login.LoginScreen(),
+            ),
+            (route) => false,
+          );
+        }
+      } else if (data.event == AuthChangeEvent.initialSession) {
+        // Handle recovery?
+      }
+    });
   }
 
   Future<void> _prewarmCache() async {
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session == null) return;
+
     try {
       debugPrint('🔥 Pre-warming caches (Background)...');
+      // 🛡️ World-Class Security: Ensure device binding is active for this session
+      // This heals "Ghost Sessions" where a device was logged in but not bound.
+      context.read<SecurityController>().ensureDeviceBinding();
+
       await Future.wait([
         _apiService.getUserProfile(),
         _apiService.getSavedCards(),

@@ -34,25 +34,29 @@ serve(async (req) => {
   }
 
   try {
-    // 2. Auth Verification (Use Admin Client for Robustness)
+    // 2. Auth Verification
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+
+    const adminClient = createClient(supabaseUrl, supabaseServiceKey);
+
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return jsonError('Missing Authorization header', 401);
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const adminClient = createClient(supabaseUrl, supabaseServiceKey);
+    // Validate Token (User Context)
+    const jwt = authHeader.replace(/^Bearer\s+/i, '');
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
 
-    const match = authHeader.match(/^Bearer\s+(.*)$/i);
-    if (!match) return jsonError('Invalid details', 401);
-
-    const jwt = match[1];
-    const { data: { user }, error: authError } = await adminClient.auth.getUser(jwt);
+    const { data: { user }, error: authError } = await userClient.auth.getUser(jwt);
 
     if (authError || !user) {
       console.error('[SetupPin] Auth failed:', authError);
-      return jsonError('Unauthorized', 401);
+      return jsonError('Unauthorized: ' + (authError?.message || 'Invalid Token'), 401);
     }
 
     // 3. Parse Body

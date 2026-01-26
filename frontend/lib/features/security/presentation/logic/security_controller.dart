@@ -68,17 +68,36 @@ class SecurityController extends ChangeNotifier {
       _setState(_state.copyWith(status: SecurityStatus.success));
       return true;
     } catch (e) {
-      // Check if error is a Lockout (423) or Auth Failure (401)
-      // Since our Repository throws strict Exceptions or we might need to parse.
-      // For now, assume message contains info or we parse a custom Exception if we made one.
-      // In a real app we'd have `Failure` objects.
-      // Let's assume the Exception string might contain "locked".
+      final errorStr = e.toString();
+      final isDeviceError = errorStr.contains('Device not recognized');
+
+      if (isDeviceError) {
+        _setState(
+          _state.copyWith(
+            status: SecurityStatus.error,
+            errorMessage: 'Device link broken. Please log in again.',
+          ),
+        );
+        // Special case: Unlike normal 401, this usually needs a full re-auth to re-bind
+        return false;
+      }
+
+      if (errorStr.contains('401') ||
+          errorStr.contains('Unauthorized') ||
+          errorStr.contains('Invalid JWT')) {
+        // 🛡️ World-Class Security: Log warning but don't force logout here.
+        // The API Interceptor/DataSource will handle refresh or force logout if refresh truly fails.
+        _setState(
+          _state.copyWith(
+            status: SecurityStatus.error,
+            errorMessage: 'Session error. Please try again.',
+          ),
+        );
+        return false;
+      }
 
       final msg = e.toString().toLowerCase();
       if (msg.contains('locked')) {
-        // Parse "Try again in X seconds" or similar if possible,
-        // or getting `locked_until` from data if we improved the Repo to return it.
-        // For MVP, we set status to locked.
         _setState(
           _state.copyWith(
             status: SecurityStatus.locked,
@@ -90,7 +109,6 @@ class SecurityController extends ChangeNotifier {
           _state.copyWith(
             status: SecurityStatus.error,
             errorMessage: 'Incorrect PIN',
-            // We could decrement locally for UI effect, but Server is Authority.
           ),
         );
       }
@@ -111,6 +129,16 @@ class SecurityController extends ChangeNotifier {
           errorMessage: e.toString(),
         ),
       );
+    }
+  }
+
+  /// Silently ensures the device is bound (Background).
+  Future<void> ensureDeviceBinding() async {
+    try {
+      await _repository.bindCurrentDevice();
+    } catch (e) {
+      debugPrint('Silent binding failed: $e');
+      // Do not update UI state to avoid disruption
     }
   }
 
@@ -145,5 +173,24 @@ class SecurityController extends ChangeNotifier {
   /// Checks if the user has a PIN correctly configured.
   Future<bool> hasPin() async {
     return await _repository.hasPin();
+  }
+
+  /// Changes the user's PIN securely.
+  Future<bool> changePin({
+    required String oldPin,
+    required String newPin,
+  }) async {
+    _setState(_state.copyWith(status: SecurityStatus.loading));
+    try {
+      await _repository.changePin(oldPin: oldPin, newPin: newPin);
+      _setState(_state.copyWith(status: SecurityStatus.success));
+      return true;
+    } catch (e) {
+      final msg = e.toString().replaceAll('Exception:', '').trim();
+      _setState(
+        _state.copyWith(status: SecurityStatus.error, errorMessage: msg),
+      );
+      return false;
+    }
   }
 }

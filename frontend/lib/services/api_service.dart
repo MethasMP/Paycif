@@ -28,7 +28,8 @@ class ApiService {
   // Static Completer to handle concurrent refresh requests (The "Race Condition Killer")
   static Completer<void>? _refreshCompleter;
 
-  Future<void> _ensureSessionValid({bool forceRefresh = false}) async {
+  // Made Public Static for Global Access (MainScreen, SecurityDataSource, etc.)
+  static Future<void> ensureSessionValid({bool forceRefresh = false}) async {
     final session = Supabase.instance.client.auth.currentSession;
     if (session == null) return;
 
@@ -63,6 +64,8 @@ class ApiService {
     } catch (e) {
       debugPrint("⚠️ [Universal] Silent refresh failed: $e");
       _refreshCompleter?.completeError(e);
+      // We do NOT rethrow here to avoid crashing callers.
+      // If refresh failed, subsequent API calls will fail 401 and trigger their own recovery loops if needed.
     } finally {
       // 🔓 UNLOCK: Clear completer so next check runs fresh
       _refreshCompleter = null;
@@ -71,42 +74,57 @@ class ApiService {
 
   // 🛡️ Helper: Robust Edge Function Invoker (Total Control Edition)
   // Uses RAW HTTP to bypass any internal client state lag.
-  Future<FunctionResponse> _invokeEdgeFunction(
+  // Made STATIC for universal use (Race condition proof).
+  static Future<FunctionResponse> invokeEdgeFunction(
     String functionName, {
     Map<String, dynamic>? body,
+    Map<String, String>? headers,
   }) async {
     // 1. Proactive Health Check
-    await _ensureSessionValid();
+    await ApiService.ensureSessionValid();
 
     try {
       // 2. Initial Attempt (Raw HTTP)
-      return await _invokeRaw(functionName, body: body);
+      return await invokeRaw(functionName, body: body, headers: headers);
     } on FunctionException catch (e) {
       // 3. Catch 401 (Unauthorized) specifically
-      if (e.status == 401) {
+      // 🛡️ World-Class: Check if it's a REAL session error or a "Logical 401"
+      final isLogicalError =
+          e.details?['error']?.toString().contains('Device not recognized') ??
+          false;
+
+      if (e.status == 401 && !isLogicalError) {
         debugPrint(
-          "🚨 [Interceptor] Caught 401 in $functionName. Force refreshing & Explicit retry...",
+          "🚨 [Universal Invoker] Caught 401 in $functionName. Force refreshing & Explicit retry...",
         );
 
         // 4. Force Refresh via Mutex Lock
         try {
-          await _ensureSessionValid(forceRefresh: true);
+          await ApiService.ensureSessionValid(forceRefresh: true);
 
           final freshToken =
               Supabase.instance.client.auth.currentSession?.accessToken;
           debugPrint(
-            "✅ [Interceptor] Token refreshed. Retrying with explicit raw header...",
+            "✅ [Universal Invoker] Token refreshed. Retrying with explicit fresh token...",
           );
 
-          // 5. Retry with EXPLICIT Header Propagation (Raw HTTP)
-          return await _invokeRaw(functionName, body: body, token: freshToken);
+          // 5. Short Delay to allow session propagation
+          await Future.delayed(const Duration(milliseconds: 300));
+
+          // 6. Retry with EXPLICIT Fresh Token (Raw HTTP)
+          return await invokeRaw(
+            functionName,
+            body: body,
+            token: freshToken,
+            headers: headers,
+          );
         } catch (refreshError) {
           debugPrint(
-            "❌ [Interceptor] Resilience recovery failed: $refreshError",
+            "❌ [Universal Invoker] Resilience recovery failed: $refreshError",
           );
-          // 🛡️ World-Class Self-Healing: If we can't refresh, the session is poisoned.
-          // Force a sign out to clear the bad local state.
-          await Supabase.instance.client.auth.signOut();
+          // 🛡️ World-Class Self-Healing: If refresh failed or server still rejects,
+          // we throw the error so the caller can handle it (UI toast, etc).
+          // DO NOT forcedly sign out here, as it causes death loops for server-side bugs.
           rethrow;
         }
       }
@@ -116,10 +134,11 @@ class ApiService {
 
   // 🛡️ Raw HTTP Invoker for Edge Functions
   // This provides absolute control over headers.
-  Future<FunctionResponse> _invokeRaw(
+  static Future<FunctionResponse> invokeRaw(
     String functionName, {
     Map<String, dynamic>? body,
     String? token,
+    Map<String, String>? headers,
   }) async {
     final client = Supabase.instance.client;
     final jwt = token ?? client.auth.currentSession?.accessToken ?? '';
@@ -144,13 +163,19 @@ class ApiService {
     // Format: https://[project-id].supabase.co/functions/v1/[function-name]
     final functionUrl = Uri.parse('$supabaseUrl/functions/v1/$functionName');
 
+    // Merge custom headers
+    final Map<String, String> finalHeaders = {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $sanitizedJwt',
+      'apikey': supabaseKey,
+      ...headers ?? {},
+    };
+
+    debugPrint('🌐 [RawInvoke] $functionName');
+
     final response = await http.post(
       functionUrl,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $sanitizedJwt',
-        'apikey': supabaseKey,
-      },
+      headers: finalHeaders,
       body: body != null ? jsonEncode(body) : null,
     );
 
@@ -176,6 +201,9 @@ class ApiService {
         details = {'error': response.body};
       }
 
+      // 🔍 DEBUG: Print full error details for all non-2xx responses
+      debugPrint('❌ [RawInvoke] Error - Details: $details');
+
       throw FunctionException(
         status: response.statusCode,
         reasonPhrase: response.reasonPhrase,
@@ -196,7 +224,7 @@ class ApiService {
       debugPrint("🚨 [Universal Interceptor] 401 detected. Recovery mode...");
       try {
         // 1. Synchronized Refresh
-        await _ensureSessionValid(forceRefresh: true);
+        await ApiService.ensureSessionValid(forceRefresh: true);
 
         // 2. Retry with pristine headers
         final freshHeaders = await _getHeaders();
@@ -218,7 +246,7 @@ class ApiService {
 
   // 2. Helper to get headers
   Future<Map<String, String>> _getHeaders() async {
-    await _ensureSessionValid(); // 🛡️ Universal Protection
+    await ApiService.ensureSessionValid(); // 🛡️ Universal Protection
 
     final session = Supabase.instance.client.auth.currentSession;
     final String token = session?.accessToken ?? '';
@@ -272,7 +300,7 @@ class ApiService {
   // Get User Profile
   Future<Map<String, dynamic>?> getUserProfile() async {
     try {
-      await _ensureSessionValid(); // 🛡️ Protect Profile
+      await ApiService.ensureSessionValid(); // 🛡️ Protect Profile
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) return null;
 
@@ -485,7 +513,7 @@ class ApiService {
       );
 
       // 🛡️ Use Robust Invoker
-      final response = await _invokeEdgeFunction(
+      final response = await ApiService.invokeEdgeFunction(
         'payout-executor',
         body: {
           'user_id': user.id,
@@ -549,7 +577,7 @@ class ApiService {
       debugPrint('🚀 [ApiService] Sending Payload to Edge Function: $payload');
 
       // 🛡️ Use Robust Invoker
-      final response = await _invokeEdgeFunction(
+      final response = await ApiService.invokeEdgeFunction(
         'inbound-handler', // inbound-handler
         body: payload,
       );
@@ -607,7 +635,7 @@ class ApiService {
     try {
       debugPrint('🌐 Fetching saved cards from Edge Function...');
       // 🛡️ Use Robust Invoker
-      final response = await _invokeEdgeFunction('get-saved-cards');
+      final response = await ApiService.invokeEdgeFunction('get-saved-cards');
 
       if (response.status != 200) {
         debugPrint('Failed to get saved cards: ${response.status}');
@@ -635,7 +663,7 @@ class ApiService {
     try {
       debugPrint('💳 Saving new card with token: $token');
       // 🛡️ Use Robust Invoker
-      final response = await _invokeEdgeFunction(
+      final response = await ApiService.invokeEdgeFunction(
         'manage-payment-methods',
         body: {'action': 'add-card', 'token': token},
       );
@@ -660,7 +688,7 @@ class ApiService {
     try {
       debugPrint('🗑️ Deleting card: $cardId');
       // 🛡️ Use Robust Invoker
-      final response = await _invokeEdgeFunction(
+      final response = await ApiService.invokeEdgeFunction(
         'manage-payment-methods',
         body: {'action': 'delete-card', 'card_id': cardId},
       );

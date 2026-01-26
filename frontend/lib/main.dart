@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'screens/splash_screen.dart';
 import 'services/connectivity_service.dart';
+import 'services/api_service.dart';
 import 'widgets/connectivity_wrapper.dart';
 import 'utils/theme_notifier.dart';
 import 'utils/language_notifier.dart';
 import 'theme/app_theme.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
-import 'package:jwt_decoder/jwt_decoder.dart';
+// import 'package:jwt_decoder/jwt_decoder.dart'; // No longer needed
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
@@ -20,8 +22,10 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'features/security/data/datasources/security_remote_data_source.dart';
 import 'features/security/data/datasources/crypto_service.dart';
 import 'features/security/data/datasources/secure_storage_service.dart';
+import 'features/security/domain/repositories/security_repository.dart';
 import 'features/security/data/repositories/security_repository_impl.dart';
 import 'features/security/presentation/logic/security_controller.dart';
+import 'features/security/presentation/pages/app_lock_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -59,56 +63,84 @@ class PaycifApp extends StatefulWidget {
 }
 
 class _PaycifAppState extends State<PaycifApp> with WidgetsBindingObserver {
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
+  Timer? _heartbeatTimer;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
+    // 💓 The Supreme Session Engine: Heartbeat Timer
+    // Check and refresh session proactively every 15 minutes
+    // even if the user is just sitting on a screen.
+    // This makes the "Expiry" non-existent to the user.
+    _heartbeatTimer = Timer.periodic(const Duration(minutes: 15), (timer) {
+      _checkSessionHealth();
+    });
   }
 
   @override
   void dispose() {
+    _heartbeatTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
+
+  DateTime? _lastBackgroundTime;
+  static const _lockdownThreshold = Duration(seconds: 30);
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _checkSessionHealth();
+      _checkBackgroundLockdown();
+    } else if (state == AppLifecycleState.paused) {
+      _lastBackgroundTime = DateTime.now();
+      debugPrint("📱 [Security] App backgrounded at: $_lastBackgroundTime");
     }
+  }
+
+  void _checkBackgroundLockdown() {
+    if (_lastBackgroundTime == null) return;
+
+    final inactiveDuration = DateTime.now().difference(_lastBackgroundTime!);
+    debugPrint(
+      "📱 [Security] App resumed after: ${inactiveDuration.inSeconds}s",
+    );
+
+    if (inactiveDuration > _lockdownThreshold) {
+      debugPrint(
+        "🚨 [Security] Lockdown triggered! Redirecting to AppLockScreen...",
+      );
+      // 🛡️ World-Class Security: Force re-authentication
+      // Use navigatorKey to find the correct context for navigation
+      navigatorKey.currentState?.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const AppLockScreen()),
+        (route) => false,
+      );
+    }
+    _lastBackgroundTime = null; // Reset
   }
 
   Future<void> _checkSessionHealth() async {
     final session = Supabase.instance.client.auth.currentSession;
     if (session != null) {
-      // 🛡️ World-Class: Auto-Refresh on Resume
-      // If token is expired or close to expiring (within 10 mins), refresh it.
-      final isNearlyExpired =
-          JwtDecoder.getExpirationDate(
-            session.accessToken,
-          ).difference(DateTime.now()).inMinutes <
-          10;
+      // 🛡️ World-Class First Principle: "Daily Use = Never Expire"
+      // We use the Centralized Mutex from ApiService to prevent Race Conditions.
+      // This ensures that MainScreen, SecurityDataSource, and ApiService all respect the same lock.
+      debugPrint(
+        "📱 [Resilience] App Resumed: Proactivately extending session (Centralized)...",
+      );
 
-      if (isNearlyExpired) {
-        final timeleft = JwtDecoder.getExpirationDate(
-          session.accessToken,
-        ).difference(DateTime.now()).inMinutes;
+      try {
+        await ApiService.ensureSessionValid(forceRefresh: true);
         debugPrint(
-          "📱 [Resilience] App Resumed: Token stale (${timeleft}m). Refreshing...",
+          "✅ [Resilience] Session extended successfully via Centralized Manager.",
         );
-        try {
-          // Use ApiService logic if available, or direct call with logging
-          await Supabase.instance.client.auth.refreshSession();
-          debugPrint(
-            "✅ [Resilience] App Resumed: Session refreshed successfully.",
-          );
-        } catch (e) {
-          debugPrint("⚠️ [Resilience] App Resumed: Refresh failed: $e");
-          // If refresh fails on resume, we don't force logout yet,
-          // but next API call will catch it via ApiService Interceptor.
-        }
-      } else {
-        debugPrint("📱 [Resilience] App Resumed: Session is healthy.");
+      } catch (e) {
+        debugPrint("⚠️ [Resilience] Extension warning: $e");
       }
     }
   }
@@ -127,6 +159,16 @@ class _PaycifAppState extends State<PaycifApp> with WidgetsBindingObserver {
                   create: (_) => ConnectivityService(),
                   dispose: (_, service) => service.dispose(),
                 ),
+                // 🛡️ Provide Security Infrastructure Globally
+                Provider<SecurityRepository>(
+                  create: (_) => SecurityRepositoryImpl(
+                    remoteDataSource: SecurityRemoteDataSource(
+                      Supabase.instance.client,
+                    ),
+                    cryptoService: CryptoService(),
+                    secureStorage: SecureStorageService(),
+                  ),
+                ),
                 ChangeNotifierProvider<PaymentController>(
                   create: (_) => PaymentController()..fetchData(),
                 ),
@@ -136,18 +178,12 @@ class _PaycifAppState extends State<PaycifApp> with WidgetsBindingObserver {
                   )..init(),
                 ),
                 ChangeNotifierProvider<SecurityController>(
-                  create: (context) => SecurityController(
-                    SecurityRepositoryImpl(
-                      remoteDataSource: SecurityRemoteDataSource(
-                        Supabase.instance.client,
-                      ),
-                      cryptoService: CryptoService(),
-                      secureStorage: SecureStorageService(),
-                    ),
-                  ),
+                  create: (context) =>
+                      SecurityController(context.read<SecurityRepository>()),
                 ),
               ],
               child: MaterialApp(
+                navigatorKey: navigatorKey,
                 title: 'Paycif',
                 themeMode: currentMode,
                 locale: currentLocale,

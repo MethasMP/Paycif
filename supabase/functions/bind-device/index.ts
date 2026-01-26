@@ -22,71 +22,83 @@ serve(async (req) => {
   try {
     // 1. Auth & Setup
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    // Service Role needed to potentially bypass RLS or if table is in private schema (it issues public schema but sometimes needs admin rights for "binding")
-    // Actually user_device_bindings is public, so user *could* insert if RLS allows.
-    // But safe to use Service Role for "System Binding" to ensure integrity.
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+
+    // Admin Client for Privileged Operations (DB Writes)
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) return jsonError('Missing auth', 401);
 
-    // Validate Token
-    const authClient = createClient(supabaseUrl, supabaseServiceKey);
-    const jwt = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await authClient.auth.getUser(jwt);
+    // Validate Token using Standard Pattern (Client Context)
+    const jwt = authHeader.replace(/^Bearer\s+/i, '');
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    // Explicitly pass JWT to ensure it is picked up
+    const { data: { user }, error: authError } = await userClient.auth.getUser(jwt);
 
     if (authError || !user) {
-      return jsonError('Unauthorized', 401);
+      console.error('[BindDevice] Auth Failed:', authError);
+      return jsonError('Unauthorized: ' + (authError?.message || 'Invalid Token'), 401);
     }
 
     // 2. Parse Body
-    const { public_key, device_id, device_name } = await req.json();
+    const { public_key, device_id, device_name, os_type, metadata, trust_score } = await req.json();
 
     if (!public_key || !device_id) {
       return jsonError('Missing public_key or device_id', 400);
     }
 
-    console.log(`[BindDevice] Binding device for ${user.id}. Model: ${device_name || 'Unknown'}`);
+    console.log(
+      `[BindDevice] Binding device for ${user.id}. Model: ${device_name || 'Unknown'} OS: ${
+        os_type || 'Unknown'
+      }`,
+    );
 
-    // 3. Upsert Binding
-    // NOTE: Schema provided: user_device_bindings (id, user_id, device_id, public_key, is_active, last_used_at)
-    // We will upsert based on (user_id, device_id).
+    // 3. 🛡️ Atomic Rebind Strategy: DELETE old binding, then INSERT new.
+    // This bypasses the missing unique constraint issue and ensures key rotation works.
+    // Step 1: Delete any existing binding for this (user_id, device_id)
+    await adminClient
+      .from('user_device_bindings')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('device_id', device_id);
 
+    console.log(`[BindDevice] Deleted old binding for device ${device_id}`);
+
+    // Step 2: Insert the new binding with fresh public key
     const payload: any = {
       user_id: user.id,
       device_id: device_id,
       public_key: public_key,
       is_active: true,
       last_used_at: new Date().toISOString(),
+      device_name: device_name || 'Unknown Device',
+      os_type: os_type || 'web', // Default to 'web' to satisfy CHECK constraint
+      metadata: metadata || {},
+      trust_score: trust_score ?? 100,
     };
 
-    // Optional Metadata Support (If schema supports it later)
-    // if (device_name) payload.device_name = device_name;
-
-    // Using upsert to allow re-binding (e.g., user re-installs app)
     const { error: bindError } = await adminClient
       .from('user_device_bindings')
-      .upsert(payload, { onConflict: 'user_id, device_id' } as any) // Assuming composite unique constraint?
-      // If no composite constraint, upsert might fail or duplicate.
-      // Schema constraints were "not valid for execution" in prompt.
-      // We assume standard (user_id, device_id) uniqueness for binding logic.
+      .insert(payload)
       .select();
 
     if (bindError) {
-      console.error('[BindDevice] DB Error:', bindError);
-      // If conflict error, we might need to handle it.
+      console.error('[BindDevice] DB Insert Error:', bindError);
       return jsonError('Failed to bind device', 500);
     }
 
     // 4. Audit Log (Black Box)
-    // If table exists... (Project Prompt asked for it, assuming we can attempt)
     try {
       await adminClient.from('security_logs').insert({
         user_id: user.id,
         event_type: 'DEVICE_BIND',
         device_id: device_id,
-        metadata: { device_name: device_name, timestamp: new Date() },
+        metadata: { device_name: device_name, os_type: os_type, timestamp: new Date() },
         ip_address: req.headers.get('x-forwarded-for') || 'unknown',
       });
     } catch (ignore) {

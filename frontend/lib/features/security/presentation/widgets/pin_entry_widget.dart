@@ -5,10 +5,20 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../presentation/logic/security_controller.dart';
 
 class PinEntryWidget extends StatefulWidget {
-  final VoidCallback? onSuccess;
+  final ValueChanged<String>? onSuccess;
   final bool isSetupMode;
+  final Future<void> Function(String)? onPinConfirmed;
+  final Future<bool> Function(String)? onVerify;
+  final bool showLabel;
 
-  const PinEntryWidget({super.key, this.onSuccess, this.isSetupMode = false});
+  const PinEntryWidget({
+    super.key,
+    this.onSuccess,
+    this.isSetupMode = false,
+    this.onPinConfirmed,
+    this.onVerify,
+    this.showLabel = true,
+  });
 
   @override
   State<PinEntryWidget> createState() => _PinEntryWidgetState();
@@ -62,10 +72,14 @@ class _PinEntryWidgetState extends State<PinEntryWidget> {
         // Second entry
         if (_pin == _firstPin) {
           // Match!
-          await controller.setupPin(_pin);
+          if (widget.onPinConfirmed != null) {
+            await widget.onPinConfirmed!(_pin);
+          } else {
+            await controller.setupPin(_pin);
+          }
           if (controller.state.status == SecurityStatus.success) {
             HapticFeedback.mediumImpact();
-            widget.onSuccess?.call();
+            widget.onSuccess?.call(_pin);
           } else {
             // Failed (e.g. net error)
             HapticFeedback.heavyImpact();
@@ -81,10 +95,13 @@ class _PinEntryWidgetState extends State<PinEntryWidget> {
     } else {
       // Verify Mode
       HapticFeedback.mediumImpact();
-      final success = await controller.verifyPin(_pin);
+      final success = widget.onVerify != null
+          ? await widget.onVerify!(_pin)
+          : await controller.verifyPin(_pin);
+
       if (success) {
         HapticFeedback.lightImpact();
-        widget.onSuccess?.call();
+        widget.onSuccess?.call(_pin);
       } else {
         HapticFeedback.heavyImpact();
         _onClear(); // Auto clear on error
@@ -165,7 +182,7 @@ class _PinEntryWidgetState extends State<PinEntryWidget> {
                 ),
               ).animate().shake(),
 
-            if (widget.isSetupMode)
+            if (widget.isSetupMode && widget.showLabel)
               Text(
                 _isConfirming
                     ? 'Verify Your Security PIN'

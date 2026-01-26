@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:frontend/utils/pay_notify.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -16,6 +15,8 @@ import '../utils/theme_notifier.dart';
 import '../utils/language_notifier.dart';
 import '../utils/error_translator.dart';
 import '../features/security/presentation/widgets/pin_entry_widget.dart';
+import '../features/security/presentation/widgets/change_pin_sheet.dart';
+import '../features/security/presentation/pages/linked_devices_screen.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -68,6 +69,25 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _saveBiometricState(bool enabled) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_biometricPrefKey, enabled);
+
+    // 🛡️ World-Class Security: Sync Policy to Server
+    // This allows support to remotely kill biometrics via 'biometric_enabled = false'
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user != null) {
+        await _supabase
+            .from('profiles')
+            .update({
+              'biometric_enabled': enabled,
+              'updated_at': DateTime.now().toIso8601String(),
+            })
+            .eq('id', user.id);
+      }
+    } catch (e) {
+      // Non-blocking: If network fails, local preference still rules for UX.
+      // But we log it.
+      debugPrint('⚠️ Failed to sync biometric policy: $e');
+    }
   }
 
   Future<void> _fetchProfile() async {
@@ -226,8 +246,28 @@ class _ProfilePageState extends State<ProfilePage> {
             const SizedBox(height: 16),
             _buildMenuContainer(context, [
               _buildBiometricTile(context, l10n),
-              _buildMenuItem(Icons.lock_outline, l10n.changePin),
-              _buildMenuItem(Icons.devices, l10n.linkedDevices),
+              _buildMenuItem(
+                Icons.lock_outline,
+                l10n.changePin,
+                onTap: () {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (context) => const ChangePinSheet(),
+                  );
+                },
+              ),
+              _buildMenuItem(
+                Icons.devices,
+                l10n.linkedDevices,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const LinkedDevicesScreen(),
+                  ),
+                ),
+              ),
             ]),
 
             const SizedBox(height: 32),
@@ -801,7 +841,7 @@ class _ProfilePageState extends State<ProfilePage> {
             const SizedBox(height: 16),
             Expanded(
               child: PinEntryWidget(
-                onSuccess: () {
+                onSuccess: (pin) {
                   Navigator.pop(context);
                   onVerified();
                 },

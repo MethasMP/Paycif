@@ -69,6 +69,9 @@ void main() {
             publicKey: any(named: 'publicKey'),
             deviceId: any(named: 'deviceId'),
             deviceName: any(named: 'deviceName'),
+            osType: any(named: 'osType'),
+            metadata: any(named: 'metadata'),
+            trustScore: any(named: 'trustScore'),
           ),
         ).thenAnswer((_) async {});
 
@@ -94,6 +97,9 @@ void main() {
             publicKey: 'mock_pub_key_base64',
             deviceId: any(named: 'deviceId'),
             deviceName: any(named: 'deviceName'),
+            osType: any(named: 'osType'),
+            metadata: any(named: 'metadata'),
+            trustScore: any(named: 'trustScore'),
           ),
         ).called(1);
       },
@@ -125,6 +131,9 @@ void main() {
           publicKey: any(named: 'publicKey'),
           deviceId: 'existing_uuid',
           deviceName: any(named: 'deviceName'),
+          osType: any(named: 'osType'),
+          metadata: any(named: 'metadata'),
+          trustScore: any(named: 'trustScore'),
         ),
       ).thenAnswer((_) async {});
 

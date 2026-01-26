@@ -16,4 +16,21 @@ abstract class SecurityRepository {
 
   /// Checks if the user has a PIN set up.
   Future<bool> hasPin();
+
+  /// Changes the user's PIN securely.
+  Future<void> changePin({required String oldPin, required String newPin});
+
+  /// Gets the list of active devices linked to the account.
+  Future<List<Map<String, dynamic>>> getLinkedDevices({
+    bool forceRefresh = false,
+  });
+
+  /// Real-time stream of linked devices.
+  Stream<List<Map<String, dynamic>>> watchLinkedDevices();
+
+  /// Revokes a specific device by ID.
+  Future<void> revokeDevice(String deviceId, {String? reason});
+
+  /// Gets the unique ID of the current device binding.
+  Future<String?> getCurrentDeviceId();
 }
