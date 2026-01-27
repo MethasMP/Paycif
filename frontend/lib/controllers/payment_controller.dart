@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import '../services/api_service.dart';
 import '../models/saved_card.dart';
+import '../features/security/data/datasources/secure_storage_service.dart';
+import 'dart:convert';
 
 /// 💎 PAYMENT CONTROLLER (World-Class Reactive Sync)
 /// Centralized state management for Payment Methods.
@@ -8,6 +10,10 @@ import '../models/saved_card.dart';
 /// reflects IMMEDIATELY across all other screens (e.g. Payment Settings).
 class PaymentController extends ChangeNotifier {
   final ApiService _apiService = ApiService();
+  final SecureStorageService _storage = SecureStorageService();
+
+  static const _kCardsCacheKey = 'cache_payment_cards';
+  static const _kPrefCacheKey = 'cache_payment_pref';
 
   List<SavedCard> _savedCards = [];
   String? _preferredMethodId;
@@ -23,7 +29,12 @@ class PaymentController extends ChangeNotifier {
   /// 🌐 FETCH DATA
   /// Refreshes both profile (for preference) and cards list.
   Future<void> fetchData({bool silent = false}) async {
-    if (!silent) _isLoading = true;
+    // ⚡ [Fast-Path] Warm up from Cache immediately
+    if (_savedCards.isEmpty) {
+      await _loadCache();
+    }
+
+    if (!silent && _savedCards.isEmpty) _isLoading = true;
     if (!silent) notifyListeners();
 
     try {
@@ -40,6 +51,9 @@ class PaymentController extends ChangeNotifier {
         _preferredMethodType = profile['preferred_payment_method_type'];
       }
 
+      // 📡 [Side-Effect] Persist Ground Truth to Disk
+      _saveCache().ignore();
+
       debugPrint(
         '✅ PaymentController: Data Refreshed. Pref=$_preferredMethodId',
       );
@@ -49,6 +63,43 @@ class PaymentController extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  Future<void> _loadCache() async {
+    try {
+      final cardsJson = await _storage.read(_kCardsCacheKey);
+      final prefJson = await _storage.read(_kPrefCacheKey);
+
+      if (cardsJson != null) {
+        final List<dynamic> decoded = jsonDecode(cardsJson);
+        _savedCards = decoded.map((i) => SavedCard.fromJson(i)).toList();
+      }
+
+      if (prefJson != null) {
+        final pref = jsonDecode(prefJson);
+        _preferredMethodId = pref['id'];
+        _preferredMethodType = pref['type'];
+      }
+
+      if (_savedCards.isNotEmpty) notifyListeners();
+    } catch (e) {
+      debugPrint('⚠️ [Payment] Cache load error: $e');
+    }
+  }
+
+  Future<void> _saveCache() async {
+    _storage
+        .write(
+          _kCardsCacheKey,
+          jsonEncode(_savedCards.map((c) => c.toJson()).toList()),
+        )
+        .ignore();
+    _storage
+        .write(
+          _kPrefCacheKey,
+          jsonEncode({'id': _preferredMethodId, 'type': _preferredMethodType}),
+        )
+        .ignore();
   }
 
   /// 🔗 UPDATE PREFERENCE (Instant Sync)

@@ -23,6 +23,15 @@ class Wallet {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'balance': balance,
+      'currency': currency,
+      'account_type': accountType,
+    };
+  }
+
   /// Calculates the equivalent value in the home currency (e.g., THB).
   /// Rate should be FROM this.currency TO homeCurrency.
   double getEstimatedHomeValue(ExchangeRate rate) {

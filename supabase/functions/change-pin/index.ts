@@ -144,9 +144,9 @@ serve(async (req) => {
     const newPinHash = await argon2id({
       password: new_pin,
       salt: newSalt,
-      parallelism: 4,
-      iterations: 2,
-      memorySize: 32768, // 32MB
+      parallelism: 1,
+      iterations: 1,
+      memorySize: 16384, // 16MB
       hashLength: 32,
       outputType: 'encoded',
     });

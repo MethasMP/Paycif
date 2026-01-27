@@ -4,10 +4,16 @@ import '../models/wallet_model.dart';
 import '../models/exchange_rate_model.dart';
 import '../models/transaction.dart';
 import '../services/api_service.dart';
+import '../features/security/data/datasources/secure_storage_service.dart';
+import 'dart:convert';
 
 class DashboardRepository {
   final SupabaseClient _client;
   final ApiService _api = ApiService();
+  final SecureStorageService _storage = SecureStorageService();
+
+  static const _kWalletCacheKey = 'cache_wallet_data';
+  static const _kTxCacheKey = 'cache_transactions_data';
 
   DashboardRepository(this._client);
 
@@ -19,7 +25,7 @@ class DashboardRepository {
   Stream<Wallet?> fetchUserWallet() {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) {
-      return Stream.value(null); // Return null stream if not logged in
+      return Stream.value(null);
     }
 
     // Real-time listener for the wallets table
@@ -29,11 +35,27 @@ class DashboardRepository {
         .eq('profile_id', userId)
         .limit(1)
         .map((data) {
-          if (data.isEmpty) {
-            return null;
-          }
-          return Wallet.fromJson(data.first);
+          if (data.isEmpty) return null;
+          final wallet = Wallet.fromJson(data.first);
+
+          // 📡 [Side-Effect] Keep cache in sync with Cloud ground truth
+          _storage
+              .write(_kWalletCacheKey, jsonEncode(wallet.toJson()))
+              .ignore();
+
+          return wallet;
         });
+  }
+
+  /// ⚡ [Fast-Path] Load Wallet from Disk Cache
+  Future<Wallet?> getCachedWallet() async {
+    final json = await _storage.read(_kWalletCacheKey);
+    if (json == null) return null;
+    try {
+      return Wallet.fromJson(jsonDecode(json));
+    } catch (e) {
+      return null;
+    }
   }
 
   /// Fetches the latest exchange rate for the given pair via API.
@@ -142,8 +164,30 @@ class DashboardRepository {
         .order('created_at', ascending: false)
         .limit(10) // Limit to top 10 for dashboard
         .map((data) {
-          return data.map((json) => Transaction.fromJson(json)).toList();
+          final txs = data.map((json) => Transaction.fromJson(json)).toList();
+
+          // 📡 [Side-Effect] Keep cache in sync with Cloud ground truth
+          _storage
+              .write(
+                _kTxCacheKey,
+                jsonEncode(txs.map((t) => t.toJson()).toList()),
+              )
+              .ignore();
+
+          return txs;
         });
+  }
+
+  /// ⚡ [Fast-Path] Load Transactions from Disk Cache
+  Future<List<Transaction>> getCachedTransactions() async {
+    final json = await _storage.read(_kTxCacheKey);
+    if (json == null) return [];
+    try {
+      final List<dynamic> decoded = jsonDecode(json);
+      return decoded.map((item) => Transaction.fromJson(item)).toList();
+    } catch (e) {
+      return [];
+    }
   }
 
   /// Diagnostic function to check wallet existence and permissions.

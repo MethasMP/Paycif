@@ -106,10 +106,14 @@ class DashboardController extends Cubit<DashboardState> {
     emit(DashboardState());
   }
 
-  void init() {
+  void init() async {
     // Reset state before starting new subscriptions to avoid stale data
     reset();
-    _startSubscriptions(showLoading: true);
+
+    // ⚡ [Fast-Path] Warm up UI immediately from Disk Cache
+    await _loadCache();
+
+    _startSubscriptions(showLoading: state.wallet == null);
 
     // 10x Eager Loading: Speculative Rate Prefetch
     // Most users use THB/USD. Warming this now saves ~200-500ms later.
@@ -120,6 +124,26 @@ class DashboardController extends Cubit<DashboardState> {
         debugPrint('🔥 [Audit] Speculative Rate Warmed: THB/USD');
       }
     });
+  }
+
+  Future<void> _loadCache() async {
+    try {
+      final cachedWallet = await _repository.getCachedWallet();
+      final cachedTxs = await _repository.getCachedTransactions();
+
+      if (cachedWallet != null) {
+        var newState = state.copyWith(
+          wallet: cachedWallet,
+          transactions: cachedTxs,
+          isTransactionsLoaded: cachedTxs.isNotEmpty,
+          status: 'success', // 🚫 No spinner needed if we have cache
+        );
+        emit(_calculateDisplayValues(newState));
+        debugPrint('⚡ [Dashboard] UI Warmed from Cache');
+      }
+    } catch (e) {
+      debugPrint('⚠️ [Dashboard] Cache load failed: $e');
+    }
   }
 
   Future<void> refresh() async {

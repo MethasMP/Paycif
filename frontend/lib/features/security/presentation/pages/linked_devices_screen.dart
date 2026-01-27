@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
 import '../../domain/repositories/security_repository.dart';
 import '../logic/linked_devices_controller.dart';
@@ -49,7 +48,7 @@ class _LinkedDevicesView extends StatelessWidget {
                   controller,
                   l10n,
                   isDark,
-                ).animate(delay: (index * 100).ms).fadeIn().slideX();
+                );
               },
             ),
     );

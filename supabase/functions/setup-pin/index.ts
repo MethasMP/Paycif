@@ -76,9 +76,9 @@ serve(async (req) => {
     const pinHash = await argon2id({
       password: pin,
       salt: salt,
-      parallelism: 4,
-      iterations: 2, // Reduced from 3
-      memorySize: 32768, // Reduced from 64 MB to 32 MB
+      parallelism: 1, // Optimized for Edge
+      iterations: 1, // Minimal iterations for sub-100ms response
+      memorySize: 16384, // 16MB (Better for Edge concurrency)
       hashLength: 32,
       outputType: 'encoded', // PHC String format
     });

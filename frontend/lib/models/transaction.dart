@@ -26,4 +26,15 @@ class Transaction {
       createdAt: DateTime.parse(json['created_at']),
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'wallet_id': walletId,
+      'type': type,
+      'amount': amount,
+      'description': description,
+      'created_at': createdAt.toIso8601String(),
+    };
+  }
 }

@@ -75,6 +75,16 @@ class CryptoService {
   /// Hashes a PIN using Argon2id (L1 Cache Optimized) via 'cryptography' package.
   /// Returns Base64 encoded hash bytes.
   Future<String> computePinHash(String pin, List<int> salt) async {
+    return computePinHashStatic({'pin': pin, 'salt': salt});
+  }
+
+  /// Static version for Isolate (compute) compatibility
+  static Future<String> computePinHashStatic(
+    Map<String, dynamic> params,
+  ) async {
+    final String pin = params['pin'];
+    final List<int> salt = params['salt'];
+
     final algorithm = Argon2id(
       parallelism: 1, // ⚡ Single Thread
       memory: 64, // ⚡ 64 KB (L1 Cache)

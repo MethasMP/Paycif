@@ -12,7 +12,7 @@ class LinkedDevicesController extends ChangeNotifier {
 
   StreamSubscription? _devicesSub;
 
-  bool _isLoading = true;
+  bool _isLoading = false;
   bool get isLoading => _isLoading;
 
   List<Map<String, dynamic>> _devices = [];
@@ -28,9 +28,10 @@ class LinkedDevicesController extends ChangeNotifier {
     final cachedDevices = await _repository.getLinkedDevices();
     if (cachedDevices.isNotEmpty) {
       _devices = cachedDevices;
-      _isLoading = false; // 🚫 Spinner is not needed because we have data
+      _isLoading = false;
       notifyListeners();
     } else {
+      // Only show spinner if we REALLY have nothing after the first fast check
       _isLoading = true;
       notifyListeners();
     }

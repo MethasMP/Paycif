@@ -5,34 +5,38 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 class SecureStorageService {
   final _storage = const FlutterSecureStorage();
 
-  /// iOS Options: Require device to be unlocked (Passcode/Biometric).
-  /// strictly forbids access if device is locked.
-  final _iosOptions = const IOSOptions(
+  /// Relaxed Options: For device identity (DeviceID).
+  /// Required ONLY that the device has been unlocked at least once since boot.
+  final _relaxedIosOptions = const IOSOptions(
+    accessibility: KeychainAccessibility.unlocked,
+    synchronizable: false,
+  );
+
+  /// Strict Options: For secrets (Private Keys, PIN Hashes).
+  /// Requires device to be currently unlocked (Passcode/Biometric).
+  final _strictIosOptions = const IOSOptions(
     accessibility: KeychainAccessibility.passcode,
-    synchronizable: false, // Do not sync to iCloud (device specific binding)
+    synchronizable: false,
   );
 
   /// Android Options: Use EncryptedSharedPreferences (Hardware KeyStore).
-  final _androidOptions = const AndroidOptions(
-    resetOnError: true,
-    // Ensures keys are stored in hardware-backed KeyStore
-  );
+  final _androidOptions = const AndroidOptions(resetOnError: true);
 
   /// Reads a value from secure storage.
-  Future<String?> read(String key) async {
+  Future<String?> read(String key, {bool strict = false}) async {
     return await _storage.read(
       key: key,
-      iOptions: _iosOptions,
+      iOptions: strict ? _strictIosOptions : _relaxedIosOptions,
       aOptions: _androidOptions,
     );
   }
 
   /// Writes a value to secure storage.
-  Future<void> write(String key, String value) async {
+  Future<void> write(String key, String value, {bool strict = false}) async {
     await _storage.write(
       key: key,
       value: value,
-      iOptions: _iosOptions,
+      iOptions: strict ? _strictIosOptions : _relaxedIosOptions,
       aOptions: _androidOptions,
     );
   }
@@ -41,22 +45,25 @@ class SecureStorageService {
   Future<void> delete(String key) async {
     await _storage.delete(
       key: key,
-      iOptions: _iosOptions,
+      iOptions: _strictIosOptions,
       aOptions: _androidOptions,
     );
   }
 
   /// Checks if a key exists.
-  Future<bool> containsKey(String key) async {
+  Future<bool> containsKey(String key, {bool strict = false}) async {
     return await _storage.containsKey(
       key: key,
-      iOptions: _iosOptions,
+      iOptions: strict ? _strictIosOptions : _relaxedIosOptions,
       aOptions: _androidOptions,
     );
   }
 
   /// Clears all data (useful for reset/logout).
   Future<void> clear() async {
-    await _storage.deleteAll(iOptions: _iosOptions, aOptions: _androidOptions);
+    await _storage.deleteAll(
+      iOptions: _relaxedIosOptions,
+      aOptions: _androidOptions,
+    );
   }
 }

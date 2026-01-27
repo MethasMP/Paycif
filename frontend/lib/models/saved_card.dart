@@ -35,4 +35,16 @@ class SavedCard {
 
   String get formattedExpiry =>
       '${expirationMonth.toString().padLeft(2, '0')}/${expirationYear.toString().substring(2)}';
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'brand': brand,
+      'last_digits': lastDigits,
+      'expiration_month': expirationMonth,
+      'expiration_year': expirationYear,
+      'last_used_at': lastUsedAt?.toIso8601String(),
+      'health_score': healthScore,
+    };
+  }
 }

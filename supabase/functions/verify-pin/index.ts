@@ -76,6 +76,8 @@ serve(async (req) => {
     }
 
     // Fetch binding
+    console.log(`[VerifyPin] Checking binding for User: ${user.id}, Device: ${deviceId}`);
+
     const { data: binding, error: bindError } = await adminClient
       .from('user_device_bindings')
       .select('public_key')
@@ -84,7 +86,9 @@ serve(async (req) => {
       .single();
 
     if (bindError || !binding) {
-      console.warn(`[VerifyPin] Unbound device attempt: ${deviceId}`);
+      console.warn(
+        `[VerifyPin] Device not recognized. User: ${user.id}, Device: ${deviceId}. Error: ${bindError?.message}`,
+      );
       return jsonError('Device not recognized', 401);
     }
 
