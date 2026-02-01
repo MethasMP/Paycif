@@ -31,26 +31,24 @@ serve(async (req) => {
     // 1. Auth & Setup
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
 
-    // We need Service Role to access 'private' schema via RPC (SECURITY DEFINER)
-    const adminClient = createClient(supabaseUrl, supabaseServiceKey);
+    // We need Service Role to access 'private' schema
+    // We need two clients: one for public schema and one for private
+    const publicClient = createClient(supabaseUrl, supabaseServiceKey);
+    const privateClient = createClient(supabaseUrl, supabaseServiceKey, {
+      db: { schema: 'private' },
+    });
 
+    // Verify User from Header (using standard auth client for token check)
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) return jsonError('Missing auth', 401);
 
-    // Validate Token using Standard Pattern (Client Context)
-    const jwt = authHeader.replace(/^Bearer\s+/i, '');
-    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    // Explicitly pass JWT to ensure it is picked up
-    const { data: { user }, error: authError } = await userClient.auth.getUser(jwt);
+    // Use a separate public client for auth.getUser to verify the JWT specifically
+    const jwt = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await publicClient.auth.getUser(jwt);
 
     if (authError || !user) {
-      console.error('[VerifyPin] Auth Failed:', authError);
-      return jsonError('Unauthorized (VerifyPin): ' + (authError?.message || 'Invalid Token'), 401);
+      return jsonError('Unauthorized', 401);
     }
 
     // ------------------------------------------------------------------------
@@ -76,9 +74,7 @@ serve(async (req) => {
     }
 
     // Fetch binding
-    console.log(`[VerifyPin] Checking binding for User: ${user.id}, Device: ${deviceId}`);
-
-    const { data: binding, error: bindError } = await adminClient
+    const { data: binding, error: bindError } = await publicClient
       .from('user_device_bindings')
       .select('public_key')
       .eq('user_id', user.id)
@@ -86,9 +82,7 @@ serve(async (req) => {
       .single();
 
     if (bindError || !binding) {
-      console.warn(
-        `[VerifyPin] Device not recognized. User: ${user.id}, Device: ${deviceId}. Error: ${bindError?.message}`,
-      );
+      console.warn(`[VerifyPin] Unbound device attempt: ${deviceId}`);
       return jsonError('Device not recognized', 401);
     }
 
@@ -121,13 +115,13 @@ serve(async (req) => {
     // ------------------------------------------------------------------------
     // 3. SERVER-SIDE LOCKOUT CHECK (The "Authority")
     // ------------------------------------------------------------------------
-    // 🛡️ FIX: Use RPC to access private schema instead of direct fetch
-    const { data: secret, error: secretError } = await adminClient.rpc(
-      'get_user_auth_secret',
-      { p_user_id: user.id },
-    );
+    const { data: secret, error: secretError } = await privateClient
+      .from('user_auth_secrets')
+      .select('*')
+      .eq('user_id', user.id)
+      .single();
 
-    if (secretError) {
+    if (secretError && secretError.code !== 'PGRST116') {
       console.error('Secret fetch error:', secretError);
       // 🔍 DEBUG: Expose the actual DB error for troubleshooting
       return jsonError(
@@ -174,16 +168,18 @@ serve(async (req) => {
       // SUCCESS: Reset counters
       console.log(`[VerifyPin] User ${user.id} Success`);
 
-      // 🛡️ FIX: Use RPC to update status
-      await adminClient.rpc('update_user_auth_status', {
-        p_user_id: user.id,
-        p_failed_attempts: 0,
-        p_locked_until: null,
-        p_reset_counters: true,
-      });
+      await privateClient
+        .from('user_auth_secrets')
+        .update({
+          failed_attempts: 0,
+          locked_until: null,
+          updated_at: new Date().toISOString(),
+          last_used_at: new Date().toISOString(), // Update usage
+        })
+        .eq('user_id', user.id);
 
       // Also update device last_used
-      await adminClient
+      await publicClient
         .from('user_device_bindings')
         .update({ last_used_at: new Date().toISOString() })
         .eq('device_id', deviceId);
@@ -209,13 +205,14 @@ serve(async (req) => {
         errorMsg = `Invalid PIN. ${remaining} attempts remaining.`;
       }
 
-      // 🛡️ FIX: Use RPC to update status
-      await adminClient.rpc('update_user_auth_status', {
-        p_user_id: user.id,
-        p_failed_attempts: newFailed,
-        p_locked_until: newLockedUntil,
-        p_reset_counters: false,
-      });
+      await privateClient
+        .from('user_auth_secrets')
+        .update({
+          failed_attempts: newFailed,
+          locked_until: newLockedUntil,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', user.id);
 
       return jsonError(errorMsg, 401);
     }

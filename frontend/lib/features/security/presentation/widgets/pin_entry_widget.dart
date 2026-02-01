@@ -3,7 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../presentation/logic/security_controller.dart';
+import '../../../../utils/error_translator.dart';
+import 'package:frontend/l10n/generated/app_localizations.dart';
 
+/// 🚀 World-Class PIN Entry Widget
+/// Designed 20 years ahead with premium UX/UI patterns
 class PinEntryWidget extends StatefulWidget {
   final ValueChanged<String>? onSuccess;
   final bool isSetupMode;
@@ -24,19 +28,37 @@ class PinEntryWidget extends StatefulWidget {
   State<PinEntryWidget> createState() => _PinEntryWidgetState();
 }
 
-class _PinEntryWidgetState extends State<PinEntryWidget> {
+class _PinEntryWidgetState extends State<PinEntryWidget>
+    with SingleTickerProviderStateMixin {
   String _pin = '';
-  // Setup mode specific state
-  String? _firstPin; // Confirmation step
+  String? _firstPin;
   bool _isConfirming = false;
+  bool _hasError = false;
+  late AnimationController _shakeController;
+
+  @override
+  void initState() {
+    super.initState();
+    _shakeController = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+  }
+
+  @override
+  void dispose() {
+    _shakeController.dispose();
+    super.dispose();
+  }
 
   void _onKeyPress(String key) {
-    if (_pin.length >= 6) return; // Max 6 digits
+    if (_pin.length >= 6) return;
 
     HapticFeedback.lightImpact();
 
     setState(() {
       _pin += key;
+      _hasError = false;
     });
 
     if (_pin.length == 6) {
@@ -58,20 +80,22 @@ class _PinEntryWidgetState extends State<PinEntryWidget> {
     });
   }
 
+  void _triggerErrorAnimation() {
+    setState(() => _hasError = true);
+    _shakeController.forward(from: 0);
+    HapticFeedback.heavyImpact();
+  }
+
   Future<void> _onSubmit() async {
     final controller = context.read<SecurityController>();
 
     if (widget.isSetupMode) {
       if (!_isConfirming) {
-        // First entry done, ask for confirmation
         _firstPin = _pin;
         _isConfirming = true;
         _onClear();
-        // UI feedback "Confirm PIN" (Handled by header text or similar later)
       } else {
-        // Second entry
         if (_pin == _firstPin) {
-          // Match!
           if (widget.onPinConfirmed != null) {
             await widget.onPinConfirmed!(_pin);
           } else {
@@ -81,19 +105,15 @@ class _PinEntryWidgetState extends State<PinEntryWidget> {
             HapticFeedback.mediumImpact();
             widget.onSuccess?.call(_pin);
           } else {
-            // Failed (e.g. net error)
-            HapticFeedback.heavyImpact();
+            _triggerErrorAnimation();
             _resetSetup();
           }
         } else {
-          // Mismatch
-          HapticFeedback.heavyImpact();
+          _triggerErrorAnimation();
           _resetSetup();
-          // Ideally show snackbar "PINs do not match"
         }
       }
     } else {
-      // Verify Mode
       HapticFeedback.mediumImpact();
       final success = widget.onVerify != null
           ? await widget.onVerify!(_pin)
@@ -103,8 +123,8 @@ class _PinEntryWidgetState extends State<PinEntryWidget> {
         HapticFeedback.lightImpact();
         widget.onSuccess?.call(_pin);
       } else {
-        HapticFeedback.heavyImpact();
-        _onClear(); // Auto clear on error
+        _triggerErrorAnimation();
+        _onClear();
       }
     }
   }
@@ -117,20 +137,14 @@ class _PinEntryWidgetState extends State<PinEntryWidget> {
     });
   }
 
-  String _formatErrorMessage(String error) {
-    if (error.contains('FunctionException') ||
-        error.contains('500') ||
-        error.contains('Identity registration failed')) {
-      return 'Security service temporarily unavailable. Please try again.';
-    }
-    if (error.contains('Incorrect PIN') || error.contains('Invalid PIN')) {
-      return 'Incorrect passcode. Please verify and try again.';
-    }
-    return error;
+  String _formatErrorMessage(String error, AppLocalizations l10n) {
+    return ErrorTranslator.translate(l10n, error);
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Consumer<SecurityController>(
       builder: (context, controller, child) {
         final isLocked = controller.state.status == SecurityStatus.locked;
@@ -142,93 +156,203 @@ class _PinEntryWidgetState extends State<PinEntryWidget> {
 
         return Column(
           children: [
-            // Status / Prompt
+            // 🚨 Error Banner
             if (errorMsg != null && !isLocked)
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 8,
-                ),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.red.shade50,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.red.shade100),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.lock_reset_rounded,
-                        size: 20,
-                        color: Colors.red.shade700,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          _formatErrorMessage(errorMsg),
-                          style: TextStyle(
-                            color: Colors.red.shade700,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ).animate().shake(),
-
-            if (widget.isSetupMode && widget.showLabel)
-              Text(
-                _isConfirming
-                    ? 'Verify Your Security PIN'
-                    : 'Set Your Security PIN',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: Theme.of(context).primaryColor,
-                  letterSpacing: 0.5,
-                ),
+              _buildErrorBanner(
+                errorMsg,
+                isDark,
+                AppLocalizations.of(context)!,
               ),
 
-            const SizedBox(height: 32),
+            // 📝 Setup Context
+            if (widget.isSetupMode && widget.showLabel)
+              _buildSetupPrompt(isDark),
 
-            // PIN Dots
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(6, (index) {
-                final isFilled = index < _pin.length;
-                return Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 10),
-                      width: 14,
-                      height: 14,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: isFilled
-                            ? Theme.of(context).primaryColor
-                            : Colors.grey.withValues(alpha: 0.2),
-                        border: isFilled
-                            ? null
-                            : Border.all(
-                                color: Colors.grey.withValues(alpha: 0.3),
-                              ),
-                      ),
-                    )
-                    .animate(target: isFilled ? 1 : 0)
-                    .scale(duration: 200.ms, curve: Curves.elasticOut);
-              }),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Keypad
-            _buildKeypad(),
+            // 🏛️ The Silent Sentinel (Clean, Fast)
+            _buildUnifiedConsole(isDark),
           ],
         );
       },
+    );
+  }
+
+  Widget _buildSetupPrompt(bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(
+        _isConfirming ? 'Confirm Your PIN' : 'Create Your Security PIN',
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: isDark ? Colors.white70 : Colors.black54,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUnifiedConsole(bool isDark) {
+    return Column(
+      children: [
+        // 🔘 Deep Navy Dots (Static, Instant)
+        _buildPinDots(isDark),
+
+        const SizedBox(height: 48),
+
+        // 🔢 Precision Keypad
+        _buildKeypadGrid(isDark),
+      ],
+    ); // No animation - instant render
+  }
+
+  Widget _buildKeypadGrid(bool isDark) {
+    return Column(
+      children: [
+        _buildKeypadRow(['1', '2', '3'], isDark),
+        const SizedBox(height: 12),
+        _buildKeypadRow(['4', '5', '6'], isDark),
+        const SizedBox(height: 12),
+        _buildKeypadRow(['7', '8', '9'], isDark),
+        const SizedBox(height: 12),
+        _buildKeypadRow(['EMPTY', '0', 'DEL'], isDark),
+      ],
+    );
+  }
+
+  Widget _buildErrorBanner(
+    String errorMsg,
+    bool isDark,
+    AppLocalizations l10n,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Colors.red.shade900.withValues(alpha: 0.15),
+              Colors.red.shade800.withValues(alpha: 0.05),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.red.shade400.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.red.shade400.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                Icons.error_outline_rounded,
+                size: 20,
+                color: Colors.red.shade300,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                _formatErrorMessage(errorMsg, l10n),
+                style: TextStyle(
+                  color: isDark ? Colors.red.shade200 : Colors.red.shade700,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ).animate().shake(duration: 400.ms).fadeIn();
+  }
+
+  Widget _buildPinDots(bool isDark) {
+    const navyColor = Color(0xFF0F172A); // Premium Navy
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(6, (index) {
+        final isFilled = index < _pin.length;
+
+        return AnimatedContainer(
+          duration: 100.ms,
+          margin: const EdgeInsets.symmetric(horizontal: 12),
+          width: 14,
+          height: 14,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: _hasError
+                ? Colors.red.shade600
+                : (isFilled
+                      ? (isDark ? Colors.white : navyColor)
+                      : (isDark ? Colors.white24 : Colors.grey.shade300)),
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _buildKeypadRow(List<String> keys, bool isDark) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: keys.map((key) {
+        if (key == 'EMPTY') {
+          return const SizedBox(width: 72, height: 72);
+        }
+        if (key == 'DEL') {
+          return _buildDeleteButton(isDark);
+        }
+        return _buildDigitButton(key, isDark);
+      }).toList(),
+    );
+  }
+
+  Widget _buildDigitButton(String digit, bool isDark) {
+    return GestureDetector(
+      onTapDown: (_) => HapticFeedback.lightImpact(),
+      onTap: () => _onKeyPress(digit),
+      child: Container(
+        width: 80,
+        height: 80,
+        alignment: Alignment.center,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.transparent,
+        ),
+        child: Text(
+          digit,
+          style: TextStyle(
+            fontSize: 34,
+            fontWeight: FontWeight.w400,
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
+            fontFamily: 'Outfit',
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDeleteButton(bool isDark) {
+    return GestureDetector(
+      onTap: _onDelete,
+      child: Container(
+        width: 72,
+        height: 72,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.grey.shade100,
+        ),
+        child: Icon(
+          Icons.backspace_outlined,
+          size: 26,
+          color: isDark ? Colors.white54 : Colors.grey.shade600,
+        ),
+      ),
     );
   }
 
@@ -237,89 +361,50 @@ class _PinEntryWidgetState extends State<PinEntryWidget> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.lock, size: 64, color: Colors.orange),
-          const SizedBox(height: 16),
-          Text(
-            'Security Lockout',
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.grey),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildKeypad() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        children: [
-          _buildRow(['1', '2', '3']),
-          const SizedBox(height: 24),
-          _buildRow(['4', '5', '6']),
-          const SizedBox(height: 24),
-          _buildRow(['7', '8', '9']),
-          const SizedBox(height: 24),
-          _buildRow([
-            'DOT',
-            '0',
-            'DEL',
-          ]), // DOT is empty or biometric placeholder
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRow(List<String> keys) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: keys.map((key) {
-        if (key == 'DOT') return const SizedBox(width: 64, height: 64);
-        if (key == 'DEL') {
-          return IconButton(
-            onPressed: _onDelete,
-            icon: const Icon(Icons.backspace_outlined),
-            iconSize: 28,
-            style: IconButton.styleFrom(fixedSize: const Size(64, 64)),
-          );
-        }
-        return _buildDigitButton(key);
-      }).toList(),
-    );
-  }
-
-  Widget _buildDigitButton(String digit) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => _onKeyPress(digit),
-        borderRadius: BorderRadius.circular(40),
-        child: Container(
-          width: 72,
-          height: 72,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Colors.white10
-                : Colors.grey.shade50,
-          ),
-          child: Text(
-            digit,
-            style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.w500,
-              fontFamily: 'Inter',
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: [Colors.orange.shade400, Colors.red.shade400],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.orange.withValues(alpha: 0.4),
+                  blurRadius: 30,
+                  spreadRadius: 5,
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.lock_clock_rounded,
+              size: 48,
+              color: Colors.white,
             ),
           ),
-        ),
+          const SizedBox(height: 24),
+          Text(
+            'Security Lockout',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 48),
+            child: Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.grey.shade500,
+                fontSize: 14,
+                height: 1.5,
+              ),
+            ),
+          ),
+        ],
       ),
-    );
+    ).animate().fadeIn().scale();
   }
 }

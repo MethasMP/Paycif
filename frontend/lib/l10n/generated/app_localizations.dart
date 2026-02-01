@@ -666,6 +666,78 @@ abstract class AppLocalizations {
   /// **'Instant'**
   String get topUpTrustInstant;
 
+  /// No description provided for @topUpProcessingFee.
+  ///
+  /// In en, this message translates to:
+  /// **'Transaction Fee ({percent}%)'**
+  String topUpProcessingFee(String percent);
+
+  /// No description provided for @topUpVat.
+  ///
+  /// In en, this message translates to:
+  /// **'VAT (7%)'**
+  String get topUpVat;
+
+  /// No description provided for @topUpTotalCharge.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Charge'**
+  String get topUpTotalCharge;
+
+  /// No description provided for @topUpAmountToWallet.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount to Wallet'**
+  String get topUpAmountToWallet;
+
+  /// No description provided for @topUpFeeGateway.
+  ///
+  /// In en, this message translates to:
+  /// **'Gateway Fee (Omise) {percent}%'**
+  String topUpFeeGateway(String percent);
+
+  /// No description provided for @topUpFeeNip.
+  ///
+  /// In en, this message translates to:
+  /// **'Platform Fee (Paysif)'**
+  String get topUpFeeNip;
+
+  /// No description provided for @topUpFeeVat.
+  ///
+  /// In en, this message translates to:
+  /// **'VAT ({percent}%)'**
+  String topUpFeeVat(String percent);
+
+  /// No description provided for @topUpFeeFree.
+  ///
+  /// In en, this message translates to:
+  /// **'Free'**
+  String get topUpFeeFree;
+
+  /// No description provided for @topUpChargeAmountLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Card will be charged'**
+  String get topUpChargeAmountLabel;
+
+  /// No description provided for @applePay.
+  ///
+  /// In en, this message translates to:
+  /// **'Apple Pay'**
+  String get applePay;
+
+  /// No description provided for @topUpFeeDisclosure.
+  ///
+  /// In en, this message translates to:
+  /// **'Includes {feePercent} processing fee'**
+  String topUpFeeDisclosure(String feePercent);
+
+  /// No description provided for @topUpChargeBreakdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Card will be charged ฿{chargeAmount}'**
+  String topUpChargeBreakdown(String chargeAmount);
+
   /// No description provided for @cardTitle.
   ///
   /// In en, this message translates to:

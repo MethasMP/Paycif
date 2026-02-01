@@ -30,6 +30,7 @@ type WalletService struct {
 	FX    *FXService
 	Alert *AlertService
 	Redis *redis.Client
+	Audit *AuditService
 }
 
 // TransferRequest represents a request to transfer funds.
@@ -50,7 +51,7 @@ type TransferResponse struct {
 }
 
 // NewWalletService creates a new instance of WalletService with Circuit Breaker.
-func NewWalletService(db *sql.DB, fx *FXService, alert *AlertService, redisClient *redis.Client) *WalletService {
+func NewWalletService(db *sql.DB, fx *FXService, alert *AlertService, redisClient *redis.Client, audit *AuditService) *WalletService {
 	cbSettings := gobreaker.Settings{
 		Name:        "ExternalPaymentProvider",
 		MaxRequests: 5,
@@ -67,6 +68,7 @@ func NewWalletService(db *sql.DB, fx *FXService, alert *AlertService, redisClien
 		FX:    fx,
 		Alert: alert,
 		Redis: redisClient,
+		Audit: audit,
 	}
 }
 
@@ -317,7 +319,13 @@ func (c *TransferCommand) Execute(ctx context.Context) (*TransferResponse, error
 
 // callExternalProviderStub simulates an external call wrapped by CB.
 func (c *TransferCommand) callExternalProviderStub(ctx context.Context) (bool, error) {
-	return true, nil
+	select {
+	case <-ctx.Done():
+		return false, ctx.Err()
+	default:
+		// Logic placeholder for future provider verification
+		return true, nil
+	}
 }
 
 // BalanceResponse represents the simplified balance view.
@@ -524,4 +532,168 @@ func (s *WalletService) ProcessTopUp(ctx context.Context, userID uuid.UUID, amou
 	}
 
 	return tx.Commit()
+}
+
+// PayoutRequest represents a request to pay to an external PromptPay account.
+type PayoutRequest struct {
+	UserID         uuid.UUID
+	Amount         int64  // In minor units (satang)
+	PromptPayID    string // Phone or National ID
+	RecipientName  string
+	IdempotencyKey string
+}
+
+// PayoutResponse returned after a successful payout initiation.
+type PayoutResponse struct {
+	TransactionID string `json:"transaction_id"`
+	Status        string `json:"status"`
+	Message       string `json:"message"`
+	SenderName    string `json:"sender_name"` // Added sender name for receipt
+	NewBalance    int64  `json:"new_balance"` // Added for receipt
+}
+
+// PayoutToPromptPay deducts from user's wallet and queues a payout to PromptPay.
+// Production: This would integrate with a bank API (e.g., SCB, KBANK, BOT).
+// For now, it simulates the payout by just deducting from the wallet.
+func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest) (*PayoutResponse, error) {
+	// 1. Validate Amount
+	if req.Amount <= 0 {
+		return nil, errors.New("amount must be positive")
+	}
+	if req.Amount > MaxTransactionAmount {
+		return nil, fmt.Errorf("amount exceeds single transaction limit of %.2f", float64(MaxTransactionAmount)/100)
+	}
+
+	// 2. Get User's THB Wallet and Profile Name
+	var walletID uuid.UUID
+	var currentBalance int64
+	var senderFullName string
+	err := s.DB.QueryRowContext(ctx, `
+		SELECT w.id, w.balance, p.full_name 
+		FROM wallets w
+		JOIN profiles p ON w.profile_id = p.id
+		WHERE w.profile_id = $1 AND w.currency = 'THB'
+	`, req.UserID).Scan(&walletID, &currentBalance, &senderFullName)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.New("wallet or profile not found")
+		}
+		return nil, fmt.Errorf("failed to fetch wallet/profile: %w", err)
+	}
+
+	// 3. Check Sufficient Balance
+	if currentBalance < req.Amount {
+		return nil, errors.New("insufficient balance")
+	}
+
+	// 4. Check Daily Limit
+	var dailyDebitTotal sql.NullInt64
+	err = s.DB.QueryRowContext(ctx, `
+		SELECT COALESCE(SUM(ABS(le.amount)), 0) FROM ledger_entries le
+		JOIN transactions t ON le.transaction_id = t.id
+		WHERE le.wallet_id = $1 
+		AND le.amount < 0 
+		AND t.created_at > NOW() - INTERVAL '24 hours'
+	`, walletID).Scan(&dailyDebitTotal)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("failed to check daily limit: %w", err)
+	}
+	if dailyDebitTotal.Valid && (dailyDebitTotal.Int64+req.Amount > MaxDailyUserAmount) {
+		return nil, errors.New("daily payout limit of ฿20,000 exceeded")
+	}
+
+	// 5. Begin Transaction
+	tx, err := s.DB.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// 6. Check Idempotency
+	var existingID uuid.UUID
+	err = tx.QueryRowContext(ctx, "SELECT id FROM transactions WHERE reference_id = $1", req.IdempotencyKey).Scan(&existingID)
+	if err == nil {
+		// For idempotency, we still want to show the current balance
+		var currentBal int64
+		_ = tx.QueryRowContext(ctx, "SELECT balance FROM wallets WHERE id = $1", walletID).Scan(&currentBal)
+
+		// Already processed - return success (idempotent)
+		return &PayoutResponse{
+			TransactionID: existingID.String(),
+			Status:        "already_processed",
+			Message:       "This payout was already processed",
+			SenderName:    senderFullName,
+			NewBalance:    currentBal,
+		}, nil
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("error checking idempotency: %w", err)
+	}
+
+	// 7. Create Transaction Record
+	newTxID := uuid.New()
+	description := fmt.Sprintf("PromptPay to %s (%s)", req.RecipientName, req.PromptPayID)
+	metadata := fmt.Sprintf(`{"promptpay_id": "%s", "recipient_name": "%s"}`, req.PromptPayID, req.RecipientName)
+
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO transactions (id, reference_id, description, settlement_status, metadata, wallet_id, amount, type, status)
+		VALUES ($1, $2, $3, 'PENDING', $4, $5, $6, 'PAYOUT', 'PENDING')
+	`, newTxID, req.IdempotencyKey, description, metadata, walletID, req.Amount)
+	if err != nil {
+		return nil, fmt.Errorf("failed to insert transaction: %w", err)
+	}
+
+	// 8. Deduct from Wallet
+	var newBalance int64
+	err = tx.QueryRowContext(ctx, `
+		UPDATE wallets 
+		SET balance = balance - $1, updated_at = NOW()
+		WHERE id = $2
+		RETURNING balance
+	`, req.Amount, walletID).Scan(&newBalance)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deduct from wallet: %w", err)
+	}
+
+	// 9. Create Ledger Entry (Debit)
+	// We MUST include base_currency_amount and home_currency_amount to match the schema
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO ledger_entries (
+			id, transaction_id, wallet_id, amount, 
+			balance_after, base_currency_amount, home_currency_amount
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`, uuid.New(), newTxID, walletID, -req.Amount, 
+	   newBalance, -req.Amount, -req.Amount) // Since it's THB, these are same
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ledger entry: %w", err)
+	}
+
+	// 10. Queue for Payout Processing (Outbox Pattern)
+	payload := fmt.Sprintf(`{
+		"transaction_id": "%s",
+		"promptpay_id": "%s",
+		"recipient_name": "%s",
+		"amount": %d
+	}`, newTxID, req.PromptPayID, req.RecipientName, req.Amount)
+
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO transaction_outbox (id, transaction_id, event_type, payload, status)
+		VALUES ($1, $2, 'PROMPTPAY_PAYOUT', $3, 'PENDING')
+	`, uuid.New(), newTxID, payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to queue payout: %w", err)
+	}
+
+	// 11. Commit
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return &PayoutResponse{
+		TransactionID: newTxID.String(),
+		Status:        "SUCCESS",
+		Message:       "Payout processed successfully",
+		SenderName:    senderFullName,
+		NewBalance:    newBalance,
+	}, nil
 }

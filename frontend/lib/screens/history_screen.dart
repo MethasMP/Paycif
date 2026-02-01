@@ -31,46 +31,51 @@ class HistoryScreen extends StatelessWidget {
             context,
           ); // Pass context
 
-          return ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            itemCount: grouped.keys.length,
-            itemBuilder: (context, index) {
-              final dateKey = grouped.keys.elementAt(index);
-              final transactions = grouped[dateKey]!;
+          return RefreshIndicator(
+            onRefresh: () async {
+              await context.read<DashboardController>().refresh();
+            },
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              itemCount: grouped.keys.length,
+              itemBuilder: (context, index) {
+                final dateKey = grouped.keys.elementAt(index);
+                final transactions = grouped[dateKey]!;
 
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    child: Text(
-                      dateKey.toUpperCase(),
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: Theme.of(
-                          context,
-                        ).textTheme.bodySmall?.color?.withValues(alpha: 0.5),
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.2,
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: Text(
+                        dateKey.toUpperCase(),
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: Theme.of(
+                            context,
+                          ).textTheme.bodySmall?.color?.withValues(alpha: 0.5),
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.2,
+                        ),
                       ),
                     ),
-                  ),
-                  ...transactions.map(
-                    (tx) => TransactionItem(
-                      transaction: tx,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                TransactionDetailScreen(transaction: tx),
-                          ),
-                        );
-                      },
+                    ...transactions.map(
+                      (tx) => TransactionItem(
+                        transaction: tx,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  TransactionDetailScreen(transaction: tx),
+                            ),
+                          );
+                        },
+                      ),
                     ),
-                  ),
-                ],
-              );
-            },
+                  ],
+                );
+              },
+            ),
           );
         },
       ),

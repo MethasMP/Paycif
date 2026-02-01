@@ -294,6 +294,52 @@ class AppLocalizationsEn extends AppLocalizations {
   String get topUpTrustInstant => 'Instant';
 
   @override
+  String topUpProcessingFee(String percent) {
+    return 'Transaction Fee ($percent%)';
+  }
+
+  @override
+  String get topUpVat => 'VAT (7%)';
+
+  @override
+  String get topUpTotalCharge => 'Total Charge';
+
+  @override
+  String get topUpAmountToWallet => 'Amount to Wallet';
+
+  @override
+  String topUpFeeGateway(String percent) {
+    return 'Gateway Fee (Omise) $percent%';
+  }
+
+  @override
+  String get topUpFeeNip => 'Platform Fee (Paysif)';
+
+  @override
+  String topUpFeeVat(String percent) {
+    return 'VAT ($percent%)';
+  }
+
+  @override
+  String get topUpFeeFree => 'Free';
+
+  @override
+  String get topUpChargeAmountLabel => 'Card will be charged';
+
+  @override
+  String get applePay => 'Apple Pay';
+
+  @override
+  String topUpFeeDisclosure(String feePercent) {
+    return 'Includes $feePercent processing fee';
+  }
+
+  @override
+  String topUpChargeBreakdown(String chargeAmount) {
+    return 'Card will be charged ฿$chargeAmount';
+  }
+
+  @override
   String get cardTitle => 'Add New Card';
 
   @override

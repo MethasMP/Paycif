@@ -1,8 +1,6 @@
-import 'dart:io';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../services/api_service.dart';
 import 'payment_state.dart';
-import '../models/saved_card.dart';
 
 class PaymentCubit extends Cubit<PaymentState> {
   final ApiService _apiService;
@@ -11,56 +9,68 @@ class PaymentCubit extends Cubit<PaymentState> {
     : _apiService = apiService ?? ApiService(),
       super(PaymentInitial());
 
-  Future<void> initialize(double amount) async {
+  /// Initializes the payment screen with wallet balance check.
+  Future<void> initialize(double amount, {String? recipientName}) async {
     emit(PaymentLoading());
     try {
-      // 1. Fetch User Profile & Cards
-      // In a real app, these might already be cached or passed in.
-      final results = await Future.wait([
-        _apiService.getUserProfile(),
-        _apiService.getSavedCards(),
-      ]);
+      // 1. Fetch Wallet Balance (THB) with retry for race conditions
+      Map<String, dynamic>? balanceData;
+      int retries = 0;
+      const maxRetries = 3;
 
-      final profile = results[0] as Map<String, dynamic>?;
-      final cards = results[1] as List<SavedCard>;
+      while (retries < maxRetries) {
+        try {
+          balanceData = await _apiService.getBalance('THB');
+          // If we got a valid response, break out of retry loop
+          if (balanceData['balance'] != null) break;
+        } catch (_) {
+          // Connection error, retry
+        }
+        retries++;
+        if (retries < maxRetries) {
+          await Future.delayed(Duration(milliseconds: 500 * retries));
+        }
+      }
 
-      // 2. Determine Available Methods
-      final availableMethods = <PaymentMethod>[];
-      if (Platform.isIOS) {
-        availableMethods.add(
-          const PaymentMethod(
-            id: 'apple_pay',
-            type: PaymentMethodType.applePay,
-            title: 'Apple Pay',
-            subtitle: 'Fast and secure',
+      final int balanceMinor = balanceData?['balance'] ?? 0;
+      final double balanceMajor = balanceMinor / 100.0;
+
+      // 2. Check if sufficient funds
+      final bool hasSufficientFunds = balanceMajor >= amount;
+
+      // 3. Create Wallet Payment Method
+      final walletMethod = PaymentMethod(
+        id: 'wallet_thb',
+        type: PaymentMethodType.wallet,
+        title: 'Paysif Wallet',
+        subtitle: '฿${balanceMajor.toStringAsFixed(2)} Available',
+      );
+
+      if (hasSufficientFunds) {
+        emit(
+          PaymentReady(
+            method: walletMethod,
+            amount: amount,
+            availableMethods: [walletMethod],
+            balance: balanceMajor,
+          ),
+        );
+      } else {
+        // Insufficient Balance: Emit special state
+        emit(
+          PaymentInsufficientFunds(
+            availableBalance: balanceMajor,
+            requiredAmount: amount,
           ),
         );
       }
-      availableMethods.addAll(cards.map(_mapCardToMethod));
-
-      // 3. Determine Default Method
-      final defaultMethod = _selectDefaultMethod(profile, cards);
-
-      emit(
-        PaymentReady(
-          method: defaultMethod,
-          amount: amount,
-          availableMethods: availableMethods,
-        ),
-      );
     } catch (e) {
-      // If initialization fails, we might default to "Add Card" state or retry.
-      // For now, let's assume we can at least show a "Needs Setup" state if empty.
-      // But strictly following the design: "No Method Available" triggers Add Card.
-      // For simplicity here, we'll emit a "No Method" state wrapped in Ready?
-      // Actually, let's allow PaymentReady to have a "None" method type for that case.
-      // But for now, closest valid fallback:
       emit(
         PaymentFailure(
-          errorMessage: "Failed to load payment methods",
+          errorMessage: 'Failed to load wallet: $e',
           failedMethod: const PaymentMethod(
             id: 'error',
-            type: PaymentMethodType.card,
+            type: PaymentMethodType.wallet,
             title: 'Error',
           ),
         ),
@@ -68,96 +78,66 @@ class PaymentCubit extends Cubit<PaymentState> {
     }
   }
 
-  PaymentMethod _selectDefaultMethod(
-    Map<String, dynamic>? profile,
-    List<SavedCard> cards,
-  ) {
-    // Priority 1: Device Wallet (Apple Pay / Google Pay)
-    if (Platform.isIOS) {
-      // Check if user has Apple Pay setup (mocked check for now)
-      // In production: await Stripe.instance.isApplePaySupported();
-      return const PaymentMethod(
-        id: 'apple_pay',
-        type: PaymentMethodType.applePay,
-        title: 'Apple Pay',
-        subtitle: 'Fast and secure',
-      );
-    }
-    // Android Google Pay logic would go here
-
-    // Priority 2: User's Preferred Method
-    if (profile != null) {
-      final preferredId = profile['preferred_payment_method_id'];
-      if (preferredId != null) {
-        // Try to find it in cards
-        try {
-          final preferredCard = cards.firstWhere((c) => c.id == preferredId);
-          return _mapCardToMethod(preferredCard);
-        } catch (_) {
-          // Preferred card might be deleted or invalid, fall through
-        }
-      }
-    }
-
-    // Priority 3: Most Recently Used / First Card
-    if (cards.isNotEmpty) {
-      // Sort by lastUsedAt descending
-      cards.sort((a, b) {
-        if (a.lastUsedAt == null && b.lastUsedAt == null) return 0;
-        if (a.lastUsedAt == null) return 1;
-        if (b.lastUsedAt == null) return -1;
-        return b.lastUsedAt!.compareTo(a.lastUsedAt!);
-      });
-
-      return _mapCardToMethod(cards.first);
-    }
-
-    // Priority 4: No Method (Trigger Add Card flow in UI)
-    // We'll return a placeholder that UI recognizes to show "Add Card"
-    return const PaymentMethod(
-      id: 'add_new',
-      type: PaymentMethodType.card,
-      title: 'Add Payment Method',
-    );
-  }
-
-  PaymentMethod _mapCardToMethod(SavedCard card) {
-    return PaymentMethod(
-      id: card.id,
-      type: PaymentMethodType.card,
-      title: '${card.brand} •••• ${card.lastDigits}',
-      subtitle: 'Expires ${card.formattedExpiry}',
-      cardData: card,
-    );
-  }
-
-  Future<void> pay() async {
+  /// Executes the payment from the wallet to PromptPay.
+  Future<void> pay({
+    required String recipientPromptPayId,
+    required String recipientName,
+  }) async {
     final currentState = state;
     if (currentState is! PaymentReady) return;
 
-    final method = currentState.method;
-
-    // Guard: If it's the "Add New" placeholder, we shouldn't "pay" yet.
-    if (method.id == 'add_new') return;
-
-    emit(PaymentProcessing(method: method));
+    emit(PaymentProcessing(method: currentState.method));
 
     try {
-      // Simulate Payment Processing
-      await Future.delayed(const Duration(seconds: 2));
+      // Generate unique idempotency key
+      final idempotencyKey =
+          'pay_${currentState.amount.toInt()}_${DateTime.now().millisecondsSinceEpoch}';
+
+      // Convert amount to satang (minor units)
+      final amountInSatang = (currentState.amount * 100).toInt();
+
+      // Call the real Payout API
+      final response = await _apiService.payToPromptPay(
+        amountInSatang: amountInSatang,
+        promptPayId: recipientPromptPayId,
+        recipientName: recipientName,
+        idempotencyKey: idempotencyKey,
+      );
 
       // Success!
-      emit(const PaymentSuccess(transactionId: 'tx_mock_12345'));
+      final transactionId = response['transaction_id'] ?? idempotencyKey;
+      final senderName = response['sender_name'];
+      final newBalanceRaw = response['new_balance'];
+      final remainingBalance = newBalanceRaw != null
+          ? (newBalanceRaw as num).toDouble() / 100.0
+          : null;
+
+      emit(
+        PaymentSuccess(
+          transactionId: transactionId,
+          senderName: senderName,
+          remainingBalance: remainingBalance,
+        ),
+      );
     } catch (e) {
-      emit(PaymentFailure(errorMessage: e.toString(), failedMethod: method));
-      // Auto-recovery logic could be triggered here or in the UI listener
+      emit(
+        PaymentFailure(
+          errorMessage: e.toString().replaceAll('Exception: ', ''),
+          failedMethod: currentState.method,
+        ),
+      );
     }
   }
 
   void selectMethod(PaymentMethod method) {
     if (state is PaymentReady) {
+      final currentState = state as PaymentReady;
       emit(
-        PaymentReady(method: method, amount: (state as PaymentReady).amount),
+        PaymentReady(
+          method: method,
+          amount: currentState.amount,
+          balance: currentState.balance,
+        ),
       );
     }
   }

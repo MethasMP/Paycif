@@ -3,8 +3,13 @@ package worker
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
+	"net/url"
+	"os"
+	"strings"
 	"time"
 )
 
@@ -39,16 +44,6 @@ func (w *OutboxWorker) Run(ctx context.Context) {
 }
 
 func (w *OutboxWorker) processBatch(ctx context.Context) error {
-	// Select events that are PENDING or RETRY_PENDING and ready for retry
-	// Using Exponential Backoff logic: last_attempt_at + (base * 2^retry) < NOW()
-	// Simplified poller: just check raw eligibility, exact backoff calc done here or in SQL
-	// Here we select generic 'PENDING' or failed ones that waited enough.
-	// Note: For complex backoff in SQL, it's often cleaner to just fetch and check code side or use `next_attempt_at` column.
-	// Given schema constraints (last_attempt_at), we'll select where last_attempt_at IS NULL OR ...
-	// But standard SQL exponential math is verbose. simpler: select all pending/retrying, enforce delay in code or simple interval.
-	// Let's rely on status 'RETRY_PENDING' and specific simple query for now, or just generic poll.
-
-	// We will query simple candidates.
 	rows, err := w.DB.QueryContext(ctx, `
 		SELECT id, event_type, payload, retry_count, COALESCE(last_attempt_at, '1970-01-01') 
 		FROM transaction_outbox 
@@ -74,10 +69,10 @@ func (w *OutboxWorker) processBatch(ctx context.Context) error {
 			continue
 		}
 
-		log.Printf("Processing event %s | Attempt: %d", id, retryCount+1)
+		log.Printf("Processing event %s | Type: %s | Attempt: %d", id, eventType, retryCount+1)
 
 		// Execute with Idempotency
-		err := w.callExternalBank(ctx, id, payload)
+		err := w.handleEvent(ctx, id, eventType, payload)
 
 		if err == nil {
 			// Success
@@ -96,37 +91,124 @@ func (w *OutboxWorker) processBatch(ctx context.Context) error {
 	return rows.Err()
 }
 
-// callExternalBank simulates the external API call.
-func (w *OutboxWorker) callExternalBank(ctx context.Context, idempotencyKey string, payload []byte) error {
-	// 1. Simulate Idempotency check via API headers (conceptual)
-	// req.Header.Set("Idempotency-Key", idempotencyKey)
+func (w *OutboxWorker) handleEvent(ctx context.Context, outboxID string, eventType string, payload []byte) error {
+	switch eventType {
+	case "PROMPTPAY_PAYOUT":
+		return w.processPromptPayPayout(ctx, outboxID, payload)
+	case "TRANSFER_COMPLETED":
+		// Logic for notification or other side effects
+		log.Printf("Transfer completed for event %s, no further action needed.", outboxID)
+		return nil
+	default:
+		log.Printf("Unknown event type: %s", eventType)
+		return nil
+	}
+}
 
-	// 2. Simulate Failure Modes
-	// For demo: randomly fail to show retry logic? Or strict impl.
-	// User request: "If we don't get a clear Yes/No... mark for manual/automated reconciliation"
-	// We'll simulate a 500 equivalent here.
+func (w *OutboxWorker) processPromptPayPayout(ctx context.Context, idempotencyKey string, payload []byte) error {
+	var data struct {
+		TransactionID string `json:"transaction_id"`
+		PromptPayID   string `json:"promptpay_id"`
+		RecipientName string `json:"recipient_name"`
+		Amount        int64  `json:"amount"`
+	}
 
-	// Logic: In real app, unmarshal payload, make HTTP req.
-	// Here return nil for success logic verification.
-	// return fmt.Errorf("ambiguous error") // Uncomment to test PENDING_CHECK
+	if err := json.Unmarshal(payload, &data); err != nil {
+		return fmt.Errorf("failed to unmarshal payout payload: %w", err)
+	}
+
+	omiseSecret := os.Getenv("OMISE_SECRET_KEY")
+	if omiseSecret == "" {
+		log.Println("⚠️ OMISE_SECRET_KEY not set, skipping real payout call (simulating success)")
+		return nil
+	}
+
+	client := &http.Client{Timeout: 30 * time.Second}
+
+	// 1. Create Recipient
+	recURL := "https://api.omise.co/recipients"
+	recForm := url.Values{}
+	recForm.Set("name", data.RecipientName)
+	recForm.Set("type", "individual")
+	recForm.Set("bank_account[brand]", "scb")
+	recForm.Set("bank_account[number]", data.PromptPayID)
+	recForm.Set("bank_account[name]", data.RecipientName)
+
+	req, err := http.NewRequestWithContext(ctx, "POST", recURL, strings.NewReader(recForm.Encode()))
+	if err != nil {
+		return err
+	}
+	req.SetBasicAuth(omiseSecret, "")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("omise recipient API error: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 500 {
+		return fmt.Errorf("omise recipient API server error: %d", resp.StatusCode)
+	}
+
+	var recData struct {
+		ID    string `json:"id"`
+		Error *struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	json.NewDecoder(resp.Body).Decode(&recData)
+
+	if recData.ID == "" {
+		msg := "unknown error"
+		if recData.Error != nil {
+			msg = recData.Error.Message
+		}
+		return fmt.Errorf("failed to create Omise recipient: %s", msg)
+	}
+
+	// 2. Create Transfer
+	trsfURL := "https://api.omise.co/transfers"
+	trsfForm := url.Values{}
+	trsfForm.Set("amount", fmt.Sprintf("%d", data.Amount))
+	trsfForm.Set("recipient", recData.ID)
+
+	req, err = http.NewRequestWithContext(ctx, "POST", trsfURL, strings.NewReader(trsfForm.Encode()))
+	if err != nil {
+		return err
+	}
+	req.SetBasicAuth(omiseSecret, "")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	// Use outbox ID as idempotency key for Omise
+	req.Header.Set("Omise-Idempotency-Key", idempotencyKey)
+
+	resp, err = client.Do(req)
+	if err != nil {
+		return fmt.Errorf("omise transfer API error: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 500 {
+		return fmt.Errorf("omise transfer API server error: %d", resp.StatusCode)
+	}
+
+	if resp.StatusCode >= 400 {
+		var errData struct {
+			Message string `json:"message"`
+		}
+		json.NewDecoder(resp.Body).Decode(&errData)
+		return fmt.Errorf("omise transfer API failed: %s", errData.Message)
+	}
+
+	log.Printf("✅ Successfully processed Omise payout for transaction %s", data.TransactionID)
 	return nil
 }
 
 func (w *OutboxWorker) handleFailure(ctx context.Context, id string, currentRetries int, err error) {
-	// Determine next state
-	// If error is "Ambiguous" (timeout, 500) -> PENDING_CHECK?
-	// Or standard Retry.
-	// User said: "If we don't get a clear Yes/No ... mark it for ... reconciliation"
-	// We'll assume specific error types trigger PENDING_CHECK.
-	// For generic errors, we retry until max.
-
 	newStatus := "RETRY_PENDING"
 	if currentRetries >= 5 {
-		newStatus = "FAILED" // Or PENDING_CHECK if we want human validation
+		newStatus = "FAILED"
 	}
-
-	// If truly ambiguous (like network timeout after write), maybe PENDING_CHECK immediately?
-	// Simplified: Standard retry for now.
 
 	_, _ = w.DB.ExecContext(ctx, `
 		UPDATE transaction_outbox 

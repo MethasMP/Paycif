@@ -13,13 +13,15 @@ import (
 type KYCService struct {
 	DB     *sql.DB
 	Crypto *CryptoService
+	Audit  *AuditService
 }
 
 // NewKYCService creates a new KYCService.
-func NewKYCService(db *sql.DB, crypto *CryptoService) *KYCService {
+func NewKYCService(db *sql.DB, crypto *CryptoService, audit *AuditService) *KYCService {
 	return &KYCService{
 		DB:     db,
 		Crypto: crypto,
+		Audit:  audit,
 	}
 }
 
@@ -54,6 +56,11 @@ func (s *KYCService) SubmitKYC(ctx context.Context, dto KYCSubmissionDTO) error 
 		return fmt.Errorf("failed to insert kyc record: %w", err)
 	}
 
+	// 3. Audit Log (Financial Standard)
+	s.Audit.Log(ctx, dto.UserID, "KYC_SUBMIT", "IDENTITY_VERIFICATION", dto.UserID.String(), map[string]interface{}{
+		"nationality": dto.Nationality,
+	})
+
 	return nil
 }
 
@@ -79,6 +86,9 @@ func (s *KYCService) GetKYC(ctx context.Context, userID uuid.UUID) (*KYCSubmissi
 	if err != nil {
 		return nil, fmt.Errorf("failed to decrypt passport: %w", err)
 	}
+
+	// Audit Log (Tracking who/when sensitive data was accessed)
+	s.Audit.Log(ctx, userID, "KYC_VIEW", "IDENTITY_VERIFICATION", userID.String(), nil)
 
 	return &KYCSubmissionDTO{
 		UserID:         userID, // echoed back

@@ -25,7 +25,8 @@ import 'features/security/data/datasources/secure_storage_service.dart';
 import 'features/security/domain/repositories/security_repository.dart';
 import 'features/security/data/repositories/security_repository_impl.dart';
 import 'features/security/presentation/logic/security_controller.dart';
-import 'features/security/presentation/pages/app_lock_screen.dart';
+import 'features/security/presentation/pages/security_unlock_screen.dart';
+// import 'screens/main_screen.dart'; // No longer used in main.dart nav directly
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -51,6 +52,9 @@ Future<void> main() async {
   debugPrint('🚀 [Environment] Project: $projectRef');
   debugPrint('🚀 [Environment] Key Prefix: $keyPrefix...');
   debugPrint('🚀 [Environment] Backend: ${dotenv.env['BACKEND_URL']}');
+
+  // 10x Performance: Establish early connection to backend
+  ApiService.prewarmConnection().ignore();
 
   runApp(const PaycifApp());
 }
@@ -112,12 +116,12 @@ class _PaycifAppState extends State<PaycifApp> with WidgetsBindingObserver {
 
     if (inactiveDuration > _lockdownThreshold) {
       debugPrint(
-        "🚨 [Security] Lockdown triggered! Redirecting to AppLockScreen...",
+        "🚨 [Security] Lockdown triggered! Redirecting to SecurityUnlockScreen...",
       );
       // 🛡️ World-Class Security: Force re-authentication
       // Use navigatorKey to find the correct context for navigation
       navigatorKey.currentState?.pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const AppLockScreen()),
+        MaterialPageRoute(builder: (_) => const SecurityUnlockScreen()),
         (route) => false,
       );
     }
@@ -135,10 +139,18 @@ class _PaycifAppState extends State<PaycifApp> with WidgetsBindingObserver {
       );
 
       try {
-        await ApiService.ensureSessionValid(forceRefresh: true);
+        await ApiService.ensureSessionValid(forceRefresh: false);
         debugPrint(
-          "✅ [Resilience] Session extended successfully via Centralized Manager.",
+          "✅ [Resilience] Session health checked via Centralized Manager.",
         );
+
+        // 🕯️ Background Security Warmup
+        if (navigatorKey.currentContext != null) {
+          navigatorKey.currentContext!
+              .read<SecurityController>()
+              .warmUp()
+              .ignore();
+        }
       } catch (e) {
         debugPrint("⚠️ [Resilience] Extension warning: $e");
       }

@@ -14,6 +14,8 @@ class EMFData {
   final String rawValue;
   final QRType type;
   final String? promptPayId;
+  final bool
+  isPersonal; // True if no Tag 59 (Merchant Name) - indicates Personal QR
 
   EMFData({
     required this.rawTags,
@@ -25,6 +27,7 @@ class EMFData {
     required this.rawValue,
     required this.type,
     this.promptPayId,
+    this.isPersonal = false,
   });
 }
 
@@ -40,26 +43,33 @@ class EMVCoParser {
     // 1. Validate CRC (Tag 63)
     bool isValid = _validateCRC(raw);
 
-    // 2. Extract Basic Info
-    final merchantName = tags['59'] ?? 'Unknown Merchant';
+    // 2. Extract PromptPay ID first (needed for fallback name)
+    String? promptPayId = _extractPromptPayID(tags);
+
+    // 3. Extract Basic Info - with Smart Fallback for Personal QR
+    String merchantName = tags['59'] ?? '';
+    if (merchantName.isEmpty && promptPayId != null) {
+      // Personal PromptPay: Format ID as display name
+      merchantName = _formatPromptPayDisplayName(promptPayId);
+    } else if (merchantName.isEmpty) {
+      merchantName = 'Unknown Merchant';
+    }
+
     final merchantCity = tags['60'];
 
-    // 3. Extract Amount (Tag 54)
+    // 4. Extract Amount (Tag 54)
     double? amount;
     if (tags['54'] != null) {
       amount = double.tryParse(tags['54']!);
     }
 
-    // 4. Extract Point of Initiation Method (Tag 01)
+    // 5. Extract Point of Initiation Method (Tag 01)
     // 11 = Static (Reusable), 12 = Dynamic (One-time)
     QRType type = QRType.unknown;
     if (tags['01'] == '11') type = QRType.static;
     if (tags['01'] == '12') type = QRType.dynamic;
-
-    // 5. Extract PromptPay ID (Tag 29 or 30 usually)
-    // AID: A000000677010111 -> Tag 29, Subtag 00
-    // Simplified search for PromptPay ID in Tag 29 (Credit Transfer)
-    String? promptPayId = _extractPromptPayID(tags);
+    // Determine if this is a Personal QR (no merchant name in QR)
+    final bool isPersonal = (tags['59'] ?? '').isEmpty && promptPayId != null;
 
     return EMFData(
       rawTags: tags,
@@ -71,7 +81,34 @@ class EMVCoParser {
       rawValue: raw,
       type: type,
       promptPayId: promptPayId,
+      isPersonal: isPersonal,
     );
+  }
+
+  /// Formats a PromptPay ID for user-friendly display
+  /// Input: "0066812345678" -> Output: "PromptPay: 081-234-5678"
+  /// Input: "1234567890123" (13 digits) -> Output: "PromptPay: X-XXXX-12345"
+  static String _formatPromptPayDisplayName(String id) {
+    // Remove country code prefix if present (0066 -> local format)
+    String localId = id;
+    if (id.startsWith('0066')) {
+      localId = '0${id.substring(4)}';
+    }
+
+    // Format based on type
+    if (localId.length == 10 && localId.startsWith('0')) {
+      // Mobile Number: 0XX-XXX-XXXX (mask middle)
+      return 'PromptPay: ${localId.substring(0, 3)}-XXX-${localId.substring(7)}';
+    } else if (localId.length == 13) {
+      // National ID: X-XXXX-XXXXX (heavy mask for privacy)
+      return 'PromptPay: ${localId.substring(0, 1)}-XXXX-${localId.substring(8)}';
+    } else {
+      // Fallback: Just show last 4 digits
+      final suffix = localId.length > 4
+          ? localId.substring(localId.length - 4)
+          : localId;
+      return 'PromptPay: ***$suffix';
+    }
   }
 
   static Map<String, String> _parseTLV(String raw) {

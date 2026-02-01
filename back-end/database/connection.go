@@ -42,6 +42,41 @@ func Connect() error {
 	}
 
 	log.Println("Successfully connected to the database")
+
+	// --- Auto-Migration: Ensure necessary tables exist ---
+	query := `
+	CREATE TABLE IF NOT EXISTS transaction_outbox (
+		id UUID PRIMARY KEY,
+		transaction_id UUID NOT NULL,
+		event_type VARCHAR(50) NOT NULL,
+		payload JSONB NOT NULL,
+		status VARCHAR(20) DEFAULT 'PENDING',
+		created_at TIMESTAMPTZ DEFAULT NOW(),
+		processed_at TIMESTAMPTZ
+	);
+	CREATE INDEX IF NOT EXISTS idx_outbox_status ON transaction_outbox(status);
+
+	CREATE TABLE IF NOT EXISTS audit_logs (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		user_id UUID NOT NULL,
+		action VARCHAR(100) NOT NULL,
+		resource_type VARCHAR(50) NOT NULL,
+		resource_id VARCHAR(100),
+		metadata JSONB,
+		request_id VARCHAR(100),
+		ip_address VARCHAR(50),
+		created_at TIMESTAMPTZ DEFAULT NOW()
+	);
+	CREATE INDEX IF NOT EXISTS idx_audit_user_action ON audit_logs(user_id, action);
+	CREATE INDEX IF NOT EXISTS idx_audit_created_at ON audit_logs(created_at);
+	`
+	if _, err := DB.Exec(query); err != nil {
+		log.Printf("⚠️ Warning: Failed to ensure system tables exist: %v\n", err)
+	} else {
+		log.Println("✅ Verified system tables (outbox, audit_logs).")
+	}
+	// --------------------------------------------------------
+
 	return nil
 }
 

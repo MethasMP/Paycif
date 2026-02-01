@@ -100,6 +100,53 @@
   "topUpTrustSecured": "加密保护",
   "topUpTrustNoFees": "免手续费",
   "topUpTrustInstant": "即时到账",
+  "topUpProcessingFee": "手续费 ({percent}%)",
+  "@topUpProcessingFee": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "topUpVat": "增值税 (7%)",
+  "topUpTotalCharge": "实际扣款",
+  "topUpAmountToWallet": "到账金额",
+  "topUpFeeGateway": "网关手续费 (Omise) {percent}%",
+  "@topUpFeeGateway": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "topUpFeeNip": "平台手续费 (Paysif)",
+  "topUpFeeVat": "增值税 ({percent}%)",
+  "@topUpFeeVat": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "topUpFeeFree": "免费",
+  "topUpChargeAmountLabel": "实际扣款",
+  "applePay": "Apple Pay",
+  "topUpFeeDisclosure": "含 {feePercent} 手续费",
+  "@topUpFeeDisclosure": {
+    "placeholders": {
+      "feePercent": {
+        "type": "String"
+      }
+    }
+  },
+  "topUpChargeBreakdown": "将从卡中扣取 ฿{chargeAmount}",
+  "@topUpChargeBreakdown": {
+    "placeholders": {
+      "chargeAmount": {
+        "type": "String"
+      }
+    }
+  },
 
   "cardTitle": "添加新卡",
   "cardNumber": "卡号",
@@ -152,6 +199,7 @@
   "confirmPaymentFailed": "支付失败",
   "commonOk": "确定",
   "commonValidationFailed": "请检查高亮显示的字段。",
+  "commonForgotPin": "忘记 PIN 码？",
   "errorCardInvalid": "卡片信息有误，请核对后重试。",
   "errorInsufficientFunds": "余额不足。",
   "errorProcessingFailed": "无法处理此笔付款，请稍后重试。",

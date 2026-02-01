@@ -100,6 +100,53 @@
   "topUpTrustSecured": "보안 보호",
   "topUpTrustNoFees": "수수료 없음",
   "topUpTrustInstant": "즉시 반영",
+  "topUpProcessingFee": "결제 수수료 ({percent}%)",
+  "@topUpProcessingFee": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "topUpVat": "부가세 (7%)",
+  "topUpTotalCharge": "총 결제 금액",
+  "topUpAmountToWallet": "지갑 입금액",
+  "topUpFeeGateway": "게이트웨이 수수료 (Omise) {percent}%",
+  "@topUpFeeGateway": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "topUpFeeNip": "플랫폼 수수료 (Paysif)",
+  "topUpFeeVat": "부가세 ({percent}%)",
+  "@topUpFeeVat": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "topUpFeeFree": "무료",
+  "topUpChargeAmountLabel": "총 결제 금액",
+  "applePay": "Apple Pay",
+  "topUpFeeDisclosure": "{feePercent} 수수료 포함",
+  "@topUpFeeDisclosure": {
+    "placeholders": {
+      "feePercent": {
+        "type": "String"
+      }
+    }
+  },
+  "topUpChargeBreakdown": "카드에서 ฿{chargeAmount} 결제됩니다",
+  "@topUpChargeBreakdown": {
+    "placeholders": {
+      "chargeAmount": {
+        "type": "String"
+      }
+    }
+  },
 
   "cardTitle": "카드 추가",
   "cardNumber": "카드 번호",
@@ -152,6 +199,7 @@
   "confirmPaymentFailed": "결제 실패",
   "commonOk": "확인",
   "commonValidationFailed": "강조 표시된 필드를 확인하십시오.",
+  "commonForgotPin": "PIN을 잊으셨나요?",
   "errorCardInvalid": "카드 정보가 올바르지 않습니다. 확인 후 다시 시도하십시오.",
   "errorInsufficientFunds": "계좌에 잔액이 부족합니다.",
   "errorProcessingFailed": "결제를 처리할 수 없습니다. 나중에 다시 시도하십시오.",

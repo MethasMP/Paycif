@@ -33,4 +33,7 @@ abstract class SecurityRepository {
 
   /// Gets the unique ID of the current device binding.
   Future<String?> getCurrentDeviceId();
+
+  /// 🔒 Hard-Clear: Wipes all sensitive in-memory and disk caches (Logout).
+  Future<void> clearSecurityData();
 }

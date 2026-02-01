@@ -2,6 +2,7 @@ import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../widgets/payment_method_tile.dart';
+import '../factories/payment_logo_factory.dart';
 
 /// ─────────────────────────────────────────────────────────────────────────────
 /// PAYMENT METHODS SCREEN - Tourist-First Design
@@ -159,7 +160,8 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
   Widget _buildRecommendedCard(String recommended, bool isDark) {
     final isApple = recommended == 'apple_pay';
     final title = isApple ? 'Apple Pay' : 'Google Pay';
-    final logo = isApple ? _buildApplePayLogo() : _buildGooglePayLogo();
+    // Use Factory here
+    final logo = PaymentLogoFactory.create(recommended);
 
     return RecommendedMethodCard(
       logo: logo,
@@ -181,7 +183,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
     return Column(
       children: cards.map((card) {
         return PaymentMethodTile(
-          logo: _buildCardLogo(card['id']!),
+          logo: PaymentLogoFactory.create(card['id']!),
           title: card['name']!,
           subtitle: card['sub']!,
           isSelected: _selectedMethodId == card['id'],
@@ -208,7 +210,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
     return Column(
       children: wallets.map((wallet) {
         return PaymentMethodTile(
-          logo: _buildWalletLogo(wallet['id'] as String),
+          logo: PaymentLogoFactory.create(wallet['id'] as String),
           title: wallet['name'] as String,
           subtitle: wallet['sub'] as String,
           isSelected: _selectedMethodId == wallet['id'],
@@ -249,311 +251,5 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
         ),
       ],
     );
-  }
-
-  // ─── LOGO BUILDERS ────
-
-  Widget _buildApplePayLogo() {
-    return const Icon(Icons.apple, color: Colors.black, size: 28);
-  }
-
-  Widget _buildGooglePayLogo() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: const BoxDecoration(
-            color: Color(0xFF4285F4),
-            shape: BoxShape.circle,
-          ),
-        ),
-        Container(
-          width: 8,
-          height: 8,
-          decoration: const BoxDecoration(
-            color: Color(0xFFEA4335),
-            shape: BoxShape.circle,
-          ),
-        ),
-        Container(
-          width: 8,
-          height: 8,
-          decoration: const BoxDecoration(
-            color: Color(0xFFFBBC05),
-            shape: BoxShape.circle,
-          ),
-        ),
-        Container(
-          width: 8,
-          height: 8,
-          decoration: const BoxDecoration(
-            color: Color(0xFF34A853),
-            shape: BoxShape.circle,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCardLogo(String cardId) {
-    switch (cardId) {
-      case 'card_visa':
-        return Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: const Color(0xFF1A1F71).withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Center(
-            child: Text(
-              'VISA',
-              style: TextStyle(
-                color: Color(0xFF1A1F71),
-                fontWeight: FontWeight.w900,
-                fontSize: 10,
-                letterSpacing: 1,
-              ),
-            ),
-          ),
-        );
-      case 'card_mastercard':
-        return Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: Colors.orange.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Center(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 14,
-                  height: 14,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFEB001B),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                Transform.translate(
-                  offset: const Offset(-5, 0),
-                  child: Container(
-                    width: 14,
-                    height: 14,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF79E1B).withValues(alpha: 0.9),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      case 'card_jcb':
-        return Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF003087), Color(0xFF009A44), Color(0xFFE30613)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Center(
-            child: Text(
-              'JCB',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w900,
-                fontSize: 12,
-              ),
-            ),
-          ),
-        );
-      case 'card_unionpay':
-        return Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: const Color(0xFF002B5C).withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Center(
-            child: Text(
-              'UP',
-              style: TextStyle(
-                color: Color(0xFF002B5C),
-                fontWeight: FontWeight.w900,
-                fontSize: 14,
-              ),
-            ),
-          ),
-        );
-      default:
-        return Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: Colors.grey.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Icon(Icons.credit_card, color: Colors.grey),
-        );
-    }
-  }
-
-  Widget _buildWalletLogo(String walletId) {
-    switch (walletId) {
-      case 'apple_pay':
-        return Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: Colors.black,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Icon(Icons.apple, color: Colors.white, size: 26),
-        );
-      case 'google_pay':
-        return Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey[200]!),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 6,
-                height: 6,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF4285F4),
-                  shape: BoxShape.circle,
-                ),
-              ),
-              Container(
-                width: 6,
-                height: 6,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFEA4335),
-                  shape: BoxShape.circle,
-                ),
-              ),
-              Container(
-                width: 6,
-                height: 6,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFFBBC05),
-                  shape: BoxShape.circle,
-                ),
-              ),
-              Container(
-                width: 6,
-                height: 6,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF34A853),
-                  shape: BoxShape.circle,
-                ),
-              ),
-            ],
-          ),
-        );
-      case 'paypal':
-        return Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: const Color(0xFF003087).withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Center(
-            child: Text(
-              'PP',
-              style: TextStyle(
-                color: Color(0xFF003087),
-                fontWeight: FontWeight.w900,
-                fontSize: 16,
-              ),
-            ),
-          ),
-        );
-      case 'alipay':
-        return Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: const Color(0xFF1677FF).withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Center(
-            child: Text(
-              'A',
-              style: TextStyle(
-                color: Color(0xFF1677FF),
-                fontWeight: FontWeight.w900,
-                fontSize: 20,
-              ),
-            ),
-          ),
-        );
-      case 'wechat_pay':
-        return Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: const Color(0xFF07C160).withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Center(
-            child: Text(
-              'WC',
-              style: TextStyle(
-                color: Color(0xFF07C160),
-                fontWeight: FontWeight.w900,
-                fontSize: 14,
-              ),
-            ),
-          ),
-        );
-      case 'kakao_pay':
-        return Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFE812).withValues(alpha: 0.3),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Center(
-            child: Text(
-              'K',
-              style: TextStyle(
-                color: Color(0xFF3C1E1E),
-                fontWeight: FontWeight.w900,
-                fontSize: 20,
-              ),
-            ),
-          ),
-        );
-      default:
-        return Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: Colors.grey.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Icon(Icons.account_balance_wallet, color: Colors.grey),
-        );
-    }
   }
 }

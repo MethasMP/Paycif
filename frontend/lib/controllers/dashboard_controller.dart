@@ -22,6 +22,7 @@ class DashboardState {
   final List<Transaction> transactions; // Restored missing field
   final bool isTransactionsLoaded;
   final bool isDataWarmed;
+  final bool isOffline;
 
   DashboardState({
     this.wallet,
@@ -35,6 +36,7 @@ class DashboardState {
     this.transactions = const [],
     this.isTransactionsLoaded = false,
     this.isDataWarmed = false,
+    this.isOffline = false,
   });
 
   DashboardState copyWith({
@@ -49,6 +51,7 @@ class DashboardState {
     List<Transaction>? transactions,
     bool? isTransactionsLoaded,
     bool? isDataWarmed,
+    bool? isOffline,
   }) {
     return DashboardState(
       wallet: wallet ?? this.wallet,
@@ -62,6 +65,7 @@ class DashboardState {
       transactions: transactions ?? this.transactions,
       isTransactionsLoaded: isTransactionsLoaded ?? this.isTransactionsLoaded,
       isDataWarmed: isDataWarmed ?? this.isDataWarmed,
+      isOffline: isOffline ?? this.isOffline,
     );
   }
 }
@@ -146,18 +150,18 @@ class DashboardController extends Cubit<DashboardState> {
     }
   }
 
-  Future<void> refresh() async {
-    // Restart subscriptions without clearing UI
-    _startSubscriptions(showLoading: false);
-    // Artificial delay to let the UI show the refresh spinner for a moment
-    // In a real app, we might wait for the first data emission.
-    await Future.delayed(const Duration(seconds: 1));
+  Future<void> refresh({bool showLoading = false}) async {
+    // Restart subscriptions
+    _startSubscriptions(showLoading: showLoading);
+    // Removed artificial delay to make it snappier
   }
 
   void _startSubscriptions({required bool showLoading}) {
     _walletSub?.cancel();
     _txSub
         ?.cancel(); // Also cancel transaction sub when restarting wallet fetch
+    _subscribedWalletId =
+        null; // FORCE RESET: Allow re-subscribing to get fresh transactions
 
     if (showLoading) {
       emit(state.copyWith(status: 'loading', isTransactionsLoaded: false));
@@ -180,12 +184,25 @@ class DashboardController extends Cubit<DashboardState> {
         }
       },
       onError: (e) {
-        emit(
-          state.copyWith(
-            status: 'error',
-            errorMessage: 'Failed to load wallet: $e',
-          ),
-        );
+        debugPrint('⚠️ [Dashboard] Wallet Stream Error: $e');
+        if (state.wallet != null) {
+          // 🛡️ Resilience: We have cached data, so don't block the UI.
+          // Mark as offline so UI can show a subtle indicator.
+          emit(
+            state.copyWith(
+              isOffline: true,
+              // Keep status as whatever it was from cache
+            ),
+          );
+        } else {
+          // No cache available, fatal error.
+          emit(
+            state.copyWith(
+              status: 'error',
+              errorMessage: 'Failed to load wallet: $e',
+            ),
+          );
+        }
       },
     );
   }
@@ -236,7 +253,11 @@ class DashboardController extends Cubit<DashboardState> {
   Future<void> _updateWithNewWallet(Wallet wallet) async {
     debugPrint('🔥 [Audit] Wallet Received: ID=${wallet.id}');
     // 1. Update Wallet immediately
-    var currentState = state.copyWith(wallet: wallet);
+    var currentState = state.copyWith(
+      wallet: wallet,
+      isOffline: false,
+      errorMessage: null, // Clear any transient error
+    );
 
     currentState = _calculateDisplayValues(currentState);
 
@@ -247,16 +268,23 @@ class DashboardController extends Cubit<DashboardState> {
 
     emit(currentState);
 
-    // 2. Fetch Exchange Rate in background
+    // 2. Fetch Exchange Rate in background (Isolated Success/Failure)
     if (wallet.currency != state.selectedCurrency) {
       try {
         final rate = await _repository.fetchLatestRate(
           wallet.currency,
           state.selectedCurrency,
         );
-        emit(_calculateDisplayValues(state.copyWith(exchangeRate: rate)));
+        if (rate != null) {
+          emit(_calculateDisplayValues(state.copyWith(exchangeRate: rate)));
+        }
       } catch (e) {
-        // Silently fail
+        // 🛡️ World-Class Resilience: Isolated Rate Fail
+        // If the backend rate service is down, don't kill the whole app!
+        debugPrint(
+          '⚠️ [Resilience] Rate fetch failed ($e). Wallet balance still valid.',
+        );
+        // We keep the wallet state but maybe clear the dual display if we want to be strict
       }
     }
   }
@@ -313,5 +341,52 @@ class DashboardController extends Cubit<DashboardState> {
 
   Future<String> runDiagnostic() async {
     return _repository.runWalletDiagnostic();
+  }
+
+  /// 🚀 Synchronize payment success with the Reactive Repository.
+  /// This triggers an atomic update to both local cache and streams.
+  /// 🛡️ [Trust but Verify]: We update UI instantly, then force a server sync
+  /// to ensure the "Ground Truth" overwrites any potential mismatch.
+  void syncPaymentSuccess({
+    required String transactionId,
+    required double amount,
+    required String recipientName,
+    required double remainingBalance,
+  }) {
+    debugPrint('⚡ [Optimistic] Syncing payment local state...');
+
+    // 1. Update Repository (Cache + Stream)
+    _repository.synchronizePaymentSuccess(
+      transactionId: transactionId,
+      amount: amount,
+      recipientName: recipientName,
+      remainingBalanceMajor: remainingBalance,
+    );
+
+    // 2. 🛡️ Auto-Correction: Force a background ground-truth check
+    // This handles the "What if server crashed during commit?" edge case.
+    // We wait 2 seconds for Realtime to propagate, then force a hard refresh.
+    Future.delayed(const Duration(seconds: 2), () {
+      debugPrint('🛡️ [Verify] Performing Ground-Truth Auto-Correction...');
+      refresh(showLoading: false);
+    });
+  }
+
+  /// 🚀 10x SPEED: Optimistic Balance Update
+  /// Instantly updates the UI balance without waiting for DB sync.
+  /// This makes TopUp feel instantaneous to the user.
+  void optimisticBalanceAdd(int amountSatang) {
+    if (state.wallet == null) return;
+
+    final newBalance = state.wallet!.balance + amountSatang;
+    final updatedWallet = state.wallet!.copyWith(balance: newBalance);
+
+    debugPrint(
+      '⚡ [Optimistic] Instant balance update: +$amountSatang satang -> $newBalance',
+    );
+
+    var newState = state.copyWith(wallet: updatedWallet);
+    newState = _calculateDisplayValues(newState);
+    emit(newState);
   }
 }

@@ -10,17 +10,79 @@ import '../models/saved_card.dart';
 import 'dart:async'; // Required for Completer
 
 class ApiService {
+  // 🔌 CIRCUIT BREAKER: Stop hammering a dead backend
+  static bool _isBackendDead = false;
+  static DateTime? _lastBackendFailure;
+  static const Duration _circuitBreakerCooldown = Duration(seconds: 30);
+
+  /// Check if backend is likely down (Circuit Breaker)
+  static bool get isBackendAvailable {
+    if (!_isBackendDead) return true;
+    // Auto-reset after cooldown period
+    if (_lastBackendFailure != null &&
+        DateTime.now().difference(_lastBackendFailure!) >
+            _circuitBreakerCooldown) {
+      _isBackendDead = false;
+      debugPrint('🟢 [Circuit Breaker] Cooldown expired. Retrying backend...');
+      return true;
+    }
+    return false;
+  }
+
+  /// Mark backend as dead (Circuit Breaker triggered)
+  static void _markBackendDead() {
+    if (!_isBackendDead) {
+      debugPrint(
+        '🔴 [Circuit Breaker] Backend marked as DEAD. Pausing requests for ${_circuitBreakerCooldown.inSeconds}s.',
+      );
+    }
+    _isBackendDead = true;
+    _lastBackendFailure = DateTime.now();
+  }
+
+  /// 🚀 Manual Reset (Used when user clicks 'Retry')
+  static void resetCircuitBreaker() {
+    if (_isBackendDead) {
+      debugPrint('🟢 [Circuit Breaker] Manual reset triggered.');
+      _isBackendDead = false;
+      _lastBackendFailure = null;
+    }
+  }
+
   // 1. Return to localhost for simulator access via 127.0.0.1 (Android uses 10.0.2.2 usually, iOS 127.0.0.1)
+  // 🚀 World-Class URL Management
+  // Use: flutter run --dart-define=BACKEND_URL=http://192.168.1.XX:8080/api/v1
   static String get baseUrl {
+    // 1. Try Dart Define (The most flexible way)
+    const defineUrl = String.fromEnvironment('BACKEND_URL');
+    if (defineUrl.isNotEmpty) return defineUrl;
+
+    // 2. Try .env file
     final prodUrl = dotenv.env['BACKEND_URL'];
     if (prodUrl != null && prodUrl.isNotEmpty) {
       return prodUrl;
     }
 
+    // 3. Fallback logic for Local Development
     if (Platform.isAndroid) {
       return 'http://10.0.2.2:8080/api/v1';
     } else {
-      return 'http://127.0.0.1:8080/api/v1';
+      // 🍎 On iOS, we distinguish between Simulator and Physical Device
+      return 'http://localhost:8080/api/v1';
+    }
+  }
+
+  /// �️ [Performance] Pre-warm Connection
+  /// Establishes TCP/TLS handshake with the backend early to eliminate
+  /// the 200-500ms connection delay for the first actual request.
+  static Future<void> prewarmConnection() async {
+    try {
+      debugPrint('🕯️ [Warm-up] Priming connection to $baseUrl...');
+      // Use a valid endpoint to avoid 404 logs
+      final warmUpUrl = Uri.parse('$baseUrl/rates/latest?home_currency=USD');
+      await http.head(warmUpUrl).timeout(const Duration(seconds: 2));
+    } catch (_) {
+      // Ignore failures
     }
   }
 
@@ -64,8 +126,7 @@ class ApiService {
     } catch (e) {
       debugPrint("⚠️ [Universal] Silent refresh failed: $e");
       _refreshCompleter?.completeError(e);
-      // We do NOT rethrow here to avoid crashing callers.
-      // If refresh failed, subsequent API calls will fail 401 and trigger their own recovery loops if needed.
+      rethrow; // 🛡️ World-Class: Propagate error so caller knows refresh failed
     } finally {
       // 🔓 UNLOCK: Clear completer so next check runs fresh
       _refreshCompleter = null;
@@ -80,8 +141,8 @@ class ApiService {
     Map<String, dynamic>? body,
     Map<String, String>? headers,
   }) async {
-    // 1. Proactive Health Check
-    await ApiService.ensureSessionValid();
+    // 🌍 FIRST PRINCIPLE: Remove Proactive Check.
+    // Don't wait 100ms to check if valid. Assume valid, then recover on 401.
 
     try {
       // 2. Initial Attempt (Raw HTTP)
@@ -141,6 +202,7 @@ class ApiService {
     Map<String, String>? headers,
   }) async {
     final client = Supabase.instance.client;
+
     final jwt = token ?? client.auth.currentSession?.accessToken ?? '';
     final sanitizedJwt = jwt.trim().replaceAll('\n', '').replaceAll('\r', '');
 
@@ -266,19 +328,45 @@ class ApiService {
     };
   }
 
-  // --- Exponential Backoff Retry Helper ---
+  // --- Exponential Backoff Retry Helper (with Circuit Breaker) ---
   Future<T> _retry<T>(
     Future<T> Function() action, {
     int maxAttempts = 3,
     Duration initialDelay = const Duration(seconds: 1),
     bool Function(Object)? shouldRetry,
+    bool isCritical =
+        true, // Non-critical calls (like Rates) won't retry at all
   }) async {
+    // 🔌 Circuit Breaker: Fast-fail if backend is known to be dead
+    if (!ApiService.isBackendAvailable) {
+      throw SocketException(
+        'Backend is temporarily unavailable (Circuit Breaker)',
+      );
+    }
+
+    // Non-critical calls: Fail fast, no retries
+    if (!isCritical) {
+      maxAttempts = 1;
+    }
+
     int attempts = 0;
     while (true) {
       try {
         attempts++;
         return await action();
       } catch (e) {
+        // Detect fatal backend errors
+        final isFatalBackendError =
+            e.toString().contains('Host is down') ||
+            e.toString().contains('Connection refused') ||
+            e.toString().contains('Connection failed') ||
+            e.toString().contains('Network is unreachable');
+
+        if (isFatalBackendError) {
+          ApiService._markBackendDead();
+          rethrow; // Don't retry - backend is dead
+        }
+
         final isLastAttempt = attempts >= maxAttempts;
         final worthRetrying =
             shouldRetry?.call(e) ??
@@ -288,21 +376,35 @@ class ApiService {
           rethrow;
         }
 
-        final delay = initialDelay * (1 << (attempts - 1)); // 1s, 2s, 4s...
-        debugPrint(
-          '⚠️ Network failure (Attempt $attempts). Retrying in ${delay.inSeconds}s...',
-        );
-        await Future.delayed(delay);
+        // Only log retries for critical calls to reduce noise
+        if (isCritical) {
+          final delay = initialDelay * (1 << (attempts - 1)); // 1s, 2s, 4s...
+          debugPrint(
+            '⚠️ Network failure (Attempt $attempts). Retrying in ${delay.inSeconds}s...',
+          );
+          await Future.delayed(delay);
+        }
       }
     }
   }
 
   // Get User Profile
   Future<Map<String, dynamic>?> getUserProfile() async {
+    // 1. 🔒 MUTEX: Prevent multiple concurrent profile fetches
+    if (_profileCompleter != null) {
+      debugPrint('⏳ [ApiService] Waiting for concurrent Profile Fetch...');
+      return await _profileCompleter!.future;
+    }
+
+    _profileCompleter = Completer<Map<String, dynamic>?>();
+
     try {
       await ApiService.ensureSessionValid(); // 🛡️ Protect Profile
       final user = Supabase.instance.client.auth.currentUser;
-      if (user == null) return null;
+      if (user == null) {
+        _profileCompleter?.complete(null);
+        return null;
+      }
 
       final response = await Supabase.instance.client
           .from('profiles')
@@ -313,10 +415,14 @@ class ApiService {
       _cachedPreferredMethodId = response['preferred_payment_method_id'];
       _cachedPreferredMethodType = response['preferred_payment_method_type'];
 
+      _profileCompleter?.complete(response);
       return response;
     } catch (e) {
       debugPrint('Error fetching profile: $e');
+      _profileCompleter?.completeError(e);
       return null;
+    } finally {
+      _profileCompleter = null; // 🔓 Unlock
     }
   }
 
@@ -400,6 +506,51 @@ class ApiService {
     }
   }
 
+  // Pay to PromptPay (Wallet -> External)
+  Future<Map<String, dynamic>> payToPromptPay({
+    required int amountInSatang,
+    required String promptPayId,
+    required String recipientName,
+    required String idempotencyKey,
+  }) async {
+    final body = jsonEncode({
+      'amount': amountInSatang,
+      'promptpay_id': promptPayId,
+      'recipient_name': recipientName,
+      'idempotency_key': idempotencyKey,
+    });
+
+    final response = await _safeRequest(
+      (headers) => http.post(
+        Uri.parse('$baseUrl/payout/promptpay'),
+        headers: headers,
+        body: body,
+      ),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else if (response.statusCode == 402) {
+      throw Exception('Insufficient balance');
+    } else {
+      throw Exception('Payout failed: ${response.body}');
+    }
+  }
+
+  /// Look up recipient name from PromptPay ID
+  /// Note: In Thailand, real-time Proxy Lookup (ID -> Name) is restricted
+  /// to licensed banking applications via NITMX Interbank Switch.
+  /// Third-party merchants cannot freely lookup names from IDs.
+  ///
+  /// Validation Rely On:
+  /// 1. EMV QR Code Tag 59 (Merchant Name) - Best Practice
+  /// 2. Payer verification after transaction
+  Future<String?> lookupPromptPayName(String promptPayId) async {
+    // ⚠️ No Verification Logic needed here.
+    // relying strictly on the Secure QR Payload (Tag 59).
+    return null;
+  }
+
   // Get Transactions
   Future<String> createPaymentIntent(double amount) async {
     final response = await _safeRequest(
@@ -419,25 +570,70 @@ class ApiService {
   }
 
   Future<List<dynamic>> getTransactions(String walletId) async {
-    return _retry(() async {
-      final response = await _safeRequest(
-        (headers) => http.get(
-          Uri.parse('$baseUrl/transactions?wallet_id=$walletId'),
-          headers: headers,
-        ),
+    // 🔌 Circuit Breaker: If backend is dead, fallback to Supabase directly
+    if (!ApiService.isBackendAvailable) {
+      debugPrint(
+        '⚡ [Fallback] Using Supabase directly for transactions (Backend offline)',
       );
+      return _getTransactionsFromSupabase(walletId);
+    }
 
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      } else {
-        debugPrint("Backend Error: ${response.body}");
-        throw Exception('Failed to load transactions: ${response.statusCode}');
-      }
-    });
+    try {
+      return await _retry(() async {
+        final response = await _safeRequest(
+          (headers) => http.get(
+            Uri.parse('$baseUrl/transactions?wallet_id=$walletId'),
+            headers: headers,
+          ),
+        );
+
+        if (response.statusCode == 200) {
+          // 🚀 10/10 Performance: Decode JSON in background isolate
+          // to keep Main Thread free for animations (0% Jank).
+          return await compute(_decodeJson, response.body) as List<dynamic>;
+        } else {
+          debugPrint("Backend Error: ${response.body}");
+          throw Exception(
+            'Failed to load transactions: ${response.statusCode}',
+          );
+        }
+      });
+    } catch (e) {
+      // Fallback to Supabase on any error
+      debugPrint(
+        '⚡ [Fallback] Backend error, using Supabase for transactions: $e',
+      );
+      return _getTransactionsFromSupabase(walletId);
+    }
   }
 
-  // Get Exchange Rate
+  /// Fallback: Get transactions directly from Supabase
+  Future<List<dynamic>> _getTransactionsFromSupabase(String walletId) async {
+    try {
+      final response = await Supabase.instance.client
+          .from('transactions')
+          .select()
+          .eq('wallet_id', walletId)
+          .order('created_at', ascending: false)
+          .limit(20);
+      return response as List<dynamic>;
+    } catch (e) {
+      debugPrint('❌ Supabase fallback also failed: $e');
+      return []; // Return empty list instead of crashing
+    }
+  }
+
+  // Global static helper for Isolate decoding
+  static dynamic _decodeJson(String body) => jsonDecode(body);
+
+  // Get Exchange Rate (Non-Critical: No Retries, Fail Fast)
   Future<Map<String, dynamic>> fetchExchangeRate(String homeCurrency) async {
+    // 🔌 Circuit Breaker: If backend is dead, don't even try
+    if (!ApiService.isBackendAvailable) {
+      throw SocketException('Backend offline - Rate fetch skipped');
+    }
+
+    // Non-critical call: isCritical = false means NO retries
     return _retry(() async {
       final response = await _safeRequest(
         (headers) => http.get(
@@ -449,10 +645,9 @@ class ApiService {
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else {
-        debugPrint("Backend Error (Rates): ${response.body}");
         throw Exception('Failed to load rates: ${response.statusCode}');
       }
-    });
+    }, isCritical: false); // ← NO RETRIES for rates
   }
 
   // Smart Routing Quote
@@ -547,7 +742,8 @@ class ApiService {
   // Execute OPn TopUp (calls inbound-handler Edge Function)
   // ============================================================================
   Future<Map<String, dynamic>> executeOpnTopUp({
-    required int amountSatang,
+    required int amountSatang, // Charge amount (includes fee)
+    int? walletAmountSatang, // Optional: What goes into wallet (net of fee)
     String? token, // Now optional for Saved Cards
     String? cardId,
     bool isApplePay = false,
@@ -561,11 +757,14 @@ class ApiService {
 
     try {
       debugPrint(
-        '💸 Executing Opn TopUp: $amountSatang satang (Token: ${token ?? "SAVED_CARD"}, Card: $cardId, ApplePay: $isApplePay)',
+        '💸 Executing Opn TopUp: Charge=$amountSatang, Wallet=${walletAmountSatang ?? amountSatang} satang (Token: ${token ?? "SAVED_CARD"}, Card: $cardId, ApplePay: $isApplePay)',
       );
 
       final payload = {
-        'amount_satang': amountSatang.toInt(),
+        'amount_satang': amountSatang.toInt(), // Charge amount (for Omise)
+        // Wallet amount: If specified, use it; otherwise backend calculates from Omise net
+        if (walletAmountSatang != null)
+          'wallet_amount_satang': walletAmountSatang.toInt(),
         if (token != null) 'token': token,
         if (cardId != null) 'card_id': cardId,
         if (isApplePay) 'is_apple_pay': true,
@@ -605,6 +804,10 @@ class ApiService {
   static String? _cachedPreferredMethodId;
   static String? _cachedPreferredMethodType;
 
+  // 🛡️ Double-Fetch Protection
+  static Completer<List<SavedCard>>? _cardsCompleter;
+  static Completer<Map<String, dynamic>?>? _profileCompleter;
+
   // Get Cached Cards (Manual Access)
   static List<SavedCard>? getCachedCards() => _cachedSavedCards;
 
@@ -627,10 +830,23 @@ class ApiService {
       return _cachedSavedCards!;
     }
 
+    // 2. 🔒 MUTEX: If a fetch is already running, wait for it.
+    if (_cardsCompleter != null) {
+      debugPrint('⏳ [ApiService] Waiting for concurrent Card Fetch...');
+      return await _cardsCompleter!.future;
+    }
+
+    // 3. Start new fetch
+    _cardsCompleter = Completer<List<SavedCard>>();
+
     final supabase = Supabase.instance.client;
     final user = supabase.auth.currentUser;
 
-    if (user == null) return [];
+    if (user == null) {
+      _cardsCompleter?.complete([]);
+      _cardsCompleter = null;
+      return [];
+    }
 
     try {
       debugPrint('🌐 Fetching saved cards from Edge Function...');
@@ -639,23 +855,35 @@ class ApiService {
 
       if (response.status != 200) {
         debugPrint('Failed to get saved cards: ${response.status}');
+        _cardsCompleter?.complete([]);
         return [];
       }
 
       final data = response.data as Map<String, dynamic>;
       final cardsData = data['cards'] as List<dynamic>? ?? [];
 
-      final cards = cardsData
-          .map((json) => SavedCard.fromJson(json as Map<String, dynamic>))
-          .toList();
+      // 🚀 10/10 Performance: Map to models in background isolate
+      final cards = await compute(_mapSavedCards, cardsData);
 
-      // 2. Update Cache
+      // Update Cache
       _cachedSavedCards = cards;
+      _cardsCompleter?.complete(cards);
       return cards;
     } catch (e) {
       debugPrint('Error getting saved cards: $e');
+      _cardsCompleter?.completeError(e);
       return [];
+    } finally {
+      _cardsCompleter = null; // 🔓 Unlock
     }
+  }
+
+  // Global static helper for Card Isolate mapping
+  static List<SavedCard> _mapSavedCards(dynamic data) {
+    if (data is! List) return [];
+    return data
+        .map((json) => SavedCard.fromJson(json as Map<String, dynamic>))
+        .toList();
   }
 
   // Save Card

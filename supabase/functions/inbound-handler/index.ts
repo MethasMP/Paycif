@@ -152,13 +152,26 @@ serve(async (req) => {
     // 2. INPUT PARSING
     // ========================================================================
     const body: InboundRequest = await req.json();
-    const { amount_satang, token, card_id, is_apple_pay, reference_id, description } = body;
+    const {
+      amount_satang,
+      wallet_amount_satang,
+      token,
+      card_id,
+      is_apple_pay,
+      reference_id,
+      description,
+    } = body;
 
     if (!amount_satang || !reference_id) {
       return jsonError('Missing required fields (amount_satang, reference_id)', 400);
     }
 
-    console.log(`[Request] TopUp ${amount_satang} satang, ref: ${reference_id}`);
+    // 💎 Fee Handling: Wallet amount is what gets credited to user
+    // If wallet_amount_satang is not provided, we'll calculate it from Omise's net (later)
+    const effectiveWalletAmount = wallet_amount_satang ?? amount_satang;
+    console.log(
+      `[Request] Charge: ${amount_satang} satang, Wallet: ${effectiveWalletAmount} satang, ref: ${reference_id}`,
+    );
 
     // ========================================================================
     // 3. IDEMPOTENCY CHECK
@@ -279,18 +292,29 @@ serve(async (req) => {
     // ========================================================================
     // 7. ATOMIC LEDGER UPDATE
     // ========================================================================
-    console.log(`[DB] Executing RPC process_inbound_transaction...`);
+    // 💎 Use effectiveWalletAmount (net amount) for ledger, not charge amount
+    console.log(
+      `[DB] Executing RPC with wallet amount: ${effectiveWalletAmount} satang (Omise charged: ${amount_satang})...`,
+    );
+
+    // Calculate actual fee paid (for metadata/reporting)
+    const feeAmount = amount_satang - effectiveWalletAmount;
 
     const { data: rpcData, error: rpcError } = await adminClient.rpc(
       'process_inbound_transaction',
       {
         p_user_id: userId,
-        p_amount_satang: amount_satang,
+        p_amount_satang: effectiveWalletAmount, // 💎 Use WALLET amount for ledger
         p_provider: 'omise',
         p_provider_txn_id: charge.id,
         p_reference_id: reference_id,
         p_description: description ?? 'Top Up',
-        p_metadata: charge,
+        p_metadata: {
+          ...charge,
+          charge_amount_satang: amount_satang, // What was charged to card
+          wallet_amount_satang: effectiveWalletAmount, // What went into wallet
+          fee_amount_satang: feeAmount, // Processing fee
+        },
       },
     );
 

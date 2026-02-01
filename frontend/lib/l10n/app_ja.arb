@@ -57,6 +57,7 @@
   "commonGotIt": "了解しました",
   "commonRequired": "必須",
   "commonInvalid": "無効",
+  "commonForgotPin": "PINを忘れましたか？",
   "commonValidationFailed": "入力内容を確認してください",
   "commonDefault": "デフォルト",
   "commonEdit": "編集",
@@ -101,6 +102,53 @@
   "topUpTrustSecured": "暗号化保護",
   "topUpTrustNoFees": "手数料なし",
   "topUpTrustInstant": "即時反映",
+  "topUpProcessingFee": "決済手数料 ({percent}%)",
+  "@topUpProcessingFee": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "topUpVat": "消費税 (7%)",
+  "topUpTotalCharge": "カード請求額",
+  "topUpAmountToWallet": "ウォレット入金額",
+  "topUpFeeGateway": "ゲートウェイ手数料 (Omise) {percent}%",
+  "@topUpFeeGateway": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "topUpFeeNip": "プラットフォーム手数料 (Paysif)",
+  "topUpFeeVat": "消費税 ({percent}%)",
+  "@topUpFeeVat": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "topUpFeeFree": "無料",
+  "topUpChargeAmountLabel": "カード請求額",
+  "applePay": "Apple Pay",
+  "topUpFeeDisclosure": "{feePercent} の決済手数料を含む",
+  "@topUpFeeDisclosure": {
+    "placeholders": {
+      "feePercent": {
+        "type": "String"
+      }
+    }
+  },
+  "topUpChargeBreakdown": "カードから ฿{chargeAmount} が請求されます",
+  "@topUpChargeBreakdown": {
+    "placeholders": {
+      "chargeAmount": {
+        "type": "String"
+      }
+    }
+  },
 
   "cardTitle": "カード追加",
   "cardNumber": "カード番号",
@@ -152,7 +200,6 @@
   "topUpEnterAmountError": "金額を入力してください",
   "confirmPaymentFailed": "支払いに失敗しました",
   "commonOk": "OK",
-  "commonValidationFailed": "入力内容を確認してください",
   "errorCardInvalid": "カード情報が正しくありません。確認してもう一度お試しください。",
   "errorInsufficientFunds": "残高が不足しています。",
   "errorProcessingFailed": "支払いを処理できませんでした。後でもう一度お試しください。",

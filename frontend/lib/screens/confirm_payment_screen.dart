@@ -170,6 +170,17 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
       return;
     }
 
+    // 🛡️ World-Class: Proactive Session Shield
+    // Ensure session is fresh BEFORE asking for Biometrics/PIN.
+    // This prevents "Ghost Auth" where user scans FaceID but request fails 401.
+    try {
+      await ApiService.ensureSessionValid();
+    } catch (e) {
+      debugPrint(
+        '🛡️ [Security] Proactive refresh failed in ConfirmPayment, but proceed to retry on call.',
+      );
+    }
+
     setState(() => _isProcessing = true);
 
     try {

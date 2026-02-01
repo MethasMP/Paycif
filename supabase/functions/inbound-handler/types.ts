@@ -4,7 +4,8 @@
 
 // Request from Flutter app
 export interface InboundRequest {
-  amount_satang: number;
+  amount_satang: number; // Charge amount (what Omise charges)
+  wallet_amount_satang?: number; // Optional: What goes into wallet (net of fee)
   currency: string;
   token?: string; // Optional: Opn card token (tokn_...). If omitted, uses saved card.
   card_id?: string; // NEW: Specific card ID to charge (card_test_...)

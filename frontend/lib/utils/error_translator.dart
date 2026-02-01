@@ -23,6 +23,13 @@ class ErrorTranslator {
       return l10n.errorAuthenticationFailed;
     }
 
+    if (msg.contains('incorrect pin') ||
+        msg.contains('invalid pin') ||
+        msg.contains('invalid credential') ||
+        msg.contains('challenge failed')) {
+      return l10n.errorAuthenticationFailed;
+    }
+
     // 2. Connectivity Errors
     if (msg.contains('socketexception') ||
         msg.contains('connection failed') ||
@@ -31,18 +38,34 @@ class ErrorTranslator {
     }
 
     // 3. Backend / Generic Errors
-    if (msg.contains('unauthorized') || msg.contains('401')) {
+    if (msg.contains('unauthorized') ||
+        msg.contains('401') ||
+        msg.contains('jwt') ||
+        msg.contains('session expired')) {
       return l10n.commonSessionExpired;
+    }
+
+    if (msg.contains('forbidden') || msg.contains('403')) {
+      return l10n.errorAuthenticationFailed;
     }
 
     if (msg.contains('timeout') || msg.contains('deadline exceeded')) {
       return l10n.errorConnectionFailed;
     }
 
-    if (msg.contains('failed to load rates') ||
-        msg.contains('failed to fetch rate') ||
-        msg.contains('pq:')) {
+    if (msg.contains('failed to load') ||
+        msg.contains('failed to fetch') ||
+        msg.contains('500') ||
+        msg.contains('502') ||
+        msg.contains('503') ||
+        msg.contains('internal server error') ||
+        msg.contains('pq:') ||
+        msg.contains('database error')) {
       return l10n.errorProcessingFailed;
+    }
+
+    if (msg.contains('not found') || msg.contains('404')) {
+      return l10n.commonSomethingWentWrong;
     }
 
     // Default fallback

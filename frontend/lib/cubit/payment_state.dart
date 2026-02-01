@@ -1,14 +1,15 @@
 import 'package:equatable/equatable.dart';
 import '../models/saved_card.dart';
 
-enum PaymentMethodType { applePay, googlePay, card, promptPay }
+enum PaymentMethodType { wallet, applePay, googlePay, card, promptPay }
 
 class PaymentMethod extends Equatable {
   final String id;
   final PaymentMethodType type;
   final String title;
   final String? subtitle;
-  final SavedCard? cardData; // Null if it's Apple/Google Pay or PromptPay
+  final SavedCard?
+  cardData; // Null if it's Wallet, Apple/Google Pay or PromptPay
 
   const PaymentMethod({
     required this.id,
@@ -36,16 +37,33 @@ class PaymentLoading extends PaymentState {}
 class PaymentReady extends PaymentState {
   final PaymentMethod method;
   final double amount;
+  final double balance;
   final List<PaymentMethod> availableMethods;
 
   const PaymentReady({
     required this.method,
     required this.amount,
+    this.balance = 0.0,
     this.availableMethods = const [],
   });
 
   @override
-  List<Object?> get props => [method, amount, availableMethods];
+  List<Object?> get props => [method, amount, balance, availableMethods];
+}
+
+class PaymentInsufficientFunds extends PaymentState {
+  final double availableBalance;
+  final double requiredAmount;
+
+  const PaymentInsufficientFunds({
+    required this.availableBalance,
+    required this.requiredAmount,
+  });
+
+  double get shortfall => requiredAmount - availableBalance;
+
+  @override
+  List<Object?> get props => [availableBalance, requiredAmount];
 }
 
 class PaymentProcessing extends PaymentState {
@@ -59,11 +77,17 @@ class PaymentProcessing extends PaymentState {
 
 class PaymentSuccess extends PaymentState {
   final String transactionId;
+  final String? senderName;
+  final double? remainingBalance;
 
-  const PaymentSuccess({required this.transactionId});
+  const PaymentSuccess({
+    required this.transactionId,
+    this.senderName,
+    this.remainingBalance,
+  });
 
   @override
-  List<Object?> get props => [transactionId];
+  List<Object?> get props => [transactionId, senderName, remainingBalance];
 }
 
 class PaymentFailure extends PaymentState {

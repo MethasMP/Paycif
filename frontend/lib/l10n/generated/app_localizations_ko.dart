@@ -171,7 +171,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get commonValidationFailed => '강조 표시된 필드를 확인하십시오.';
 
   @override
-  String get commonForgotPin => 'Forgot PIN?';
+  String get commonForgotPin => 'PIN을 잊으셨나요?';
 
   @override
   String get commonDefault => '기본';
@@ -289,6 +289,52 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get topUpTrustInstant => '즉시 반영';
+
+  @override
+  String topUpProcessingFee(String percent) {
+    return '결제 수수료 ($percent%)';
+  }
+
+  @override
+  String get topUpVat => '부가세 (7%)';
+
+  @override
+  String get topUpTotalCharge => '총 결제 금액';
+
+  @override
+  String get topUpAmountToWallet => '지갑 입금액';
+
+  @override
+  String topUpFeeGateway(String percent) {
+    return '게이트웨이 수수료 (Omise) $percent%';
+  }
+
+  @override
+  String get topUpFeeNip => '플랫폼 수수료 (Paysif)';
+
+  @override
+  String topUpFeeVat(String percent) {
+    return '부가세 ($percent%)';
+  }
+
+  @override
+  String get topUpFeeFree => '무료';
+
+  @override
+  String get topUpChargeAmountLabel => '총 결제 금액';
+
+  @override
+  String get applePay => 'Apple Pay';
+
+  @override
+  String topUpFeeDisclosure(String feePercent) {
+    return '$feePercent 수수료 포함';
+  }
+
+  @override
+  String topUpChargeBreakdown(String chargeAmount) {
+    return '카드에서 ฿$chargeAmount 결제됩니다';
+  }
 
   @override
   String get cardTitle => '카드 추가';

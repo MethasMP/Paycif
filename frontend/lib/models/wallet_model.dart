@@ -14,6 +14,20 @@ class Wallet {
     required this.accountType,
   });
 
+  Wallet copyWith({
+    String? id,
+    int? balance,
+    String? currency,
+    String? accountType,
+  }) {
+    return Wallet(
+      id: id ?? this.id,
+      balance: balance ?? this.balance,
+      currency: currency ?? this.currency,
+      accountType: accountType ?? this.accountType,
+    );
+  }
+
   factory Wallet.fromJson(Map<String, dynamic> json) {
     return Wallet(
       id: json['id'] as String,

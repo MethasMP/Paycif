@@ -171,7 +171,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get commonValidationFailed => '请检查高亮显示的字段。';
 
   @override
-  String get commonForgotPin => 'Forgot PIN?';
+  String get commonForgotPin => '忘记 PIN 码？';
 
   @override
   String get commonDefault => '默认';
@@ -289,6 +289,52 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get topUpTrustInstant => '即时到账';
+
+  @override
+  String topUpProcessingFee(String percent) {
+    return '手续费 ($percent%)';
+  }
+
+  @override
+  String get topUpVat => '增值税 (7%)';
+
+  @override
+  String get topUpTotalCharge => '实际扣款';
+
+  @override
+  String get topUpAmountToWallet => '到账金额';
+
+  @override
+  String topUpFeeGateway(String percent) {
+    return '网关手续费 (Omise) $percent%';
+  }
+
+  @override
+  String get topUpFeeNip => '平台手续费 (Paysif)';
+
+  @override
+  String topUpFeeVat(String percent) {
+    return '增值税 ($percent%)';
+  }
+
+  @override
+  String get topUpFeeFree => '免费';
+
+  @override
+  String get topUpChargeAmountLabel => '实际扣款';
+
+  @override
+  String get applePay => 'Apple Pay';
+
+  @override
+  String topUpFeeDisclosure(String feePercent) {
+    return '含 $feePercent 手续费';
+  }
+
+  @override
+  String topUpChargeBreakdown(String chargeAmount) {
+    return '将从卡中扣取 ฿$chargeAmount';
+  }
 
   @override
   String get cardTitle => '添加新卡';

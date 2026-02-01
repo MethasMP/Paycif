@@ -6,7 +6,10 @@ import '../controllers/dashboard_controller.dart';
 import 'login_screen.dart';
 import '../l10n/generated/app_localizations.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
-import '../features/security/presentation/pages/app_lock_screen.dart';
+import 'main_screen.dart';
+import 'package:provider/provider.dart';
+import '../features/security/presentation/logic/security_controller.dart';
+import '../features/security/presentation/pages/security_unlock_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -46,6 +49,7 @@ class _SplashScreenState extends State<SplashScreen> {
         debugPrint("✅ Session recovered successfully.");
       } catch (e) {
         debugPrint("❌ Recovery failed. Redirecting to login.");
+        await Supabase.instance.client.auth.signOut();
         await _delayedNavigateToLogin();
         return;
       }
@@ -72,7 +76,18 @@ class _SplashScreenState extends State<SplashScreen> {
       await Future.delayed(const Duration(milliseconds: 1500) - elapsed);
     }
 
-    _navigateTo(const AppLockScreen());
+    // 🛡️ World-Class Security: Mandatory Pin/Biometric Check
+    if (!mounted) return;
+    final securityController = context.read<SecurityController>();
+    final hasPin = await securityController.hasPin();
+
+    if (hasPin) {
+      debugPrint("🚨 [Security] PIN detected. Challenging user identity...");
+      _navigateTo(const SecurityUnlockScreen());
+    } else {
+      debugPrint("🔓 [Security] No PIN set. Proceeding to MainScreen.");
+      _navigateTo(const MainScreen());
+    }
   }
 
   Future<void> _delayedNavigateToLogin() async {

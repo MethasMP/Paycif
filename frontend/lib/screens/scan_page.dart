@@ -6,6 +6,7 @@ import 'package:frontend/l10n/generated/app_localizations.dart';
 import 'package:frontend/utils/emv_parser.dart';
 import 'package:frontend/utils/pay_notify.dart';
 
+import 'package:frontend/screens/amount_entry_screen.dart';
 import 'pay_screen.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -67,53 +68,8 @@ class _ScanPageState extends State<ScanPage> {
 
     if (!mounted) return;
 
-    // Proceed to Payment
-    _goToPaymentScreen(emvData);
-  }
-
-  void _goToPaymentScreen(EMFData data) {
-    final l10n = AppLocalizations.of(context)!;
-    if (!data.isValid) {
-      _showError(AppLocalizations.of(context)!.scanUnknownRecipient);
-      _resumeScanning();
-      return;
-    }
-
-    // If amount is not in QR, we might need an input screen.
-    // The design doc focuses on the Confirm/Pay step.
-    // Assuming for now QR has amount or we default to 0 for demo if needed.
-    // Ideally we prompt for amount. But let's assume valid QR has amount or we hardcode.
-    final amount = data.amount ?? 0.0;
-    if (amount <= 0) {
-      _showError(l10n.topUpEnterAmountError);
-      _resumeScanning();
-      return;
-    }
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) =>
-            PayScreen(amount: amount, merchantName: data.merchantName),
-      ),
-    ).then((result) {
-      if (!mounted) return;
-      if (result == true) {
-        // Explicitly check for success result
-        // HapticFeedback.heavyImpact(); // Already done in PayScreen? No, PayScreen popped.
-        // Let's do it here on success return
-        HapticFeedback.heavyImpact();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '${AppLocalizations.of(context)!.scanPaymentSuccess} 🎉',
-            ),
-            backgroundColor: const Color(0xFF10B981),
-          ),
-        );
-      }
-      _resumeScanning();
-    });
+    // Proceed to Payment Logic
+    _handleValidQR(emvData);
   }
 
   void _resumeScanning() {
@@ -144,9 +100,62 @@ class _ScanPageState extends State<ScanPage> {
   void _showError(String message) {
     if (!mounted) return;
     PayNotify.error(context, message);
+    // 🛡️ Fix: Add a delay before resuming to prevent notification flood
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) _resumeScanning();
+    });
+  }
+
+  void _handleValidQR(EMFData data) async {
+    // 🛑 Pause Camera immediately
+    await _cameraController.stop();
+    if (!mounted) return;
+
+    if (!data.isValid) {
+      _showError(AppLocalizations.of(context)!.scanUnknownRecipient);
+      return; // Error will auto-resume scanning
+    }
+
+    final hasAmount = (data.amount ?? 0) > 0;
+
+    // Route Logic:
+    // 1. Has valid amount in QR -> Go to PayScreen directly
+    // 2. No amount (0) -> Go to AmountEntryScreen (Full Screen)
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => hasAmount
+            ? PayScreen(
+                amount: data.amount!,
+                merchantName: data.merchantName,
+                promptPayId: data.promptPayId,
+              )
+            : AmountEntryScreen(data: data),
+      ),
+    );
+
+    if (mounted) {
+      if (result == true) {
+        HapticFeedback.heavyImpact();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${AppLocalizations.of(context)!.scanPaymentSuccess} 🎉',
+            ),
+            backgroundColor: const Color(0xFF10B981),
+          ),
+        );
+      }
+      // Resume scanning after returning from any flow
+      _resumeScanning();
+    }
   }
 
   void _showHelpModal() {
+    // 🛑 Pause Camera
+    _cameraController.stop();
+
     final l10n = AppLocalizations.of(context)!;
     showModalBottomSheet(
       context: context,
@@ -213,7 +222,9 @@ class _ScanPageState extends State<ScanPage> {
           ),
         ),
       ),
-    );
+    ).then((_) {
+      if (mounted) _resumeScanning();
+    });
   }
 
   Widget _buildHelpItem(String emoji, String title, String desc) {

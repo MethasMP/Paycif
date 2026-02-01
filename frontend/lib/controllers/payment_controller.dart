@@ -40,7 +40,7 @@ class PaymentController extends ChangeNotifier {
     try {
       final results = await Future.wait([
         _apiService.getUserProfile(),
-        _apiService.getSavedCards(forceRefresh: true),
+        _apiService.getSavedCards(forceRefresh: false),
       ]);
 
       final profile = results[0] as Map<String, dynamic>?;

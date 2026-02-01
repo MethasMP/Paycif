@@ -6,6 +6,7 @@ import '../models/transaction.dart';
 import '../services/api_service.dart';
 import '../features/security/data/datasources/secure_storage_service.dart';
 import 'dart:convert';
+import 'dart:async';
 
 class DashboardRepository {
   final SupabaseClient _client;
@@ -14,6 +15,11 @@ class DashboardRepository {
 
   static const _kWalletCacheKey = 'cache_wallet_data';
   static const _kTxCacheKey = 'cache_transactions_data';
+
+  // 🚀 Reactive Stream for Transactions
+  final _txController = StreamController<List<Transaction>>.broadcast();
+  Stream<List<Transaction>> get transactionsStream => _txController.stream;
+  List<Transaction> _lastTxsCache = [];
 
   DashboardRepository(this._client);
 
@@ -154,28 +160,30 @@ class DashboardRepository {
     }
   }
 
-  /// Streams the latest transactions for a specific wallet.
-  /// Bypasses the Go backend for reads to improve performance.
+  /// Fetches the latest transactions for a specific wallet via Go Backend.
+  /// This ensures correct JOIN logic and auditing.
   Stream<List<Transaction>> fetchTransactions(String walletId) {
-    return _client
-        .from('transactions')
-        .stream(primaryKey: ['id'])
-        .eq('wallet_id', walletId)
-        .order('created_at', ascending: false)
-        .limit(10) // Limit to top 10 for dashboard
-        .map((data) {
+    // Return the broadcast stream so multiple listeners can stay in sync
+    _api
+        .getTransactions(walletId)
+        .then((data) {
           final txs = data.map((json) => Transaction.fromJson(json)).toList();
+          _lastTxsCache = txs;
+          _txController.add(txs);
 
-          // 📡 [Side-Effect] Keep cache in sync with Cloud ground truth
+          // 📡 [Side-Effect] Keep cache in sync
           _storage
               .write(
                 _kTxCacheKey,
                 jsonEncode(txs.map((t) => t.toJson()).toList()),
               )
               .ignore();
-
-          return txs;
+        })
+        .catchError((e) {
+          debugPrint('❌ DashboardRepository: Error fetching transactions: $e');
         });
+
+    return transactionsStream;
   }
 
   /// ⚡ [Fast-Path] Load Transactions from Disk Cache
@@ -184,10 +192,59 @@ class DashboardRepository {
     if (json == null) return [];
     try {
       final List<dynamic> decoded = jsonDecode(json);
-      return decoded.map((item) => Transaction.fromJson(item)).toList();
+      final txs = decoded.map((item) => Transaction.fromJson(item)).toList();
+      _lastTxsCache = txs;
+      return txs;
     } catch (e) {
       return [];
     }
+  }
+
+  /// 🚀 Atomic Sync: Updates both balance and transaction list instantly
+  /// following a successful payment. This remains consistent with the
+  /// Reactive Architecture as it pushes to the same stream.
+  void synchronizePaymentSuccess({
+    required String transactionId,
+    required double amount,
+    required String recipientName,
+    required double remainingBalanceMajor,
+  }) {
+    // 1. Create the persistent Transaction entry
+    final newTx = Transaction(
+      id: transactionId,
+      walletId: _client.auth.currentUser?.id ?? '', // Mock or actual wallet ID
+      type: 'payment',
+      amount: (amount * 100).toInt(),
+      description: 'Payment to $recipientName',
+      createdAt: DateTime.now(),
+    );
+
+    // 2. Prepend to current cache
+    _lastTxsCache = [newTx, ..._lastTxsCache];
+
+    // 3. Push to all reactive listeners (Dashboard, History, etc.)
+    _txController.add(_lastTxsCache);
+
+    // 4. Persistence: Write to Disk immediately (Resilience)
+    _storage
+        .write(
+          _kTxCacheKey,
+          jsonEncode(_lastTxsCache.map((t) => t.toJson()).toList()),
+        )
+        .ignore();
+
+    // Note: Wallet balance is handled by Supabase Realtime Stream automatically,
+    // but we heal the local cache just in case the Realtime connection is slow.
+    getCachedWallet().then((wallet) {
+      if (wallet != null) {
+        final updatedWallet = wallet.copyWith(
+          balance: (remainingBalanceMajor * 100).round(),
+        );
+        _storage
+            .write(_kWalletCacheKey, jsonEncode(updatedWallet.toJson()))
+            .ignore();
+      }
+    });
   }
 
   /// Diagnostic function to check wallet existence and permissions.

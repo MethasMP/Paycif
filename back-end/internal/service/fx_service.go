@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 )
 
@@ -149,20 +148,8 @@ func (s *FXService) fetchRateFromAPI(base, target string) (float64, error) {
 }
 
 func (s *FXService) persistRate(ctx context.Context, from, to string, mid, provider, spread decimal.Decimal) error {
-	tx, err := s.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	// 1. Upsert into exchange_rates
-	// We use ON CONFLICT to update if exists.
-	// Postgres UUID gen is default, but here we might need to find ID first or just use ON CONFLICT(from, to) if unique constraint exists.
-	// Schema upgrade v2 added: CONSTRAINT unique_currency_pair UNIQUE (from_currency, to_currency)
-
-	var rateID uuid.UUID
-
-	queryRates := `
+	// Simple upsert into exchange_rates
+	query := `
 		INSERT INTO exchange_rates (from_currency, to_currency, mid_rate, provider_rate, spread, updated_at)
 		VALUES ($1, $2, $3, $4, $5, NOW())
 		ON CONFLICT (from_currency, to_currency) 
@@ -170,25 +157,14 @@ func (s *FXService) persistRate(ctx context.Context, from, to string, mid, provi
 			mid_rate = EXCLUDED.mid_rate,
 			provider_rate = EXCLUDED.provider_rate,
 			spread = EXCLUDED.spread,
-			updated_at = NOW()
-		RETURNING id;
+			updated_at = NOW();
 	`
-	err = tx.QueryRowContext(ctx, queryRates, from, to, mid, provider, spread).Scan(&rateID)
+	_, err := s.DB.ExecContext(ctx, query, from, to, mid, provider, spread)
 	if err != nil {
 		return fmt.Errorf("failed to upsert exchange_rates: %w", err)
 	}
 
-	// 2. Insert into fx_rate_history
-	queryHistory := `
-		INSERT INTO fx_rate_history (exchange_rate_id, from_currency, to_currency, mid_rate, provider_rate, captured_at)
-		VALUES ($1, $2, $3, $4, $5, NOW())
-	`
-	_, err = tx.ExecContext(ctx, queryHistory, rateID, from, to, mid, provider)
-	if err != nil {
-		return fmt.Errorf("failed to insert history: %w", err)
-	}
-
-	return tx.Commit()
+	return nil
 }
 
 // ConvertToBase converts an amount in a given currency to THB (Base).

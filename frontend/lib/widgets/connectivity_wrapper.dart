@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import '../services/connectivity_service.dart';
+import '../services/api_service.dart';
 import '../l10n/generated/app_localizations.dart';
 
 class ConnectivityWrapper extends StatelessWidget {
@@ -13,7 +16,7 @@ class ConnectivityWrapper extends StatelessWidget {
     final service = Provider.of<ConnectivityService>(context);
     return StreamBuilder<ConnectivityStatus>(
       stream: service.statusStream,
-      initialData: service.currentStatus, // Sync with current state immediately
+      initialData: service.currentStatus,
       builder: (context, snapshot) {
         final isOffline = snapshot.data == ConnectivityStatus.offline;
 
@@ -25,71 +28,99 @@ class ConnectivityWrapper extends StatelessWidget {
               duration: const Duration(milliseconds: 400),
               curve: Curves.easeInOut,
               child: IgnorePointer(
-                ignoring: !isOffline,
-                child: Container(
-                  color: Colors.black.withValues(alpha: 0.8),
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(32.0),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.wifi_off_rounded,
-                            size: 80,
-                            color: Color(0xFFF59E0B), // Gold
-                          ),
-                          const SizedBox(height: 24),
-                          Text(
-                            AppLocalizations.of(context)?.noInternetTitle ??
-                                'No Connection',
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                              decoration: TextDecoration.none,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            AppLocalizations.of(context)?.noInternetMessage ??
-                                'Please check your internet settings.',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              color: Colors.white70,
-                              decoration: TextDecoration.none,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 32),
-                          ElevatedButton(
-                            onPressed: () {
-                              Provider.of<ConnectivityService>(
-                                context,
-                                listen: false,
-                              ).checkStatus();
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFF59E0B), // Gold
-                              foregroundColor: const Color(0xFF1A1F71), // Navy
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 40,
-                                vertical: 16,
+                ignoring:
+                    !isOffline, // 🛡️ CRITICAL: Don't block UI when online!
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: Container(
+                    width: double.infinity,
+                    height: double.infinity,
+                    color: Colors.black.withValues(alpha: 0.9),
+                    child: Center(
+                      child: SingleChildScrollView(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32.0),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                    Icons.wifi_off_rounded,
+                                    size: 100,
+                                    color: Color(0xFFF59E0B),
+                                  )
+                                  .animate(
+                                    onPlay: (c) => c.repeat(reverse: true),
+                                  )
+                                  .scale(
+                                    duration: 1.seconds,
+                                    curve: Curves.easeInOut,
+                                  ),
+                              const SizedBox(height: 32),
+                              Text(
+                                AppLocalizations.of(context)?.noInternetTitle ??
+                                    'No Connection',
+                                style: const TextStyle(
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  letterSpacing: -0.5,
+                                  decoration: TextDecoration.none,
+                                ),
+                                textAlign: TextAlign.center,
                               ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(30),
+                              const SizedBox(height: 16),
+                              Text(
+                                AppLocalizations.of(
+                                      context,
+                                    )?.noInternetMessage ??
+                                    'Please check your internet settings.',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.white70,
+                                  height: 1.5,
+                                  decoration: TextDecoration.none,
+                                ),
+                                textAlign: TextAlign.center,
                               ),
-                            ),
-                            child: Text(
-                              AppLocalizations.of(context)?.noInternetRetry ??
-                                  'Retry',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
+                              const SizedBox(height: 40),
+                              SizedBox(
+                                width: 200,
+                                height: 56,
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    HapticFeedback.mediumImpact();
+                                    ApiService.resetCircuitBreaker();
+                                    Provider.of<ConnectivityService>(
+                                      context,
+                                      listen: false,
+                                    ).checkStatus();
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFFF59E0B),
+                                    foregroundColor: const Color(0xFF1A1F71),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(28),
+                                    ),
+                                    elevation: 8,
+                                    shadowColor: const Color(
+                                      0xFFF59E0B,
+                                    ).withValues(alpha: 0.4),
+                                  ),
+                                  child: Text(
+                                    AppLocalizations.of(
+                                          context,
+                                        )?.noInternetRetry ??
+                                        'Retry',
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   ),

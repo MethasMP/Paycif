@@ -171,7 +171,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get commonValidationFailed => '入力内容を確認してください';
 
   @override
-  String get commonForgotPin => 'Forgot PIN?';
+  String get commonForgotPin => 'PINを忘れましたか？';
 
   @override
   String get commonDefault => 'デフォルト';
@@ -289,6 +289,52 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get topUpTrustInstant => '即時反映';
+
+  @override
+  String topUpProcessingFee(String percent) {
+    return '決済手数料 ($percent%)';
+  }
+
+  @override
+  String get topUpVat => '消費税 (7%)';
+
+  @override
+  String get topUpTotalCharge => 'カード請求額';
+
+  @override
+  String get topUpAmountToWallet => 'ウォレット入金額';
+
+  @override
+  String topUpFeeGateway(String percent) {
+    return 'ゲートウェイ手数料 (Omise) $percent%';
+  }
+
+  @override
+  String get topUpFeeNip => 'プラットフォーム手数料 (Paysif)';
+
+  @override
+  String topUpFeeVat(String percent) {
+    return '消費税 ($percent%)';
+  }
+
+  @override
+  String get topUpFeeFree => '無料';
+
+  @override
+  String get topUpChargeAmountLabel => 'カード請求額';
+
+  @override
+  String get applePay => 'Apple Pay';
+
+  @override
+  String topUpFeeDisclosure(String feePercent) {
+    return '$feePercent の決済手数料を含む';
+  }
+
+  @override
+  String topUpChargeBreakdown(String chargeAmount) {
+    return 'カードから ฿$chargeAmount が請求されます';
+  }
 
   @override
   String get cardTitle => 'カード追加';

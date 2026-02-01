@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:cryptography/cryptography.dart';
 
 /// Service responsible for cryptographic operations using Ed25519.
@@ -50,26 +51,10 @@ class CryptoService {
     return _algorithm.newKeyPairFromSeed(seed);
   }
 
-  /// Generates a random 16-byte salt for Argon2 hashing.
+  /// Generates a cryptographically secure 16-byte salt for Argon2 hashing.
   List<int> generateSalt() {
-    // Note: In production, use a cryptographically secure random number generator.
-    // For this implementation context, we'll use a simple approach or better yet,
-    // use the cryptography package's random bytes if available in scope,
-    // but dargon2 can also manage its own salt if configured.
-    // Let's use a cleaner approach with `dargon2`.
-    // Actually, let's just use a basic list generation here or better,
-    // rely on the caller to provide randomness or use a proper secure random generator.
-    //
-    // Revised: Use `dargon2`'s capabilities or a simple secure random if possible.
-    // Since `cryptography` export `SecureRandom` implicitly via implementations,
-    // we can just use `List.generate` with `SecureRandom.safe` if available,
-    // or keep it simple.
-    //
-    // Better approach: Use a predefined salt generation logic.
-    return List<int>.generate(
-      16,
-      (i) => (DateTime.now().microsecondsSinceEpoch >> i) & 0xFF,
-    );
+    final random = Random.secure();
+    return List<int>.generate(16, (i) => random.nextInt(256));
   }
 
   /// Hashes a PIN using Argon2id (L1 Cache Optimized) via 'cryptography' package.

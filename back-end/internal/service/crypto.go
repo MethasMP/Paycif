@@ -18,26 +18,17 @@ type CryptoService struct {
 
 // NewCryptoService creates a new CryptoService.
 func NewCryptoService() *CryptoService {
-	// 32 bytes for AES-256
 	keyStr := os.Getenv("ENCRYPTION_KEY")
 	if keyStr == "" {
-		// FALLBACK FOR DEV ONLY - In prod, this must panic or block startup
-		fmt.Println("⚠️ ENCRYPTION_KEY not found. Using dev fallback key (UNSAFE for Prod).")
-		keyStr = "01234567890123456789012345678901" // 32 chars
+		// 🚨 CRITICAL SECURITY GUARDRAIL
+		// In a Fintech environment, we MUST NOT start if the encryption key is missing.
+		// Using a fallback is dangerous as it might lead to data being encrypted with a known key.
+		panic("FATAL: ENCRYPTION_KEY environment variable is not set. System cannot start in a secure state.")
 	}
 
 	key := []byte(keyStr)
 	if len(key) != 32 {
-		// Attempt to pad or panic? Panic is safer for security service config error.
-		// For robustness in this demo, strictly check 32 bytes.
-		if len(key) > 32 {
-			key = key[:32]
-		} else {
-			// Pad with zero
-			padded := make([]byte, 32)
-			copy(padded, key)
-			key = padded
-		}
+		panic(fmt.Sprintf("FATAL: ENCRYPTION_KEY must be exactly 32 bytes for AES-256 (current length: %d)", len(key)))
 	}
 
 	return &CryptoService{key: key}

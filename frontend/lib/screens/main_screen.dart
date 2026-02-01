@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../features/security/presentation/logic/security_controller.dart';
+import '../controllers/dashboard_controller.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'login_screen.dart' as import_login;
 import '../services/api_service.dart';
@@ -88,7 +89,14 @@ class _MainScreenState extends State<MainScreen> {
     if (index == 2) {
       Navigator.of(
         context,
-      ).push(MaterialPageRoute(builder: (context) => const ScanPage()));
+      ).push(MaterialPageRoute(builder: (context) => const ScanPage())).then((
+        _,
+      ) {
+        // Refresh dashboard when returning from Scan (likely made a payment)
+        if (mounted) {
+          context.read<DashboardController>().refresh();
+        }
+      });
       return;
     }
 

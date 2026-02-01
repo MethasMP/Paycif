@@ -16,7 +16,9 @@ import '../utils/language_notifier.dart';
 import '../utils/error_translator.dart';
 import '../features/security/presentation/widgets/pin_entry_widget.dart';
 import '../features/security/presentation/widgets/change_pin_sheet.dart';
+import '../features/security/presentation/logic/security_controller.dart';
 import '../features/security/presentation/pages/linked_devices_screen.dart';
+import 'package:provider/provider.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -115,15 +117,77 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _signOut() async {
-    // Clear global caches before signing out
-    ApiService.clearStaticCache();
-    await _supabase.auth.signOut();
-    if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-        (route) => false,
-      );
+    // 🛡️ World-Class Sign Out: HARD-RESET Flow
+
+    // 1. Show Premium Loading Overlay
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => PopScope(
+        canPop: false,
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.2),
+                  blurRadius: 30,
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF1A1F71)),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'Signing out safely...',
+                  style: TextStyle(
+                    color: Theme.of(context).textTheme.bodyLarge?.color,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      // 2. Clear All Sensitive Caches (Principal Logic)
+      ApiService.clearStaticCache();
+
+      // 3. Clear Security Identity & PIN Anchors
+      if (mounted) {
+        final securityController = context.read<SecurityController>();
+        await securityController.clearSecurityState();
+      }
+
+      // 4. Terminate Remote Session
+      await _supabase.auth.signOut();
+
+      // 5. Hard Navigation Reset
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      debugPrint('🚨 Sign Out Disaster: $e');
+      if (mounted) {
+        Navigator.pop(context); // Close loading
+        PayNotify.error(
+          context,
+          'Critical error during sign out. Please force close app.',
+        );
+      }
     }
   }
 

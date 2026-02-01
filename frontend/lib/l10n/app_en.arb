@@ -102,6 +102,53 @@
   "topUpTrustSecured": "Secured",
   "topUpTrustNoFees": "No fees",
   "topUpTrustInstant": "Instant",
+  "topUpProcessingFee": "Transaction Fee ({percent}%)",
+  "@topUpProcessingFee": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "topUpVat": "VAT (7%)",
+  "topUpTotalCharge": "Total Charge",
+  "topUpAmountToWallet": "Amount to Wallet",
+  "topUpFeeGateway": "Gateway Fee (Omise) {percent}%",
+  "@topUpFeeGateway": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "topUpFeeNip": "Platform Fee (Paysif)",
+  "topUpFeeVat": "VAT ({percent}%)",
+  "@topUpFeeVat": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "topUpFeeFree": "Free",
+  "topUpChargeAmountLabel": "Card will be charged",
+  "applePay": "Apple Pay",
+  "topUpFeeDisclosure": "Includes {feePercent} processing fee",
+  "@topUpFeeDisclosure": {
+    "placeholders": {
+      "feePercent": {
+        "type": "String"
+      }
+    }
+  },
+  "topUpChargeBreakdown": "Card will be charged ฿{chargeAmount}",
+  "@topUpChargeBreakdown": {
+    "placeholders": {
+      "chargeAmount": {
+        "type": "String"
+      }
+    }
+  },
 
   "cardTitle": "Add New Card",
   "cardNumber": "Card Number",

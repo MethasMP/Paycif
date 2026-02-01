@@ -11,6 +11,7 @@ import '../widgets/transaction_item.dart';
 import 'top_up_view.dart';
 import 'transaction_detail_screen.dart';
 import 'history_screen.dart';
+import '../utils/error_translator.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({super.key});
@@ -46,7 +47,9 @@ class _HomeViewState extends State<HomeView> {
               builder: (context, state) {
                 if (state.status == 'error') {
                   return Center(
-                    child: Text("${l10n.commonError}: ${state.errorMessage}"),
+                    child: Text(
+                      "${l10n.commonError}: ${ErrorTranslator.translate(l10n, state.errorMessage ?? '')}",
+                    ),
                   );
                 }
 
@@ -284,11 +287,50 @@ class _HomeViewState extends State<HomeView> {
                               ),
                             ],
                           ),
-                          Icon(
-                            Icons.wifi,
-                            color: Colors.white.withValues(alpha: 0.5),
-                            size: 24,
-                          ),
+                          state.isOffline
+                              ? Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.amber.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: Colors.amber.withValues(
+                                        alpha: 0.5,
+                                      ),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.cloud_off_rounded,
+                                        color: Colors.amber,
+                                        size: 14,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'OFFLINE',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .labelSmall
+                                            ?.copyWith(
+                                              color: Colors.amber,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                              letterSpacing: 1.0,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : Icon(
+                                  Icons.wifi,
+                                  color: Colors.white.withValues(alpha: 0.5),
+                                  size: 24,
+                                ),
                         ],
                       ),
                       const Spacer(),

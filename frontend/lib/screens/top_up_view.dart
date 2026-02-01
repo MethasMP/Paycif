@@ -16,6 +16,7 @@ import 'login_screen.dart';
 import '../utils/payment_utils.dart';
 import '../utils/error_translator.dart';
 import '../utils/pay_notify.dart';
+import '../utils/fee_calculator.dart';
 
 class TopUpView extends StatefulWidget {
   const TopUpView({super.key});
@@ -30,7 +31,7 @@ class _TopUpViewState extends State<TopUpView> {
   final ApiService _apiService = ApiService();
   final OmiseService _omiseService = OmiseService(); // New Service
   int? _selectedChipIndex;
-  bool _isLoading = false;
+  final bool _isLoading = false;
   final List<int> _smartAmounts = [500, 1000, 2000, 5000];
   final NumberFormat _currencyFormat = NumberFormat('#,###');
 
@@ -441,7 +442,7 @@ class _TopUpViewState extends State<TopUpView> {
               if (Platform.isIOS)
                 _buildPickerTile(
                   icon: Icons.apple,
-                  title: 'Apple Pay',
+                  title: l10n.applePay,
                   isSelected: prefType == 'apple_pay',
                   onTap: () {
                     paymentController.updatePreference(
@@ -578,14 +579,30 @@ class _TopUpViewState extends State<TopUpView> {
     bool isApplePay = false,
   }) async {
     final l10n = AppLocalizations.of(context)!;
-    setState(() => _isLoading = true);
+
+    // 💎 Calculate Fee Breakdown
+    final walletAmountSatang = (_enteredAmount * 100).toInt();
+    final feeBreakdown = FeeCalculator.calculate(walletAmountSatang);
+    final chargeAmountSatang = feeBreakdown.chargeAmount;
+
+    // 🚀 10x SPEED: Show Processing Overlay IMMEDIATELY (Zero Delay Start)
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withValues(alpha: 0.6),
+      builder: (_) => const _ProcessingOverlay(),
+    );
     HapticFeedback.mediumImpact();
+
+    // 🚀 10x SPEED: Parallel Session Check (Non-Blocking)
+    // Don't await - let it run in background while we prepare the request
+    ApiService.ensureSessionValid().ignore();
 
     try {
       String? token;
 
       if (!useSaved) {
-        // ... (existing tokenize logic) ...
+        // Only create token for new cards (Saved cards skip this entirely)
         token = await _omiseService.createToken(
           name: _nameController.text,
           number: _cardNumberController.text,
@@ -595,32 +612,56 @@ class _TopUpViewState extends State<TopUpView> {
         );
       }
 
-      // 2. Execute Charge via Backend (token is null if useSaved)
+      // 🚀 10x SPEED: Execute Charge with Fee-Included Amount
+      // Charge: chargeAmountSatang (includes fee)
+      // Wallet: walletAmountSatang (what user receives)
       await _apiService.executeOpnTopUp(
-        amountSatang: (_enteredAmount * 100).toInt(),
+        amountSatang: chargeAmountSatang, // What to charge on card
+        walletAmountSatang: walletAmountSatang, // What goes into wallet
         token: token,
-        cardId: card?.id, // Use card ID if saved
+        cardId: card?.id,
         isApplePay: isApplePay,
         referenceId: DateTime.now().millisecondsSinceEpoch.toString(),
       );
 
+      // ✅ SUCCESS PATH: Instant UI Feedback
       if (mounted) {
+        // 🚀 10x SPEED: Close overlay and show success IMMEDIATELY
+        Navigator.of(
+          context,
+          rootNavigator: true,
+        ).popUntil((route) => route is! DialogRoute);
         HapticFeedback.heavyImpact();
         _showSuccessDialog();
-        context.read<DashboardController>().init();
 
-        // ✅ FIXED: Save the ACTUAL method ID used, not the string 'card'
-        if (card != null) {
-          _apiService.updatePaymentPreference(card.id, 'card');
-        } else if (isApplePay) {
-          _apiService.updatePaymentPreference('apple_pay', 'apple_pay');
-        }
+        // 🚀 10x SPEED: Optimistic Balance Update (Instant UI)
+        // Update with WALLET amount (not charge amount) - this is what user sees
+        // Capture controllers before async gap to fix use_build_context_synchronously
+        final dashboardController = context.read<DashboardController>();
+        final paymentController = context.read<PaymentController>();
 
-        // Refresh saved card status (in case first time)
-        context.read<PaymentController>().fetchData(silent: true);
+        dashboardController.optimisticBalanceAdd(
+          walletAmountSatang, // Use wallet amount, not charge amount
+        );
+
+        // 🚀 10x SPEED: Background Sync (Fire-and-Forget, Non-Blocking)
+        // These run AFTER user sees success - they don't slow down perceived speed
+        Future.microtask(() {
+          dashboardController.init(); // Sync with DB in background
+          if (card != null) {
+            _apiService.updatePaymentPreference(card.id, 'card');
+          } else if (isApplePay) {
+            _apiService.updatePaymentPreference('apple_pay', 'apple_pay');
+          }
+          paymentController.fetchData(silent: true);
+        });
       }
     } on FunctionException catch (e) {
       if (mounted) {
+        Navigator.of(
+          context,
+          rootNavigator: true,
+        ).popUntil((route) => route is! DialogRoute);
         if (e.status == 401) {
           _handleSessionExpired();
         } else {
@@ -632,10 +673,12 @@ class _TopUpViewState extends State<TopUpView> {
       }
     } catch (e) {
       if (mounted) {
+        Navigator.of(
+          context,
+          rootNavigator: true,
+        ).popUntil((route) => route is! DialogRoute);
         PayNotify.error(context, ErrorTranslator.translate(l10n, e.toString()));
       }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -810,7 +853,12 @@ class _TopUpViewState extends State<TopUpView> {
 
   Widget _buildImmersiveAmount(BuildContext context, bool isDark) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final text = _amountController.text.isEmpty ? '0' : _amountController.text;
+
+    // Calculate fee breakdown for display
+    final walletAmountSatang = (_enteredAmount * 100).round();
+    final feeBreakdown = FeeCalculator.calculate(walletAmountSatang);
 
     return Column(
       children: [
@@ -843,10 +891,12 @@ class _TopUpViewState extends State<TopUpView> {
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Text(
-              'No extra fees apply',
+              l10n.topUpChargeBreakdown(
+                _currencyFormat.format(feeBreakdown.chargeAmountBaht),
+              ),
               style: TextStyle(
-                color: const Color(0xFF10B981).withValues(alpha: 0.8),
-                fontSize: 12,
+                color: isDark ? Colors.white54 : Colors.grey[600],
+                fontSize: 13,
                 fontWeight: FontWeight.w500,
               ),
             ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.2),
@@ -1036,6 +1086,10 @@ class _TopUpViewState extends State<TopUpView> {
           final l10n = AppLocalizations.of(context)!;
           final topUpAmount = _enteredAmount;
 
+          // 💎 Calculate Fee Breakdown
+          final walletAmountSatang = (topUpAmount * 100).round();
+          final feeBreakdown = FeeCalculator.calculate(walletAmountSatang);
+
           final prefId = paymentController.preferredMethodId;
           final prefType = paymentController.preferredMethodType;
           final currentCards = paymentController.savedCards;
@@ -1076,6 +1130,7 @@ class _TopUpViewState extends State<TopUpView> {
           }
 
           final theme = Theme.of(context);
+          final isDark = theme.brightness == Brightness.dark;
 
           return Container(
             padding: const EdgeInsets.only(bottom: 24),
@@ -1132,37 +1187,117 @@ class _TopUpViewState extends State<TopUpView> {
                   padding: const EdgeInsets.all(24),
                   child: Column(
                     children: [
+                      // 💎 Fee Breakdown Section
                       _buildReviewRow(
+                        // Amount to add to wallet
                         l10n.confirmAmount,
                         '฿${_currencyFormat.format(topUpAmount)}',
                       ),
-                      const SizedBox(height: 16),
-                      _buildReviewRow(l10n.confirmFee, '฿0.00', isGreen: true),
+                      const SizedBox(height: 12),
+                      // 💎 Detailed Fee Breakdown (Granular Transparency)
+                      _buildReviewRow(
+                        // Transaction Fee (Total)
+                        l10n.topUpProcessingFee(
+                          feeBreakdown.effectiveFeePercent.toStringAsFixed(2),
+                        ),
+                        '+฿${_currencyFormat.format(feeBreakdown.totalFeeBaht)}',
+                        isSubtle: true,
+                      ),
+                      const SizedBox(height: 8),
+                      // Indented Breakdown
+                      Padding(
+                        padding: const EdgeInsets.only(left: 16),
+                        child: Column(
+                          children: [
+                            _buildReviewRow(
+                              // Gateway Fee (e.g., 3.65%)
+                              l10n.topUpFeeGateway(
+                                (feeBreakdown.feeRate * 100).toStringAsFixed(2),
+                              ),
+                              '฿${_currencyFormat.format(feeBreakdown.processingFeeBaht)}',
+                              isSubtle: true,
+                              isSmall: true, // Need to support smaller font
+                            ),
+                            const SizedBox(height: 4),
+                            _buildReviewRow(
+                              // VAT (e.g., 7%)
+                              l10n.topUpFeeVat(
+                                (feeBreakdown.vatRate * 100).round().toString(),
+                              ),
+                              '฿${_currencyFormat.format(feeBreakdown.vatBaht)}',
+                              isSubtle: true,
+                              isSmall: true,
+                            ),
+                            const SizedBox(height: 4),
+                            _buildReviewRow(
+                              // Platform Fee (Free)
+                              l10n.topUpFeeNip,
+                              l10n.topUpFeeFree,
+                              isSubtle: true,
+                              isSmall: true,
+                              isGreen: true, // Highlight "Free"
+                            ),
+                          ],
+                        ),
+                      ),
                       const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 20),
+                        padding: EdgeInsets.symmetric(vertical: 16),
                         child: Divider(),
                       ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            l10n.confirmTotalPayment,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
+                      // 💎 Total Charge (What card will be charged)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? const Color(0xFF3949AB).withValues(alpha: 0.15)
+                              : const Color(0xFF3949AB).withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: const Color(
+                              0xFF3949AB,
+                            ).withValues(alpha: 0.2),
                           ),
-                          Text(
-                            '฿${_currencyFormat.format(topUpAmount)}',
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF3949AB),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  l10n.confirmTotalPayment,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: isDark
+                                        ? Colors.white70
+                                        : Colors.grey[600],
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  l10n.topUpChargeAmountLabel,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isDark
+                                        ? Colors.white38
+                                        : Colors.grey[500],
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ],
+                            Text(
+                              '฿${_currencyFormat.format(feeBreakdown.chargeAmountBaht)}',
+                              style: const TextStyle(
+                                fontSize: 26,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF3949AB),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 24),
                       Align(
                         alignment: Alignment.centerLeft,
                         child: Text(
@@ -1200,7 +1335,7 @@ class _TopUpViewState extends State<TopUpView> {
                               Expanded(
                                 child: Text(
                                   isApplePay
-                                      ? 'Apple Pay'
+                                      ? l10n.applePay
                                       : (displayCard != null
                                             ? '${displayCard.brand} •••• ${displayCard.lastDigits}'
                                             : l10n.paymentAddMethod),
@@ -1248,17 +1383,33 @@ class _TopUpViewState extends State<TopUpView> {
     );
   }
 
-  Widget _buildReviewRow(String label, String value, {bool isGreen = false}) {
+  Widget _buildReviewRow(
+    String label,
+    String value, {
+    bool isGreen = false,
+    bool isSubtle = false,
+    bool isSmall = false,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 15)),
+        Text(
+          label,
+          style: TextStyle(
+            color: isSubtle ? Colors.grey[500] : Colors.grey[600],
+            fontSize: isSmall ? 12 : (isSubtle ? 13 : 15),
+          ),
+        ),
         Text(
           value,
           style: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 15,
-            color: isGreen ? const Color(0xFF10B981) : null,
+            fontWeight: isSubtle ? FontWeight.w500 : FontWeight.w600,
+            fontSize: isSmall ? 12 : (isSubtle ? 13 : 15),
+            color: isGreen
+                ? const Color(0xFF10B981)
+                : isSubtle
+                ? Colors.grey[600]
+                : null,
           ),
         ),
       ],
@@ -1466,6 +1617,61 @@ class UpperCaseTextFormatter extends TextInputFormatter {
     return TextEditingValue(
       text: newValue.text.toUpperCase(),
       selection: newValue.selection,
+    );
+  }
+}
+
+/// 💎 World-Class Processing Overlay
+/// Provides premium, focused feedback during financial transactions.
+class _ProcessingOverlay extends StatelessWidget {
+  const _ProcessingOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
+
+    return Center(
+      child: Container(
+        width: 140,
+        height: 140,
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.15),
+              blurRadius: 40,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 44,
+              height: 44,
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  isDark ? Colors.white : const Color(0xFF3949AB),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              l10n.confirmProcessing,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white70 : Colors.black54,
+                decoration: TextDecoration.none, // Required for Dialog overlay
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -9,3 +9,15 @@ verify_jwt = false
 
 [functions.setup-pin]
 verify_jwt = false
+
+[functions.inbound-handler]
+verify_jwt = false
+
+[functions.payout-executor]
+verify_jwt = false
+
+[functions.get-saved-cards]
+verify_jwt = false
+
+[functions.manage-payment-methods]
+verify_jwt = false
