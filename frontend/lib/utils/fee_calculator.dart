@@ -1,3 +1,5 @@
+import 'package:decimal/decimal.dart';
+
 // ============================================================================
 // Fee Calculator - Omise Payment Gateway Fee Calculation
 // ============================================================================
@@ -11,26 +13,26 @@
 
 /// Fee calculation result containing all breakdown information
 class FeeBreakdown {
-  /// The amount user wants to receive in wallet (in satang)
-  final int walletAmount;
+  /// The amount user wants to receive in wallet (in minor units)
+  final Decimal walletAmount;
 
-  /// The processing fee (in satang)
-  final int processingFee;
+  /// The processing fee (in minor units)
+  final Decimal processingFee;
 
-  /// VAT on the processing fee (in satang)
-  final int vat;
+  /// VAT on the processing fee (in minor units)
+  final Decimal vat;
 
-  /// Total fee = processingFee + VAT (in satang)
-  final int totalFee;
+  /// Total fee = processingFee + VAT (in minor units)
+  final Decimal totalFee;
 
-  /// Total charge = walletAmount + totalFee (in satang)
-  final int chargeAmount;
+  /// Total charge = walletAmount + totalFee (in minor units)
+  final Decimal chargeAmount;
 
   /// Fee rate used for calculation (e.g., 0.0365)
-  final double feeRate;
+  final Decimal feeRate;
 
   /// VAT rate used (e.g., 0.07)
-  final double vatRate;
+  final Decimal vatRate;
 
   const FeeBreakdown({
     required this.walletAmount,
@@ -43,22 +45,23 @@ class FeeBreakdown {
   });
 
   /// Get wallet amount in Baht (major units)
-  double get walletAmountBaht => walletAmount / 100.0;
+  double get walletAmountBaht => walletAmount.toDouble() / 100.0;
 
   /// Get processing fee in Baht
-  double get processingFeeBaht => processingFee / 100.0;
+  double get processingFeeBaht => processingFee.toDouble() / 100.0;
 
   /// Get VAT in Baht
-  double get vatBaht => vat / 100.0;
+  double get vatBaht => vat.toDouble() / 100.0;
 
   /// Get total fee in Baht
-  double get totalFeeBaht => totalFee / 100.0;
+  double get totalFeeBaht => totalFee.toDouble() / 100.0;
 
   /// Get charge amount in Baht
-  double get chargeAmountBaht => chargeAmount / 100.0;
+  double get chargeAmountBaht => chargeAmount.toDouble() / 100.0;
 
   /// Effective fee percentage (for display)
-  double get effectiveFeePercent => (feeRate * (1 + vatRate)) * 100;
+  double get effectiveFeePercent =>
+      (feeRate * (Decimal.one + vatRate)).toDouble() * 100;
 
   @override
   String toString() {
@@ -71,32 +74,34 @@ class FeeBreakdown {
 /// Fee Calculator for Omise Payment Gateway
 class FeeCalculator {
   // Omise Fee Rates (Thailand)
-  static const double domesticCardRate = 0.0365; // 3.65%
-  static const double internationalCardRate = 0.045; // 4.5%
-  static const double vatRate = 0.07; // 7% VAT
+  static final Decimal domesticCardRate = Decimal.parse('0.0365'); // 3.65%
+  static final Decimal internationalCardRate = Decimal.parse('0.045'); // 4.5%
+  static final Decimal vatRate = Decimal.parse('0.07'); // 7% VAT
 
   // Minimum charge amount (to avoid micro-transactions)
-  static const int minimumChargeSatang = 2000; // ฿20 minimum
+  static final Decimal minimumChargeSatang = Decimal.fromInt(
+    2000,
+  ); // ฿20 minimum
 
   /// Calculate fee breakdown for a desired wallet amount.
   ///
-  /// [walletAmountSatang] - The amount user wants to receive in wallet (in satang)
+  /// [walletAmountSatang] - The amount user wants to receive in wallet (in minor units)
   /// [isInternational] - Whether the card is international (higher fee)
   ///
   /// Returns [FeeBreakdown] containing all fee information.
   ///
   /// Formula: chargeAmount = walletAmount / (1 - (feeRate * (1 + vatRate)))
   static FeeBreakdown calculate(
-    int walletAmountSatang, {
+    Decimal walletAmountSatang, {
     bool isInternational = false,
   }) {
-    if (walletAmountSatang <= 0) {
-      return const FeeBreakdown(
-        walletAmount: 0,
-        processingFee: 0,
-        vat: 0,
-        totalFee: 0,
-        chargeAmount: 0,
+    if (walletAmountSatang <= Decimal.zero) {
+      return FeeBreakdown(
+        walletAmount: Decimal.zero,
+        processingFee: Decimal.zero,
+        vat: Decimal.zero,
+        totalFee: Decimal.zero,
+        chargeAmount: Decimal.zero,
         feeRate: domesticCardRate,
         vatRate: vatRate,
       );
@@ -107,23 +112,24 @@ class FeeCalculator {
     // Calculate effective rate including VAT
     // effectiveRate = feeRate * (1 + vatRate)
     // For domestic: 0.0365 * 1.07 = 0.039055
-    final effectiveRate = feeRate * (1 + vatRate);
+    final effectiveValue = Decimal.one - (feeRate * (Decimal.one + vatRate));
 
     // Reverse calculate charge amount
     // chargeAmount = walletAmount / (1 - effectiveRate)
-    final chargeAmountDouble = walletAmountSatang / (1 - effectiveRate);
-    final chargeAmount = chargeAmountDouble
-        .ceil(); // Round up to ensure full amount
+    // Use rational to avoid precision loss during division then ceil
+    final chargeAmountRat = walletAmountSatang / effectiveValue;
+    final chargeAmountDec = Decimal.fromBigInt(chargeAmountRat.ceil());
 
     // Calculate the total fee (what Omise takes)
-    final totalFee = chargeAmount - walletAmountSatang;
+    final totalFee = chargeAmountDec - walletAmountSatang;
 
     // Break down fee into base fee and VAT
     // totalFee = baseFee + (baseFee * vatRate)
     // totalFee = baseFee * (1 + vatRate)
     // baseFee = totalFee / (1 + vatRate)
-    final processingFeeDouble = totalFee / (1 + vatRate);
-    final processingFee = processingFeeDouble.round();
+    final onePlusVat = Decimal.one + vatRate;
+    final processingFeeRat = totalFee / onePlusVat;
+    final processingFee = Decimal.fromBigInt(processingFeeRat.round());
     final vat = totalFee - processingFee;
 
     return FeeBreakdown(
@@ -131,7 +137,7 @@ class FeeCalculator {
       processingFee: processingFee,
       vat: vat,
       totalFee: totalFee,
-      chargeAmount: chargeAmount,
+      chargeAmount: chargeAmountDec,
       feeRate: feeRate,
       vatRate: vatRate,
     );
@@ -142,20 +148,20 @@ class FeeCalculator {
     double walletAmountBaht, {
     bool isInternational = false,
   }) {
-    final satang = (walletAmountBaht * 100).round();
+    final satang = Decimal.parse((walletAmountBaht * 100).toStringAsFixed(0));
     return calculate(satang, isInternational: isInternational);
   }
 
   /// Format fee for display (e.g., "3.65% + VAT")
   static String formatFeeRateDisplay({bool isInternational = false}) {
     final rate = isInternational ? internationalCardRate : domesticCardRate;
-    return '${(rate * 100).toStringAsFixed(2)}% + VAT';
+    return '${(rate * Decimal.fromInt(100)).toString()}% + VAT';
   }
 
   /// Get effective fee percentage for display (e.g., "3.91%")
   static String formatEffectiveFeePercent({bool isInternational = false}) {
     final rate = isInternational ? internationalCardRate : domesticCardRate;
-    final effective = rate * (1 + vatRate) * 100;
+    final effective = rate * (Decimal.one + vatRate) * Decimal.fromInt(100);
     return '${effective.toStringAsFixed(2)}%';
   }
 }

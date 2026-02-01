@@ -65,6 +65,8 @@ dependencies:
   ed25519_edwards: ^0.3.1
   device_info_plus: ^12.3.0
   uuid: ^4.5.2
+  decimal: ^3.0.1
+  rational: ^2.2.3
 
 dev_dependencies:
   flutter_test:

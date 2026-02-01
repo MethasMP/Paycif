@@ -34,6 +34,7 @@ class _TopUpViewState extends State<TopUpView> {
   final bool _isLoading = false;
   final List<int> _smartAmounts = [500, 1000, 2000, 5000];
   final NumberFormat _currencyFormat = NumberFormat('#,###');
+  final NumberFormat _decimalFormat = NumberFormat('#,##0.00');
 
   // FocusNodes for Custom Payment Sheet
   final FocusNode _cardNumberFocus = FocusNode();
@@ -181,7 +182,7 @@ class _TopUpViewState extends State<TopUpView> {
                           children: [
                             Text(
                               l10n.topUpPayAmount(
-                                _currencyFormat.format(_enteredAmount),
+                                _decimalFormat.format(_enteredAmount),
                               ),
                               style: const TextStyle(
                                 fontSize: 28,
@@ -581,9 +582,9 @@ class _TopUpViewState extends State<TopUpView> {
     final l10n = AppLocalizations.of(context)!;
 
     // 💎 Calculate Fee Breakdown
-    final walletAmountSatang = (_enteredAmount * 100).toInt();
-    final feeBreakdown = FeeCalculator.calculate(walletAmountSatang);
-    final chargeAmountSatang = feeBreakdown.chargeAmount;
+    final feeBreakdown = FeeCalculator.calculateFromBaht(_enteredAmount);
+    final walletAmountSatang = feeBreakdown.walletAmount.toBigInt().toInt();
+    final chargeAmountSatang = feeBreakdown.chargeAmount.toBigInt().toInt();
 
     // 🚀 10x SPEED: Show Processing Overlay IMMEDIATELY (Zero Delay Start)
     showDialog(
@@ -857,8 +858,7 @@ class _TopUpViewState extends State<TopUpView> {
     final text = _amountController.text.isEmpty ? '0' : _amountController.text;
 
     // Calculate fee breakdown for display
-    final walletAmountSatang = (_enteredAmount * 100).round();
-    final feeBreakdown = FeeCalculator.calculate(walletAmountSatang);
+    final feeBreakdown = FeeCalculator.calculateFromBaht(_enteredAmount);
 
     return Column(
       children: [
@@ -892,7 +892,7 @@ class _TopUpViewState extends State<TopUpView> {
             padding: const EdgeInsets.only(top: 8),
             child: Text(
               l10n.topUpChargeBreakdown(
-                _currencyFormat.format(feeBreakdown.chargeAmountBaht),
+                _decimalFormat.format(feeBreakdown.chargeAmountBaht),
               ),
               style: TextStyle(
                 color: isDark ? Colors.white54 : Colors.grey[600],
@@ -1087,8 +1087,7 @@ class _TopUpViewState extends State<TopUpView> {
           final topUpAmount = _enteredAmount;
 
           // 💎 Calculate Fee Breakdown
-          final walletAmountSatang = (topUpAmount * 100).round();
-          final feeBreakdown = FeeCalculator.calculate(walletAmountSatang);
+          final feeBreakdown = FeeCalculator.calculateFromBaht(topUpAmount);
 
           final prefId = paymentController.preferredMethodId;
           final prefType = paymentController.preferredMethodType;
@@ -1191,7 +1190,7 @@ class _TopUpViewState extends State<TopUpView> {
                       _buildReviewRow(
                         // Amount to add to wallet
                         l10n.confirmAmount,
-                        '฿${_currencyFormat.format(topUpAmount)}',
+                        '฿${_decimalFormat.format(topUpAmount)}',
                       ),
                       const SizedBox(height: 12),
                       // 💎 Detailed Fee Breakdown (Granular Transparency)
@@ -1200,7 +1199,7 @@ class _TopUpViewState extends State<TopUpView> {
                         l10n.topUpProcessingFee(
                           feeBreakdown.effectiveFeePercent.toStringAsFixed(2),
                         ),
-                        '+฿${_currencyFormat.format(feeBreakdown.totalFeeBaht)}',
+                        '+฿${_decimalFormat.format(feeBreakdown.totalFeeBaht)}',
                         isSubtle: true,
                       ),
                       const SizedBox(height: 8),
@@ -1212,9 +1211,10 @@ class _TopUpViewState extends State<TopUpView> {
                             _buildReviewRow(
                               // Gateway Fee (e.g., 3.65%)
                               l10n.topUpFeeGateway(
-                                (feeBreakdown.feeRate * 100).toStringAsFixed(2),
+                                (feeBreakdown.feeRate.toDouble() * 100)
+                                    .toStringAsFixed(2),
                               ),
-                              '฿${_currencyFormat.format(feeBreakdown.processingFeeBaht)}',
+                              '฿${_decimalFormat.format(feeBreakdown.processingFeeBaht)}',
                               isSubtle: true,
                               isSmall: true, // Need to support smaller font
                             ),
@@ -1222,9 +1222,11 @@ class _TopUpViewState extends State<TopUpView> {
                             _buildReviewRow(
                               // VAT (e.g., 7%)
                               l10n.topUpFeeVat(
-                                (feeBreakdown.vatRate * 100).round().toString(),
+                                (feeBreakdown.vatRate.toDouble() * 100)
+                                    .round()
+                                    .toString(),
                               ),
-                              '฿${_currencyFormat.format(feeBreakdown.vatBaht)}',
+                              '฿${_decimalFormat.format(feeBreakdown.vatBaht)}',
                               isSubtle: true,
                               isSmall: true,
                             ),
@@ -1287,7 +1289,7 @@ class _TopUpViewState extends State<TopUpView> {
                               ],
                             ),
                             Text(
-                              '฿${_currencyFormat.format(feeBreakdown.chargeAmountBaht)}',
+                              '฿${_decimalFormat.format(feeBreakdown.chargeAmountBaht)}',
                               style: const TextStyle(
                                 fontSize: 26,
                                 fontWeight: FontWeight.bold,
