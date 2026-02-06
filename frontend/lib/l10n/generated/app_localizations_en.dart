@@ -305,23 +305,46 @@ class AppLocalizationsEn extends AppLocalizations {
   String get topUpTotalCharge => 'Total Charge';
 
   @override
-  String get topUpAmountToWallet => 'Amount to Wallet';
+  String get topUpAmountToWallet => 'You receive in wallet';
 
   @override
   String topUpFeeGateway(String percent) {
-    return 'Gateway Fee (Omise) $percent%';
+    return 'Omise Processing Fee ($percent%)';
   }
 
   @override
-  String get topUpFeeNip => 'Platform Fee (Paysif)';
-
-  @override
-  String topUpFeeVat(String percent) {
-    return 'VAT ($percent%)';
-  }
+  String get topUpFeePaysif => 'Paycif Service Fee';
 
   @override
   String get topUpFeeFree => 'Free';
+
+  @override
+  String get topUpFeeInfoTitle => 'Fee Transparency';
+
+  @override
+  String get topUpFeeInfoOmiseTitle => 'External Costs (Omise)';
+
+  @override
+  String get topUpFeeInfoOmiseDesc =>
+      'Securely processed by Omise. This fee goes directly to cover gateway and card network costs (Visa/Mastercard).';
+
+  @override
+  String get topUpFeeInfoLayer1Title => 'Government VAT';
+
+  @override
+  String get topUpFeeInfoLayer1Desc =>
+      'Standard 7% Value Added Tax required on processing services.';
+
+  @override
+  String get topUpFeeInfoPaysifTitle => 'Paycif Service Fee';
+
+  @override
+  String get topUpFeeInfoPaysifDesc =>
+      '฿0.00. We don\'t charge you for adding money. Our platform remains free for your convenience.';
+
+  @override
+  String get topUpFeeInfoSummary =>
+      'We believe in full transparency. You only pay for mandatory external processing costs.';
 
   @override
   String get topUpChargeAmountLabel => 'Card will be charged';

@@ -22,6 +22,12 @@ import {
 } from './types.ts';
 
 import { createGateway } from './gateway.ts';
+import * as ed from 'https://esm.sh/@noble/ed25519@2.0.0';
+import { sha512 } from 'https://esm.sh/@noble/hashes@1.3.1/sha512';
+import { decode as base64Decode } from 'https://deno.land/std@0.168.0/encoding/base64.ts';
+
+// 🛡️ CRITICAL: Configure SHA-512 for @noble/ed25519 v2
+ed.etc.sha512Sync = (...m: Uint8Array[]) => sha512(ed.etc.concatBytes(...m));
 
 // ============================================================================
 // CORS Headers
@@ -82,12 +88,17 @@ function validateRequest(body: unknown): PayoutRequest {
     throw new Error('target_value is required and must be at least 5 characters');
   }
 
+  if (!req.idempotency_key || typeof req.idempotency_key !== 'string') {
+    throw new Error('idempotency_key is required for signed requests');
+  }
+
   return {
     user_id: req.user_id as string,
     wallet_id: req.wallet_id as string,
     amount_satang: req.amount_satang as number,
     target_type: req.target_type as 'MOBILE' | 'NATID' | 'EWALLET',
     target_value: req.target_value as string,
+    idempotency_key: req.idempotency_key as string,
     description: (req.description as string) || 'Paysif Payout',
   };
 }
@@ -180,6 +191,55 @@ async function handlePayoutRequest(request: Request): Promise<Response> {
 
     console.log('[PayoutExecutor] Request validated:', payoutRequest.user_id);
 
+    // =========================================================================
+    // STEP 1.5: SECURE DEVICE CHALLENGE (Signature Verification)
+    // =========================================================================
+    const deviceId = request.headers.get('x-device-id');
+    const signature = request.headers.get('x-device-signature');
+
+    if (!deviceId || !signature) {
+      console.error('[Security] Missing device headers for high-risk Payout');
+      return new Response(
+        JSON.stringify({ success: false, error: 'Device authorization missing' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    // Fetch the device public key for this user
+    const { data: binding, error: bindError } = await adminClient
+      .from('user_device_bindings')
+      .select('public_key')
+      .eq('user_id', user.id)
+      .eq('device_id', deviceId)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (bindError || !binding) {
+      console.warn(`[Security] Unrecognized or inactive device attempt: ${deviceId}`);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Device not recognized or link revoked' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    // Verify Signature: Payload signed must be the idempotency_key
+    const isValidSig = await verifySignature(
+      signature,
+      payoutRequest.idempotency_key,
+      binding.public_key,
+    );
+    if (!isValidSig) {
+      console.error(
+        `[Security] Signature Mismatch for Payout key: ${payoutRequest.idempotency_key}`,
+      );
+      return new Response(
+        JSON.stringify({ success: false, error: 'Payout integrity check failed' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    console.log(`[Security] Payout Signature Verified for Device: ${deviceId}`);
+
     // STEP 2: Get Supabase client (Service Role for DB operations)
     const supabase = getSupabaseClient();
 
@@ -192,6 +252,7 @@ async function handlePayoutRequest(request: Request): Promise<Response> {
         p_amount_satang: payoutRequest.amount_satang,
         p_target_type: payoutRequest.target_type,
         p_target_value: payoutRequest.target_value,
+        p_reference_id: payoutRequest.idempotency_key, // 💎 Pass hardened key
         p_description: payoutRequest.description,
       })
       .single();
@@ -323,6 +384,18 @@ async function handlePayoutRequest(request: Request): Promise<Response> {
       } as PayoutResponse),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
+  }
+}
+
+async function verifySignature(sigB64: string, msg: string, pubKeyB64: string): Promise<boolean> {
+  try {
+    const sig = base64Decode(sigB64);
+    const pub = base64Decode(pubKeyB64);
+    const msgBytes = new TextEncoder().encode(msg);
+    return await ed.verify(sig, msgBytes, pub);
+  } catch (err) {
+    console.error('Ed25519 verify error:', err);
+    return false;
   }
 }
 

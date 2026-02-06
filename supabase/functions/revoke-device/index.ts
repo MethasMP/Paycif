@@ -81,7 +81,7 @@ serve(async (req) => {
         metadata: { timestamp: new Date() },
         ip_address: req.headers.get('x-forwarded-for') || 'unknown',
       });
-    } catch (ignore) {
+    } catch (_ignore) {
       // Ignore
     }
 

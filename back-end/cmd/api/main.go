@@ -44,11 +44,15 @@ func main() {
 	// Pass redisClient and AuditService to WalletService
 	walletService := service.NewWalletService(database.DB, fxService, alertService, redisClient, auditService)
 	kycService := service.NewKYCService(database.DB, cryptoService, auditService)
+	sigService := service.NewSignatureService() // Security Initialization
 
 	// 3. Handler Initialization
-	transferHandler := &TransferHandler{Service: walletService}
+	transferHandler := &TransferHandler{
+		Service:          walletService,
+		SignatureService: sigService,
+	}
 	paymentHandler := NewPaymentHandler(walletService)
-	payoutHandler := NewPayoutHandler(walletService)
+	payoutHandler := NewPayoutHandler(walletService, sigService)
 	kycHandler := NewKYCHandler(kycService)
 	routingService := routing.NewStaticRouter(walletService)
 	routingHandler := NewRoutingHandler(routingService)
@@ -59,6 +63,7 @@ func main() {
 	}
 	
 	r := gin.New() // Use New() to avoid default logger
+	r.SetTrustedProxies(nil) // Security: Disable trusting all proxies
 	r.Use(gin.Recovery()) // Recovery from panics
 	r.Use(middleware.StructuredLogger()) // World-Class JSON Logger
 	

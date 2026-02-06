@@ -310,15 +310,38 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String get topUpFeeNip => '플랫폼 수수료 (Paysif)';
-
-  @override
-  String topUpFeeVat(String percent) {
-    return '부가세 ($percent%)';
-  }
+  String get topUpFeePaysif => 'Paycif Service Fee';
 
   @override
   String get topUpFeeFree => '무료';
+
+  @override
+  String get topUpFeeInfoTitle => '거래 수수료 안내';
+
+  @override
+  String get topUpFeeInfoOmiseTitle => 'Omise란?';
+
+  @override
+  String get topUpFeeInfoOmiseDesc =>
+      'Omise는 태국에서 인허가된 결제 게이트웨이로, 카드 거래를 안전하게 처리합니다. 모든 거래에 표준 수수료가 부과됩니다.';
+
+  @override
+  String get topUpFeeInfoLayer1Title => '기본 수수료 (레이어 1)';
+
+  @override
+  String get topUpFeeInfoLayer1Desc =>
+      'Omise가 부과하는 표준 처리 수수료입니다: 충전 금액의 3.65%와 수수료에 대한 7% 부가세. 카드 결제에서는 이 수수료를 피할 수 없습니다.';
+
+  @override
+  String get topUpFeeInfoPaysifTitle => 'Paysif 플랫폼 수수료';
+
+  @override
+  String get topUpFeeInfoPaysifDesc =>
+      'Paysif는 추가 플랫폼 수수료를 부과하지 않습니다. 결제 게이트웨이 비용만 전달합니다.';
+
+  @override
+  String get topUpFeeInfoSummary =>
+      '우리는 완전한 투명성을 믿습니다. 안전한 결제 처리에 필요한 비용만 지불하시면 됩니다.';
 
   @override
   String get topUpChargeAmountLabel => '총 결제 금액';

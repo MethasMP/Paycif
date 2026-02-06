@@ -160,28 +160,47 @@ class DashboardRepository {
     }
   }
 
-  /// Fetches the latest transactions for a specific wallet via Go Backend.
-  /// This ensures correct JOIN logic and auditing.
+  /// Fetches the latest transactions for a specific wallet via Realtime Stream.
+  /// This ensures the UI updates instantly when database changes (Reconciliation, etc).
   Stream<List<Transaction>> fetchTransactions(String walletId) {
-    // Return the broadcast stream so multiple listeners can stay in sync
-    _api
-        .getTransactions(walletId)
-        .then((data) {
-          final txs = data.map((json) => Transaction.fromJson(json)).toList();
-          _lastTxsCache = txs;
-          _txController.add(txs);
+    // 📡 REALTIME: Listen to changes in the 'transactions' table for this wallet
+    _client
+        .from('transactions')
+        .stream(primaryKey: ['id'])
+        .eq('wallet_id', walletId)
+        .order('created_at')
+        .listen(
+          (data) {
+            final txs = data.map((json) => Transaction.fromJson(json)).toList();
+            // Sort locally to ensure latest is always on top (descending)
+            txs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-          // 📡 [Side-Effect] Keep cache in sync
-          _storage
-              .write(
-                _kTxCacheKey,
-                jsonEncode(txs.map((t) => t.toJson()).toList()),
-              )
-              .ignore();
-        })
-        .catchError((e) {
-          debugPrint('❌ DashboardRepository: Error fetching transactions: $e');
-        });
+            _lastTxsCache = txs;
+            _txController.add(txs);
+
+            // 💾 [Side-Effect] Keep disk cache in sync
+            _storage
+                .write(
+                  _kTxCacheKey,
+                  jsonEncode(txs.map((t) => t.toJson()).toList()),
+                )
+                .ignore();
+
+            debugPrint(
+              '📡 [Realtime] Transactions updated: ${txs.length} items',
+            );
+          },
+          onError: (e) {
+            debugPrint('❌ DashboardRepository: Realtime Transaction Error: $e');
+            // Fallback to one-time fetch if realtime fails
+            _api.getTransactions(walletId).then((data) {
+              final txs = data
+                  .map((json) => Transaction.fromJson(json))
+                  .toList();
+              _txController.add(txs);
+            });
+          },
+        );
 
     return transactionsStream;
   }

@@ -71,9 +71,11 @@ class CryptoService {
     final List<int> salt = params['salt'];
 
     final algorithm = Argon2id(
-      parallelism: 1, // ⚡ Single Thread
-      memory: 64, // ⚡ 64 KB (L1 Cache)
-      iterations: 1, // ⚡ 1 Iteration
+      parallelism: 1, // ⚡ Single Thread (predictable for mobile)
+      memory:
+          32768, // 🛡️ 32 MB (OWASP/RFC 9106 defense against GPU/ASIC attacks)
+      iterations:
+          3, // 🛡️ 3 Iterations (Increased time-cost for brute-force defense)
       hashLength: 32,
     );
 

@@ -70,7 +70,7 @@ serve(async (req) => {
     console.log(`[BindDevice] Deleted old binding for device ${device_id}`);
 
     // Step 2: Insert the new binding with fresh public key
-    const payload: any = {
+    const payload: Record<string, unknown> = {
       user_id: user.id,
       device_id: device_id,
       public_key: public_key,
@@ -101,7 +101,7 @@ serve(async (req) => {
         metadata: { device_name: device_name, os_type: os_type, timestamp: new Date() },
         ip_address: req.headers.get('x-forwarded-for') || 'unknown',
       });
-    } catch (ignore) {
+    } catch (_ignore) {
       // Ignore audit log failure if table missing
     }
 

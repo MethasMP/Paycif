@@ -10,6 +10,7 @@ import '../utils/error_translator.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
 import 'payment_success_screen.dart';
 import 'top_up_view.dart';
+import '../features/security/domain/repositories/security_repository.dart';
 
 class PayScreen extends StatefulWidget {
   final double amount;
@@ -144,8 +145,10 @@ class _PayScreenState extends State<PayScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return BlocProvider(
-      create: (context) =>
-          PaymentCubit(apiService: ApiService())..initialize(widget.amount),
+      create: (context) => PaymentCubit(
+        apiService: ApiService(),
+        securityRepository: context.read<SecurityRepository>(),
+      )..initialize(widget.amount),
       child: Scaffold(
         backgroundColor: isDark
             ? const Color(0xFF0F172A)

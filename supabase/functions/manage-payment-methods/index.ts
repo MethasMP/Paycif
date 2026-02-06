@@ -8,7 +8,7 @@ const corsHeaders = {
 
 // 1. Initialize Clients OUTSIDE handler for container reuse
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+const _supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const omiseSecretKey = Deno.env.get('OMISE_SECRET_KEY')!;
 
@@ -128,7 +128,7 @@ serve(async (req) => {
       console.log(`[ManageCards] Requested delete: ${card_id} for user: ${userId}`);
 
       // SECURITY CHECK: Check for active transactions
-      const { data: activeTxns } = await adminClient
+      const { data: _activeTxns } = await adminClient
         .from('transactions')
         .select('id')
         .eq('status', 'PENDING')
@@ -172,7 +172,7 @@ serve(async (req) => {
               preferred_payment_method_id: null,
               preferred_payment_method_type: null,
             })
-            .eq('id', userId) as any,
+            .eq('id', userId),
         );
       }
 
@@ -192,7 +192,7 @@ serve(async (req) => {
   }
 });
 
-function jsonResponse(body: any, status: number): Response {
+function jsonResponse(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -17,6 +17,8 @@ import '../utils/payment_utils.dart';
 import '../utils/error_translator.dart';
 import '../utils/pay_notify.dart';
 import '../utils/fee_calculator.dart';
+import 'package:uuid/uuid.dart';
+import '../features/security/domain/repositories/security_repository.dart';
 
 class TopUpView extends StatefulWidget {
   const TopUpView({super.key});
@@ -32,9 +34,21 @@ class _TopUpViewState extends State<TopUpView> {
   final OmiseService _omiseService = OmiseService(); // New Service
   int? _selectedChipIndex;
   final bool _isLoading = false;
-  final List<int> _smartAmounts = [500, 1000, 2000, 5000];
+  final List<int> _smartAmounts = [500, 1000, 2000, 3000]; // Max 3000/day
   final NumberFormat _currencyFormat = NumberFormat('#,###');
   final NumberFormat _decimalFormat = NumberFormat('#,##0.00');
+
+  // Daily limit tracking
+  double _dailyLimit = 3000.0; // 3,000 THB per day
+  double _dailyUsed = 0.0;
+  double _dailyRemaining = 3000.0;
+  double _minPerTransaction = 500.0; // Min 500 THB per transaction
+  bool _isLimitLoading = true;
+  String? _limitError;
+
+  // 🛡️ IDEMPOTENCY: Track the reference ID for the current payment attempt
+  // If user retries due to error, we reuse this ID to prevent double charge.
+  String? _pendingReferenceId;
 
   // FocusNodes for Custom Payment Sheet
   final FocusNode _cardNumberFocus = FocusNode();
@@ -68,6 +82,27 @@ class _TopUpViewState extends State<TopUpView> {
         }
       });
     });
+    _fetchDailyLimits();
+  }
+
+  Future<void> _fetchDailyLimits() async {
+    try {
+      final limits = await _apiService.getDailyTopUpStatus();
+      setState(() {
+        _dailyLimit = (limits['max_daily_baht'] as num).toDouble();
+        _dailyUsed = (limits['current_total_baht'] as num).toDouble();
+        _dailyRemaining = (limits['remaining_limit_baht'] as num).toDouble();
+        _minPerTransaction = (limits['min_per_transaction_baht'] as num)
+            .toDouble();
+        _isLimitLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _limitError = 'Unable to load daily limits';
+        _isLimitLoading = false;
+      });
+      debugPrint('❌ Failed to fetch daily limits: $e');
+    }
   }
 
   @override
@@ -89,6 +124,7 @@ class _TopUpViewState extends State<TopUpView> {
     setState(() {
       _selectedChipIndex = index;
       _amountController.text = _smartAmounts[index].toString();
+      _pendingReferenceId = null; // New amount = New txn
     });
   }
 
@@ -580,9 +616,14 @@ class _TopUpViewState extends State<TopUpView> {
     bool isApplePay = false,
   }) async {
     final l10n = AppLocalizations.of(context)!;
+    // Store repository reference before any async gaps
+    final securityRepo = context.read<SecurityRepository>();
 
-    // 💎 Calculate Fee Breakdown
-    final feeBreakdown = FeeCalculator.calculateFromBaht(_enteredAmount);
+    // 💎 Calculate Fee Breakdown (Wallet-centric: User gets exactly what they typed)
+    final feeBreakdown = FeeCalculator.calculateFromBaht(
+      _enteredAmount,
+      isChargeAmount: false,
+    );
     final walletAmountSatang = feeBreakdown.walletAmount.toBigInt().toInt();
     final chargeAmountSatang = feeBreakdown.chargeAmount.toBigInt().toInt();
 
@@ -595,9 +636,9 @@ class _TopUpViewState extends State<TopUpView> {
     );
     HapticFeedback.mediumImpact();
 
-    // 🚀 10x SPEED: Parallel Session Check (Non-Blocking)
-    // Don't await - let it run in background while we prepare the request
-    ApiService.ensureSessionValid().ignore();
+    // 🛡️ CRITICAL: Ensure session is fresh BEFORE any payment operation
+    // This prevents race conditions where payment starts with stale/expired token
+    await ApiService.ensureSessionValid();
 
     try {
       String? token;
@@ -613,17 +654,73 @@ class _TopUpViewState extends State<TopUpView> {
         );
       }
 
+      // 🛡️ SECURITY: Hardened Idempotency + Non-Repudiation (Signature)
+      // 🛡️ IDEMPOTENCY: Reuse existing reference ID if retrying
+      // This ensures we don't accidentally double-charge if the user presses Pay again
+      // after a timeout or network error.
+      _pendingReferenceId ??= const Uuid().v4();
+      final referenceId = _pendingReferenceId!;
+
+      Map<String, String>? signatureHeaders;
+
+      try {
+        signatureHeaders = await securityRepo.generateSignatureHeaders(
+          referenceId,
+        );
+      } catch (e) {
+        debugPrint('⚠️ [Signing] Failed to sign request: $e');
+        // We continue for now, but in production this might be a Hard Reject
+      }
+
       // 🚀 10x SPEED: Execute Charge with Fee-Included Amount
       // Charge: chargeAmountSatang (includes fee)
       // Wallet: walletAmountSatang (what user receives)
-      await _apiService.executeOpnTopUp(
-        amountSatang: chargeAmountSatang, // What to charge on card
-        walletAmountSatang: walletAmountSatang, // What goes into wallet
-        token: token,
-        cardId: card?.id,
-        isApplePay: isApplePay,
-        referenceId: DateTime.now().millisecondsSinceEpoch.toString(),
-      );
+      try {
+        await _apiService.executeOpnTopUp(
+          amountSatang: chargeAmountSatang, // Total charge (Gross)
+          walletAmountSatang: walletAmountSatang, // Actual top up amount (Net)
+          token: token,
+          cardId: card?.id,
+          isApplePay: isApplePay,
+          referenceId: referenceId,
+          headers: signatureHeaders,
+        );
+      } catch (e) {
+        // 🛡️ RECOVERY: Handle Key Mismatch (Integrity Check Failed)
+        // This happens if the user reinstalled the app but server kept old key
+        if (e.toString().contains('Request integrity check failed') ||
+            e.toString().contains('Device not recognized')) {
+          debugPrint(
+            '⚠️ [Self-Healing] Integrity Check Failed. Re-binding device and retrying...',
+          );
+
+          // 1. Force Re-bind (Generate new keys & sync to server)
+          await securityRepo.bindCurrentDevice();
+
+          // 🛡️ FIX: Add delay to ensure DB replication/propagation completes
+          // Supabase has minimal replication lag but edge functions may cache
+          await Future.delayed(const Duration(milliseconds: 500));
+
+          // 2. Re-sign the SAME reference_id with NEW keys
+          final newHeaders = await securityRepo.generateSignatureHeaders(
+            referenceId,
+          );
+
+          // 3. Retry the Top Up
+          await _apiService.executeOpnTopUp(
+            amountSatang: chargeAmountSatang,
+            walletAmountSatang: walletAmountSatang,
+            token: token,
+            cardId: card?.id,
+            isApplePay: isApplePay,
+            referenceId: referenceId,
+            headers: newHeaders,
+          );
+        } else {
+          // Rethrow other errors (Balance insufficient, limit reached, etc.)
+          rethrow;
+        }
+      }
 
       // ✅ SUCCESS PATH: Instant UI Feedback
       if (mounted) {
@@ -656,6 +753,15 @@ class _TopUpViewState extends State<TopUpView> {
           }
           paymentController.fetchData(silent: true);
         });
+
+        // 🛡️ Reset Idempotency Key for next distinct payment
+        if (mounted) {
+          setState(() {
+            _pendingReferenceId = null;
+            _amountController.clear(); // Reset input field
+            _selectedChipIndex = null; // Reset chips
+          });
+        }
       }
     } on FunctionException catch (e) {
       if (mounted) {
@@ -663,8 +769,24 @@ class _TopUpViewState extends State<TopUpView> {
           context,
           rootNavigator: true,
         ).popUntil((route) => route is! DialogRoute);
-        if (e.status == 401) {
+
+        // 🛡️ FIX: Differentiate between Session Expired and Integrity Error
+        final isIntegrityError =
+            e.toString().contains('integrity check failed') ||
+            e.toString().contains('Device not recognized');
+
+        if (e.status == 401 && !isIntegrityError) {
+          // Real Session Expired (JWT truly dead)
           _handleSessionExpired();
+        } else if (isIntegrityError) {
+          // Device Key Mismatch - Show friendly error, don't force logout
+          debugPrint(
+            '🔑 [TopUp] Integrity Error detected after all retries. Showing user message.',
+          );
+          PayNotify.error(
+            context,
+            'Security verification failed. Please try again or restart the app.',
+          );
         } else {
           PayNotify.error(
             context,
@@ -767,7 +889,24 @@ class _TopUpViewState extends State<TopUpView> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(l10n.topUpTitle),
+        title: Column(
+          children: [
+            Text(
+              l10n.topUpTitle,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              '${l10n.homeTotalBalance} ฿${_currencyFormat.format(currentBalance)}',
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? Colors.white70 : Colors.black54,
+                fontWeight: FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+        centerTitle: true,
         elevation: 0,
         backgroundColor: Colors.transparent,
       ),
@@ -779,19 +918,13 @@ class _TopUpViewState extends State<TopUpView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const SizedBox(height: 16),
-                  _buildBalanceCard(context, currentBalance, isDark, l10n),
-                  const SizedBox(height: 40),
-                  Text(
-                    l10n.topUpAmountLabel,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey[500],
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
+                  // Direction 1: Unified Slim Limit Indicator
+                  _buildSlimLimitBar(context, isDark),
+                  const SizedBox(height: 48), // Comfortable spacing
+                  // Amount Display (Removed "Amount to Add" Label)
                   _buildImmersiveAmount(context, isDark),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 32), // Reduced from 40
                   _buildSmartSuggestions(context, isDark),
                 ],
               ),
@@ -807,101 +940,467 @@ class _TopUpViewState extends State<TopUpView> {
     );
   }
 
-  Widget _buildBalanceCard(
-    BuildContext context,
-    double balance,
-    bool isDark,
-    AppLocalizations l10n,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey[100],
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.05),
+  // Refactored: Slim, Unified Limit Bar (Direction 1)
+  Widget _buildSlimLimitBar(BuildContext context, bool isDark) {
+    if (_isLimitLoading) {
+      return Center(
+        child: SizedBox(
+          width: 200,
+          child: LinearProgressIndicator(
+            minHeight: 2,
+            backgroundColor: Colors.transparent,
+            color: isDark ? Colors.white24 : Colors.grey[300],
+          ),
         ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.account_balance_wallet_rounded,
-            color: const Color(0xFF3949AB).withValues(alpha: 0.8),
-            size: 18,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            l10n.homeTotalBalance,
-            style: TextStyle(
-              color: isDark ? Colors.white60 : Colors.grey[600],
-              fontSize: 13,
-            ),
-          ),
-          const SizedBox(width: 4),
-          Text(
-            '฿${_currencyFormat.format(balance)}',
-            style: TextStyle(
-              color: isDark ? Colors.white : Colors.black87,
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+      );
+    }
 
-  Widget _buildImmersiveAmount(BuildContext context, bool isDark) {
-    final theme = Theme.of(context);
-    final l10n = AppLocalizations.of(context)!;
-    final text = _amountController.text.isEmpty ? '0' : _amountController.text;
+    if (_limitError != null) return const SizedBox.shrink();
 
-    // Calculate fee breakdown for display
-    final feeBreakdown = FeeCalculator.calculateFromBaht(_enteredAmount);
+    final isLimitReached = _dailyRemaining <= 0;
+    final progressPercent = (_dailyUsed / _dailyLimit).clamp(0.0, 1.0);
+    final color = isLimitReached
+        ? const Color(0xFFEF4444)
+        : const Color(0xFF3949AB);
 
     return Column(
       children: [
         Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              '฿',
-              style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.w300,
-                color: const Color(0xFF3949AB),
-                fontSize: 40,
+              isLimitReached ? 'Daily Limit Reached' : 'Daily Limit',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white60 : Colors.grey[600],
               ),
             ),
-            const SizedBox(width: 8),
-            IntrinsicWidth(
-              child: Text(
-                text,
-                style: theme.textTheme.displayLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: text.length > 6 ? 48 : 64,
-                  letterSpacing: -1,
+            Text(
+              '฿${_currencyFormat.format(_dailyRemaining)} / ฿${_currencyFormat.format(_dailyLimit)}',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: isDark ? Colors.white60 : Colors.grey[600],
+                fontFamily: 'Monospace', // Aligns numbers nicely
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(2),
+          child: LinearProgressIndicator(
+            value: progressPercent,
+            minHeight: 4, // Extremely slim
+            backgroundColor: isDark ? Colors.white10 : Colors.grey[200],
+            valueColor: AlwaysStoppedAnimation<Color>(color),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildImmersiveAmount(BuildContext context, bool isDark) {
+    final text = _amountController.text.isEmpty ? '0' : _amountController.text;
+
+    // 🎯 TARGET: User wants this EXACT amount in their wallet
+    final feeBreakdown = FeeCalculator.calculateFromBaht(
+      _enteredAmount,
+      isChargeAmount: false,
+    );
+
+    // Validation states
+    final bool isBelowMinimum = _enteredAmount > 0 && _enteredAmount < 500;
+    final bool isAboveLimit =
+        _enteredAmount > _dailyRemaining && _dailyRemaining > 0;
+    final bool isValid =
+        _enteredAmount >= 500 && _enteredAmount <= _dailyRemaining;
+
+    // Dynamic font size based on text length
+    final double amountFontSize = text.length > 6 ? 48 : 56;
+    final bool showFeeBreakdown = _enteredAmount > 0 && isValid;
+
+    return Column(
+      children: [
+        // Amount Display with improved typography
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Currency symbol
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  '฿',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w400,
+                    color: isValid || _enteredAmount == 0
+                        ? const Color(0xFF1E40AF)
+                        : isBelowMinimum
+                        ? const Color(0xFFDC2626)
+                        : const Color(0xFFF59E0B),
+                    fontSize: 28,
+                    height: 1,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              // Amount with animated value
+              IntrinsicWidth(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  curve: Curves.easeOutCubic,
+                  child: Text(
+                    text,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: amountFontSize,
+                      letterSpacing: -0.5,
+                      height: 1.1,
+                      color: isValid || _enteredAmount == 0
+                          ? isDark
+                                ? Colors.white
+                                : Colors.black87
+                          : isBelowMinimum
+                          ? const Color(0xFFDC2626)
+                          : const Color(0xFFB45309),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Fee breakdown - only show when valid
+        if (showFeeBreakdown)
+          Padding(
+            padding: const EdgeInsets.only(top: 8), // Reduced from 12
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 4,
+              ), // Reduced from 12, 6
+              decoration: BoxDecoration(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.05)
+                    : const Color(0xFFF5F5F7),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    size: 12,
+                    color: isDark ? Colors.white54 : Colors.grey[500],
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Total charge: ฿${_decimalFormat.format(feeBreakdown.chargeAmountBaht)}',
+                    style: TextStyle(
+                      color: isDark ? Colors.white54 : Colors.grey[600],
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  GestureDetector(
+                    onTap: () => _showFeeBreakdown(context, feeBreakdown),
+                    child: Icon(
+                      Icons.help_outline,
+                      size: 12,
+                      color: const Color(0xFF1E40AF),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.1),
+
+        // Inline validation errors
+        if (isBelowMinimum)
+          _buildInlineError(
+            icon: Icons.error_outline,
+            message: 'Minimum top-up is ฿500',
+            action: 'Set to ฿500',
+            isError: true,
+            onAction: () => _setAmount(500),
+          ),
+
+        if (isAboveLimit)
+          _buildInlineError(
+            icon: Icons.warning_amber_rounded,
+            message:
+                'Exceeds daily limit of ฿${_dailyLimit.toStringAsFixed(0)}',
+            action: 'Set to max',
+            isError: false,
+            onAction: () => _setAmount(_dailyRemaining.toInt()),
+          ),
+      ],
+    );
+  }
+
+  void _setAmount(int amount) {
+    HapticFeedback.mediumImpact();
+    _amountController.text = _currencyFormat.format(amount);
+    _selectedChipIndex = _smartAmounts.indexOf(amount);
+    if (_selectedChipIndex == -1) _selectedChipIndex = null;
+    setState(() {
+      _pendingReferenceId = null; // New amount = New txn
+    });
+  }
+
+  Widget _buildInlineError({
+    required IconData icon,
+    required String message,
+    required String action,
+    required bool isError,
+    required VoidCallback onAction,
+  }) {
+    final color = isError ? const Color(0xFFDC2626) : const Color(0xFFB45309);
+
+    return Container(
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.15)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                fontSize: 13,
+                color: color,
+                height: 1.4,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: onAction,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              action,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ).animate().shake(duration: 400.ms, hz: 3);
+  }
+
+  void _showFeeBreakdown(BuildContext context, FeeBreakdown feeBreakdown) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              l10n.topUpFeeInfoTitle,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: isDark ? Colors.white : Colors.black87,
+                letterSpacing: -0.5,
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Row 1: Amount to Wallet
+            _buildFeeRow(
+              l10n.topUpAmountToWallet,
+              '฿${feeBreakdown.walletAmountBaht.toStringAsFixed(2)}',
+              icon: Icons.account_balance_wallet_rounded,
+              iconColor: const Color(0xFF1E40AF),
+              isDark: isDark,
+            ),
+
+            // Row 2: Paycif Service Fee
+            _buildFeeRow(
+              l10n.topUpFeePaysif,
+              l10n.topUpFeeFree,
+              icon: Icons.stars_rounded,
+              iconColor: const Color(0xFF10B981),
+              isDark: isDark,
+              valueColor: const Color(0xFF10B981),
+            ),
+
+            // Row 3: Omise Processing Fee
+            _buildFeeRow(
+              l10n.topUpFeeGateway('3.65'),
+              '฿${feeBreakdown.processingFeeLayer1Baht.toStringAsFixed(2)}',
+              icon: Icons.credit_card_rounded,
+              iconColor: Colors.orange,
+              isDark: isDark,
+            ),
+
+            // Row 4: VAT
+            _buildFeeRow(
+              l10n.topUpVat,
+              '฿${feeBreakdown.vatLayer1Baht.toStringAsFixed(2)}',
+              icon: Icons.account_balance_rounded,
+              iconColor: Colors.blueGrey,
+              isDark: isDark,
+            ),
+
+            const Divider(height: 32, thickness: 1),
+
+            // Row 5: Total Charge
+            _buildFeeRow(
+              l10n.topUpTotalCharge,
+              '฿${feeBreakdown.chargeAmountBaht.toStringAsFixed(2)}',
+              isDark: isDark,
+              isTotal: true,
+            ),
+
+            const SizedBox(height: 24),
+
+            // Trust Footer
+            Center(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.verified_user_rounded,
+                    size: 14,
+                    color: Colors.grey[400],
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Secured by Omise Gateway',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[400],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1E40AF),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                child: Text(
+                  l10n.commonGotIt,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                 ),
               ),
             ),
           ],
         ),
-        if (_enteredAmount > 0)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
+      ),
+    );
+  }
+
+  Widget _buildFeeRow(
+    String label,
+    String value, {
+    required bool isDark,
+    IconData? icon,
+    Color? iconColor,
+    Color? valueColor,
+    bool isTotal = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          if (icon != null) ...[
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: (iconColor ?? Colors.grey).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, size: 18, color: iconColor),
+            ),
+            const SizedBox(width: 14),
+          ],
+          Expanded(
             child: Text(
-              l10n.topUpChargeBreakdown(
-                _decimalFormat.format(feeBreakdown.chargeAmountBaht),
-              ),
+              label,
               style: TextStyle(
-                color: isDark ? Colors.white54 : Colors.grey[600],
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
+                fontSize: isTotal ? 17 : 15,
+                fontWeight: isTotal ? FontWeight.w700 : FontWeight.w500,
+                color: isTotal
+                    ? (isDark ? Colors.white : Colors.black87)
+                    : (isDark ? Colors.white70 : Colors.black54),
               ),
-            ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.2),
+            ),
           ),
-      ],
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: isTotal ? 18 : 15,
+              fontWeight: isTotal ? FontWeight.w800 : FontWeight.w700,
+              color:
+                  valueColor ??
+                  (isTotal
+                      ? (isDark ? Colors.white : Colors.black)
+                      : (isDark ? Colors.white : Colors.black87)),
+              fontFamily: 'Monospace',
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -913,11 +1412,13 @@ class _TopUpViewState extends State<TopUpView> {
         children: List.generate(_smartAmounts.length, (index) {
           final amount = _smartAmounts[index];
           final isSelected = _selectedChipIndex == index;
+          // Disable chip if amount exceeds remaining daily limit
+          final isDisabled = amount > _dailyRemaining;
 
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: InkWell(
-              onTap: () => _onChipSelected(index),
+              onTap: isDisabled ? null : () => _onChipSelected(index),
               borderRadius: BorderRadius.circular(100),
               child: AnimatedContainer(
                 duration: 200.ms,
@@ -926,14 +1427,22 @@ class _TopUpViewState extends State<TopUpView> {
                   vertical: 10,
                 ),
                 decoration: BoxDecoration(
-                  color: isSelected
+                  color: isDisabled
+                      ? (isDark
+                            ? Colors.white.withValues(alpha: 0.02)
+                            : Colors.grey[100])
+                      : isSelected
                       ? const Color(0xFF3949AB)
                       : (isDark
                             ? Colors.white.withValues(alpha: 0.05)
                             : Colors.white),
                   borderRadius: BorderRadius.circular(100),
                   border: Border.all(
-                    color: isSelected
+                    color: isDisabled
+                        ? (isDark
+                              ? Colors.white.withValues(alpha: 0.05)
+                              : Colors.grey[300]!)
+                        : isSelected
                         ? const Color(0xFF3949AB)
                         : (isDark ? Colors.white12 : Colors.grey[300]!),
                   ),
@@ -941,10 +1450,14 @@ class _TopUpViewState extends State<TopUpView> {
                 child: Text(
                   '฿${_currencyFormat.format(amount)}',
                   style: TextStyle(
-                    color: isSelected
+                    color: isDisabled
+                        ? (isDark
+                              ? Colors.white.withValues(alpha: 0.3)
+                              : Colors.grey[400])
+                        : isSelected
                         ? Colors.white
                         : (isDark ? Colors.white70 : Colors.black87),
-                    fontWeight: FontWeight.w600,
+                    fontWeight: isDisabled ? FontWeight.w400 : FontWeight.w600,
                     fontSize: 14,
                   ),
                 ),
@@ -1066,11 +1579,15 @@ class _TopUpViewState extends State<TopUpView> {
 
   Widget _buildPayButton(BuildContext context, AppLocalizations l10n) {
     final hasAmount = _enteredAmount > 0;
+    final meetsMinimum = _enteredAmount >= _minPerTransaction;
+    final withinLimit = _enteredAmount <= _dailyRemaining;
+    final canProceed =
+        hasAmount && meetsMinimum && withinLimit && !_isLimitLoading;
 
     return _buildPrimaryButton(
       context,
       label: l10n.commonNext,
-      onPressed: hasAmount ? _showReviewSheet : null,
+      onPressed: canProceed ? _showReviewSheet : null,
     );
   }
 
@@ -1086,8 +1603,11 @@ class _TopUpViewState extends State<TopUpView> {
           final l10n = AppLocalizations.of(context)!;
           final topUpAmount = _enteredAmount;
 
-          // 💎 Calculate Fee Breakdown
-          final feeBreakdown = FeeCalculator.calculateFromBaht(topUpAmount);
+          // 💎 Calculate Fee Breakdown (Wallet-centric: 500 entered = 500 received)
+          final feeBreakdown = FeeCalculator.calculateFromBaht(
+            topUpAmount,
+            isChargeAmount: false,
+          );
 
           final prefId = paymentController.preferredMethodId;
           final prefType = paymentController.preferredMethodType;
@@ -1186,115 +1706,65 @@ class _TopUpViewState extends State<TopUpView> {
                   padding: const EdgeInsets.all(24),
                   child: Column(
                     children: [
-                      // 💎 Fee Breakdown Section
-                      _buildReviewRow(
-                        // Amount to add to wallet
-                        l10n.confirmAmount,
-                        '฿${_decimalFormat.format(topUpAmount)}',
-                      ),
-                      const SizedBox(height: 12),
-                      // 💎 Detailed Fee Breakdown (Granular Transparency)
-                      _buildReviewRow(
-                        // Transaction Fee (Total)
-                        l10n.topUpProcessingFee(
-                          feeBreakdown.effectiveFeePercent.toStringAsFixed(2),
-                        ),
-                        '+฿${_decimalFormat.format(feeBreakdown.totalFeeBaht)}',
-                        isSubtle: true,
-                      ),
-                      const SizedBox(height: 8),
-                      // Indented Breakdown
-                      Padding(
-                        padding: const EdgeInsets.only(left: 16),
+                      // 💎 HERO: What you get
+                      Center(
                         child: Column(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            _buildReviewRow(
-                              // Gateway Fee (e.g., 3.65%)
-                              l10n.topUpFeeGateway(
-                                (feeBreakdown.feeRate.toDouble() * 100)
-                                    .toStringAsFixed(2),
+                            Text(
+                              'You will receive',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
                               ),
-                              '฿${_decimalFormat.format(feeBreakdown.processingFeeBaht)}',
-                              isSubtle: true,
-                              isSmall: true, // Need to support smaller font
                             ),
-                            const SizedBox(height: 4),
-                            _buildReviewRow(
-                              // VAT (e.g., 7%)
-                              l10n.topUpFeeVat(
-                                (feeBreakdown.vatRate.toDouble() * 100)
-                                    .round()
-                                    .toString(),
+                            const SizedBox(height: 8),
+                            Text(
+                              '+฿${_decimalFormat.format(feeBreakdown.walletAmountBaht)}',
+                              style: const TextStyle(
+                                fontSize: 40,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF10B981),
+                                letterSpacing: -1,
                               ),
-                              '฿${_decimalFormat.format(feeBreakdown.vatBaht)}',
-                              isSubtle: true,
-                              isSmall: true,
-                            ),
-                            const SizedBox(height: 4),
-                            _buildReviewRow(
-                              // Platform Fee (Free)
-                              l10n.topUpFeeNip,
-                              l10n.topUpFeeFree,
-                              isSubtle: true,
-                              isSmall: true,
-                              isGreen: true, // Highlight "Free"
                             ),
                           ],
                         ),
                       ),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        child: Divider(),
-                      ),
-                      // 💎 Total Charge (What card will be charged)
+                      const SizedBox(height: 24),
+                      // 💎 Breakdown
                       Container(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
                           color: isDark
-                              ? const Color(0xFF3949AB).withValues(alpha: 0.15)
-                              : const Color(0xFF3949AB).withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(16),
+                              ? Colors.white.withValues(alpha: 0.05)
+                              : const Color(0xFFF8F9FA),
+                          borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: const Color(
-                              0xFF3949AB,
-                            ).withValues(alpha: 0.2),
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.1)
+                                : const Color(0xFFE9ECEF),
                           ),
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        child: Column(
                           children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  l10n.confirmTotalPayment,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                    color: isDark
-                                        ? Colors.white70
-                                        : Colors.grey[600],
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  l10n.topUpChargeAmountLabel,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: isDark
-                                        ? Colors.white38
-                                        : Colors.grey[500],
-                                  ),
-                                ),
-                              ],
+                            _buildReviewRow(
+                              'Amount Added to Wallet',
+                              '฿${_decimalFormat.format(feeBreakdown.walletAmountBaht)}',
+                              isSubtle: false,
                             ),
-                            Text(
+                            const SizedBox(height: 12),
+                            _buildReviewRow(
+                              'Processing Fee (${feeBreakdown.effectiveFeePercent.toStringAsFixed(2)}%)',
+                              '+฿${_decimalFormat.format(feeBreakdown.totalFeeBaht)}',
+                              isSubtle: true,
+                              isSmall: true,
+                            ),
+                            const Divider(height: 24),
+                            _buildReviewRow(
+                              'Total Deducted from Card',
                               '฿${_decimalFormat.format(feeBreakdown.chargeAmountBaht)}',
-                              style: const TextStyle(
-                                fontSize: 26,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF3949AB),
-                              ),
+                              isSubtle: false,
                             ),
                           ],
                         ),

@@ -44,7 +44,7 @@ interface OpnCardsListResponse {
 // Omise Client (Minimal)
 // ============================================================================
 
-class OpnClient {
+class _OpnClient {
   private secretKey: string;
   private baseUrl = 'https://api.omise.co';
 

@@ -310,15 +310,35 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get topUpFeeNip => '平台手续费 (Paysif)';
-
-  @override
-  String topUpFeeVat(String percent) {
-    return '增值税 ($percent%)';
-  }
+  String get topUpFeePaysif => 'Paycif Service Fee';
 
   @override
   String get topUpFeeFree => '免费';
+
+  @override
+  String get topUpFeeInfoTitle => '了解交易费用';
+
+  @override
+  String get topUpFeeInfoOmiseTitle => '什么是Omise？';
+
+  @override
+  String get topUpFeeInfoOmiseDesc => 'Omise是泰国持牌支付网关，安全处理信用卡交易。每笔交易收取标准费用。';
+
+  @override
+  String get topUpFeeInfoLayer1Title => '基础费用（第1层）';
+
+  @override
+  String get topUpFeeInfoLayer1Desc =>
+      '这是Omise收取的标准处理费：充值金额的3.65%加上费用的7%增值税。此费用是信用卡支付不可避免的。';
+
+  @override
+  String get topUpFeeInfoPaysifTitle => 'Paysif平台费用';
+
+  @override
+  String get topUpFeeInfoPaysifDesc => 'Paysif不收取任何额外平台费用。我们只转嫁支付网关成本。';
+
+  @override
+  String get topUpFeeInfoSummary => '我们坚信完全透明。您只需支付安全处理支付所必需的费用。';
 
   @override
   String get topUpChargeAmountLabel => '实际扣款';

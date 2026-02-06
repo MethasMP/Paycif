@@ -16,6 +16,7 @@ CREATE OR REPLACE FUNCTION process_payout_request(
     p_amount_satang BIGINT,
     p_target_type TEXT,       -- MOBILE, NATID, EWALLET
     p_target_value TEXT,
+    p_reference_id TEXT,      -- Idempotency key from client
     p_description TEXT DEFAULT 'Payout'
 )
 RETURNS TABLE (
@@ -33,7 +34,18 @@ DECLARE
     v_wallet_owner UUID;
     v_wallet_status TEXT;
     v_new_balance BIGINT;
+    v_existing_id UUID;
 BEGIN
+    -- =========================================================================
+    -- STEP 0: Idempotency Check
+    -- =========================================================================
+    IF p_reference_id IS NOT NULL THEN
+        SELECT id INTO v_existing_id FROM transactions WHERE reference_id = p_reference_id;
+        IF v_existing_id IS NOT NULL THEN
+            RETURN QUERY SELECT v_existing_id, 200, 'Duplicate request - Return existing transaction'::TEXT;
+            RETURN;
+        END IF;
+    END IF;
     -- =========================================================================
     -- STEP 1: Validate wallet exists and belongs to user (profile_id)
     -- =========================================================================
@@ -132,7 +144,7 @@ BEGIN
         created_at
     ) VALUES (
         v_transaction_id,
-        'PAYOUT-' || v_transaction_id::TEXT,
+        COALESCE(p_reference_id, 'PAYOUT-' || v_transaction_id::TEXT),
         p_description,
         'PENDING',
         jsonb_build_object(

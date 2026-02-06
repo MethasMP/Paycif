@@ -3,10 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-// import 'package:frontend/l10n/generated/app_localizations.dart'; // No longer used in this file
+
 import '../logic/security_controller.dart';
 import '../widgets/pin_entry_widget.dart';
 import '../../../../screens/main_screen.dart';
+
+import 'recovery_screen.dart';
 
 class SecurityUnlockScreen extends StatefulWidget {
   const SecurityUnlockScreen({super.key});
@@ -124,15 +126,16 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
 
             const Spacer(),
 
-            // 🔢 PIN Keypad
+            // 🔢 PIN Keypad with Forgot Action
             PinEntryWidget(
               showLabel: false,
               onSuccess: (_) => _onUnlockSuccess(),
+              onForgotPin: () => _handleForgotPin(context),
             ).animate().fadeIn(delay: 600.ms),
 
             const SizedBox(height: 24),
 
-            // 🤳 Biometric Fallback Button
+            // 🤳 Biometric Action (Primary Alternative)
             TextButton.icon(
               onPressed: _tryBiometricUnlock,
               icon: const Icon(Icons.face_unlock_rounded),
@@ -145,6 +148,30 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
             const SizedBox(height: 40),
           ],
         ),
+      ),
+    );
+  }
+
+  void _handleForgotPin(BuildContext context) {
+    // 🛡️ World-Class UX: Seamless Transition to Recovery Protocol
+    // Instead of a jarring dialog, we flow into the Identity Challenge.
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            const RecoveryScreen(),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          const begin = Offset(0.0, 1.0);
+          const end = Offset.zero;
+          const curve = Curves.easeInOutCubicEmphasized;
+          var tween = Tween(
+            begin: begin,
+            end: end,
+          ).chain(CurveTween(curve: curve));
+          return SlideTransition(
+            position: animation.drive(tween),
+            child: child,
+          );
+        },
       ),
     );
   }

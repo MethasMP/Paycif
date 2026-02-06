@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+
 import '../../presentation/logic/security_controller.dart';
 import '../../../../utils/error_translator.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
@@ -160,7 +160,7 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
                           color: Color(0xFF667EEA),
                           size: 40,
                         ),
-                      ).animate().scale(curve: Curves.elasticOut),
+                      ),
 
                       const SizedBox(height: 24),
                       const Text(
@@ -170,7 +170,7 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
                           fontWeight: FontWeight.bold,
                           letterSpacing: -1,
                         ),
-                      ).animate().fadeIn(delay: 200.ms).slideX(begin: -0.2),
+                      ),
 
                       const SizedBox(height: 12),
                       Text(
@@ -180,7 +180,7 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
                           color: isDark ? Colors.white54 : Colors.grey.shade600,
                           height: 1.5,
                         ),
-                      ).animate().fadeIn(delay: 400.ms),
+                      ),
 
                       const SizedBox(height: 48),
 
@@ -200,7 +200,7 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
                               fontSize: 13,
                             ),
                           ),
-                        ).animate().shake(),
+                        ),
 
                       const SizedBox(height: 48),
 
@@ -253,6 +253,7 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
           const SizedBox(height: 16),
           TextFormField(
             controller: _answerController,
+            autofocus: true,
             keyboardType: TextInputType.number,
             maxLength: 4,
             style: const TextStyle(
@@ -280,7 +281,7 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
           ),
         ],
       ),
-    ).animate().fadeIn(delay: 600.ms).slideY(begin: 0.1);
+    );
   }
 
   Widget _buildSubmitButton(bool isLoading) {
@@ -325,7 +326,7 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
                 ),
               ),
       ),
-    ).animate().fadeIn(delay: 800.ms);
+    );
   }
 
   Widget _buildLockedState(bool isDark, String? errorMsg) {
@@ -355,6 +356,6 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
           ],
         ),
       ),
-    ).animate().fadeIn();
+    );
   }
 }

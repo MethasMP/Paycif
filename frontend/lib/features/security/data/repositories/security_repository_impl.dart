@@ -153,7 +153,8 @@ class SecurityRepositoryImpl implements SecurityRepository {
   }
 
   /// Helper to generate headers with signature for critical actions.
-  Future<Map<String, String>> _generateSignatureHeaders(String payload) async {
+  @override
+  Future<Map<String, String>> generateSignatureHeaders(String payload) async {
     // ⚡ Lightning-Fast Check (In-Memory)
     if (_cachedDeviceId != null && _cachedKeyPair != null) {
       final signature = await _cryptoService.signPayload(
@@ -293,7 +294,7 @@ class SecurityRepositoryImpl implements SecurityRepository {
 
     // 🐢 2. Fallback: Server Verification
     await _withDeviceSelfHealing(() async {
-      final headers = await _generateSignatureHeaders(pin);
+      final headers = await generateSignatureHeaders(pin);
       await _remoteDataSource.verifyPin(pin, headers: headers);
 
       // If we reached here, Server said OK. Self-Heal local hash.
@@ -304,7 +305,7 @@ class SecurityRepositoryImpl implements SecurityRepository {
   Future<void> _backgroundServerVerify(String pin) async {
     try {
       await _withDeviceSelfHealing(() async {
-        final headers = await _generateSignatureHeaders(pin);
+        final headers = await generateSignatureHeaders(pin);
         await _remoteDataSource.verifyPin(pin, headers: headers);
       });
       debugPrint('✅ [Background-Verify] Server confirmed PIN.');
@@ -316,7 +317,7 @@ class SecurityRepositoryImpl implements SecurityRepository {
   @override
   Future<void> initiatePinReset({required String challengeAnswer}) async {
     await _withDeviceSelfHealing(() async {
-      final headers = await _generateSignatureHeaders(challengeAnswer);
+      final headers = await generateSignatureHeaders(challengeAnswer);
       await _remoteDataSource.initiatePinReset(
         answer: challengeAnswer,
         headers: headers,
@@ -365,7 +366,7 @@ class SecurityRepositoryImpl implements SecurityRepository {
     required String newPin,
   }) async {
     await _withDeviceSelfHealing(() async {
-      final headers = await _generateSignatureHeaders(newPin);
+      final headers = await generateSignatureHeaders(newPin);
       await _remoteDataSource.changePin(
         oldPin: oldPin,
         newPin: newPin,

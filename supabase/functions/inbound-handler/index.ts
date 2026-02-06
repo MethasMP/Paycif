@@ -12,6 +12,13 @@ import {
   OpnCustomerResponse,
   ServiceResponse,
 } from './types.ts';
+import * as ed from 'https://esm.sh/@noble/ed25519@2.0.0';
+import { sha512 } from 'https://esm.sh/@noble/hashes@1.3.1/sha512';
+import { decode as base64Decode } from 'https://deno.land/std@0.168.0/encoding/base64.ts';
+
+// 🛡️ CRITICAL: Configure SHA-512 for @noble/ed25519 v2
+// v2 requires manual hash configuration, otherwise verify() fails silently!
+ed.etc.sha512Sync = (...m: Uint8Array[]) => sha512(ed.etc.concatBytes(...m));
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -109,7 +116,7 @@ serve(async (req) => {
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+  const _supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const omiseSecretKey = Deno.env.get('OMISE_SECRET_KEY')!;
 
@@ -157,7 +164,7 @@ serve(async (req) => {
       wallet_amount_satang,
       token,
       card_id,
-      is_apple_pay,
+      is_apple_pay: _is_apple_pay,
       reference_id,
       description,
     } = body;
@@ -166,15 +173,114 @@ serve(async (req) => {
       return jsonError('Missing required fields (amount_satang, reference_id)', 400);
     }
 
-    // 💎 Fee Handling: Wallet amount is what gets credited to user
-    // If wallet_amount_satang is not provided, we'll calculate it from Omise's net (later)
-    const effectiveWalletAmount = wallet_amount_satang ?? amount_satang;
+    // 💎 Fee Handling: MONEY CORRECTNESS RE-ENGINEERING
+    // The amount the user enters (e.g., 500 THB) should be EXACTLY what they get
+    // in their wallet and what shows in their history.
+
+    // 1. Determine the Intended Wallet Credit (Net)
+    // We prioritize what the user intended to add.
+    const targetNetSatang = wallet_amount_satang || amount_satang;
+
+    const OMISE_FEERATE = 0.0365; // 3.65%
+    const VAT_RATE = 0.07; // 7%
+    const effectiveRate = OMISE_FEERATE * (1 + VAT_RATE);
+
+    // 2. Calculate Required Charge Amount (Gross) to yield the target Net
+    // Formula: Gross = Net / (1 - effectiveRate)
+    // We use Math.ceil to ensure we cover all fees and don't lose satangs.
+    const requiredChargeSatang = Math.ceil(targetNetSatang / (1 - effectiveRate));
+
     console.log(
-      `[Request] Charge: ${amount_satang} satang, Wallet: ${effectiveWalletAmount} satang, ref: ${reference_id}`,
+      `[Money Logic] Target Net: ${targetNetSatang}, Required Charge: ${requiredChargeSatang} (Total Fee: ${
+        requiredChargeSatang - targetNetSatang
+      })`,
     );
 
+    const effectiveWalletAmount = targetNetSatang;
+    const finalChargeAmount = requiredChargeSatang;
+
+    // 💎 DAILY TOP-UP LIMITS CHECK (Using the INTENDED amount)
+    const MIN_PER_TRANSACTION = 50000; // 500 THB
+    const MAX_DAILY = 300000; // 3,000 THB
+
+    if (effectiveWalletAmount < MIN_PER_TRANSACTION) {
+      return jsonError(
+        `Top-up amount must be at least ${MIN_PER_TRANSACTION / 100} THB`,
+        400,
+      );
+    }
+
+    // Check daily limit using intended Net amount
+    const { data: limitCheck, error: limitError } = await adminClient.rpc(
+      'check_and_update_daily_topup',
+      {
+        p_user_id: userId,
+        p_amount_satang: effectiveWalletAmount,
+      },
+    );
+
+    if (limitError) {
+      console.error('[Limits] Failed to check daily limit:', limitError);
+      return jsonError('Unable to verify daily limits. Please try again.', 500);
+    }
+
+    const limitResult = limitCheck as {
+      success: boolean;
+      error?: string;
+      remaining_limit?: number;
+    };
+
+    if (!limitResult.success) {
+      return jsonError(
+        `Daily top-up limit reached. You can top up up to ${MAX_DAILY / 100} THB per day. ` +
+          `Remaining: ${(limitResult.remaining_limit || 0) / 100} THB`,
+        400,
+      );
+    }
+
+    console.log(`[Limits] Approved. Remaining: ${(limitResult.remaining_limit || 0) / 100} THB`);
+
     // ========================================================================
-    // 3. IDEMPOTENCY CHECK
+    // 3. SECURE DEVICE CHALLENGE (Signature Verification)
+    // ========================================================================
+    const deviceId = req.headers.get('x-device-id');
+    const signature = req.headers.get('x-device-signature');
+
+    if (!deviceId || !signature) {
+      console.error('[Security] Missing device headers for critical action');
+      return jsonError('Device authorization missing', 401);
+    }
+
+    // Fetch the device public key for this user
+    const { data: binding, error: bindError } = await adminClient
+      .from('user_device_bindings')
+      .select('public_key')
+      .eq('user_id', userId)
+      .eq('device_id', deviceId)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (bindError || !binding) {
+      console.warn(`[Security] Unrecognized or inactive device attempt: ${deviceId}`);
+      return jsonError('Device not recognized or link revoked', 401);
+    }
+
+    // 🔬 DEBUG: Log the public key prefix from DB for troubleshooting key mismatch
+    console.log(
+      `[Security] Device ${deviceId} - DB PubKey Prefix: ${binding.public_key.substring(0, 10)}...`,
+    );
+
+    // Verify Signature: Payload signed is the reference_id
+    const isValidSig = await verifySignature(signature, reference_id, binding.public_key);
+    if (!isValidSig) {
+      console.error(`[Security] Signature Mismatch for ref: ${reference_id}. Device: ${deviceId}`);
+      return jsonError('Request integrity check failed', 401);
+    }
+
+    console.log(`[Security] Signature Verified for Device: ${deviceId}`);
+
+    // ========================================================================
+    // 3.5 IDEMPOTENCY CHECK
     // ========================================================================
     const { data: existingTxn } = await adminClient
       .from('transactions')
@@ -267,53 +373,75 @@ serve(async (req) => {
     }
 
     // ========================================================================
-    // 6. CREATE CHARGE
+    // 6. EXECUTE PAYMENT (OMISE)
     // ========================================================================
-    console.log(`[Opn] Creating charge for ${amount_satang} satang...`);
-
-    const chargePayload: OpnChargeRequest = {
-      amount: amount_satang,
+    // Use finalChargeAmount for Omise and effectiveWalletAmount for Database
+    const chargePayload: any = {
+      amount: finalChargeAmount,
       currency: 'thb',
-      customer: omiseCustomerId,
-      card: chargeCard,
-      description: `TopUp: ${description ?? 'Wallet'} (Ref: ${reference_id})`,
       capture: true,
-      metadata: { reference_id, user_id: userId },
+      description: description || `Top up ${effectiveWalletAmount / 100} THB`,
+      metadata: {
+        user_id: userId,
+        reference_id,
+        wallet_amount_satang: effectiveWalletAmount, // True intended amount
+        charge_amount_satang: finalChargeAmount, // Total taken from card
+      },
     };
 
-    const charge = await opn.createCharge(chargePayload);
-    console.log(`[Opn] Charge result: ${charge.status} (${charge.id})`);
+    // 🎯 FIX: Always use customer + card if we have them (prevents using a consumed token)
+    if (omiseCustomerId && chargeCard) {
+      chargePayload.customer = omiseCustomerId;
+      chargePayload.card = chargeCard;
+    } else if (token) {
+      // Fallback: Charge token directly (only if vaulting was skipped)
+      chargePayload.card = token;
+    } else if (_is_apple_pay) {
+      // Apple Pay handling...
+    }
 
-    if (charge.status !== 'successful' && charge.status !== 'pending') {
-      console.error(`[Opn] Charge failed: ${charge.failure_message}`);
-      return jsonError(charge.failure_message || 'Payment failed', 400, 'CHARGE_FAILED');
+    const charge = await opn.createCharge(chargePayload);
+    // @ts-ignore: Handle both successful charge and error response objects
+    const chargeError = charge.object === 'error' ? (charge as any).message : null;
+    console.log(`[Opn] Charge result: ${charge.status || 'error'} (${charge.id || 'N/A'})`);
+
+    if (chargeError || (charge.status !== 'successful' && charge.status !== 'pending')) {
+      const errorMsg = chargeError || charge.failure_message || 'Payment failed';
+      // 🔍 DEBUG: Log full charge response for troubleshooting
+      console.error(`[Opn] Charge failed: ${errorMsg}`);
+      console.error(`[Opn] Full charge response:`, JSON.stringify(charge, null, 2));
+      console.error(`[Opn] Charge payload was:`, JSON.stringify(chargePayload, null, 2));
+      return jsonError(errorMsg, 400, 'CHARGE_FAILED');
     }
 
     // ========================================================================
     // 7. ATOMIC LEDGER UPDATE
     // ========================================================================
-    // 💎 Use effectiveWalletAmount (net amount) for ledger, not charge amount
+    // 💎 ATOMIC LEDGER UPDATE
+    // We record the WALLET amount (Net) as the primary transaction value.
+    // fees are kept in metadata for audit.
     console.log(
-      `[DB] Executing RPC with wallet amount: ${effectiveWalletAmount} satang (Omise charged: ${amount_satang})...`,
+      `[DB] Recording Transaction: Net Wallet +${effectiveWalletAmount} (Gross Charge: ${finalChargeAmount})`,
     );
 
-    // Calculate actual fee paid (for metadata/reporting)
-    const feeAmount = amount_satang - effectiveWalletAmount;
+    const feeAmount = finalChargeAmount - effectiveWalletAmount;
 
     const { data: rpcData, error: rpcError } = await adminClient.rpc(
       'process_inbound_transaction',
       {
         p_user_id: userId,
-        p_amount_satang: effectiveWalletAmount, // 💎 Use WALLET amount for ledger
+        p_amount_satang: effectiveWalletAmount, // 💎 SOURCE OF TRUTH: Net amount
         p_provider: 'omise',
         p_provider_txn_id: charge.id,
         p_reference_id: reference_id,
-        p_description: description ?? 'Top Up',
+        p_description: 'Wallet Top Up',
         p_metadata: {
           ...charge,
-          charge_amount_satang: amount_satang, // What was charged to card
-          wallet_amount_satang: effectiveWalletAmount, // What went into wallet
-          fee_amount_satang: feeAmount, // Processing fee
+          charge_amount_satang: finalChargeAmount,
+          wallet_amount_satang: effectiveWalletAmount,
+          fee_amount_satang: feeAmount,
+          is_auto_round: true,
+          recorded_at: new Date().toISOString(),
         },
       },
     );
@@ -400,4 +528,16 @@ function jsonResponse<T>(body: ServiceResponse<T>, status: number): Response {
 
 function jsonError(message: string, status: number, code?: string): Response {
   return jsonResponse({ success: false, message, error: message, error_code: code }, status);
+}
+
+async function verifySignature(sigB64: string, msg: string, pubKeyB64: string): Promise<boolean> {
+  try {
+    const sig = base64Decode(sigB64);
+    const pub = base64Decode(pubKeyB64);
+    const msgBytes = new TextEncoder().encode(msg);
+    return await ed.verify(sig, msgBytes, pub);
+  } catch (err) {
+    console.error('Ed25519 verify error:', err);
+    return false;
+  }
 }

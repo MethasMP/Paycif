@@ -21,3 +21,6 @@ verify_jwt = false
 
 [functions.manage-payment-methods]
 verify_jwt = false
+
+[functions.get-topup-status]
+verify_jwt = false

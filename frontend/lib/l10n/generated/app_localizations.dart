@@ -687,32 +687,74 @@ abstract class AppLocalizations {
   /// No description provided for @topUpAmountToWallet.
   ///
   /// In en, this message translates to:
-  /// **'Amount to Wallet'**
+  /// **'You receive in wallet'**
   String get topUpAmountToWallet;
 
   /// No description provided for @topUpFeeGateway.
   ///
   /// In en, this message translates to:
-  /// **'Gateway Fee (Omise) {percent}%'**
+  /// **'Omise Processing Fee ({percent}%)'**
   String topUpFeeGateway(String percent);
 
-  /// No description provided for @topUpFeeNip.
+  /// No description provided for @topUpFeePaysif.
   ///
   /// In en, this message translates to:
-  /// **'Platform Fee (Paysif)'**
-  String get topUpFeeNip;
-
-  /// No description provided for @topUpFeeVat.
-  ///
-  /// In en, this message translates to:
-  /// **'VAT ({percent}%)'**
-  String topUpFeeVat(String percent);
+  /// **'Paycif Service Fee'**
+  String get topUpFeePaysif;
 
   /// No description provided for @topUpFeeFree.
   ///
   /// In en, this message translates to:
   /// **'Free'**
   String get topUpFeeFree;
+
+  /// No description provided for @topUpFeeInfoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fee Transparency'**
+  String get topUpFeeInfoTitle;
+
+  /// No description provided for @topUpFeeInfoOmiseTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'External Costs (Omise)'**
+  String get topUpFeeInfoOmiseTitle;
+
+  /// No description provided for @topUpFeeInfoOmiseDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Securely processed by Omise. This fee goes directly to cover gateway and card network costs (Visa/Mastercard).'**
+  String get topUpFeeInfoOmiseDesc;
+
+  /// No description provided for @topUpFeeInfoLayer1Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Government VAT'**
+  String get topUpFeeInfoLayer1Title;
+
+  /// No description provided for @topUpFeeInfoLayer1Desc.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard 7% Value Added Tax required on processing services.'**
+  String get topUpFeeInfoLayer1Desc;
+
+  /// No description provided for @topUpFeeInfoPaysifTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Paycif Service Fee'**
+  String get topUpFeeInfoPaysifTitle;
+
+  /// No description provided for @topUpFeeInfoPaysifDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'฿0.00. We don\'t charge you for adding money. Our platform remains free for your convenience.'**
+  String get topUpFeeInfoPaysifDesc;
+
+  /// No description provided for @topUpFeeInfoSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'We believe in full transparency. You only pay for mandatory external processing costs.'**
+  String get topUpFeeInfoSummary;
 
   /// No description provided for @topUpChargeAmountLabel.
   ///

@@ -13,7 +13,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
 // 🛡️ Use WASM-based Argon2id for Edge Compatibility
-import { argon2id } from 'npm:hash-wasm';
+import { argon2id } from 'https://esm.sh/hash-wasm@4.12.0';
 import { decode as base64Decode } from 'https://deno.land/std@0.168.0/encoding/base64.ts';
 
 const corsHeaders = {
@@ -94,17 +94,8 @@ serve(async (req) => {
     console.log(`[VerifyPin] DEBUG - Signature Prefix (from Header): ${sigPrefix}...`);
     console.log(`[VerifyPin] DEBUG - PIN (message): ${pin}`);
 
-    // 🛠️ TEMPORARY BYPASS: Signature verification disabled due to Ed25519 library mismatch
-    // between Dart's `cryptography` package and Deno's `@noble/ed25519`.
-    // Device binding check is still enforced (line 76-86).
-    // TODO: Align Ed25519 implementations or use a shared WASM library.
-    console.log(
-      `[VerifyPin] BYPASS: Signature verification skipped (Ed25519 lib mismatch). Device binding confirmed.`,
-    );
-    const isValidSig = true; // TEMPORARY: Always pass if device is bound
-
-    // ORIGINAL CODE (commented out for investigation):
-    // const isValidSig = await verifySignature(signature, pin, binding.public_key);
+    // Verify Signature: The device signs the PIN attempt itself.
+    const isValidSig = await verifySignature(signature, pin, binding.public_key);
     if (!isValidSig) {
       console.warn(
         `[VerifyPin] Invalid Signature for ${user.id}. PubKey: ${pubKeyPrefix}... Sig: ${sigPrefix}...`,
@@ -216,10 +207,11 @@ serve(async (req) => {
 
       return jsonError(errorMsg, 401);
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('[VerifyPin] Critical Error:', e);
     // 🛡️ DEBUG MODE: Returning error details to client for troubleshooting
-    return jsonError(`Internal Server Error: ${e.message || e}`, 500);
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    return jsonError(`Internal Server Error: ${errorMessage}`, 500);
   }
 });
 
@@ -234,6 +226,10 @@ function jsonError(message: string, status: number): Response {
 // HELPER: Verify Ed25519 Signature
 // ----------------------------------------------------------------------------
 import * as ed from 'https://esm.sh/@noble/ed25519@2.0.0';
+import { sha512 } from 'https://esm.sh/@noble/hashes@1.3.1/sha512';
+
+// 🛡️ CRITICAL: Configure SHA-512 for @noble/ed25519 v2
+ed.etc.sha512Sync = (...m: Uint8Array[]) => sha512(ed.etc.concatBytes(...m));
 
 async function verifySignature(sigB64: string, msg: string, pubKeyB64: string): Promise<boolean> {
   try {
@@ -270,7 +266,7 @@ async function verifyWithHashWasm(phcString: string, pin: string): Promise<boole
       return false;
     }
 
-    const paramMap: any = {};
+    const paramMap: Record<string, number> = {};
     params.split(',').forEach((p) => {
       const kv = p.split('=');
       if (kv.length === 2) {

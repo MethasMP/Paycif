@@ -310,15 +310,38 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String get topUpFeeNip => 'プラットフォーム手数料 (Paysif)';
-
-  @override
-  String topUpFeeVat(String percent) {
-    return '消費税 ($percent%)';
-  }
+  String get topUpFeePaysif => 'Paycif Service Fee';
 
   @override
   String get topUpFeeFree => '無料';
+
+  @override
+  String get topUpFeeInfoTitle => '取引手数料について';
+
+  @override
+  String get topUpFeeInfoOmiseTitle => 'Omiseとは？';
+
+  @override
+  String get topUpFeeInfoOmiseDesc =>
+      'Omiseはタイで認可された決済ゲートウェイで、カード取引を安全に処理します。すべての取引に対して標準的な手数料がかかります。';
+
+  @override
+  String get topUpFeeInfoLayer1Title => '基本手数料（レイヤー1）';
+
+  @override
+  String get topUpFeeInfoLayer1Desc =>
+      'Omiseが請求する標準処理手数料です：チャージ金額の3.65%に加え、手数料の7%の消費税。この手数料はカード決済では避けられません。';
+
+  @override
+  String get topUpFeeInfoPaysifTitle => 'Paysifプラットフォーム手数料';
+
+  @override
+  String get topUpFeeInfoPaysifDesc =>
+      'Paysifは追加のプラットフォーム手数料を請求しません。決済ゲートウェイのコストのみを転嫁します。';
+
+  @override
+  String get topUpFeeInfoSummary =>
+      '私たちは完全な透明性を信じています。安全な決済処理に必要な分のみをお支払いいただきます。';
 
   @override
   String get topUpChargeAmountLabel => 'カード請求額';

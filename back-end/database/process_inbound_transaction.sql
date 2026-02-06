@@ -180,6 +180,41 @@ BEGIN
         v_new_balance,
         200,
         'Top-up successful'::TEXT;
+        
+EXCEPTION 
+    -- 🛡️ RACE CONDITION HANDLER: Catch unique constraint violation on reference_id
+    WHEN unique_violation THEN
+        -- Another transaction with same reference_id was inserted concurrently
+        -- Return the existing transaction instead of error
+        SELECT id INTO v_existing_txn_id
+        FROM transactions
+        WHERE reference_id = p_reference_id;
+        
+        IF v_existing_txn_id IS NOT NULL THEN
+            RETURN QUERY SELECT 
+                v_existing_txn_id,
+                (SELECT balance FROM wallets WHERE profile_id = p_user_id),
+                200,
+                'Transaction already processed (Idempotent)'::TEXT;
+        ELSE
+            -- Should not happen, but handle gracefully
+            RETURN QUERY SELECT 
+                NULL::UUID, 
+                0::BIGINT, 
+                409, 
+                'Conflict: Duplicate reference_id'::TEXT;
+        END IF;
+        RETURN;
+        
+    WHEN OTHERS THEN
+        -- Log the error for debugging (in real production, send to error tracking)
+        RAISE NOTICE 'process_inbound_transaction error: %', SQLERRM;
+        RETURN QUERY SELECT 
+            NULL::UUID, 
+            0::BIGINT, 
+            500, 
+            ('Database error: ' || SQLERRM)::TEXT;
+        RETURN;
 END;
 $$;
 

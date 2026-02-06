@@ -4,11 +4,16 @@ import 'package:decimal/decimal.dart';
 // Fee Calculator - Omise Payment Gateway Fee Calculation
 // ============================================================================
 // Calculates the total charge amount needed when user wants to receive
-// a specific net amount in their wallet (Surcharge Model).
+// a specific net amount in their wallet (Full Surcharge Model).
 //
 // Omise Fee Structure (Thailand):
 // - Domestic Cards: 3.65% + VAT 7%
 // - International Cards: 4.5% + VAT 7% (Future support)
+//
+// The calculator supports two layers:
+// - Layer 1: Base fee calculated on the desired wallet amount
+// - Layer 2: Additional fee incurred because Omise charges fees on the total
+//            transaction amount (including the Layer 1 fee itself)
 // ============================================================================
 
 /// Fee calculation result containing all breakdown information
@@ -16,13 +21,16 @@ class FeeBreakdown {
   /// The amount user wants to receive in wallet (in minor units)
   final Decimal walletAmount;
 
-  /// The processing fee (in minor units)
-  final Decimal processingFee;
+  /// Layer 1: The base processing fee (on wallet amount)
+  final Decimal processingFeeLayer1;
 
-  /// VAT on the processing fee (in minor units)
-  final Decimal vat;
+  /// Layer 1: VAT on the base processing fee
+  final Decimal vatLayer1;
 
-  /// Total fee = processingFee + VAT (in minor units)
+  /// Layer 2: Additional fee (fee on fee)
+  final Decimal surchargeLayer2;
+
+  /// Total fee = Layer1 + Layer2 (in minor units)
   final Decimal totalFee;
 
   /// Total charge = walletAmount + totalFee (in minor units)
@@ -36,8 +44,9 @@ class FeeBreakdown {
 
   const FeeBreakdown({
     required this.walletAmount,
-    required this.processingFee,
-    required this.vat,
+    required this.processingFeeLayer1,
+    required this.vatLayer1,
+    required this.surchargeLayer2,
     required this.totalFee,
     required this.chargeAmount,
     required this.feeRate,
@@ -47,11 +56,17 @@ class FeeBreakdown {
   /// Get wallet amount in Baht (major units)
   double get walletAmountBaht => walletAmount.toDouble() / 100.0;
 
-  /// Get processing fee in Baht
-  double get processingFeeBaht => processingFee.toDouble() / 100.0;
+  /// Get Layer 1 processing fee in Baht
+  double get processingFeeLayer1Baht => processingFeeLayer1.toDouble() / 100.0;
 
-  /// Get VAT in Baht
-  double get vatBaht => vat.toDouble() / 100.0;
+  /// Get Layer 1 VAT in Baht
+  double get vatLayer1Baht => vatLayer1.toDouble() / 100.0;
+
+  /// Get Layer 1 total in Baht
+  double get feeLayer1Baht => processingFeeLayer1Baht + vatLayer1Baht;
+
+  /// Get Surcharge Layer 2 in Baht
+  double get surchargeLayer2Baht => surchargeLayer2.toDouble() / 100.0;
 
   /// Get total fee in Baht
   double get totalFeeBaht => totalFee.toDouble() / 100.0;
@@ -62,6 +77,12 @@ class FeeBreakdown {
   /// Effective fee percentage (for display)
   double get effectiveFeePercent =>
       (feeRate * (Decimal.one + vatRate)).toDouble() * 100;
+
+  // Legacy getters for backward compatibility
+  Decimal get processingFee => processingFeeLayer1;
+  Decimal get vat => vatLayer1;
+  double get processingFeeBaht => processingFeeLayer1Baht;
+  double get vatBaht => vatLayer1Baht;
 
   @override
   String toString() {
@@ -88,9 +109,11 @@ class FeeCalculator {
   /// [walletAmountSatang] - The amount user wants to receive in wallet (in minor units)
   /// [isInternational] - Whether the card is international (higher fee)
   ///
-  /// Returns [FeeBreakdown] containing all fee information.
+  /// Returns [FeeBreakdown] containing all fee information including Layer 2 surcharge.
   ///
-  /// Formula: chargeAmount = walletAmount / (1 - (feeRate * (1 + vatRate)))
+  /// This uses a two-layer surcharge model:
+  /// - Layer 1: Fee on the wallet amount
+  /// - Layer 2: Additional fee because Omise charges on the full transaction
   static FeeBreakdown calculate(
     Decimal walletAmountSatang, {
     bool isInternational = false,
@@ -98,8 +121,9 @@ class FeeCalculator {
     if (walletAmountSatang <= Decimal.zero) {
       return FeeBreakdown(
         walletAmount: Decimal.zero,
-        processingFee: Decimal.zero,
-        vat: Decimal.zero,
+        processingFeeLayer1: Decimal.zero,
+        vatLayer1: Decimal.zero,
+        surchargeLayer2: Decimal.zero,
         totalFee: Decimal.zero,
         chargeAmount: Decimal.zero,
         feeRate: domesticCardRate,
@@ -107,48 +131,107 @@ class FeeCalculator {
       );
     }
 
-    final feeRate = isInternational ? internationalCardRate : domesticCardRate;
+    final rate = isInternational ? internationalCardRate : domesticCardRate;
 
-    // Calculate effective rate including VAT
-    // effectiveRate = feeRate * (1 + vatRate)
-    // For domestic: 0.0365 * 1.07 = 0.039055
-    final effectiveValue = Decimal.one - (feeRate * (Decimal.one + vatRate));
+    // ═══════════════════════════════════════════════════════════════════════
+    // LAYER 1: Base Fee (Simple calculation on wallet amount)
+    // This is what Omise would charge if we only sent the wallet amount
+    // ═══════════════════════════════════════════════════════════════════════
+    final layer1Fee = (walletAmountSatang * rate).round();
+    final layer1Vat = (layer1Fee * vatRate).round();
+    final layer1Total = layer1Fee + layer1Vat;
 
-    // Reverse calculate charge amount
-    // chargeAmount = walletAmount / (1 - effectiveRate)
-    // Use rational to avoid precision loss during division then ceil
-    final chargeAmountRat = walletAmountSatang / effectiveValue;
-    final chargeAmountDec = Decimal.fromBigInt(chargeAmountRat.ceil());
+    // ═══════════════════════════════════════════════════════════════════════
+    // LAYER 2: Surcharge (Fee on Fee)
+    // Because we need to charge the customer Layer1 fees, Omise will also
+    // charge fees on that additional amount. We use iteration to find the
+    // exact gross amount that nets to our target wallet amount.
+    // ═══════════════════════════════════════════════════════════════════════
 
-    // Calculate the total fee (what Omise takes)
-    final totalFee = chargeAmountDec - walletAmountSatang;
+    // Calculate the true gross amount needed
+    final effectiveRate = rate * (Decimal.one + vatRate);
+    final divisor = Decimal.one - effectiveRate;
 
-    // Break down fee into base fee and VAT
-    // totalFee = baseFee + (baseFee * vatRate)
-    // totalFee = baseFee * (1 + vatRate)
-    // baseFee = totalFee / (1 + vatRate)
-    final onePlusVat = Decimal.one + vatRate;
-    final processingFeeRat = totalFee / onePlusVat;
-    final processingFee = Decimal.fromBigInt(processingFeeRat.round());
-    final vat = totalFee - processingFee;
+    // Use ceiling to ensure we always have enough after fees
+    BigInt targetGross = (walletAmountSatang / divisor).ceil();
+
+    // Verify and calculate actual fees at this gross amount
+    final grossDec = Decimal.fromBigInt(targetGross);
+    final actualFee = (grossDec * rate).round();
+    final actualVat = (actualFee * vatRate).round();
+    final actualTotalFee = actualFee + actualVat;
+    final netAmount = grossDec - actualTotalFee;
+
+    // If net is less than wallet (due to rounding), bump up by 1 satang
+    Decimal finalGross = grossDec;
+    Decimal finalTotalFee = actualTotalFee;
+    if (netAmount < walletAmountSatang) {
+      finalGross = Decimal.fromBigInt(targetGross + BigInt.one);
+      final adjFee = (finalGross * rate).round();
+      final adjVat = (adjFee * vatRate).round();
+      finalTotalFee = adjFee + adjVat;
+    }
+
+    // Layer 2 Surcharge = Total actual fee - Layer 1 simple fee
+    final surchargeLayer2 = finalTotalFee - layer1Total;
 
     return FeeBreakdown(
       walletAmount: walletAmountSatang,
-      processingFee: processingFee,
-      vat: vat,
+      processingFeeLayer1: layer1Fee,
+      vatLayer1: layer1Vat,
+      surchargeLayer2: surchargeLayer2,
+      totalFee: finalTotalFee,
+      chargeAmount: finalGross,
+      feeRate: rate,
+      vatRate: vatRate,
+    );
+  }
+
+  /// Calculate fee breakdown based on the TOTAL CHARGE amount (Inclusive Fee).
+  /// This is used when the user enters the amount they want to pay/bill to card.
+  ///
+  /// [chargeAmountSatang] - The total amount to be charged to the card (Gross)
+  static FeeBreakdown calculateFromCharge(
+    Decimal chargeAmountSatang, {
+    bool isInternational = false,
+  }) {
+    if (chargeAmountSatang <= Decimal.zero) {
+      return calculate(Decimal.zero, isInternational: isInternational);
+    }
+
+    final rate = isInternational ? internationalCardRate : domesticCardRate;
+
+    // Calculate actual fees on this gross amount
+    final fee = (chargeAmountSatang * rate).round();
+    final vat = (fee * vatRate).round();
+    final totalFee = fee + vat;
+    final walletAmount = chargeAmountSatang - totalFee;
+
+    return FeeBreakdown(
+      walletAmount: walletAmount,
+      processingFeeLayer1: fee,
+      vatLayer1: vat,
+      surchargeLayer2: Decimal.zero, // No extra surcharge in inclusive model
       totalFee: totalFee,
-      chargeAmount: chargeAmountDec,
-      feeRate: feeRate,
+      chargeAmount: chargeAmountSatang,
+      feeRate: rate,
       vatRate: vatRate,
     );
   }
 
   /// Calculate from Baht amount (convenience method)
+  /// Note: We keep this for backward compatibility but effectively
+  /// most UIs should now move to calculateFromChargeBaht.
   static FeeBreakdown calculateFromBaht(
-    double walletAmountBaht, {
+    double amountBaht, {
     bool isInternational = false,
+    bool isChargeAmount =
+        false, // 💎 Default: Input is Wallet Amount (Surcharge Model)
   }) {
-    final satang = Decimal.parse((walletAmountBaht * 100).toStringAsFixed(0));
+    final satang = Decimal.parse((amountBaht * 100).toStringAsFixed(0));
+    if (isChargeAmount) {
+      return calculateFromCharge(satang, isInternational: isInternational);
+    }
     return calculate(satang, isInternational: isInternational);
   }
 

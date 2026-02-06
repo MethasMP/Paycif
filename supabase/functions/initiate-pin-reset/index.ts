@@ -227,7 +227,11 @@ function jsonError(message: string, status: number, code?: string): Response {
 // HELPER: Verify Ed25519 Signature
 // ----------------------------------------------------------------------------
 import * as ed from 'https://esm.sh/@noble/ed25519@2.0.0';
+import { sha512 } from 'https://esm.sh/@noble/hashes@1.3.1/sha512';
 import { decode as base64Decode } from 'https://deno.land/std@0.168.0/encoding/base64.ts';
+
+// 🛡️ CRITICAL: Configure SHA-512 for @noble/ed25519 v2
+ed.etc.sha512Sync = (...m: Uint8Array[]) => sha512(ed.etc.concatBytes(...m));
 
 async function verifySignature(sigB64: string, msg: string, pubKeyB64: string): Promise<boolean> {
   try {

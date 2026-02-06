@@ -23,7 +23,7 @@ class Transaction {
       amount: json['amount'],
       // Handle potential null description from backend (though SQL usually returns empty string if not null)
       description: json['description'] ?? '',
-      createdAt: DateTime.parse(json['created_at']),
+      createdAt: DateTime.parse(json['created_at']).toLocal(),
     );
   }
 

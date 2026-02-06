@@ -34,6 +34,10 @@ abstract class SecurityRepository {
   /// Gets the unique ID of the current device binding.
   Future<String?> getCurrentDeviceId();
 
+  /// 🛡️ Generates signature headers for any arbitrary payload.
+  /// Used to harden sensitive actions (Transfers, Top-ups) with Device Identity.
+  Future<Map<String, String>> generateSignatureHeaders(String payload);
+
   /// 🔒 Hard-Clear: Wipes all sensitive in-memory and disk caches (Logout).
   Future<void> clearSecurityData();
 }

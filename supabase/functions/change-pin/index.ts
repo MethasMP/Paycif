@@ -14,7 +14,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
-import { argon2id } from 'npm:hash-wasm';
+import { argon2id } from 'https://esm.sh/hash-wasm@4.12.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -166,7 +166,7 @@ serve(async (req) => {
       JSON.stringify({ success: true }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error(err);
     const message = err instanceof Error ? err.message : 'Unknown error';
     return jsonError(message, 500);

@@ -1,13 +1,19 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../services/api_service.dart';
 import 'payment_state.dart';
+import 'package:uuid/uuid.dart';
+import '../features/security/domain/repositories/security_repository.dart';
 
 class PaymentCubit extends Cubit<PaymentState> {
   final ApiService _apiService;
+  final SecurityRepository _securityRepository;
 
-  PaymentCubit({ApiService? apiService})
-    : _apiService = apiService ?? ApiService(),
-      super(PaymentInitial());
+  PaymentCubit({
+    ApiService? apiService,
+    required SecurityRepository securityRepository,
+  }) : _apiService = apiService ?? ApiService(),
+       _securityRepository = securityRepository,
+       super(PaymentInitial());
 
   /// Initializes the payment screen with wallet balance check.
   Future<void> initialize(double amount, {String? recipientName}) async {
@@ -89,9 +95,18 @@ class PaymentCubit extends Cubit<PaymentState> {
     emit(PaymentProcessing(method: currentState.method));
 
     try {
-      // Generate unique idempotency key
-      final idempotencyKey =
-          'pay_${currentState.amount.toInt()}_${DateTime.now().millisecondsSinceEpoch}';
+      // 🛡️ SECURITY: Hardened Idempotency (UUID v4)
+      final idempotencyKey = const Uuid().v4();
+
+      // 🛡️ SECURITY: Non-Repudiation (Signature)
+      Map<String, String>? signatureHeaders;
+      try {
+        signatureHeaders = await _securityRepository.generateSignatureHeaders(
+          idempotencyKey,
+        );
+      } catch (e) {
+        // Skip for now, backend will reject if not signed (if enforced)
+      }
 
       // Convert amount to satang (minor units)
       final amountInSatang = (currentState.amount * 100).toInt();
@@ -102,6 +117,7 @@ class PaymentCubit extends Cubit<PaymentState> {
         promptPayId: recipientPromptPayId,
         recipientName: recipientName,
         idempotencyKey: idempotencyKey,
+        headers: signatureHeaders,
       );
 
       // Success!

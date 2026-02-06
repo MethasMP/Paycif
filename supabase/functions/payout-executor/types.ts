@@ -11,6 +11,7 @@ export interface PayoutRequest {
   amount_satang: number;
   target_type: 'MOBILE' | 'NATID' | 'EWALLET';
   target_value: string;
+  idempotency_key: string; // NEW: Signed for security
   description?: string;
 }
 

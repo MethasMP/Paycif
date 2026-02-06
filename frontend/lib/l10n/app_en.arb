@@ -113,7 +113,7 @@
   "topUpVat": "VAT (7%)",
   "topUpTotalCharge": "Total Charge",
   "topUpAmountToWallet": "Amount to Wallet",
-  "topUpFeeGateway": "Gateway Fee (Omise) {percent}%",
+   "topUpFeeGateway": "Omise Processing Fee ({percent}%)",
   "@topUpFeeGateway": {
     "placeholders": {
       "percent": {
@@ -121,16 +121,17 @@
       }
     }
   },
-  "topUpFeeNip": "Platform Fee (Paysif)",
-  "topUpFeeVat": "VAT ({percent}%)",
-  "@topUpFeeVat": {
-    "placeholders": {
-      "percent": {
-        "type": "String"
-      }
-    }
-  },
+  "topUpFeePaysif": "Paycif Service Fee",
   "topUpFeeFree": "Free",
+  "topUpAmountToWallet": "You receive in wallet",
+  "topUpFeeInfoTitle": "Fee Transparency",
+  "topUpFeeInfoOmiseTitle": "External Costs (Omise)",
+  "topUpFeeInfoOmiseDesc": "Securely processed by Omise. This fee goes directly to cover gateway and card network costs (Visa/Mastercard).",
+  "topUpFeeInfoLayer1Title": "Government VAT",
+  "topUpFeeInfoLayer1Desc": "Standard 7% Value Added Tax required on processing services.",
+  "topUpFeeInfoPaysifTitle": "Paycif Service Fee",
+  "topUpFeeInfoPaysifDesc": "฿0.00. We don't charge you for adding money. Our platform remains free for your convenience.",
+  "topUpFeeInfoSummary": "We believe in full transparency. You only pay for mandatory external processing costs.",
   "topUpChargeAmountLabel": "Card will be charged",
   "applePay": "Apple Pay",
   "topUpFeeDisclosure": "Includes {feePercent} processing fee",

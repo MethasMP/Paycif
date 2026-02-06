@@ -483,6 +483,7 @@ class ApiService {
     required String currency,
     required String idempotencyKey,
     String description = '',
+    Map<String, String>? headers,
   }) async {
     final body = jsonEncode({
       'from_wallet_id': fromWalletId,
@@ -494,9 +495,9 @@ class ApiService {
     });
 
     final response = await _safeRequest(
-      (headers) => http.post(
+      (headersMap) => http.post(
         Uri.parse('$baseUrl/transfer'),
-        headers: headers,
+        headers: {...headersMap, if (headers != null) ...headers},
         body: body,
       ),
     );
@@ -512,6 +513,7 @@ class ApiService {
     required String promptPayId,
     required String recipientName,
     required String idempotencyKey,
+    Map<String, String>? headers,
   }) async {
     final body = jsonEncode({
       'amount': amountInSatang,
@@ -521,9 +523,9 @@ class ApiService {
     });
 
     final response = await _safeRequest(
-      (headers) => http.post(
+      (headersMap) => http.post(
         Uri.parse('$baseUrl/payout/promptpay'),
-        headers: headers,
+        headers: {...headersMap, if (headers != null) ...headers},
         body: body,
       ),
     );
@@ -693,7 +695,9 @@ class ApiService {
     required double amountSatang,
     required String targetType, // MOBILE, NATID, EWALLET
     required String targetValue,
+    required String idempotencyKey, // 🛡️ Mandatory for survivability
     String? description,
+    Map<String, String>? headers,
   }) async {
     final supabase = Supabase.instance.client;
     final user = supabase.auth.currentUser;
@@ -716,8 +720,10 @@ class ApiService {
           'amount_satang': amountSatang.toInt(),
           'target_type': targetType,
           'target_value': targetValue,
+          'idempotency_key': idempotencyKey, // Hardened
           'description': description ?? 'Paycif Payment',
         },
+        headers: headers,
       );
 
       debugPrint('💸 Payout response status: ${response.status}');
@@ -749,6 +755,7 @@ class ApiService {
     bool isApplePay = false,
     required String referenceId,
     String? description,
+    Map<String, String>? headers,
   }) async {
     final supabase = Supabase.instance.client;
     final user = supabase.auth.currentUser;
@@ -779,6 +786,7 @@ class ApiService {
       final response = await ApiService.invokeEdgeFunction(
         'inbound-handler', // inbound-handler
         body: payload,
+        headers: headers,
       );
 
       if (response.status != 200) {
@@ -792,6 +800,43 @@ class ApiService {
       return data;
     } catch (e) {
       debugPrint('❌ TopUp error: $e');
+      rethrow;
+    }
+  }
+
+  // ============================================================================
+  // Get Daily Top-up Status (calls get-topup-status Edge Function)
+  // ============================================================================
+  Future<Map<String, dynamic>> getDailyTopUpStatus() async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+
+    if (user == null) throw Exception('User not authenticated');
+
+    try {
+      debugPrint('📊 Fetching daily top-up status...');
+
+      final response = await ApiService.invokeEdgeFunction(
+        'get-topup-status',
+        body: {}, // GET request doesn't need body
+      );
+
+      if (response.status != 200) {
+        final errorData = response.data as Map<String, dynamic>?;
+        final errorMessage =
+            errorData?['error'] ?? 'Failed to get top-up status';
+        throw Exception(errorMessage);
+      }
+
+      final data = response.data as Map<String, dynamic>;
+      final limits = data['limits'] as Map<String, dynamic>;
+
+      debugPrint(
+        '📊 Daily top-up status: ${limits['current_total_baht']}/${limits['max_daily_baht']} THB',
+      );
+      return limits;
+    } catch (e) {
+      debugPrint('❌ Get top-up status error: $e');
       rethrow;
     }
   }

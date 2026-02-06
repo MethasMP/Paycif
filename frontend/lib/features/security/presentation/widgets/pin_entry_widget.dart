@@ -14,6 +14,7 @@ class PinEntryWidget extends StatefulWidget {
   final Future<void> Function(String)? onPinConfirmed;
   final Future<bool> Function(String)? onVerify;
   final bool showLabel;
+  final VoidCallback? onForgotPin;
 
   const PinEntryWidget({
     super.key,
@@ -22,6 +23,7 @@ class PinEntryWidget extends StatefulWidget {
     this.onPinConfirmed,
     this.onVerify,
     this.showLabel = true,
+    this.onForgotPin,
   });
 
   @override
@@ -194,6 +196,11 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
   Widget _buildUnifiedConsole(bool isDark) {
     return Column(
       children: [
+        if (widget.onForgotPin != null) ...[
+          _buildForgotAction(isDark),
+          const SizedBox(height: 32),
+        ],
+
         // 🔘 Deep Navy Dots (Static, Instant)
         _buildPinDots(isDark),
 
@@ -299,7 +306,7 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: keys.map((key) {
         if (key == 'EMPTY') {
-          return const SizedBox(width: 72, height: 72);
+          return const SizedBox(width: 80, height: 80);
         }
         if (key == 'DEL') {
           return _buildDeleteButton(isDark);
@@ -351,6 +358,24 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
           Icons.backspace_outlined,
           size: 26,
           color: isDark ? Colors.white54 : Colors.grey.shade600,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildForgotAction(bool isDark) {
+    return GestureDetector(
+      onTap: widget.onForgotPin,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Text(
+          AppLocalizations.of(context)?.commonForgotPin ?? 'Forgot PIN?',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: isDark ? Colors.white60 : Colors.grey.shade500,
+            letterSpacing: 0.2,
+          ),
         ),
       ),
     );

@@ -3,9 +3,10 @@ package main
 import (
 	"log"
 	"net/http"
+	"paysif/database"
+	"paysif/internal/service"
 	"strings"
 	"time"
-	"paysif/internal/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -13,7 +14,8 @@ import (
 
 // TransferHandler holds dependencies for transfer operations.
 type TransferHandler struct {
-	Service *service.WalletService
+	Service          *service.WalletService
+	SignatureService *service.SignatureService
 }
 
 // TransferRequestDTO matches the expected JSON input.
@@ -46,6 +48,32 @@ func (h *TransferHandler) HandleTransfer(c *gin.Context) {
 	userID, err := uuid.Parse(userIDStr.(string))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID in token"})
+		return
+	}
+
+	// 🛡️ SECURITY: Hardened Device Signature Verification
+	deviceId := c.GetHeader("X-Device-Id")
+	signature := c.GetHeader("X-Device-Signature")
+
+	if deviceId == "" || signature == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Device authorization missing"})
+		return
+	}
+
+	// Fetch Public Key for this device and user
+	var publicKey string
+	err = database.DB.QueryRow("SELECT public_key FROM user_device_bindings WHERE user_id = $1 AND device_id = $2 AND is_active = true", userID, deviceId).Scan(&publicKey)
+	if err != nil {
+		log.Printf("⚠️ Signature Error: Device not found or inactive (%s) for user %s\n", deviceId, userID)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Device not recognized or link revoked"})
+		return
+	}
+
+	// Verify Signature: The payload being signed is the IdempotencyKey
+	isValid, err := h.SignatureService.VerifySignature(publicKey, signature, dto.IdempotencyKey)
+	if err != nil || !isValid {
+		log.Printf("❌ Signature Verification Failure for User %s, Device %s\n", userID, deviceId)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Request integrity check failed"})
 		return
 	}
 
