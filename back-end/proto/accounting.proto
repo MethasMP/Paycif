@@ -1,0 +1,115 @@
+syntax = "proto3";
+
+package accounting;
+
+option go_package = "paysif/internal/grpc/pb";
+
+// AccountingService handles all core financial operations
+// with type-safe contracts between Go API and Rust Core.
+service AccountingService {
+  // Transfer executes an atomic double-entry transfer between wallets
+  rpc Transfer(TransferRequest) returns (TransferResponse);
+  
+  // GetBalance retrieves the current balance for a wallet
+  rpc GetBalance(BalanceRequest) returns (BalanceResponse);
+  
+  // ValidateTransaction checks if a transaction is valid without executing
+  rpc ValidateTransaction(TransferRequest) returns (ValidationResponse);
+  
+  // Health check for service monitoring
+  rpc HealthCheck(HealthRequest) returns (HealthResponse);
+  
+  // CheckLimits validates if a transaction is within user limits
+  rpc CheckLimits(LimitCheckRequest) returns (LimitCheckResponse);
+  
+  // GetLimits retrieves current limit status for a user
+  rpc GetLimits(LimitsRequest) returns (LimitsResponse);
+  
+  // ProcessPayout handles external payouts (PromptPay, etc.)
+  rpc ProcessPayout(PayoutRequest) returns (PayoutResponse);
+}
+
+message TransferRequest {
+  string from_wallet_id = 1;
+  string to_wallet_id = 2;
+  int64 amount = 3;           // In minor units (satang)
+  string currency = 4;
+  string reference_id = 5;    // Idempotency key
+  string request_id = 6;      // For tracing across services
+}
+
+message TransferResponse {
+  bool success = 1;
+  string transaction_id = 2;
+  string error_code = 3;      // Empty if success
+  string error_message = 4;   // Human-readable error
+  int64 sender_balance_after = 5;
+  int64 receiver_balance_after = 6;
+}
+
+message BalanceRequest {
+  string wallet_id = 1;
+  string request_id = 2;
+}
+
+message BalanceResponse {
+  bool success = 1;
+  int64 balance = 2;
+  string currency = 3;
+  string error_message = 4;
+}
+
+message ValidationResponse {
+  bool is_valid = 1;
+  string error_code = 2;
+  string error_message = 3;
+}
+
+// Limit checking messages
+message LimitCheckRequest {
+  string user_id = 1;
+  int64 amount = 2;
+}
+
+message LimitCheckResponse {
+  bool allowed = 1;
+  int64 remaining_daily = 2;
+  string message = 3;
+}
+
+message LimitsRequest {
+  string user_id = 1;
+}
+
+message LimitsResponse {
+  int64 current_daily = 1;
+  int64 max_daily = 2;
+  int64 max_transaction = 3;
+  int64 remaining = 4;
+}
+
+// Payout messages
+message PayoutRequest {
+  string user_id = 1;
+  string wallet_id = 2;
+  int64 amount = 3;
+  string promptpay_id = 4;
+  string recipient_name = 5;
+  string idempotency_key = 6;
+}
+
+message PayoutResponse {
+  bool success = 1;
+  string transaction_id = 2;
+  string status = 3;
+  string message = 4;
+  int64 new_balance = 5;
+}
+
+message HealthRequest {}
+
+message HealthResponse {
+  bool healthy = 1;
+  string version = 2;
+  int64 uptime_seconds = 3;
+}

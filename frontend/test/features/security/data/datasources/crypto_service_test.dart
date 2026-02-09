@@ -95,5 +95,95 @@ void main() {
         reason: 'Deterministic generation failed',
       );
     });
+
+    group('PIN Hashing', () {
+      test('computePinHashStatic should produce consistent hashes', () async {
+        final salt = cryptoService.generateSalt();
+        const pin = '123456';
+
+        final hash1 = await CryptoService.computePinHashStatic({
+          'pin': pin,
+          'salt': salt,
+        });
+        final hash2 = await CryptoService.computePinHashStatic({
+          'pin': pin,
+          'salt': salt,
+        });
+
+        expect(hash1, equals(hash2));
+        expect(hash1.length, greaterThan(0));
+      });
+
+      test('computePinHashFast should produce consistent hashes', () async {
+        final salt = cryptoService.generateSalt();
+        const pin = '123456';
+
+        final hash1 = await CryptoService.computePinHashFast({
+          'pin': pin,
+          'salt': salt,
+        });
+        final hash2 = await CryptoService.computePinHashFast({
+          'pin': pin,
+          'salt': salt,
+        });
+
+        expect(hash1, equals(hash2));
+        expect(hash1.length, greaterThan(0));
+      });
+
+      test(
+        'fast and static versions should produce different hashes',
+        () async {
+          final salt = cryptoService.generateSalt();
+          const pin = '123456';
+
+          final staticHash = await CryptoService.computePinHashStatic({
+            'pin': pin,
+            'salt': salt,
+          });
+          final fastHash = await CryptoService.computePinHashFast({
+            'pin': pin,
+            'salt': salt,
+          });
+
+          expect(staticHash, isNot(equals(fastHash)));
+        },
+      );
+
+      test('different PINs should produce different hashes', () async {
+        final salt = cryptoService.generateSalt();
+
+        final hash1 = await CryptoService.computePinHashFast({
+          'pin': '123456',
+          'salt': salt,
+        });
+        final hash2 = await CryptoService.computePinHashFast({
+          'pin': '654321',
+          'salt': salt,
+        });
+
+        expect(hash1, isNot(equals(hash2)));
+      });
+
+      test(
+        'different salts should produce different hashes for same PIN',
+        () async {
+          final salt1 = cryptoService.generateSalt();
+          final salt2 = cryptoService.generateSalt();
+          const pin = '123456';
+
+          final hash1 = await CryptoService.computePinHashFast({
+            'pin': pin,
+            'salt': salt1,
+          });
+          final hash2 = await CryptoService.computePinHashFast({
+            'pin': pin,
+            'salt': salt2,
+          });
+
+          expect(hash1, isNot(equals(hash2)));
+        },
+      );
+    });
   });
 }

@@ -2,10 +2,13 @@ package service
 
 import (
 	"context"
+	"crypto/ed25519"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -17,8 +20,8 @@ import (
 )
 
 const (
-	MaxTransactionAmount  = 500000   // ฿5,000.00 (in minor units)
-	MaxDailyUserAmount    = 2000000  // ฿20,000.00
+	MaxTransactionAmount  = 300000   // ฿3,000.00 (in minor units)
+	MaxDailyUserAmount    = 300000   // ฿3,000.00
 	MaxHourlySystemAmount = 10000000 // ฿100,000.00
 )
 
@@ -42,6 +45,10 @@ type TransferRequest struct {
 	Currency     string    `json:"currency"`
 	ReferenceID  string    `json:"reference_id"`
 	Description  string    `json:"description"`
+	// Security Fields for Rust Offload
+	PublicKey     string `json:"-"` // Internal use, not from JSON body
+	Signature     string `json:"-"`
+	SignedPayload string `json:"-"`
 }
 
 // TransferResponse returned after a successful or idempotent transfer.
@@ -106,6 +113,9 @@ func (c *TransferCommand) Execute(ctx context.Context) (*TransferResponse, error
 		return nil, errors.New("unauthorized: wallet does not belong to user")
 	}
 
+	// 0. Ownership Check (Keep as is)
+	// (Not modifying 97-107)
+
 	if c.req.Amount <= 0 {
 		return nil, errors.New("amount must be positive")
 	}
@@ -113,45 +123,93 @@ func (c *TransferCommand) Execute(ctx context.Context) (*TransferResponse, error
 		return nil, errors.New("cannot transfer to same wallet")
 	}
 
-	// GUARDRAIL 1: Per-Transaction Limit
-	if c.req.Amount > MaxTransactionAmount {
-		return nil, fmt.Errorf("transaction amount %.2f exceeds limit of %.2f", float64(c.req.Amount)/100, float64(MaxTransactionAmount)/100)
+	// ⚡ RUST PRE-VALIDATION / SAFE MODE ARBITRATION
+	performManualChecks := false
+	const SafeModeThreshold = 100000 // ฿1,000.00 THB
+
+	if c.req.PublicKey != "" && c.req.Signature != "" {
+		// 1. Decode Keys
+		pubKeyBytes, err := hex.DecodeString(c.req.PublicKey)
+		if err != nil {
+			return nil, fmt.Errorf("invalid public key format: %w", err)
+		}
+		sigBytes, err := hex.DecodeString(c.req.Signature)
+		if err != nil {
+			return nil, fmt.Errorf("invalid signature format: %w", err)
+		}
+
+		// 2. Attempt Rust Pre-Validation
+		valid, msg, err := c.svc.FX.PreValidateTransfer(
+			ctx,
+			c.req.UserID.String(),
+			c.req.Currency,
+			c.req.Amount,
+			pubKeyBytes,
+			sigBytes,
+			[]byte(c.req.SignedPayload),
+		)
+
+		if err != nil {
+			// ⚠️ RUST UNAVAILABLE -> ENTER FULL SAFE MODE
+			// We no longer block high-value transactions because Go can verify signatures 
+			// and SQL can check limits. This ensures 100% availability (Survivability).
+			log.Printf("⚠️ [Safe Mode] Rust Engine Down (%v). Falling back to Manual Verification for Txn %s (Amount: %d)", err, c.req.ReferenceID, c.req.Amount)
+
+			// 3. Manual Signature Verification in Go (Survivability over Efficiency)
+			if len(pubKeyBytes) != 32 || len(sigBytes) != 64 {
+				return nil, errors.New("invalid key length (safe mode)")
+			}
+			if !ed25519.Verify(pubKeyBytes, []byte(c.req.SignedPayload), sigBytes) {
+				return nil, errors.New("invalid signature verification (safe mode)")
+			}
+
+			// Proceed to Manual DB Limits
+			performManualChecks = true
+		} else if !valid {
+			// RUST REJECTED (Signature or Limit)
+			return nil, fmt.Errorf("security/limit check failed: %s", msg)
+		}
+		// RUST APPROVED -> Proceed (skip manual checks)
+	} else {
+		// NO SIGNATURE (Internal/Legacy) -> Manual Checks
+		performManualChecks = true
 	}
 
-	// GUARDRAIL 2: Hourly Limit
+	// 🛡️ MANUAL / FALLBACK CHECKS (SQL)
+	if performManualChecks {
+		// GUARDRAIL 1: Per-Transaction Limit
+		if c.req.Amount > MaxTransactionAmount {
+			return nil, fmt.Errorf("transaction amount %.2f exceeds limit", float64(c.req.Amount)/100)
+		}
+
+		// GUARDRAIL 2: Daily User Limit (SQL Fallback)
+		var dailyDebitTotal sql.NullInt64
+		err := c.svc.DB.QueryRowContext(ctx, `
+			SELECT SUM(ABS(amount)) FROM ledger_entries le
+			JOIN transactions t ON le.transaction_id = t.id
+			WHERE le.wallet_id = $1 
+			AND le.amount < 0 
+			AND t.created_at > NOW() - INTERVAL '24 hours'
+		`, c.req.FromWalletID).Scan(&dailyDebitTotal)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("failed to check daily limit (fallback): %w", err)
+		}
+		if dailyDebitTotal.Valid && (dailyDebitTotal.Int64+c.req.Amount > MaxDailyUserAmount) {
+			return nil, errors.New("daily transfer limit exceeded (fallback)")
+		}
+	}
+
+	// GUARDRAIL 2: Hourly System Limit (Keep as is, global safety)
 	var hourlyTotal sql.NullInt64
-	err = c.svc.DB.QueryRowContext(ctx, `
-		SELECT SUM(gateway_fee) FROM transactions 
-		WHERE created_at > NOW() - INTERVAL '1 hour'
-	`).Scan(&hourlyTotal) // NOTE: Schema changed, checking logic usually on 'amount'.
-	// Reverting to checking checks on 'amount' from transactions for consistency.
-	// Original used: SELECT SUM(amount) FROM transactions.
 	err = c.svc.DB.QueryRowContext(ctx, `
 		SELECT SUM(amount) FROM transactions 
 		WHERE created_at > NOW() - INTERVAL '1 hour'
 	`).Scan(&hourlyTotal)
-
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("failed to check system breaker: %w", err)
 	}
 	if hourlyTotal.Valid && (hourlyTotal.Int64+c.req.Amount > MaxHourlySystemAmount) {
 		return nil, errors.New("system-wide hourly transfer limit exceeded")
-	}
-
-	// GUARDRAIL 3: Daily User Limit
-	var dailyDebitTotal sql.NullInt64
-	err = c.svc.DB.QueryRowContext(ctx, `
-		SELECT SUM(ABS(amount)) FROM ledger_entries le
-		JOIN transactions t ON le.transaction_id = t.id
-		WHERE le.wallet_id = $1 
-		AND le.amount < 0 
-		AND t.created_at > NOW() - INTERVAL '24 hours'
-	`, c.req.FromWalletID).Scan(&dailyDebitTotal)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("failed to check daily limit: %w", err)
-	}
-	if dailyDebitTotal.Valid && (dailyDebitTotal.Int64+c.req.Amount > MaxDailyUserAmount) {
-		return nil, errors.New("daily transfer limit of ฿20,000 exceeded for this wallet")
 	}
 
 	// 1. Check Idempotency
@@ -314,6 +372,25 @@ func (c *TransferCommand) Execute(ctx context.Context) (*TransferResponse, error
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
+	// 8. Update Redis & Alert Rust Engines (Async/Fire-and-forget)
+	// We increment the total and BROADCAST to all Rust instances for real-time consistency
+	if c.svc.Redis != nil {
+		go func() {
+			amountMajor := float64(c.req.Amount) / 100.0
+			key := fmt.Sprintf("stats:user:%s:daily_total", c.req.UserID)
+			
+			// 1. Update the persistent count in Redis
+			c.svc.Redis.IncrByFloat(context.Background(), key, amountMajor)
+			c.svc.Redis.Expire(context.Background(), key, 24*time.Hour)
+
+			// 2. Broadcast to all Rust nodes via Pub/Sub
+			// Format: "user_id:amount"
+			pubSubKey := "user_limit_updates"
+			msg := fmt.Sprintf("%s:%f", c.req.UserID, amountMajor)
+			c.svc.Redis.Publish(context.Background(), pubSubKey, msg)
+		}()
+	}
+
 	return &TransferResponse{TransactionID: newTxID, UsedExisting: false}, nil
 }
 
@@ -449,7 +526,7 @@ func (s *WalletService) GetExchangeRate(ctx context.Context, fromCurr, toCurr st
 	safeTo := strings.ReplaceAll(strings.ToUpper(toCurr), "'", "''")
 
 	query := fmt.Sprintf("SELECT provider_rate, updated_at FROM exchange_rates WHERE from_currency = '%s' AND to_currency = '%s'", safeFrom, safeTo)
-	
+
 	// No transaction needed for simple read
 	err := s.DB.QueryRowContext(ctx, query).Scan(&rate, &updatedAt)
 	if err != nil {
@@ -466,13 +543,13 @@ func (s *WalletService) GetExchangeRate(ctx context.Context, fromCurr, toCurr st
 		UpdatedAt:    updatedAt,
 	}
 
-	// 3. Write to Cache (Async or blocking? Blocking is safer for consistency here, but async is faster. 
+	// 3. Write to Cache (Async or blocking? Blocking is safer for consistency here, but async is faster.
 	// Given requirement is speed, blocking logic but short TTL is fine.)
 	if s.Redis != nil {
 		cacheKey := fmt.Sprintf("rate:%s:%s", fromCurr, toCurr)
 		data, _ := json.Marshal(response)
 		// Cache for 60 seconds (Matches FX refresh interval somewhat)
-		s.Redis.Set(ctx, cacheKey, data, 60*time.Second) 
+		s.Redis.Set(ctx, cacheKey, data, 60*time.Second)
 	}
 
 	return response, nil
@@ -599,7 +676,7 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 		return nil, fmt.Errorf("failed to check daily limit: %w", err)
 	}
 	if dailyDebitTotal.Valid && (dailyDebitTotal.Int64+req.Amount > MaxDailyUserAmount) {
-		return nil, errors.New("daily payout limit of ฿20,000 exceeded")
+		return nil, errors.New("daily payout limit of ฿3,000 exceeded")
 	}
 
 	// 5. Begin Transaction
@@ -662,8 +739,8 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 			balance_after, base_currency_amount, home_currency_amount
 		)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
-	`, uuid.New(), newTxID, walletID, -req.Amount, 
-	   newBalance, -req.Amount, -req.Amount) // Since it's THB, these are same
+	`, uuid.New(), newTxID, walletID, -req.Amount,
+		newBalance, -req.Amount, -req.Amount) // Since it's THB, these are same
 	if err != nil {
 		return nil, fmt.Errorf("failed to create ledger entry: %w", err)
 	}

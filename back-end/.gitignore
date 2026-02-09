@@ -1,1 +1,43 @@
+# 🛡️ Env & Secrets
 .env
+.env.*
+! .env.example
+
+# 🏗️ Build Binaries (Go)
+api
+api_server
+verify
+verify_transfer
+worker
+/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# 📦 Dependencies & Cache
+go_home/
+.go_home/
+.go-cache/
+.go_mod_cache/
+vendor/
+node_modules/
+.tmp_*/
+tmp_*/
+
+# 🦀 Rust (FX Engine)
+rust/fx-engine/target/
+rust/**/target/
+**/*.rs.bk
+
+# 📊 Logs & Diag
+*.log
+logs/
+.DS_Store
+
+# 🧹 Temporary Files
+tmp/
+temp*/
+.!*
+

@@ -1,16 +1,58 @@
-# frontend
+# 📱 Paycif Mobile (Flutter)
 
-A new Flutter project.
+Premium mobile application for the Paycif fintech ecosystem.
 
-## Getting Started
+---
 
-This project is a starting point for a Flutter application.
+## 🎨 Design Philosophy
 
-A few resources to get you started if this is your first Flutter project:
+- **Aesthetics**: Modern, dark-mode focused, glassmorphism UI elements.
+- **UX**: High-performance lists, skeleton loading, and optimistic UI updates.
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+---
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## 🛠️ Tech Stack
+
+- **Framework**: Flutter 3.x (Dart)
+- **State Management**: BLoC / Provider
+- **Networking**: Dio (with centralized interceptors for security)
+- **Security**:
+  - Biometric Auth (Local Auth)
+  - Secure Storage (Encrypted Keyring)
+  - On-device Transaction Signing (Ed25519)
+
+---
+
+## 🚀 Getting Started
+
+### 1. Installation
+
+```bash
+flutter pub get
+```
+
+### 2. Configuration
+
+Ensure `.env` exists in the root of the `frontend/` directory with:
+
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `BACKEND_URL` (Pointing to your Go API)
+
+### 3. Running
+
+```bash
+flutter run
+```
+
+---
+
+## 📁 Key Directories
+
+- `lib/features/`: Feature-sliced components (Security, Notification, Wallet).
+- `lib/services/`: Core infrastructure (API, Auth, Push).
+- `lib/widgets/`: Reusable UI components.
+
+---
+
+_Building the future of digital payments._

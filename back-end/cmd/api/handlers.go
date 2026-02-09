@@ -69,13 +69,13 @@ func (h *TransferHandler) HandleTransfer(c *gin.Context) {
 		return
 	}
 
-	// Verify Signature: The payload being signed is the IdempotencyKey
-	isValid, err := h.SignatureService.VerifySignature(publicKey, signature, dto.IdempotencyKey)
-	if err != nil || !isValid {
-		log.Printf("❌ Signature Verification Failure for User %s, Device %s\n", userID, deviceId)
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Request integrity check failed"})
-		return
-	}
+	// ⬇️ DEPRECATED: Go-based Signature Verification (Offloaded to Rust FX Engine)
+	// isValid, err := h.SignatureService.VerifySignature(publicKey, signature, dto.IdempotencyKey)
+	// if err != nil || !isValid {
+	// 	log.Printf("❌ Signature Verification Failure for User %s, Device %s\n", userID, deviceId)
+	// 	c.JSON(http.StatusUnauthorized, gin.H{"error": "Request integrity check failed"})
+	// 	return
+	// }
 
 	req := service.TransferRequest{
 		UserID:       userID,
@@ -85,6 +85,10 @@ func (h *TransferHandler) HandleTransfer(c *gin.Context) {
 		Currency:     dto.Currency,
 		ReferenceID:  dto.IdempotencyKey,
 		Description:  dto.Description,
+		// Security Offload to Rust
+		PublicKey:     publicKey,
+		Signature:     signature,
+		SignedPayload: dto.IdempotencyKey,
 	}
 
 	resp, err := h.Service.Transfer(c.Request.Context(), req)
@@ -231,4 +235,35 @@ func (h *TransferHandler) HandleGetLatestRate(c *gin.Context) {
 		"rate":       rateResp.ProviderRate,
 		"updated_at": rateResp.UpdatedAt,
 	})
+}
+
+// HandleGetLimits returns the user's daily transaction limits.
+func (h *TransferHandler) HandleGetLimits(c *gin.Context) {
+	userIDStr, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User unauthorized"})
+		return
+	}
+	// Assuming userID is valid UUID as middleware checks
+	
+	// Default to THB for now
+	currency := "THB"
+
+	// Fetch limits from Rust FX Engine via Service
+	limits, err := h.Service.FX.GetLimits(c.Request.Context(), userIDStr.(string), currency)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch limits: " + err.Error()})
+		return
+	}
+
+	// Map to Frontend Expected Keys (CamelCase or SnakeCase matching Edge Function)
+	// Edge Function returns: max_daily_baht, current_total_baht, remaining_limit_baht
+	response := gin.H{
+		"max_daily_baht":           limits["max_daily_amount"],
+		"current_total_baht":       limits["current_daily_total"],
+		"remaining_limit_baht":     limits["remaining_daily_amount"],
+		"min_per_transaction_baht": 500.0, // Hardcoded minimum for now
+	}
+
+	c.JSON(http.StatusOK, response)
 }

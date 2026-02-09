@@ -808,31 +808,31 @@ class ApiService {
   // Get Daily Top-up Status (calls get-topup-status Edge Function)
   // ============================================================================
   Future<Map<String, dynamic>> getDailyTopUpStatus() async {
-    final supabase = Supabase.instance.client;
-    final user = supabase.auth.currentUser;
+    // 🛡️ Ensure Valid Session
+    await ApiService.ensureSessionValid();
+    final user = Supabase.instance.client.auth.currentUser;
 
     if (user == null) throw Exception('User not authenticated');
 
     try {
-      debugPrint('📊 Fetching daily top-up status...');
-
-      final response = await ApiService.invokeEdgeFunction(
-        'get-topup-status',
-        body: {}, // GET request doesn't need body
+      debugPrint(
+        '📊 Fetching daily top-up status (via High-Performance Rust Engine)...',
       );
 
-      if (response.status != 200) {
-        final errorData = response.data as Map<String, dynamic>?;
-        final errorMessage =
-            errorData?['error'] ?? 'Failed to get top-up status';
-        throw Exception(errorMessage);
+      // 🚀 WORLD-CLASS: This call hits Go, which offloads to Rust
+      // utilizing DashMap and Jemalloc for microsecond latency.
+      final response = await _safeRequest(
+        (headers) => http.get(Uri.parse('$baseUrl/limits'), headers: headers),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to get top-up status: ${response.statusCode}');
       }
 
-      final data = response.data as Map<String, dynamic>;
-      final limits = data['limits'] as Map<String, dynamic>;
+      final limits = jsonDecode(response.body) as Map<String, dynamic>;
 
       debugPrint(
-        '📊 Daily top-up status: ${limits['current_total_baht']}/${limits['max_daily_baht']} THB',
+        '📊 Daily top-up status: ${limits['current_total_baht']}/${limits['max_daily_baht']} THB (Source: Rust Engine)',
       );
       return limits;
     } catch (e) {

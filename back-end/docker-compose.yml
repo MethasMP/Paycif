@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  # 1. Redis Cache
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    restart: always
+
+  # 2. Rust FX Engine
+  fx-engine:
+    build:
+      context: ./rust/fx-engine
+      dockerfile: Dockerfile
+    ports:
+      - "50052:50052"
+    environment:
+      - RUST_LOG=info
+    restart: always
+
+  # 3. Go API
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - GIN_MODE=release
+      - FX_ENGINE_URL=fx-engine:50052  # Service name discovery
+      - REDIS_URL=redis://redis:6379   # Service name discovery
+      # Database URL is inherited from .env file or host env
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - fx-engine
+    restart: always

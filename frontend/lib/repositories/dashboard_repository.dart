@@ -16,9 +16,12 @@ class DashboardRepository {
   static const _kWalletCacheKey = 'cache_wallet_data';
   static const _kTxCacheKey = 'cache_transactions_data';
 
-  // 🚀 Reactive Stream for Transactions
+  // 🚀 Reactive Stream for Transactions (Persistent Sink)
   final _txController = StreamController<List<Transaction>>.broadcast();
   Stream<List<Transaction>> get transactionsStream => _txController.stream;
+  StreamSubscription? _txSubscription;
+
+  // 🚀 Internal Cache for Optimistic Updates
   List<Transaction> _lastTxsCache = [];
 
   DashboardRepository(this._client);
@@ -26,8 +29,6 @@ class DashboardRepository {
   /// Exposes the auth state change stream from Supabase.
   Stream<AuthState> get authStream => _client.auth.onAuthStateChange;
 
-  /// Streams the user's primary wallet.
-  /// For V1/V2 transition, we fetch the first wallet found for the user.
   Stream<Wallet?> fetchUserWallet() {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) {
@@ -35,6 +36,7 @@ class DashboardRepository {
     }
 
     // Real-time listener for the wallets table
+    // Using .stream() for reactive updates
     return _client
         .from('wallets')
         .stream(primaryKey: ['id'])
@@ -50,6 +52,10 @@ class DashboardRepository {
               .ignore();
 
           return wallet;
+        })
+        .handleError((e) {
+          debugPrint('❌ DashboardRepository: Wallet Stream Error: $e');
+          throw e; // Let the listener handle it (resilience in controller)
         });
   }
 
@@ -160,11 +166,30 @@ class DashboardRepository {
     }
   }
 
-  /// Fetches the latest transactions for a specific wallet via Realtime Stream.
-  /// This ensures the UI updates instantly when database changes (Reconciliation, etc).
-  Stream<List<Transaction>> fetchTransactions(String walletId) {
-    // 📡 REALTIME: Listen to changes in the 'transactions' table for this wallet
-    _client
+  /// 🛡️ [Resilience] REST Fallback for Transactions
+  Future<List<Transaction>> fetchTransactionsRest(String walletId) async {
+    try {
+      final data = await _api.getTransactions(walletId);
+      final txs = data.map((json) => Transaction.fromJson(json)).toList();
+      txs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      _lastTxsCache = txs;
+      _txController.add(txs);
+      return txs;
+    } catch (e) {
+      debugPrint('❌ [Resilience] REST Fetch Failed: $e');
+      rethrow;
+    }
+  }
+
+  /// 🚀 10x REFRESH: Streams transactions with automatic REST fallback
+  void initTransactionsSubscription(String walletId) {
+    _txSubscription?.cancel();
+
+    // 1. Immediate REST fetch (ensure UI is fresh even before WebSocket connects)
+    fetchTransactionsRest(walletId).ignore();
+
+    // 2. Continuous Realtime Stream
+    _txSubscription = _client
         .from('transactions')
         .stream(primaryKey: ['id'])
         .eq('wallet_id', walletId)
@@ -172,13 +197,11 @@ class DashboardRepository {
         .listen(
           (data) {
             final txs = data.map((json) => Transaction.fromJson(json)).toList();
-            // Sort locally to ensure latest is always on top (descending)
             txs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
             _lastTxsCache = txs;
             _txController.add(txs);
 
-            // 💾 [Side-Effect] Keep disk cache in sync
+            // 💾 [Side-Effect] Cache to Disk
             _storage
                 .write(
                   _kTxCacheKey,
@@ -186,22 +209,26 @@ class DashboardRepository {
                 )
                 .ignore();
 
-            debugPrint(
-              '📡 [Realtime] Transactions updated: ${txs.length} items',
-            );
+            debugPrint('📡 [Realtime] Transactions Received: ${txs.length}');
           },
           onError: (e) {
-            debugPrint('❌ DashboardRepository: Realtime Transaction Error: $e');
-            // Fallback to one-time fetch if realtime fails
-            _api.getTransactions(walletId).then((data) {
-              final txs = data
-                  .map((json) => Transaction.fromJson(json))
-                  .toList();
-              _txController.add(txs);
+            debugPrint('⚠️ [Realtime] Subscription Error: $e');
+            // 🛡️ Error 1006 Handling: REST Fallback
+            fetchTransactionsRest(walletId).ignore();
+
+            // 🔄 Re-init after a delay (Exponential Backoff would be better, but fixed for now)
+            Future.delayed(const Duration(seconds: 5), () {
+              if (_client.auth.currentUser != null) {
+                initTransactionsSubscription(walletId);
+              }
             });
           },
         );
+  }
 
+  // Deprecated: Use transactionsStream + initTransactionsSubscription
+  Stream<List<Transaction>> fetchTransactions(String walletId) {
+    initTransactionsSubscription(walletId);
     return transactionsStream;
   }
 
@@ -240,9 +267,6 @@ class DashboardRepository {
 
     // 2. Prepend to current cache
     _lastTxsCache = [newTx, ..._lastTxsCache];
-
-    // 3. Push to all reactive listeners (Dashboard, History, etc.)
-    _txController.add(_lastTxsCache);
 
     // 4. Persistence: Write to Disk immediately (Resilience)
     _storage

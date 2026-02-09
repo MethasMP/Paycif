@@ -29,8 +29,10 @@ serve(async (req) => {
     // 1. Auth & Setup
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    // We need two clients: one for public schema (profiles, device_bindings) and one for private (secrets)
-    const publicClient = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Public client (Service Role)
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Private client (kept for Success path only, until RPC is available)
     const privateClient = createClient(supabaseUrl, supabaseServiceKey, {
       db: { schema: 'private' },
     });
@@ -39,7 +41,7 @@ serve(async (req) => {
     if (!authHeader) return jsonError('Missing auth', 401);
 
     const jwt = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await publicClient.auth.getUser(jwt);
+    const { data: { user }, error: authError } = await supabase.auth.getUser(jwt);
 
     if (authError || !user) {
       return jsonError('Unauthorized', 401);
@@ -66,7 +68,7 @@ serve(async (req) => {
       return jsonError('Device authorization missing', 401);
     }
 
-    const { data: binding, error: bindError } = await publicClient
+    const { data: binding, error: bindError } = await supabase
       .from('user_device_bindings')
       .select('public_key')
       .eq('user_id', user.id)
@@ -86,16 +88,12 @@ serve(async (req) => {
     }
 
     // ------------------------------------------------------------------------
-    // C. CHECK LOCKOUT
+    // C. CHECK LOCKOUT via RPC
     // ------------------------------------------------------------------------
-    // ... (existing lockout logic) ...
-    const { data: secret, error: secretError } = await privateClient
-      .from('user_auth_secrets')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
+    const { data: secret, error: secretError } = await supabase
+      .rpc('get_user_auth_secret', { p_user_id: user.id });
 
-    if (secretError && secretError.code !== 'PGRST116') {
+    if (secretError) {
       console.error('Secret fetch error:', secretError);
       return jsonError('System Error', 500);
     }
@@ -127,7 +125,7 @@ serve(async (req) => {
     // ------------------------------------------------------------------------
     // D. VALIDATE CHALLENGE & RESET
     // ------------------------------------------------------------------------
-    const { data: kyc, error: kycError } = await publicClient
+    const { data: kyc, error: kycError } = await supabase
       .from('identity_verification')
       .select('passport_number')
       .eq('user_id', user.id)
@@ -149,12 +147,13 @@ serve(async (req) => {
       console.log(`[ResetPin] Challenge passed for ${user.id}`);
 
       // Update Device Last Used
-      await publicClient
+      await supabase
         .from('user_device_bindings')
         .update({ last_used_at: new Date().toISOString() })
         .eq('device_id', deviceId);
 
       // A. Clear Secret Hash
+      // WARNING: Still relies on private schema due to missing RPC for clearing
       const { error: resetSecretError } = await privateClient
         .from('user_auth_secrets') // in private schema
         .update({
@@ -168,7 +167,7 @@ serve(async (req) => {
       if (resetSecretError) throw resetSecretError;
 
       // B. Update Profile
-      const { error: profileError } = await publicClient
+      const { error: profileError } = await supabase
         .from('profiles')
         .update({ has_pin: false })
         .eq('id', user.id);
@@ -180,7 +179,7 @@ serve(async (req) => {
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     } else {
-      // FAILURE: Increment Lockout
+      // FAILURE: Increment Lockout via RPC
       console.warn(`[ResetPin] Challenge FAILED for ${user.id}`);
 
       if (secret) {
@@ -196,14 +195,12 @@ serve(async (req) => {
           errorMsg = `Incorrect answer. ${3 - newFailed} attempts remaining.`;
         }
 
-        await privateClient
-          .from('user_auth_secrets')
-          .update({
-            failed_attempts: newFailed,
-            locked_until: newLockedUntil,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('user_id', user.id);
+        await supabase.rpc('update_user_auth_status', {
+          p_user_id: user.id,
+          p_failed_attempts: newFailed,
+          p_locked_until: newLockedUntil,
+          p_reset_counters: false,
+        });
 
         return jsonError(errorMsg, 401);
       } else {

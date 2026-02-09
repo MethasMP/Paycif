@@ -1,41 +1,62 @@
 package service
 
 import (
-	"crypto/ed25519"
+	"context"
 	"encoding/base64"
-	"errors"
 	"fmt"
+	"time"
+
+	pb "paysif/internal/grpc/pb" // Correct import path based on go_package option
 )
 
-// SignatureService handles Ed25519 signature verification.
-type SignatureService struct{}
-
-// NewSignatureService creates a new SignatureService.
-func NewSignatureService() *SignatureService {
-	return &SignatureService{}
+// SignatureService handles Ed25519 signature verification via High-Performance Rust Microservice.
+type SignatureService struct {
+	grpcClient pb.FXServiceClient
 }
 
-// VerifySignature verifies an Ed25519 signature for a given message and public key.
+// NewSignatureService creates a new SignatureService injecting the Rust gRPC client.
+func NewSignatureService(client pb.FXServiceClient) *SignatureService {
+	return &SignatureService{
+		grpcClient: client,
+	}
+}
+
+// VerifySignature delegates verification to the high-performance Rust service.
 // publicKey and signature are expected to be base64 encoded strings.
 func (s *SignatureService) VerifySignature(publicKeyB64, signatureB64, message string) (bool, error) {
-	pub, err := base64.StdEncoding.DecodeString(publicKeyB64)
+	// 1. Decode Base64 Inputs
+	pubKeyBytes, err := base64.StdEncoding.DecodeString(publicKeyB64)
 	if err != nil {
-		return false, fmt.Errorf("failed to decode public key: %w", err)
+		return false, fmt.Errorf("invalid public key encoding: %w", err)
 	}
 
-	sig, err := base64.StdEncoding.DecodeString(signatureB64)
+	sigBytes, err := base64.StdEncoding.DecodeString(signatureB64)
 	if err != nil {
-		return false, fmt.Errorf("failed to decode signature: %w", err)
+		return false, fmt.Errorf("invalid signature encoding: %w", err)
 	}
 
-	if len(pub) != ed25519.PublicKeySize {
-		return false, errors.New("invalid public key size")
+	// 2. Call Rust via gRPC (over UDS/TCP)
+	if s.grpcClient == nil {
+		return false, fmt.Errorf("signature verification unavailable: rust engine is offline")
 	}
 
-	if len(sig) != ed25519.SignatureSize {
-		return false, errors.New("invalid signature size")
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second) // Fast timeout for auth
+	defer cancel()
+
+	resp, err := s.grpcClient.VerifySignature(ctx, &pb.VerifySignatureRequest{
+		PublicKey: pubKeyBytes,
+		Signature: sigBytes,
+		Message:   []byte(message),
+	})
+
+	if err != nil {
+		// Log error but don't leak details to caller for security
+		return false, fmt.Errorf("rust signature verification error: %w", err)
 	}
 
-	isValid := ed25519.Verify(pub, []byte(message), sig)
-	return isValid, nil
+	if !resp.Valid {
+		return false, fmt.Errorf("verification failed: %s", resp.ErrorMessage)
+	}
+
+	return true, nil
 }

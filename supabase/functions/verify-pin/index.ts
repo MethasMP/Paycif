@@ -32,20 +32,16 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    // We need Service Role to access 'private' schema
-    // We need two clients: one for public schema and one for private
-    const publicClient = createClient(supabaseUrl, supabaseServiceKey);
-    const privateClient = createClient(supabaseUrl, supabaseServiceKey, {
-      db: { schema: 'private' },
-    });
+    // Use Service Role client (standard public schema)
+    // We will use RPC calls to access private data securely
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Verify User from Header (using standard auth client for token check)
+    // Verify User from Header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) return jsonError('Missing auth', 401);
 
-    // Use a separate public client for auth.getUser to verify the JWT specifically
     const jwt = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await publicClient.auth.getUser(jwt);
+    const { data: { user }, error: authError } = await supabase.auth.getUser(jwt);
 
     if (authError || !user) {
       return jsonError('Unauthorized', 401);
@@ -68,13 +64,11 @@ serve(async (req) => {
     // Strict Mode: Require Device Signature
     if (!deviceId || !signature) {
       console.warn(`[VerifyPin] User ${user.id} missing device headers.`);
-      // return jsonError('Device authorization missing', 401);
-      // Check if we want to enforce strictly yet. Yes, per audit.
       return jsonError('Device authorization missing', 401);
     }
 
     // Fetch binding
-    const { data: binding, error: bindError } = await publicClient
+    const { data: binding, error: bindError } = await supabase
       .from('user_device_bindings')
       .select('public_key')
       .eq('user_id', user.id)
@@ -106,19 +100,13 @@ serve(async (req) => {
     // ------------------------------------------------------------------------
     // 3. SERVER-SIDE LOCKOUT CHECK (The "Authority")
     // ------------------------------------------------------------------------
-    const { data: secret, error: secretError } = await privateClient
-      .from('user_auth_secrets')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
+    // Use RPC to get secret securely without exposing private schema
+    const { data: secret, error: secretError } = await supabase
+      .rpc('get_user_auth_secret', { p_user_id: user.id });
 
-    if (secretError && secretError.code !== 'PGRST116') {
+    if (secretError) {
       console.error('Secret fetch error:', secretError);
-      // 🔍 DEBUG: Expose the actual DB error for troubleshooting
-      return jsonError(
-        `System Error: ${secretError.message || secretError.code || 'Unknown DB issue'}`,
-        500,
-      );
+      return jsonError(`System Error: ${secretError.message}`, 500);
     }
 
     if (!secret) {
@@ -156,21 +144,18 @@ serve(async (req) => {
     const isValid = await verifyWithHashWasm(secret.pin_hash, pin);
 
     if (isValid) {
-      // SUCCESS: Reset counters
+      // SUCCESS: Reset counters via RPC
       console.log(`[VerifyPin] User ${user.id} Success`);
 
-      await privateClient
-        .from('user_auth_secrets')
-        .update({
-          failed_attempts: 0,
-          locked_until: null,
-          updated_at: new Date().toISOString(),
-          last_used_at: new Date().toISOString(), // Update usage
-        })
-        .eq('user_id', user.id);
+      await supabase.rpc('update_user_auth_status', {
+        p_user_id: user.id,
+        p_failed_attempts: 0,
+        p_locked_until: null,
+        p_reset_counters: true
+      });
 
-      // Also update device last_used
-      await publicClient
+      // Also update device last_used (Public table)
+      await supabase
         .from('user_device_bindings')
         .update({ last_used_at: new Date().toISOString() })
         .eq('device_id', deviceId);
@@ -180,7 +165,7 @@ serve(async (req) => {
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     } else {
-      // FAILURE: Increment & Check Lockout
+      // FAILURE: Increment & Check Lockout via RPC
       const newFailed = (secret.failed_attempts || 0) + 1;
       let newLockedUntil = null;
       let errorMsg = 'Invalid PIN';
@@ -196,14 +181,12 @@ serve(async (req) => {
         errorMsg = `Invalid PIN. ${remaining} attempts remaining.`;
       }
 
-      await privateClient
-        .from('user_auth_secrets')
-        .update({
-          failed_attempts: newFailed,
-          locked_until: newLockedUntil,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('user_id', user.id);
+      await supabase.rpc('update_user_auth_status', {
+        p_user_id: user.id,
+        p_failed_attempts: newFailed,
+        p_locked_until: newLockedUntil,
+        p_reset_counters: false
+      });
 
       return jsonError(errorMsg, 401);
     }

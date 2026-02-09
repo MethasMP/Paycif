@@ -24,3 +24,6 @@ verify_jwt = false
 
 [functions.get-topup-status]
 verify_jwt = false
+
+[functions.initiate-pin-reset]
+verify_jwt = false

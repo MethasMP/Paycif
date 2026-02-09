@@ -80,73 +80,85 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
-        child: Column(
-          children: [
-            const SizedBox(height: 60),
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              const SizedBox(height: 60),
 
-            // 🛡️ Premium Identity Header
-            Center(
-              child: Column(
-                children: [
-                  Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      color: Theme.of(
-                        context,
-                      ).primaryColor.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
+              // 🛡️ Premium Identity Header
+              Center(
+                child: Column(
+                  children: [
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(
+                        color: Theme.of(
+                          context,
+                        ).primaryColor.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.lock_person_rounded,
+                        size: 32,
+                        color: Theme.of(context).primaryColor,
+                      ),
+                    ).animate().scale(
+                      duration: 600.ms,
+                      curve: Curves.elasticOut,
                     ),
-                    child: Icon(
-                      Icons.lock_person_rounded,
-                      size: 32,
-                      color: Theme.of(context).primaryColor,
-                    ),
-                  ).animate().scale(duration: 600.ms, curve: Curves.elasticOut),
 
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-                  Text(
-                    'Unlock Paycif',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: -0.5,
-                    ),
-                  ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.2, end: 0),
+                    Text(
+                          'Unlock Paycif',
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: -0.5,
+                              ),
+                        )
+                        .animate()
+                        .fadeIn(delay: 200.ms)
+                        .slideY(begin: 0.2, end: 0),
 
-                  const SizedBox(height: 8),
+                    const SizedBox(height: 8),
 
-                  Text(
-                    'Verify your identity to continue',
-                    style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
-                  ).animate().fadeIn(delay: 400.ms),
-                ],
+                    Text(
+                      'Verify your identity to continue',
+                      style: TextStyle(
+                        color: Colors.grey.shade500,
+                        fontSize: 14,
+                      ),
+                    ).animate().fadeIn(delay: 400.ms),
+                  ],
+                ),
               ),
-            ),
 
-            const Spacer(),
+              const SizedBox(height: 40),
 
-            // 🔢 PIN Keypad with Forgot Action
-            PinEntryWidget(
-              showLabel: false,
-              onSuccess: (_) => _onUnlockSuccess(),
-              onForgotPin: () => _handleForgotPin(context),
-            ).animate().fadeIn(delay: 600.ms),
+              // 🔢 PIN Keypad with Forgot Action
+              PinEntryWidget(
+                showLabel: false,
+                onSuccess: (_) => _onUnlockSuccess(),
+                onForgotPin: () => _handleForgotPin(context),
+              ).animate().fadeIn(delay: 600.ms),
 
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
 
-            // 🤳 Biometric Action (Primary Alternative)
-            TextButton.icon(
-              onPressed: _tryBiometricUnlock,
-              icon: const Icon(Icons.face_unlock_rounded),
-              label: const Text('Use Biometrics'),
-              style: TextButton.styleFrom(
-                foregroundColor: Theme.of(context).primaryColor,
-              ),
-            ).animate().fadeIn(delay: 800.ms),
+              // 🤳 Biometric Action (Primary Alternative)
+              TextButton.icon(
+                onPressed: _tryBiometricUnlock,
+                icon: const Icon(Icons.face_unlock_rounded),
+                label: const Text('Use Biometrics'),
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).primaryColor,
+                ),
+              ).animate().fadeIn(delay: 800.ms),
 
-            const SizedBox(height: 40),
-          ],
+              const SizedBox(height: 40),
+            ],
+          ),
         ),
       ),
     );

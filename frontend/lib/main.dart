@@ -18,6 +18,9 @@ import 'controllers/dashboard_controller.dart';
 import 'controllers/payment_controller.dart';
 import 'repositories/dashboard_repository.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'services/push_notification_service.dart';
+import 'firebase_options.dart';
 
 import 'features/security/data/datasources/security_remote_data_source.dart';
 import 'features/security/data/datasources/crypto_service.dart';
@@ -42,6 +45,16 @@ Future<void> main() async {
   }
 
   await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey ?? '');
+
+  // 🛡️ Firebase Initialization (Required for Push Notifications)
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    await PushNotificationService.initialize();
+  } catch (e) {
+    debugPrint('⚠️ Firebase initialization failed: $e');
+  }
 
   // 🛡️ World-Class Diagnostic: Project Environment Audit
   // Log truncated URL and Key prefix to detect environment mismatches without leaking secrets.
@@ -187,6 +200,7 @@ class _PaycifAppState extends State<PaycifApp> with WidgetsBindingObserver {
                 BlocProvider<DashboardController>(
                   create: (context) => DashboardController(
                     DashboardRepository(Supabase.instance.client),
+                    context.read<ConnectivityService>(),
                   )..init(),
                 ),
                 ChangeNotifierProvider<SecurityController>(

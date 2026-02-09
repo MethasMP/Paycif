@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	_ "github.com/lib/pq" // PostgreSQL driver
+	_ "github.com/jackc/pgx/v5/stdlib" // pgx driver for better Supabase support
 )
 
 var DB *sql.DB
@@ -21,11 +21,30 @@ func Connect() error {
 		return fmt.Errorf("DATABASE_URL environment variable is not set")
 	}
 
-	// Logging connection attempt (Redacted for security)
-	log.Printf("Connecting to database at: %s", _redactConnStr(connStr))
+	// 🛡️ Supabase Compatibility:
+	// pgx handles SSL and IPv6 much better than lib/pq.
+	// We add default_query_exec_mode=cache_describe for Supabase Pooler compatibility.
+	if !strings.Contains(connStr, "sslmode=") {
+		if strings.Contains(connStr, "?") {
+			connStr += "&sslmode=require"
+		} else {
+			connStr += "?sslmode=require"
+		}
+	}
+	if !strings.Contains(connStr, "default_query_exec_mode=") {
+		if strings.Contains(connStr, "?") {
+			connStr += "&default_query_exec_mode=cache_describe"
+		} else {
+			connStr += "?default_query_exec_mode=cache_describe"
+		}
+	}
 
+	// Logging connection attempt (Redacted for security)
+	log.Printf("Connecting to database with pgx driver...")
+
+	// Use "pgx" driver name which corresponds to github.com/jackc/pgx/v5/stdlib
 	var err error
-	DB, err = sql.Open("postgres", connStr)
+	DB, err = sql.Open("pgx", connStr)
 	if err != nil {
 		return fmt.Errorf("error opening database: %w", err)
 	}
@@ -106,3 +125,4 @@ func _redactConnStr(conn string) string {
 
 	return prefix + "@" + atSplit[1]
 }
+

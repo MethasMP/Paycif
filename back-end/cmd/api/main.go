@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
-	"log"
+	"log" // Added for HandlerGetLimits return type logic if needed, but mainly standard lib
 	"os"
 	"paysif/cmd/api/middleware"
 	"paysif/database"
+	fxrpc "paysif/internal/grpc"    // Rename for clarity
+	fx_pb "paysif/internal/grpc/pb" // Import pb for FXServiceClient type
 	"paysif/internal/infrastructure/logger"
 	"paysif/internal/infrastructure/redis"
 	"paysif/internal/routing"
@@ -34,17 +36,53 @@ func main() {
 	// 1.5 Redis Infrastructure
 	redisClient := redis.NewRedisClient()
 
+	// 1.8 Rust Microservices Integration (Supports TCP & IPC)
+	fxAddress := os.Getenv("FX_ENGINE_URL")
+	if fxAddress == "" {
+		// Detect if UDS is available (Secret IPC Mode)
+		if _, err := os.Stat("/tmp/fx_engine.sock"); err == nil {
+			fxAddress = "unix:///tmp/fx_engine.sock"
+		} else {
+			fxAddress = "[::1]:50052" // Default TCP
+		}
+	}
+
+	fxClientConfig := &fxrpc.FXClientConfig{
+		Address:            fxAddress,
+		ConnectTimeout:     5 * time.Second,
+		MaxRetries:         3,
+		EnableHealthChecks: true,
+		// mTLS config defaults to false (insecure)
+	}
+	
+	var fxClient *fxrpc.FXClient
+	var fxClientInterface fxrpc.FXClientInterface
+	var sigServiceClient fx_pb.FXServiceClient
+
+	fxClient, err := fxrpc.NewFXClientWithConfig(fxClientConfig)
+	if err != nil {
+		// Log but don't fatal? No, for Survivability, if Engine is critical, maybe warn.
+		// But since we have DB fallback, we can proceed!
+		log.Printf("⚠️ WARNING: Could not connect to Rust FX Engine: %v. Running in degraded mode (DB-only).", err)
+		// fxClient remains nil
+	} else {
+		log.Println("✅ Connected to High-Performance Rust FX Engine")
+		defer fxClient.Close()
+		fxClientInterface = fxClient
+		sigServiceClient = fxClient.GetClient()
+	}
+
 	// 2. Service Initialization
 	auditService := service.NewAuditService(database.DB)
 	alertService := service.NewAlertService()
 	cryptoService := service.NewCryptoService() // Security Init
-	fxService := service.NewFXService(database.DB)
+	fxService := service.NewFXService(database.DB, fxClientInterface) // Inject Rust Client (or nil)
 	fxService.StartFXScheduler(context.Background()) // Start FX loop
 
 	// Pass redisClient and AuditService to WalletService
 	walletService := service.NewWalletService(database.DB, fxService, alertService, redisClient, auditService)
 	kycService := service.NewKYCService(database.DB, cryptoService, auditService)
-	sigService := service.NewSignatureService() // Security Initialization
+	sigService := service.NewSignatureService(sigServiceClient) // Inject Rust gRPC Client (or nil) 🛡️
 
 	// 3. Handler Initialization
 	transferHandler := &TransferHandler{
@@ -73,6 +111,7 @@ func main() {
 	{
 		v1.POST("/transfer", transferHandler.HandleTransfer)
 		v1.GET("/balance", transferHandler.HandleBalance)
+		v1.GET("/limits", transferHandler.HandleGetLimits) // New Route for Rust Limits
 		v1.GET("/transactions", transferHandler.HandleGetTransactions)
 		v1.GET("/rates/latest", transferHandler.HandleGetLatestRate)
 

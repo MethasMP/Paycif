@@ -8,6 +8,7 @@ import '../models/exchange_rate_model.dart';
 import '../repositories/dashboard_repository.dart';
 
 import '../models/transaction.dart';
+import '../services/connectivity_service.dart';
 
 // State
 class DashboardState {
@@ -73,12 +74,16 @@ class DashboardState {
 // Controller (Cubit)
 class DashboardController extends Cubit<DashboardState> {
   final DashboardRepository _repository;
+  final ConnectivityService _connectivity;
   StreamSubscription? _walletSub;
   StreamSubscription? _txSub;
+  StreamSubscription? _connSub;
   String? _subscribedWalletId;
 
-  DashboardController(this._repository) : super(DashboardState()) {
+  DashboardController(this._repository, this._connectivity)
+    : super(DashboardState()) {
     _listenToAuthChanges();
+    _listenToConnectivityChanges();
   }
 
   StreamSubscription? _authSub;
@@ -95,11 +100,27 @@ class DashboardController extends Cubit<DashboardState> {
     });
   }
 
+  void _listenToConnectivityChanges() {
+    _connSub = _connectivity.statusStream.listen((status) {
+      if (status == ConnectivityStatus.online && state.isOffline) {
+        debugPrint(
+          '🌐 [Resilience] Network restored. Forcing dashboard sync...',
+        );
+        refresh(showLoading: false);
+      }
+
+      if (status == ConnectivityStatus.offline && !state.isOffline) {
+        emit(state.copyWith(isOffline: true));
+      }
+    });
+  }
+
   @override
   Future<void> close() {
     _walletSub?.cancel();
     _txSub?.cancel();
     _authSub?.cancel();
+    _connSub?.cancel();
     return super.close();
   }
 
@@ -107,10 +128,28 @@ class DashboardController extends Cubit<DashboardState> {
     _walletSub?.cancel();
     _txSub?.cancel();
     _subscribedWalletId = null;
+    _isInitialized = false;
     emit(DashboardState());
   }
 
+  bool _isInitialized = false;
+
   void init() async {
+    final currentUser = Supabase.instance.client.auth.currentUser;
+
+    if (_isInitialized && currentUser != null) {
+      debugPrint(
+        'ℹ️ [Dashboard] Already initialized and session active. Skipping.',
+      );
+      return;
+    }
+
+    if (currentUser == null) {
+      debugPrint('⚠️ [Dashboard] Init called but no user found. Postponing.');
+      return;
+    }
+
+    _isInitialized = true;
     // Reset state before starting new subscriptions to avoid stale data
     reset();
 

@@ -49,6 +49,27 @@ func (h *PaymentHandler) HandleCreateIntent(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID"})
 		return
 	}
+	// 🛡️ Limit Check: Verify Daily Top-Up Limit
+	limits, err := h.Service.FX.GetLimits(c.Request.Context(), userID.String(), req.Currency)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify limits"})
+		return
+	}
+
+	remaining := limits["remaining_daily_amount"].(float64)
+	if req.Amount > remaining {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Daily top-up limit exceeded",
+			"remaining": remaining,
+		})
+		return
+	}
+
+	// Step 2: Minimum Check (500 THB)
+	if req.Amount < 500 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Minimum top-up is ฿500"})
+		return
+	}
 
 	// Create a PaymentIntent with amount and currency
 	params := &stripe.PaymentIntentParams{

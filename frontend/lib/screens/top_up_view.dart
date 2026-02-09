@@ -943,13 +943,16 @@ class _TopUpViewState extends State<TopUpView> {
   // Refactored: Slim, Unified Limit Bar (Direction 1)
   Widget _buildSlimLimitBar(BuildContext context, bool isDark) {
     if (_isLimitLoading) {
-      return Center(
-        child: SizedBox(
-          width: 200,
-          child: LinearProgressIndicator(
-            minHeight: 2,
-            backgroundColor: Colors.transparent,
-            color: isDark ? Colors.white24 : Colors.grey[300],
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Center(
+          child: SizedBox(
+            width: 140,
+            child: LinearProgressIndicator(
+              minHeight: 2,
+              backgroundColor: isDark ? Colors.white10 : Colors.grey[200],
+              color: const Color(0xFF3949AB),
+            ),
           ),
         ),
       );
@@ -963,41 +966,84 @@ class _TopUpViewState extends State<TopUpView> {
         ? const Color(0xFFEF4444)
         : const Color(0xFF3949AB);
 
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              isLimitReached ? 'Daily Limit Reached' : 'Daily Limit',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: isDark ? Colors.white60 : Colors.grey[600],
-              ),
-            ),
-            Text(
-              '฿${_currencyFormat.format(_dailyRemaining)} / ฿${_currencyFormat.format(_dailyLimit)}',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: isDark ? Colors.white60 : Colors.grey[600],
-                fontFamily: 'Monospace', // Aligns numbers nicely
-              ),
-            ),
-          ],
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.grey[200]!,
         ),
-        const SizedBox(height: 8),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(2),
-          child: LinearProgressIndicator(
-            value: progressPercent,
-            minHeight: 4, // Extremely slim
-            backgroundColor: isDark ? Colors.white10 : Colors.grey[200],
-            valueColor: AlwaysStoppedAnimation<Color>(color),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    isLimitReached ? Icons.error_outline : Icons.speed_rounded,
+                    size: 14,
+                    color: color,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    isLimitReached
+                        ? 'Daily Limit Reached'
+                        : 'Daily Limit Status',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white70 : Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+              Text(
+                '฿${_currencyFormat.format(_dailyRemaining)} left',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
+              ),
+            ],
           ),
-        ),
-      ],
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progressPercent,
+              minHeight: 6,
+              backgroundColor: isDark ? Colors.white10 : Colors.grey[200],
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Used: ฿${_currencyFormat.format(_dailyUsed)}',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: isDark ? Colors.white38 : Colors.grey[500],
+                ),
+              ),
+              Text(
+                'Limit: ฿${_currencyFormat.format(_dailyLimit)}/day',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: isDark ? Colors.white38 : Colors.grey[500],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 

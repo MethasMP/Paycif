@@ -19,6 +19,7 @@ import '../features/security/presentation/widgets/change_pin_sheet.dart';
 import '../features/security/presentation/logic/security_controller.dart';
 import '../features/security/presentation/pages/linked_devices_screen.dart';
 import 'package:provider/provider.dart';
+import 'notification_settings_screen.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -373,7 +374,16 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 onTap: () => _showLanguageSheet(context),
               ),
-              _buildMenuItem(Icons.notifications_outlined, l10n.notifications),
+              _buildMenuItem(
+                Icons.notifications_outlined,
+                l10n.notifications,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const NotificationSettingsScreen(),
+                  ),
+                ),
+              ),
             ]),
 
             const SizedBox(height: 32),

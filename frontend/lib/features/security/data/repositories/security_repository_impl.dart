@@ -258,8 +258,9 @@ class SecurityRepositoryImpl implements SecurityRepository {
       }
 
       if (localHash != null && localSalt != null) {
-        // ⚡ Hashing in Isolate to keep UI 60/120 FPS
-        final computedHash = await compute(CryptoService.computePinHashStatic, {
+        // ⚡ Fast Local Hash (8MB/1 round) for <200ms verification
+        // Server verification uses full strength (32MB/3 rounds)
+        final computedHash = await compute(CryptoService.computePinHashFast, {
           'pin': pin,
           'salt': localSalt,
         });

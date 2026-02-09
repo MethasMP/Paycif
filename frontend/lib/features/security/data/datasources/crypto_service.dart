@@ -64,6 +64,8 @@ class CryptoService {
   }
 
   /// Static version for Isolate (compute) compatibility
+  /// Uses OWASP/RFC 9106 compliant parameters (32MB, 3 iterations)
+  /// For server-side verification - maximum security
   static Future<String> computePinHashStatic(
     Map<String, dynamic> params,
   ) async {
@@ -76,6 +78,29 @@ class CryptoService {
           32768, // 🛡️ 32 MB (OWASP/RFC 9106 defense against GPU/ASIC attacks)
       iterations:
           3, // 🛡️ 3 Iterations (Increased time-cost for brute-force defense)
+      hashLength: 32,
+    );
+
+    final key = await algorithm.deriveKeyFromPassword(
+      password: pin,
+      nonce: salt,
+    );
+
+    final bytes = await key.extractBytes();
+    return base64Encode(bytes);
+  }
+
+  /// Fast version for local optimistic verification only
+  /// ⚠️ UPDATED: Now uses SAME parameters as Static (32MB, 3 iterations)
+  /// to ensure hash consistency. Speed is sacrificed for correctness.
+  static Future<String> computePinHashFast(Map<String, dynamic> params) async {
+    final String pin = params['pin'];
+    final List<int> salt = params['salt'];
+
+    final algorithm = Argon2id(
+      parallelism: 1, // ⚡ Single Thread
+      memory: 32768, // 🛡️ 32 MB (Same as Setup)
+      iterations: 3, // 🛡️ 3 Iterations (Same as Setup)
       hashLength: 32,
     );
 
