@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"paysif/database"
@@ -229,6 +230,16 @@ func (h *TransferHandler) HandleGetLatestRate(c *gin.Context) {
 		}
 	}
 
+	// ETag & Cache-Control (Article Step 2)
+	etag := fmt.Sprintf("\"%d\"", rateResp.UpdatedAt.UnixNano())
+	c.Header("ETag", etag)
+	c.Header("Cache-Control", "public, max-age=10") // Short cache for rates
+
+	if match := c.GetHeader("If-None-Match"); match == etag {
+		c.Status(http.StatusNotModified)
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"from":       rateResp.FromCurrency,
 		"to":         rateResp.ToCurrency,
@@ -253,6 +264,26 @@ func (h *TransferHandler) HandleGetLimits(c *gin.Context) {
 	limits, err := h.Service.FX.GetLimits(c.Request.Context(), userIDStr.(string), currency)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch limits: " + err.Error()})
+		return
+	}
+
+	// ETag & Cache-Control (Article Step 2)
+	// Create a unique fingerprint based on critical values
+	fingerprint := fmt.Sprintf("%v-%v-%v-%v", 
+		limits["max_daily_amount"], 
+		limits["current_daily_total"], 
+		limits["remaining_daily_amount"],
+		userIDStr)
+	
+	// Simple hash for ETag (or just raw string if short enough, but clean is better)
+	// We use FNV or just string since it's short.
+	etag := fmt.Sprintf("\"%x\"", fingerprint) 
+
+	c.Header("ETag", etag)
+	c.Header("Cache-Control", "private, max-age=0, must-revalidate") // Private user data, validate always but save bandwidth
+
+	if match := c.GetHeader("If-None-Match"); match == etag {
+		c.Status(http.StatusNotModified)
 		return
 	}
 

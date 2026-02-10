@@ -76,7 +76,7 @@ func main() {
 	auditService := service.NewAuditService(database.DB)
 	alertService := service.NewAlertService()
 	cryptoService := service.NewCryptoService() // Security Init
-	fxService := service.NewFXService(database.DB, fxClientInterface) // Inject Rust Client (or nil)
+	fxService := service.NewFXService(database.DB, fxClientInterface, redisClient) // Inject Rust Client and Redis
 	fxService.StartFXScheduler(context.Background()) // Start FX loop
 
 	// Pass redisClient and AuditService to WalletService

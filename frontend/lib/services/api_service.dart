@@ -340,7 +340,7 @@ class ApiService {
     // 🔌 Circuit Breaker: Fast-fail if backend is known to be dead
     if (!ApiService.isBackendAvailable) {
       throw SocketException(
-        'Backend is temporarily unavailable (Circuit Breaker)',
+        'System is temporarily busy. Please try again in 30 seconds.',
       );
     }
 
@@ -364,7 +364,10 @@ class ApiService {
 
         if (isFatalBackendError) {
           ApiService._markBackendDead();
-          rethrow; // Don't retry - backend is dead
+          // Transform strict network errors into friendly messages
+          throw SocketException(
+            'Unable to connect to server. Please check your internet connection.',
+          );
         }
 
         final isLastAttempt = attempts >= maxAttempts;
@@ -470,7 +473,7 @@ class ApiService {
       if (response.statusCode == 200) {
         return json.decode(response.body);
       } else {
-        throw Exception('Failed to load balance: ${response.statusCode}');
+        throw Exception(_friendlyError(response.statusCode));
       }
     });
   }
@@ -503,7 +506,9 @@ class ApiService {
     );
 
     if (response.statusCode != 200) {
-      throw Exception('Transfer failed: ${response.body}');
+      throw Exception(
+        'Transfer failed: ${_friendlyError(response.statusCode)}',
+      );
     }
   }
 
@@ -533,9 +538,9 @@ class ApiService {
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     } else if (response.statusCode == 402) {
-      throw Exception('Insufficient balance');
+      throw Exception('Insufficient balance.');
     } else {
-      throw Exception('Payout failed: ${response.body}');
+      throw Exception('Payout failed: ${_friendlyError(response.statusCode)}');
     }
   }
 
@@ -596,7 +601,7 @@ class ApiService {
         } else {
           debugPrint("Backend Error: ${response.body}");
           throw Exception(
-            'Failed to load transactions: ${response.statusCode}',
+            'Unable to load transactions: ${_friendlyError(response.statusCode)}',
           );
         }
       });
@@ -632,7 +637,7 @@ class ApiService {
   Future<Map<String, dynamic>> fetchExchangeRate(String homeCurrency) async {
     // 🔌 Circuit Breaker: If backend is dead, don't even try
     if (!ApiService.isBackendAvailable) {
-      throw SocketException('Backend offline - Rate fetch skipped');
+      throw SocketException('System busy - Rate fetch skipped');
     }
 
     // Non-critical call: isCritical = false means NO retries
@@ -647,7 +652,9 @@ class ApiService {
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else {
-        throw Exception('Failed to load rates: ${response.statusCode}');
+        throw Exception(
+          'Unable to update rates: ${_friendlyError(response.statusCode)}',
+        );
       }
     }, isCritical: false); // ← NO RETRIES for rates
   }
@@ -677,11 +684,13 @@ class ApiService {
         return jsonDecode(response.body);
       } else {
         debugPrint("Backend Error (Quote): ${response.body}");
-        throw Exception('Failed to load quote: ${response.statusCode}');
+        throw Exception(
+          'Unable to get quote: ${_friendlyError(response.statusCode)}',
+        );
       }
     } catch (e) {
       debugPrint("Connection Error (Quote): $e");
-      throw Exception('Could not connect to Backend for Quote');
+      throw Exception('Unable to connect to server.');
     }
   }
 
@@ -730,8 +739,13 @@ class ApiService {
 
       if (response.status != 200) {
         final errorData = response.data as Map<String, dynamic>?;
-        final errorMessage = errorData?['error'] ?? 'Payout failed';
-        throw Exception(errorMessage);
+        final errorMessage = errorData?['error'] ?? 'Transfer failed';
+        // Check popular errors
+        if (errorMessage.contains('balance'))
+          throw Exception('Insufficient balance.');
+        if (errorMessage.contains('limit'))
+          throw Exception('Daily limit exceeded.');
+        throw Exception('Transfer failed. Please try again.');
       }
 
       final data = response.data as Map<String, dynamic>;
@@ -791,8 +805,10 @@ class ApiService {
 
       if (response.status != 200) {
         final errorData = response.data as Map<String, dynamic>?;
-        final errorMessage = errorData?['error'] ?? 'TopUp failed';
-        throw Exception(errorMessage);
+        final errorMessage = errorData?['error'] ?? 'Top-Up failed';
+        if (errorMessage.contains('card'))
+          throw Exception('Card declined. Please check your card info.');
+        throw Exception('Top-Up failed. Please try again.');
       }
 
       final data = response.data as Map<String, dynamic>;
@@ -980,6 +996,34 @@ class ApiService {
     } catch (e) {
       debugPrint('❌ Delete card error: $e');
       rethrow;
+    }
+  }
+
+  // 🛡️ User-Friendly Error Mapper
+  static String _friendlyError(int statusCode) {
+    switch (statusCode) {
+      case 400:
+        return "Invalid request. Please check your input.";
+      case 401:
+        return "Session expired. Please log in again.";
+      case 402:
+        return "Insufficient balance.";
+      case 403:
+        return "Access denied.";
+      case 404:
+        return "Resource not found.";
+      case 409:
+        return "Duplicate transaction detected.";
+      case 429:
+        return "Too many requests. Please slow down.";
+      case 500:
+        return "System error. Please try again later.";
+      case 502:
+        return "Server unavailable. Please try again later.";
+      case 503:
+        return "Service maintenance. Please try again shortly.";
+      default:
+        return "Something went wrong (Error $statusCode).";
     }
   }
 }

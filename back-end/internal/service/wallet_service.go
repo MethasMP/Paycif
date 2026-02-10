@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	"paysif/internal/models"
@@ -34,6 +35,12 @@ type WalletService struct {
 	Alert *AlertService
 	Redis *redis.Client
 	Audit *AuditService
+	localRateCache sync.Map // Local In-Memory Cache (Layer 1)
+}
+
+type localCacheItem struct {
+	Response  *ExchangeRateResponse
+	ExpiresAt time.Time
 }
 
 // TransferRequest represents a request to transfer funds.
@@ -502,9 +509,20 @@ type ExchangeRateResponse struct {
 // GetExchangeRate retrieves the latest rate for a currency pair (e.g. EUR -> THB).
 // GetExchangeRate retrieves the latest rate for a currency pair (e.g. EUR -> THB).
 func (s *WalletService) GetExchangeRate(ctx context.Context, fromCurr, toCurr string) (*ExchangeRateResponse, error) {
-	// 1. Check Redis Cache
+	cacheKey := fmt.Sprintf("rate:%s:%s", fromCurr, toCurr)
+
+	// 1. Check Local In-Memory Cache (Fastest - Layer 1)
+	if val, ok := s.localRateCache.Load(cacheKey); ok {
+		item := val.(localCacheItem)
+		if time.Now().Before(item.ExpiresAt) {
+			return item.Response, nil
+		}
+		// Expired
+		s.localRateCache.Delete(cacheKey)
+	}
+
+	// 2. Check Redis Cache (Shared - Layer 2)
 	if s.Redis != nil {
-		cacheKey := fmt.Sprintf("rate:%s:%s", fromCurr, toCurr)
 		val, err := s.Redis.Get(ctx, cacheKey).Result()
 		if err == nil {
 			// Cache Hit
@@ -543,14 +561,20 @@ func (s *WalletService) GetExchangeRate(ctx context.Context, fromCurr, toCurr st
 		UpdatedAt:    updatedAt,
 	}
 
-	// 3. Write to Cache (Async or blocking? Blocking is safer for consistency here, but async is faster.
-	// Given requirement is speed, blocking logic but short TTL is fine.)
+	// 3. Write to Caches (Write-Through)
+	
+	// A. Redis (Layer 2) - 60s TTL
 	if s.Redis != nil {
 		cacheKey := fmt.Sprintf("rate:%s:%s", fromCurr, toCurr)
 		data, _ := json.Marshal(response)
-		// Cache for 60 seconds (Matches FX refresh interval somewhat)
 		s.Redis.Set(ctx, cacheKey, data, 60*time.Second)
 	}
+
+	// B. Local Memory (Layer 1) - 10s TTL (Short-lived purely for burst protection)
+	s.localRateCache.Store(cacheKey, localCacheItem{
+		Response:  response,
+		ExpiresAt: time.Now().Add(10 * time.Second),
+	})
 
 	return response, nil
 }

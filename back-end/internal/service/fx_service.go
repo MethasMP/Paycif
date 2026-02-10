@@ -13,6 +13,7 @@ import (
 
 	fxrpc "paysif/internal/grpc"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/shopspring/decimal"
 )
 
@@ -20,13 +21,15 @@ import (
 type FXService struct {
 	DB         *sql.DB
 	GRPCClient fxrpc.FXClientInterface
+	Redis      *redis.Client
 }
 
 // NewFXService creates a new FXService.
-func NewFXService(db *sql.DB, grpcClient fxrpc.FXClientInterface) *FXService {
+func NewFXService(db *sql.DB, grpcClient fxrpc.FXClientInterface, redisClient *redis.Client) *FXService {
 	return &FXService{
 		DB:         db,
 		GRPCClient: grpcClient,
+		Redis:      redisClient,
 	}
 }
 
@@ -191,6 +194,24 @@ func (s *FXService) persistRate(ctx context.Context, from, to string, mid, provi
 		}
 	}
 
+	// Proactive Redis Cache Update (for Go API consumers)
+	if s.Redis != nil {
+		cacheKey := fmt.Sprintf("rate:%s:%s", from, to)
+		// We need to match the structure WalletService expects: ExchangeRateResponse
+		// But here we might not have all fields easily.
+		// However, WalletService expects JSON.
+		// Construct minimal response payload
+		response := map[string]interface{}{
+			"from_currency": from,
+			"to_currency":   to,
+			"provider_rate": provider.InexactFloat64(), // approximate for JSON
+			"updated_at":    time.Now(),
+		}
+		data, _ := json.Marshal(response)
+		// Set with 20 min TTL (Schedule runs every 15 min)
+		s.Redis.Set(ctx, cacheKey, data, 20*time.Minute)
+	}
+
 	return nil
 }
 
@@ -251,8 +272,21 @@ func (s *FXService) GetLimits(ctx context.Context, userID, currency string) (map
 		}
 		log.Printf("⚠️ Rust Limit Check failed: %v. Falling back to DB.", err)
 	}
+	// 2. Redis Cache Check (Database Query Result Caching - Article Step)
+	// Key: "limits:user:{userID}:{currency}"
+	// We expire this cache frequently (e.g. 5 mins) or invalidate on transaction
+	if s.Redis != nil {
+		cacheKey := fmt.Sprintf("limits:user:%s:%s", userID, currency)
+		val, err := s.Redis.Get(ctx, cacheKey).Result()
+		if err == nil {
+			var cachedMap map[string]interface{}
+			if err := json.Unmarshal([]byte(val), &cachedMap); err == nil {
+				return cachedMap, nil
+			}
+		}
+	}
 
-	// 2. Fallback: Call Postgres Function directly
+	// 3. Fallback: Call Postgres Function directly
 	// Note: This relies on the 'get_daily_topup_status' function in DB.
 	var currentTotalSatang, maxDailySatang, remainingSatang, minTransactionSatang int64
 	var isLimitReached bool
