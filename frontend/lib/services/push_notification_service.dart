@@ -80,7 +80,6 @@ class PushNotificationService {
 
   static void _showLocalNotification(RemoteMessage message) async {
     final notification = message.notification;
-    final android = message.notification?.android;
 
     if (notification != null) {
       await _localNotifications.show(
