@@ -930,4 +930,37 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get privacyContactContent =>
       'プライバシーに関するご質問やデータ権利の行使については、データ保護責任者までご連絡ください：';
+
+  @override
+  String get notificationSettingsTitle => 'Notification Settings';
+
+  @override
+  String get notificationSecurityAlwaysOn => 'Security (Always On)';
+
+  @override
+  String get notificationAccountSecurity => 'Account Security';
+
+  @override
+  String get notificationAccountSecurityDesc =>
+      'Login alerts, device changes, and password updates.';
+
+  @override
+  String get notificationWalletActivity => 'Wallet Activity';
+
+  @override
+  String get notificationTransactionAlerts => 'Transaction Alerts';
+
+  @override
+  String get notificationTransactionAlertsDesc =>
+      'Sent, received, and top-up notifications.';
+
+  @override
+  String get notificationUpdates => 'Updates';
+
+  @override
+  String get notificationNewsPromotions => 'News & Promotions';
+
+  @override
+  String get notificationNewsPromotionsDesc =>
+      'Exclusive offers and feature updates.';
 }

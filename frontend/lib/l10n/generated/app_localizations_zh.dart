@@ -918,4 +918,37 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get privacyContactContent => '如果您对我们的隐私做法有疑问或希望行使您的数据权利，请联系我们的数据保护官：';
+
+  @override
+  String get notificationSettingsTitle => 'Notification Settings';
+
+  @override
+  String get notificationSecurityAlwaysOn => 'Security (Always On)';
+
+  @override
+  String get notificationAccountSecurity => 'Account Security';
+
+  @override
+  String get notificationAccountSecurityDesc =>
+      'Login alerts, device changes, and password updates.';
+
+  @override
+  String get notificationWalletActivity => 'Wallet Activity';
+
+  @override
+  String get notificationTransactionAlerts => 'Transaction Alerts';
+
+  @override
+  String get notificationTransactionAlertsDesc =>
+      'Sent, received, and top-up notifications.';
+
+  @override
+  String get notificationUpdates => 'Updates';
+
+  @override
+  String get notificationNewsPromotions => 'News & Promotions';
+
+  @override
+  String get notificationNewsPromotionsDesc =>
+      'Exclusive offers and feature updates.';
 }

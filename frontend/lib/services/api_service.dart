@@ -741,10 +741,12 @@ class ApiService {
         final errorData = response.data as Map<String, dynamic>?;
         final errorMessage = errorData?['error'] ?? 'Transfer failed';
         // Check popular errors
-        if (errorMessage.contains('balance'))
+        if (errorMessage.contains('balance')) {
           throw Exception('Insufficient balance.');
-        if (errorMessage.contains('limit'))
+        }
+        if (errorMessage.contains('limit')) {
           throw Exception('Daily limit exceeded.');
+        }
         throw Exception('Transfer failed. Please try again.');
       }
 
@@ -806,8 +808,9 @@ class ApiService {
       if (response.status != 200) {
         final errorData = response.data as Map<String, dynamic>?;
         final errorMessage = errorData?['error'] ?? 'Top-Up failed';
-        if (errorMessage.contains('card'))
+        if (errorMessage.contains('card')) {
           throw Exception('Card declined. Please check your card info.');
+        }
         throw Exception('Top-Up failed. Please try again.');
       }
 

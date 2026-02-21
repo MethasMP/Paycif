@@ -387,5 +387,16 @@
   "privacySection5Title": "Your Rights",
   "privacySection5Content": "You have the right to access, correct, or delete your personal data. You can opt out of marketing communications. You may request a copy of your data in a portable format.",
   "privacyContactTitle": "Privacy Inquiries",
-  "privacyContactContent": "If you have questions about our privacy practices or wish to exercise your data rights, please contact our Data Protection Officer:"
+  "privacyContactContent": "If you have questions about our privacy practices or wish to exercise your data rights, please contact our Data Protection Officer:",
+
+  "notificationSettingsTitle": "Notification Settings",
+  "notificationSecurityAlwaysOn": "Security (Always On)",
+  "notificationAccountSecurity": "Account Security",
+  "notificationAccountSecurityDesc": "Login alerts, device changes, and password updates.",
+  "notificationWalletActivity": "Wallet Activity",
+  "notificationTransactionAlerts": "Transaction Alerts",
+  "notificationTransactionAlertsDesc": "Sent, received, and top-up notifications.",
+  "notificationUpdates": "Updates",
+  "notificationNewsPromotions": "News & Promotions",
+  "notificationNewsPromotionsDesc": "Exclusive offers and feature updates."
 }

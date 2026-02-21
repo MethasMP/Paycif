@@ -955,4 +955,37 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get privacyContactContent =>
       'If you have questions about our privacy practices or wish to exercise your data rights, please contact our Data Protection Officer:';
+
+  @override
+  String get notificationSettingsTitle => 'Notification Settings';
+
+  @override
+  String get notificationSecurityAlwaysOn => 'Security (Always On)';
+
+  @override
+  String get notificationAccountSecurity => 'Account Security';
+
+  @override
+  String get notificationAccountSecurityDesc =>
+      'Login alerts, device changes, and password updates.';
+
+  @override
+  String get notificationWalletActivity => 'Wallet Activity';
+
+  @override
+  String get notificationTransactionAlerts => 'Transaction Alerts';
+
+  @override
+  String get notificationTransactionAlertsDesc =>
+      'Sent, received, and top-up notifications.';
+
+  @override
+  String get notificationUpdates => 'Updates';
+
+  @override
+  String get notificationNewsPromotions => 'News & Promotions';
+
+  @override
+  String get notificationNewsPromotionsDesc =>
+      'Exclusive offers and feature updates.';
 }

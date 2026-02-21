@@ -1871,6 +1871,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'If you have questions about our privacy practices or wish to exercise your data rights, please contact our Data Protection Officer:'**
   String get privacyContactContent;
+
+  /// No description provided for @notificationSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification Settings'**
+  String get notificationSettingsTitle;
+
+  /// No description provided for @notificationSecurityAlwaysOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Security (Always On)'**
+  String get notificationSecurityAlwaysOn;
+
+  /// No description provided for @notificationAccountSecurity.
+  ///
+  /// In en, this message translates to:
+  /// **'Account Security'**
+  String get notificationAccountSecurity;
+
+  /// No description provided for @notificationAccountSecurityDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Login alerts, device changes, and password updates.'**
+  String get notificationAccountSecurityDesc;
+
+  /// No description provided for @notificationWalletActivity.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet Activity'**
+  String get notificationWalletActivity;
+
+  /// No description provided for @notificationTransactionAlerts.
+  ///
+  /// In en, this message translates to:
+  /// **'Transaction Alerts'**
+  String get notificationTransactionAlerts;
+
+  /// No description provided for @notificationTransactionAlertsDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent, received, and top-up notifications.'**
+  String get notificationTransactionAlertsDesc;
+
+  /// No description provided for @notificationUpdates.
+  ///
+  /// In en, this message translates to:
+  /// **'Updates'**
+  String get notificationUpdates;
+
+  /// No description provided for @notificationNewsPromotions.
+  ///
+  /// In en, this message translates to:
+  /// **'News & Promotions'**
+  String get notificationNewsPromotions;
+
+  /// No description provided for @notificationNewsPromotionsDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Exclusive offers and feature updates.'**
+  String get notificationNewsPromotionsDesc;
 }
 
 class _AppLocalizationsDelegate

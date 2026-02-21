@@ -930,4 +930,37 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get privacyContactContent =>
       '개인정보 보호 관행에 대한 질문이나 데이터 권리 행사를 원하시면 데이터 보호 담당자에게 연락하세요:';
+
+  @override
+  String get notificationSettingsTitle => 'Notification Settings';
+
+  @override
+  String get notificationSecurityAlwaysOn => 'Security (Always On)';
+
+  @override
+  String get notificationAccountSecurity => 'Account Security';
+
+  @override
+  String get notificationAccountSecurityDesc =>
+      'Login alerts, device changes, and password updates.';
+
+  @override
+  String get notificationWalletActivity => 'Wallet Activity';
+
+  @override
+  String get notificationTransactionAlerts => 'Transaction Alerts';
+
+  @override
+  String get notificationTransactionAlertsDesc =>
+      'Sent, received, and top-up notifications.';
+
+  @override
+  String get notificationUpdates => 'Updates';
+
+  @override
+  String get notificationNewsPromotions => 'News & Promotions';
+
+  @override
+  String get notificationNewsPromotionsDesc =>
+      'Exclusive offers and feature updates.';
 }

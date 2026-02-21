@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:frontend/l10n/generated/app_localizations.dart';
 
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({super.key});
@@ -65,6 +66,7 @@ class _NotificationSettingsScreenState
     }
   }
 
+  @override
   Widget build(BuildContext context) {
     // 🛡️ Security-First: We use the context's theme to inherit the premium feel
     // and consistent typography.
@@ -73,7 +75,9 @@ class _NotificationSettingsScreenState
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Notification Settings'), // TODO: l10n
+        title: Text(
+          AppLocalizations.of(context)!.notificationSettingsTitle,
+        ),
         elevation: 0,
         backgroundColor: theme.scaffoldBackgroundColor,
         iconTheme: IconThemeData(color: theme.textTheme.bodyLarge?.color),
@@ -89,14 +93,19 @@ class _NotificationSettingsScreenState
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 🛡️ 1. Security Alerts (Non-negotiable)
-                  _buildSectionHeader('Security (Always On)'),
+                  _buildSectionHeader(
+                    AppLocalizations.of(context)!.notificationSecurityAlwaysOn,
+                  ),
                   const SizedBox(height: 16),
                   _buildCard(context, [
                     _buildSwitchTile(
                       context,
-                      title: 'Account Security',
-                      subtitle:
-                          'Login alerts, device changes, and password updates.',
+                      title: AppLocalizations.of(
+                        context,
+                      )!.notificationAccountSecurity,
+                      subtitle: AppLocalizations.of(
+                        context,
+                      )!.notificationAccountSecurityDesc,
                       value: true,
                       onChanged: null, // Disabled: Security is mandatory
                       icon: Icons.shield_rounded,
@@ -109,13 +118,19 @@ class _NotificationSettingsScreenState
                   const SizedBox(height: 32),
 
                   // 💳 2. Transaction Activity
-                  _buildSectionHeader('Wallet Activity'),
+                  _buildSectionHeader(
+                    AppLocalizations.of(context)!.notificationWalletActivity,
+                  ),
                   const SizedBox(height: 16),
                   _buildCard(context, [
                     _buildSwitchTile(
                       context,
-                      title: 'Transaction Alerts',
-                      subtitle: 'Sent, received, and top-up notifications.',
+                      title: AppLocalizations.of(
+                        context,
+                      )!.notificationTransactionAlerts,
+                      subtitle: AppLocalizations.of(
+                        context,
+                      )!.notificationTransactionAlertsDesc,
                       value: _transactionAlerts,
                       onChanged: (val) {
                         setState(() => _transactionAlerts = val);
@@ -129,13 +144,19 @@ class _NotificationSettingsScreenState
                   const SizedBox(height: 32),
 
                   // 📣 3. Marketing & Updates
-                  _buildSectionHeader('Updates'),
+                  _buildSectionHeader(
+                    AppLocalizations.of(context)!.notificationUpdates,
+                  ),
                   const SizedBox(height: 16),
                   _buildCard(context, [
                     _buildSwitchTile(
                       context,
-                      title: 'News & Promotions',
-                      subtitle: 'Exclusive offers and feature updates.',
+                      title: AppLocalizations.of(
+                        context,
+                      )!.notificationNewsPromotions,
+                      subtitle: AppLocalizations.of(
+                        context,
+                      )!.notificationNewsPromotionsDesc,
                       value: _marketingUpdates,
                       onChanged: (val) {
                         setState(() => _marketingUpdates = val);
@@ -186,11 +207,11 @@ class _NotificationSettingsScreenState
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isDark ? Colors.white10 : Colors.grey.withOpacity(0.1),
+          color: isDark ? Colors.white10 : Colors.grey.withValues(alpha: 0.1),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -238,7 +259,7 @@ class _NotificationSettingsScreenState
       trailing: Switch.adaptive(
         value: value ?? true,
         onChanged: onChanged,
-        activeColor: activeColor,
+        activeTrackColor: activeColor,
       ),
     );
   }
