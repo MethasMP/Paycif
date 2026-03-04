@@ -27,7 +27,6 @@ const (
 )
 
 // WalletService handles wallet operations.
-// WalletService handles wallet operations.
 type WalletService struct {
 	DB    *sql.DB
 	cb    *gobreaker.CircuitBreaker
@@ -537,16 +536,11 @@ func (s *WalletService) GetExchangeRate(ctx context.Context, fromCurr, toCurr st
 	var updatedAt time.Time
 
 	// Stateless Query Logic: Bypassing Prepared Statements for PGBouncer Compatibility
-	// We interpolate manually to force Simple Protocol.
-	// Safety: Inputs are strictly cast to Upper Case and we trust standard currency codes (3 chars usually)
-	// Additional safety: Escape quotes although unlikely in currency codes.
-	safeFrom := strings.ReplaceAll(strings.ToUpper(fromCurr), "'", "''")
-	safeTo := strings.ReplaceAll(strings.ToUpper(toCurr), "'", "''")
-
-	query := fmt.Sprintf("SELECT provider_rate, updated_at FROM exchange_rates WHERE from_currency = '%s' AND to_currency = '%s'", safeFrom, safeTo)
+	// We use parameterized queries with the standard protocol.
+	query := "SELECT provider_rate, updated_at FROM exchange_rates WHERE from_currency = $1 AND to_currency = $2"
 
 	// No transaction needed for simple read
-	err := s.DB.QueryRowContext(ctx, query).Scan(&rate, &updatedAt)
+	err := s.DB.QueryRowContext(ctx, query, strings.ToUpper(fromCurr), strings.ToUpper(toCurr)).Scan(&rate, &updatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("rate not found for %s/%s", fromCurr, toCurr)
@@ -797,4 +791,36 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 		SenderName:    senderFullName,
 		NewBalance:    newBalance,
 	}, nil
+}
+// EnsureUserAccount checks if a profile and wallet exist for the user, creating them if missing.
+// This is used for "auto-healing" account state upon login.
+func (s *WalletService) EnsureUserAccount(ctx context.Context, userID uuid.UUID) error {
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to start transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// 1. Ensure Profile Exists
+	username := "user_" + userID.String()[:8]
+	_, err = tx.ExecContext(ctx, "INSERT INTO profiles (id, username, full_name) VALUES ($1, $2, 'Paysif User') ON CONFLICT (id) DO NOTHING", userID, username)
+	if err != nil {
+		return fmt.Errorf("failed to ensure profile: %w", err)
+	}
+
+	// 2. Ensure Wallet Exists (THB default)
+	var exists bool
+	err = tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM wallets WHERE profile_id = $1)", userID).Scan(&exists)
+	if err != nil {
+		return fmt.Errorf("failed to check wallet: %w", err)
+	}
+
+	if !exists {
+		_, err = tx.ExecContext(ctx, "INSERT INTO wallets (profile_id, currency, balance) VALUES ($1, 'THB', 0)", userID)
+		if err != nil {
+			return fmt.Errorf("failed to create default wallet: %w", err)
+		}
+	}
+
+	return tx.Commit()
 }

@@ -2,9 +2,12 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"encoding/base64"
 	"fmt"
 	"time"
+
+	"github.com/google/uuid"
 
 	pb "paysif/internal/grpc/pb" // Correct import path based on go_package option
 )
@@ -12,13 +15,28 @@ import (
 // SignatureService handles Ed25519 signature verification via High-Performance Rust Microservice.
 type SignatureService struct {
 	grpcClient pb.FXServiceClient
+	DB         *sql.DB
 }
 
-// NewSignatureService creates a new SignatureService injecting the Rust gRPC client.
-func NewSignatureService(client pb.FXServiceClient) *SignatureService {
+// NewSignatureService creates a new SignatureService injecting dependencies.
+func NewSignatureService(client pb.FXServiceClient, db *sql.DB) *SignatureService {
 	return &SignatureService{
 		grpcClient: client,
+		DB:         db,
 	}
+}
+
+// GetDevicePublicKey retrieves the public key for a specific user and device.
+func (s *SignatureService) GetDevicePublicKey(ctx context.Context, userID uuid.UUID, deviceID string) (string, error) {
+	var publicKey string
+	err := s.DB.QueryRowContext(ctx, "SELECT public_key FROM user_device_bindings WHERE user_id = $1 AND device_id = $2 AND is_active = true", userID, deviceID).Scan(&publicKey)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "", fmt.Errorf("device not recognized or link revoked")
+		}
+		return "", fmt.Errorf("failed to fetch device public key: %w", err)
+	}
+	return publicKey, nil
 }
 
 // VerifySignature delegates verification to the high-performance Rust service.

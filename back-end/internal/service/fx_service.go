@@ -68,10 +68,9 @@ func (s *FXService) SimulateRates(ctx context.Context) {
 	for _, fromCurr := range currencies {
 		// Stateless Query for Simulation
 		var currentRateStr string
-		safeFrom := strings.ReplaceAll(strings.ToUpper(fromCurr), "'", "''")
-		simQuery := fmt.Sprintf("SELECT mid_rate FROM exchange_rates WHERE from_currency = '%s' AND to_currency = 'THB'", safeFrom)
+		simQuery := "SELECT mid_rate FROM exchange_rates WHERE from_currency = $1 AND to_currency = 'THB'"
 
-		err := s.DB.QueryRowContext(ctx, simQuery).Scan(&currentRateStr)
+		err := s.DB.QueryRowContext(ctx, simQuery, strings.ToUpper(fromCurr)).Scan(&currentRateStr)
 
 		if err == sql.ErrNoRows || currentRateStr == "" {
 			// Init: Fetch from API if not exists
@@ -237,10 +236,9 @@ func (s *FXService) ConvertToBase(ctx context.Context, amount int64, currency st
 	// 2. Fallback: Stateless Query Logic
 	// This ensures survivability if the microservice is down.
 	var rateStr string
-	safeCurrency := strings.ReplaceAll(strings.ToUpper(currency), "'", "''")
-	convQuery := fmt.Sprintf("SELECT provider_rate FROM exchange_rates WHERE from_currency = '%s' AND to_currency = 'THB'", safeCurrency)
+	convQuery := "SELECT provider_rate FROM exchange_rates WHERE from_currency = $1 AND to_currency = 'THB'"
 
-	err := s.DB.QueryRowContext(ctx, convQuery).Scan(&rateStr)
+	err := s.DB.QueryRowContext(ctx, convQuery, strings.ToUpper(currency)).Scan(&rateStr)
 
 	if err != nil {
 		return 0, decimal.Zero, fmt.Errorf("no exchange rate found for %s/THB (DB Fallback): %w", currency, err)

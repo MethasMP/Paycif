@@ -444,20 +444,24 @@ class _ProfilePageState extends State<ProfilePage> {
 
             // ─── Sign Out ──────────────────────────────────────────
             Center(
-              child: ElevatedButton.icon(
-                onPressed: () => _showSignOutConfirmation(context),
-                icon: const Icon(Icons.logout_rounded, size: 20),
-                label: Text(l10n.signOut),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red.shade50,
-                  foregroundColor: Colors.redAccent,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 32,
-                    vertical: 16,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+              child: Semantics(
+                label: 'Sign out from Paycif',
+                button: true,
+                child: ElevatedButton.icon(
+                  onPressed: () => _showSignOutConfirmation(context),
+                  icon: const Icon(Icons.logout_rounded, size: 20),
+                  label: Text(l10n.signOut),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red.shade50,
+                    foregroundColor: Colors.redAccent,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 16,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                   ),
                 ),
               ),
@@ -488,200 +492,203 @@ class _ProfilePageState extends State<ProfilePage> {
   ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Container(
-      height: 220,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isDark
-              ? [
-                  const Color(0xFF0F172A), // Slate 900
-                  const Color(0xFF1E293B), // Slate 800
-                ]
-              : [
-                  const Color(0xFF1A1F71), // Navy
-                  const Color(0xFF2C3E50), // Lighter Navy
-                ],
+    return Semantics(
+      label:
+          'Digital Passport for $name, ID $id, KYC Status: ${isVerified ? 'Verified' : 'Pending'}',
+      child: Container(
+        height: 220,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: isDark
+                ? [
+                    const Color(0xFF0F172A), // Slate 900
+                    const Color(0xFF1E293B), // Slate 800
+                  ]
+                : [
+                    const Color(0xFF1A1F71), // Navy
+                    const Color(0xFF2C3E50), // Lighter Navy
+                  ],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: (isDark ? Colors.black : const Color(0xFF1A1F71))
+                  .withValues(alpha: 0.2),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
         ),
-        boxShadow: [
-          BoxShadow(
-            color: (isDark ? Colors.black : const Color(0xFF1A1F71)).withValues(
-              alpha: 0.2,
+        child: Stack(
+          children: [
+            // Background Pattern
+            Positioned(
+              right: -40,
+              top: -40,
+              child: Icon(
+                Icons.public,
+                size: 200,
+                color: Colors.white.withValues(alpha: 0.05),
+              ),
             ),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          // Background Pattern
-          Positioned(
-            right: -40,
-            top: -40,
-            child: Icon(
-              Icons.public,
-              size: 200,
-              color: Colors.white.withValues(alpha: 0.05),
-            ),
-          ),
 
-          Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Logo / Brand
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.2),
+            Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Logo / Brand
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.bolt_rounded,
+                              color: Color(0xFFF59E0B),
+                              size: 16,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              l10n.passportLabel,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.0,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.bolt_rounded,
-                            color: Color(0xFFF59E0B),
-                            size: 16,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            l10n.passportLabel,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1.0,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // KYC Status Badge
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isVerified
-                            ? const Color(0xFF10B981).withValues(alpha: 0.2)
-                            : Colors.orange.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            isVerified ? Icons.verified : Icons.pending,
-                            color: isVerified
-                                ? const Color(0xFF10B981)
-                                : Colors.orange,
-                            size: 14,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            isVerified
-                                ? l10n.kycStatusVerified
-                                : l10n.kycStatusPending,
-                            style: TextStyle(
+                      // KYC Status Badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isVerified
+                              ? const Color(0xFF10B981).withValues(alpha: 0.2)
+                              : Colors.orange.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isVerified ? Icons.verified : Icons.pending,
                               color: isVerified
                                   ? const Color(0xFF10B981)
                                   : Colors.orange,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
+                              size: 14,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 4),
+                            Text(
+                              isVerified
+                                  ? l10n.kycStatusVerified
+                                  : l10n.kycStatusPending,
+                              style: TextStyle(
+                                color: isVerified
+                                    ? const Color(0xFF10B981)
+                                    : Colors.orange,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
 
-                const Spacer(),
+                  const Spacer(),
 
-                // ID Info
-                Row(
-                  children: [
-                    // Avatar with Ring
-                    Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: const Color(0xFFF59E0B),
-                          width: 2,
-                        ), // Gold Ring
+                  // ID Info
+                  Row(
+                    children: [
+                      // Avatar with Ring
+                      Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: const Color(0xFFF59E0B),
+                            width: 2,
+                          ), // Gold Ring
+                        ),
+                        child: CircleAvatar(
+                          radius: 32,
+                          backgroundColor: Colors.black26,
+                          backgroundImage: avatarUrl != null
+                              ? NetworkImage(avatarUrl)
+                              : null,
+                          child: avatarUrl == null
+                              ? const Icon(Icons.person, color: Colors.white)
+                              : null,
+                        ),
                       ),
-                      child: CircleAvatar(
-                        radius: 32,
-                        backgroundColor: Colors.black26,
-                        backgroundImage: avatarUrl != null
-                            ? NetworkImage(avatarUrl)
-                            : null,
-                        child: avatarUrl == null
-                            ? const Icon(Icons.person, color: Colors.white)
-                            : null,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            name,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              name,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'ID: $id',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.7),
-                              fontSize: 14,
-                              fontFamily: 'monospace',
+                            const SizedBox(height: 4),
+                            Text(
+                              'ID: $id',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.7),
+                                fontSize: 14,
+                                fontFamily: 'monospace',
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                    // Mini QR
-                    Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
+                      // Mini QR
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: QrImageView(
+                          data: id,
+                          version: QrVersions.auto,
+                          size: 40,
+                          padding: EdgeInsets.zero,
+                        ),
                       ),
-                      child: QrImageView(
-                        data: id,
-                        version: QrVersions.auto,
-                        size: 40,
-                        padding: EdgeInsets.zero,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

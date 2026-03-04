@@ -71,6 +71,16 @@ dependencies:
   firebase_messaging: ^15.2.1
   flutter_local_notifications: ^18.0.1
 
+  # ── KYC: Core (NFC & MRZ) ───────────────────────────────────────────────────
+  nfc_manager: ^3.3.0
+  flutter_mrz_scanner: ^2.2.1
+  mrz_parser: ^2.0.1
+
+  # ── KYC: Advanced (Tesla-level) Features ─────────────────────────────────────
+  google_mlkit_face_detection: ^0.11.0
+  rive: ^0.13.11
+  camera: ^0.11.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

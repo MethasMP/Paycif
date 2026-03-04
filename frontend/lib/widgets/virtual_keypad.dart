@@ -72,21 +72,25 @@ class VirtualKeypad extends StatelessWidget {
               width: 1,
             ),
           ),
-          child: label == '⌫'
-              ? Icon(
-                  Icons.backspace_rounded,
-                  color: isDark ? Colors.white70 : Colors.black54,
-                  size: 22,
-                )
-              : Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w400,
-                    color: isDark ? Colors.white : Colors.black87,
-                    letterSpacing: -0.5,
+          child: Semantics(
+            label: label == '⌫' ? 'Delete' : 'Digit $label',
+            button: true,
+            child: label == '⌫'
+                ? Icon(
+                    Icons.backspace_rounded,
+                    color: isDark ? Colors.white70 : Colors.black54,
+                    size: 22,
+                  )
+                : Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w400,
+                      color: isDark ? Colors.white : Colors.black87,
+                      letterSpacing: -0.5,
+                    ),
                   ),
-                ),
+          ),
         ),
       ),
     );

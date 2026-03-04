@@ -2,7 +2,6 @@ package main
 
 import (
 	"net/http"
-	"strconv"
 	"paysif/internal/routing"
 
 	"github.com/gin-gonic/gin"
@@ -16,6 +15,12 @@ func NewRoutingHandler(r routing.Service) *RoutingHandler {
 	return &RoutingHandler{Router: r}
 }
 
+type GetQuoteRequest struct {
+	Amount     float64 `form:"amount" binding:"required,gt=0"`
+	Currency   string  `form:"currency" binding:"required,len=3,uppercase"`
+	MerchantID string  `form:"merchant_id"`
+}
+
 func (h *RoutingHandler) HandleGetQuote(c *gin.Context) {
 	// 1. Extract Identity (from Auth Middleware)
 	userID := c.GetString("user_id")
@@ -24,27 +29,18 @@ func (h *RoutingHandler) HandleGetQuote(c *gin.Context) {
 		return
 	}
 
-	// 2. Extract Intent
-	amountStr := c.Query("amount")
-	currency := c.Query("currency")
-	merchantID := c.Query("merchant_id")
-
-	if amountStr == "" || currency == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Amount and currency are required"})
-		return
-	}
-
-	amount, err := strconv.ParseFloat(amountStr, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid amount format"})
+	// 2. Extract and Validate Query Params
+	var req GetQuoteRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	intent := routing.PaymentIntent{
 		UserID:     userID,
-		Amount:     amount,
-		Currency:   currency,
-		MerchantID: merchantID,
+		Amount:     req.Amount,
+		Currency:   req.Currency,
+		MerchantID: req.MerchantID,
 	}
 
 	// 3. Get Smart Quote

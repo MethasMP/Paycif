@@ -88,7 +88,11 @@ class _PaycifAppState extends State<PaycifApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _startHeartbeat();
+  }
 
+  void _startHeartbeat() {
+    _heartbeatTimer?.cancel();
     // 💓 The Supreme Session Engine: Heartbeat Timer
     // Check and refresh session proactively every 15 minutes
     // even if the user is just sitting on a screen.
@@ -98,9 +102,14 @@ class _PaycifAppState extends State<PaycifApp> with WidgetsBindingObserver {
     });
   }
 
+  void _stopHeartbeat() {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
+  }
+
   @override
   void dispose() {
-    _heartbeatTimer?.cancel();
+    _stopHeartbeat();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -111,9 +120,11 @@ class _PaycifAppState extends State<PaycifApp> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      _startHeartbeat(); // Resume heartbeat when user returns
       _checkSessionHealth();
       _checkBackgroundLockdown();
     } else if (state == AppLifecycleState.paused) {
+      _stopHeartbeat(); // Stop heartbeat when backgrounded to save energy
       _lastBackgroundTime = DateTime.now();
       debugPrint("📱 [Security] App backgrounded at: $_lastBackgroundTime");
     }

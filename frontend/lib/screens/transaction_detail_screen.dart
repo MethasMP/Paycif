@@ -144,18 +144,22 @@ class TransactionDetailScreen extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               height: 56,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  PayNotify.success(
-                    context,
-                    l10n.transactionSupportTicketCreated,
-                  );
-                },
-                icon: const Icon(Icons.help_outline),
-                label: Text(l10n.transactionHelp),
-                style: OutlinedButton.styleFrom(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+              child: Semantics(
+                label: 'Get help with this transaction',
+                button: true,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    PayNotify.success(
+                      context,
+                      l10n.transactionSupportTicketCreated,
+                    );
+                  },
+                  icon: const Icon(Icons.help_outline),
+                  label: Text(l10n.transactionHelp),
+                  style: OutlinedButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                   ),
                 ),
               ),

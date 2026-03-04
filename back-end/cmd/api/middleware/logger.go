@@ -33,13 +33,27 @@ func StructuredLogger() gin.HandlerFunc {
 		latency := time.Since(start)
 		status := c.Writer.Status()
 
-		logger.WithContext(c.Request.Context()).Info("HTTP Request",
+		fields := []slog.Attr{
 			slog.Int("status", status),
 			slog.String("method", c.Request.Method),
 			slog.String("path", c.Request.URL.Path),
 			slog.String("ip", c.ClientIP()),
 			slog.Duration("latency", latency),
 			slog.String("user_agent", c.Request.UserAgent()),
-		)
+		}
+
+		// Log any errors attached to the context
+		if len(c.Errors) > 0 {
+			fields = append(fields, slog.String("errors", c.Errors.String()))
+		}
+
+		lvl := slog.LevelInfo
+		if status >= 500 {
+			lvl = slog.LevelError
+		} else if status >= 400 {
+			lvl = slog.LevelWarn
+		}
+
+		logger.WithContext(c.Request.Context()).LogAttrs(c.Request.Context(), lvl, "HTTP Request Completed", fields...)
 	}
 }

@@ -45,7 +45,7 @@
 		<true/>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>This app needs camera access to scan QR codes</string>
+	<string>Paycif uses your camera to scan QR codes for payments and to read the MRZ code on your passport.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Authenticate to confirm payments</string>
 	<key>NSPhotoLibraryUsageDescription</key>
@@ -76,6 +76,18 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
+	</array>
+	<!-- ─── NFC / e-Passport: CoreNFC Entitelment ──────────────────────────────
+		 Required for reading the biometric chip inside ICAO 9303 passports.
+		 You MUST also enable the Near Field Communication Tag Reading capability
+		 in Xcode Signing & Capabilities for this to work at runtime.
+	──────────────────────────────────────────────────────────────────────────── -->
+	<key>NFCReaderUsageDescription</key>
+	<string>Paycif reads your passport NFC chip to verify your identity quickly and securely. No data is shared without your consent.</string>
+	<key>com.apple.developer.nfc.readersession.iso7816.select-identifiers</key>
+	<array>
+		<!-- ICAO e-Passport Application ID -->
+		<string>A0000002471001</string>
 	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>

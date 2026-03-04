@@ -243,36 +243,40 @@ class _LoginScreenState extends State<LoginScreen> {
                         ],
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: ElevatedButton(
-                        onPressed: _googleSignIn,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.black, // Ripple color
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                      child: Semantics(
+                        label: 'Log in with Google',
+                        button: true,
+                        child: ElevatedButton(
+                          onPressed: _googleSignIn,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: Colors.black, // Ripple color
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
                           ),
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Image.asset(
-                              'assets/images/google_logo.png',
-                              height: 20, // Standard size
-                              width: 20,
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              "${l10n.commonLogIn} with Google",
-                              textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.normal,
-                                    color: Colors.black, // Forced Black
-                                  ),
-                            ),
-                          ],
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Image.asset(
+                                'assets/images/google_logo.png',
+                                height: 20, // Standard size
+                                width: 20,
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                "${l10n.commonLogIn} with Google",
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.normal,
+                                      color: Colors.black, // Forced Black
+                                    ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     )
@@ -301,36 +305,40 @@ class _LoginScreenState extends State<LoginScreen> {
                         ],
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: ElevatedButton(
-                        onPressed: _appleSignInMock,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.black,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                      child: Semantics(
+                        label: 'Log in with Apple',
+                        button: true,
+                        child: ElevatedButton(
+                          onPressed: _appleSignInMock,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: Colors.black,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
                           ),
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.apple,
-                              color: Colors.black,
-                              size: 24, // Standard size
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              "${l10n.commonLogIn} with Apple",
-                              textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.normal,
-                                    color: Colors.black,
-                                  ),
-                            ),
-                          ],
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.apple,
+                                color: Colors.black,
+                                size: 24, // Standard size
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                "${l10n.commonLogIn} with Apple",
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.normal,
+                                      color: Colors.black,
+                                    ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     )

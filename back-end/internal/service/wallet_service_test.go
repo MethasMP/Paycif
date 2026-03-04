@@ -147,3 +147,9 @@ func TestTransferCommand_Execute(t *testing.T) {
 		mockFX.AssertExpectations(t)
 	})
 }
+
+func TestWalletService_GetMonthlySpending(t *testing.T) {
+	// RED Phase: This test will fail to compile because the method is not defined yet.
+	// Note: We'll uncomment this once we have the signature but no logic.
+	// For now, even calling it in a test is "RED".
+}

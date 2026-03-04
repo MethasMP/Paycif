@@ -109,100 +109,109 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: IndexedStack(index: _selectedIndex, children: _screens),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, -5),
-            ),
-          ],
-        ),
-        child: BottomNavigationBar(
-          items: <BottomNavigationBarItem>[
-            BottomNavigationBarItem(
-              icon: const Icon(Icons.home_filled),
-              label: AppLocalizations.of(context)!.navHome,
-            ),
-            BottomNavigationBarItem(
-              icon: const Icon(Icons.history),
-              label: AppLocalizations.of(context)!.navHistory,
-            ),
-            BottomNavigationBarItem(
-              icon: Hero(
-                tag: 'scan-hero',
-                child: Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).primaryColor, // Deep Blue
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: isDark
-                            ? const Color(0xFFF59E0B).withValues(alpha: 0.4)
-                            : Theme.of(
-                                context,
-                              ).primaryColor.withValues(alpha: 0.4),
-                        blurRadius: 10,
-                        offset: const Offset(0, 5),
+    return PopScope(
+      canPop: _selectedIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_selectedIndex != 0) {
+          setState(() => _selectedIndex = 0);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: IndexedStack(index: _selectedIndex, children: _screens),
+        bottomNavigationBar: Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, -5),
+              ),
+            ],
+          ),
+          child: BottomNavigationBar(
+            items: <BottomNavigationBarItem>[
+              BottomNavigationBarItem(
+                icon: const Icon(Icons.home_filled),
+                label: AppLocalizations.of(context)!.navHome,
+              ),
+              BottomNavigationBarItem(
+                icon: const Icon(Icons.history),
+                label: AppLocalizations.of(context)!.navHistory,
+              ),
+              BottomNavigationBarItem(
+                icon: Hero(
+                  tag: 'scan-hero',
+                  child: Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).primaryColor, // Deep Blue
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: isDark
+                              ? const Color(0xFFF59E0B).withValues(alpha: 0.4)
+                              : Theme.of(
+                                  context,
+                                ).primaryColor.withValues(alpha: 0.4),
+                          blurRadius: 10,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
+                      gradient: LinearGradient(
+                        colors: isDark
+                            ? [
+                                const Color(0xFFF59E0B), // Amber 500
+                                const Color(0xFFB45309), // Amber 700
+                              ]
+                            : [
+                                const Color(0xFF1A1F71), // Deep Blue
+                                const Color(0xFF2C3E50), // Lighter
+                              ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                    ],
-                    gradient: LinearGradient(
-                      colors: isDark
-                          ? [
-                              const Color(0xFFF59E0B), // Amber 500
-                              const Color(0xFFB45309), // Amber 700
-                            ]
-                          : [
-                              const Color(0xFF1A1F71), // Deep Blue
-                              const Color(0xFF2C3E50), // Lighter
-                            ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+                    ),
+                    child: const Icon(
+                      Icons.qr_code_scanner,
+                      color: Colors.white, // Always White for contrast
+                      size: 28,
                     ),
                   ),
-                  child: const Icon(
-                    Icons.qr_code_scanner,
-                    color: Colors.white, // Always White for contrast
-                    size: 28,
-                  ),
                 ),
+                label: '', // No label for focus
               ),
-              label: '', // No label for focus
+              BottomNavigationBarItem(
+                icon: const Icon(Icons.payment),
+                label: AppLocalizations.of(context)!.navPayment,
+              ),
+              BottomNavigationBarItem(
+                icon: const Icon(Icons.person),
+                label: AppLocalizations.of(context)!.navProfile,
+              ),
+            ],
+            currentIndex: _selectedIndex,
+            selectedItemColor: Theme.of(context).primaryColor,
+            unselectedItemColor: const Color(0xFF94A3B8), // Slate 400
+            selectedLabelStyle: TextStyle(
+              color: Theme.of(context).primaryColor,
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
             ),
-            BottomNavigationBarItem(
-              icon: const Icon(Icons.payment),
-              label: AppLocalizations.of(context)!.navPayment,
+            unselectedLabelStyle: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontWeight: FontWeight.w500,
+              fontSize: 12,
             ),
-            BottomNavigationBarItem(
-              icon: const Icon(Icons.person),
-              label: AppLocalizations.of(context)!.navProfile,
-            ),
-          ],
-          currentIndex: _selectedIndex,
-          selectedItemColor: Theme.of(context).primaryColor,
-          unselectedItemColor: const Color(0xFF94A3B8), // Slate 400
-          selectedLabelStyle: TextStyle(
-            color: Theme.of(context).primaryColor,
-            fontWeight: FontWeight.w600,
-            fontSize: 12,
+            showUnselectedLabels: true,
+            type: BottomNavigationBarType.fixed,
+            backgroundColor: Theme.of(context).cardColor,
+            elevation: 0,
+            onTap: _onItemTapped,
           ),
-          unselectedLabelStyle: const TextStyle(
-            color: Color(0xFF94A3B8),
-            fontWeight: FontWeight.w500,
-            fontSize: 12,
-          ),
-          showUnselectedLabels: true,
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: Theme.of(context).cardColor,
-          elevation: 0,
-          onTap: _onItemTapped,
         ),
       ),
     );

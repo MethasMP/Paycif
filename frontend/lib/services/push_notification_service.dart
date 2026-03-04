@@ -3,6 +3,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
+import '../features/security/data/datasources/secure_storage_service.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -58,12 +59,22 @@ class PushNotificationService {
     });
   }
 
+  static const _kLastSyncedTokenKey = 'last_synced_fcm_token';
+
   static Future<void> syncToken({String? token}) async {
     try {
       final fcmToken = token ?? await _messaging.getToken();
       final user = Supabase.instance.client.auth.currentUser;
+      final storage = SecureStorageService();
 
       if (fcmToken != null && user != null) {
+        // 🛡️ Traffic Optimization: Only sync if token changed
+        final lastSyncedToken = await storage.read(_kLastSyncedTokenKey);
+        if (lastSyncedToken == fcmToken) {
+          debugPrint('📡 FCM Token unchanged, skipping sync.');
+          return;
+        }
+
         debugPrint('📡 Syncing FCM Token: $fcmToken');
         await Supabase.instance.client
             .from('profiles')
@@ -72,6 +83,9 @@ class PushNotificationService {
               'updated_at': DateTime.now().toIso8601String(),
             })
             .eq('id', user.id);
+
+        // 💾 Persist successful sync to cache
+        await storage.write(_kLastSyncedTokenKey, fcmToken);
       }
     } catch (e) {
       debugPrint('⚠️ FCM Token Sync Failed: $e');

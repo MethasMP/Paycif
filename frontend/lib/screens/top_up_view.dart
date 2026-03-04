@@ -933,7 +933,11 @@ class _TopUpViewState extends State<TopUpView> {
           _buildCustomKeypad(context, isDark),
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-            child: _buildPayButton(context, l10n),
+            child: Semantics(
+              label: 'Pay Now and Confirm Top Up',
+              button: true,
+              child: _buildPayButton(context, l10n),
+            ),
           ),
         ],
       ),

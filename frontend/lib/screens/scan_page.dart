@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -5,12 +6,13 @@ import 'package:image_picker/image_picker.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
 import 'package:frontend/utils/emv_parser.dart';
 import 'package:frontend/utils/pay_notify.dart';
+import 'package:frontend/widgets/premium_scanner_overlay.dart';
 
 import 'package:frontend/screens/amount_entry_screen.dart';
 import 'pay_screen.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
-// SCAN PAGE - Simplified Flow (Scan → Enter Amount → Pay)
+// SCAN PAGE - Premium UX (Scan → Enter Amount → Pay)
 // ──────────────────────────────────────────────────────────────────────────────
 
 class ScanPage extends StatefulWidget {
@@ -56,19 +58,21 @@ class _ScanPageState extends State<ScanPage> {
 
     final emvData = EMVCoParser.parse(code);
 
-    // "Security Shield" UX - Validate Integrity
+    // "Tactile Luxury" UX
     if (emvData.isValid) {
-      HapticFeedback.heavyImpact(); // Stronger feedback for valid secure QR
+      // High-precision haptic sequence
+      HapticFeedback.mediumImpact();
+      Future.delayed(const Duration(milliseconds: 100), () {
+        HapticFeedback.heavyImpact();
+      });
     } else {
-      HapticFeedback.mediumImpact(); // Standard feedback
+      HapticFeedback.vibrate();
     }
 
     setState(() => _isProcessing = true);
     _cameraController.stop();
 
     if (!mounted) return;
-
-    // Proceed to Payment Logic
     _handleValidQR(emvData);
   }
 
@@ -100,27 +104,21 @@ class _ScanPageState extends State<ScanPage> {
   void _showError(String message) {
     if (!mounted) return;
     PayNotify.error(context, message);
-    // 🛡️ Fix: Add a delay before resuming to prevent notification flood
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) _resumeScanning();
     });
   }
 
   void _handleValidQR(EMFData data) async {
-    // 🛑 Pause Camera immediately
     await _cameraController.stop();
     if (!mounted) return;
 
     if (!data.isValid) {
       _showError(AppLocalizations.of(context)!.scanUnknownRecipient);
-      return; // Error will auto-resume scanning
+      return;
     }
 
     final hasAmount = (data.amount ?? 0) > 0;
-
-    // Route Logic:
-    // 1. Has valid amount in QR -> Go to PayScreen directly
-    // 2. No amount (0) -> Go to AmountEntryScreen (Full Screen)
 
     final result = await Navigator.push(
       context,
@@ -138,60 +136,239 @@ class _ScanPageState extends State<ScanPage> {
     if (mounted) {
       if (result == true) {
         HapticFeedback.heavyImpact();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '${AppLocalizations.of(context)!.scanPaymentSuccess} 🎉',
-            ),
-            backgroundColor: const Color(0xFF10B981),
-          ),
-        );
       }
-      // Resume scanning after returning from any flow
       _resumeScanning();
     }
   }
 
-  void _showHelpModal() {
-    // 🛑 Pause Camera
-    _cameraController.stop();
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
 
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          // 1. Camera Base
+          MobileScanner(
+            controller: _cameraController,
+            onDetect: _onDetect,
+            errorBuilder: (context, error) => _buildCameraError(),
+          ),
+
+          // 2. High-End Animated Overlay
+          PremiumScannerOverlay(frameSize: screenWidth * 0.7),
+
+          // 3. UI Layer (Glassmorphic Controls)
+          SafeArea(
+            child: Column(
+              children: [
+                _buildPremiumTopBar(),
+                const Spacer(),
+                _buildInstructionText(),
+                const SizedBox(height: 32),
+                _buildGlassActionButtons(),
+                const SizedBox(height: 48),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCameraError() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.videocam_off_rounded,
+            color: Colors.white38,
+            size: 64,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            AppLocalizations.of(context)!.scanErrorCamera,
+            style: const TextStyle(color: Colors.white70),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInstructionText() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.1),
+            border: Border.all(color: Colors.white10),
+          ),
+          child: Text(
+            AppLocalizations.of(context)!.scanGuideTitle,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPremiumTopBar() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          _buildGlassIconButton(
+            icon: Icons.close_rounded,
+            onTap: () {
+              if (widget.onBack != null) {
+                widget.onBack!();
+              } else {
+                Navigator.of(context).maybePop();
+              }
+            },
+          ),
+          _buildGlassIconButton(
+            icon: _isFlashOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
+            isSelected: _isFlashOn,
+            onTap: () async {
+              await _cameraController.toggleTorch();
+              setState(() => _isFlashOn = !_isFlashOn);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGlassActionButtons() {
+    final l10n = AppLocalizations.of(context)!;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _buildLongGlassButton(
+          Icons.photo_library_rounded,
+          l10n.commonUpload,
+          _pickFromGallery,
+        ),
+        const SizedBox(width: 20),
+        _buildLongGlassButton(
+          Icons.help_outline_rounded,
+          l10n.commonHelp,
+          () => _showHelpModal(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGlassIconButton({
+    required IconData icon,
+    required VoidCallback onTap,
+    bool isSelected = false,
+  }) {
+    return ClipOval(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: isSelected ? const Color(0xFFF59E0B) : Colors.white12,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white10),
+            ),
+            child: Icon(icon, color: Colors.white, size: 22),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLongGlassButton(
+    IconData icon,
+    String label,
+    VoidCallback onTap,
+  ) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white10),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, color: Colors.white, size: 20),
+                const SizedBox(width: 10),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showHelpModal() {
+    _cameraController.stop();
     final l10n = AppLocalizations.of(context)!;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.5,
-        minChildSize: 0.3,
-        maxChildSize: 0.7,
-        builder: (context, scrollController) => Container(
-          padding: const EdgeInsets.all(24),
+      builder: (context) => BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          padding: const EdgeInsets.all(28),
           decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            color: Theme.of(context).canvasColor.withValues(alpha: 0.9),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
           ),
-          child: ListView(
-            controller: scrollController,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 32),
+              Text(
+                l10n.scanGuideTitle,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
               ),
               const SizedBox(height: 24),
-              Text(
-                l10n.scanGuideTitle,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
               _buildHelpItem(
                 '📱',
                 l10n.scanGuidePromptPayTitle,
@@ -207,15 +384,22 @@ class _ScanPageState extends State<ScanPage> {
                 l10n.scanGuideCurrencyTitle,
                 l10n.scanGuideCurrencyDesc,
               ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).primaryColor,
-                ),
-                child: Text(
-                  l10n.commonGotIt,
-                  style: const TextStyle(color: Colors.white),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFF59E0B),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: Text(
+                    l10n.commonGotIt,
+                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                  ),
                 ),
               ),
             ],
@@ -229,181 +413,37 @@ class _ScanPageState extends State<ScanPage> {
 
   Widget _buildHelpItem(String emoji, String title, String desc) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 20),
       child: Row(
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 20)),
-          const SizedBox(width: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.05),
+              shape: BoxShape.circle,
+            ),
+            child: Text(emoji, style: const TextStyle(fontSize: 24)),
+          ),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
                 Text(
                   desc,
-                  style: TextStyle(
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.white54
-                        : Colors.black54,
-                    fontSize: 12,
-                  ),
+                  style: const TextStyle(color: Colors.white60, fontSize: 13),
                 ),
               ],
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          // Camera
-          MobileScanner(
-            controller: _cameraController,
-            onDetect: _onDetect,
-            errorBuilder: (context, error) => Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.error, color: Colors.white, size: 48),
-                  const SizedBox(height: 16),
-                  Text(
-                    AppLocalizations.of(context)!.scanErrorCamera,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.titleMedium?.copyWith(color: Colors.white),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Overlay with RESPONSIVE frame
-          CustomPaint(
-            painter: ScannerOverlayPainter(frameSize: screenWidth * 0.7),
-            child: const SizedBox.expand(),
-          ),
-
-          // UI Controls
-          SafeArea(
-            child: Column(
-              children: [
-                _buildTopBar(),
-                const Spacer(),
-                const SizedBox(height: 20),
-                _buildActionButtons(),
-                const SizedBox(height: 40),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTopBar() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          _buildCircleButton(
-            icon: Icons.arrow_back,
-            onPressed: () {
-              if (widget.onBack != null) {
-                widget.onBack!();
-              } else {
-                Navigator.of(context).maybePop();
-              }
-            },
-          ),
-          _buildCircleButton(
-            icon: _isFlashOn ? Icons.flash_on : Icons.flash_off,
-            onPressed: () async {
-              await _cameraController.toggleTorch();
-              setState(() => _isFlashOn = !_isFlashOn);
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCircleButton({
-    required IconData icon,
-    required VoidCallback onPressed,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.5),
-        shape: BoxShape.circle,
-      ),
-      child: IconButton(
-        icon: Icon(icon, color: Colors.white),
-        onPressed: onPressed,
-      ),
-    );
-  }
-
-  Widget _buildActionButtons() {
-    final l10n = AppLocalizations.of(context)!;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _buildActionButton(
-          Icons.image_rounded,
-          l10n.commonUpload,
-          _pickFromGallery,
-        ),
-        const SizedBox(width: 24),
-        _buildActionButton(
-          Icons.help_outline_rounded,
-          l10n.commonHelp,
-          _showHelpModal,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildActionButton(IconData icon, String label, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: Theme.of(context).primaryColor),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: Theme.of(context).primaryColor,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

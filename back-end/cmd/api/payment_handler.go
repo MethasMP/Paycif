@@ -27,8 +27,8 @@ func NewPaymentHandler(svc *service.WalletService) *PaymentHandler {
 }
 
 type CreateIntentRequest struct {
-	Amount   float64 `json:"amount" binding:"required"`
-	Currency string  `json:"currency" binding:"required"`
+	Amount   float64 `json:"amount" binding:"required,min=500"`
+	Currency string  `json:"currency" binding:"required,len=3,uppercase"`
 }
 
 // HandleCreateIntent creates a Stripe PaymentIntent

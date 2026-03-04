@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log" // Added for HandlerGetLimits return type logic if needed, but mainly standard lib
+	"log/slog" // Added for HandlerGetLimits return type logic if needed, but mainly standard lib
 	"os"
 	"paysif/cmd/api/middleware"
 	"paysif/database"
@@ -24,7 +24,8 @@ func main() {
 
 	// 1. Database Connection
 	if err := database.Connect(); err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		slog.Error("Failed to connect to database", "error", err)
+		os.Exit(1)
 	}
 	defer database.Close()
 	
@@ -63,10 +64,10 @@ func main() {
 	if err != nil {
 		// Log but don't fatal? No, for Survivability, if Engine is critical, maybe warn.
 		// But since we have DB fallback, we can proceed!
-		log.Printf("⚠️ WARNING: Could not connect to Rust FX Engine: %v. Running in degraded mode (DB-only).", err)
+		slog.Warn("Could not connect to Rust FX Engine. Running in degraded mode (DB-only).", "error", err)
 		// fxClient remains nil
 	} else {
-		log.Println("✅ Connected to High-Performance Rust FX Engine")
+		slog.Info("Connected to High-Performance Rust FX Engine")
 		defer fxClient.Close()
 		fxClientInterface = fxClient
 		sigServiceClient = fxClient.GetClient()
@@ -82,7 +83,7 @@ func main() {
 	// Pass redisClient and AuditService to WalletService
 	walletService := service.NewWalletService(database.DB, fxService, alertService, redisClient, auditService)
 	kycService := service.NewKYCService(database.DB, cryptoService, auditService)
-	sigService := service.NewSignatureService(sigServiceClient) // Inject Rust gRPC Client (or nil) 🛡️
+	sigService := service.NewSignatureService(sigServiceClient, database.DB) // Inject Rust gRPC Client and DB 🛡️
 
 	// 3. Handler Initialization
 	transferHandler := &TransferHandler{
@@ -102,11 +103,13 @@ func main() {
 	
 	r := gin.New() // Use New() to avoid default logger
 	r.SetTrustedProxies(nil) // Security: Disable trusting all proxies
-	r.Use(gin.Recovery()) // Recovery from panics
+	r.Use(middleware.Recovery()) // 🛡️ Secure Recovery from panics
 	r.Use(middleware.StructuredLogger()) // World-Class JSON Logger
+	r.Use(middleware.CORSMiddleware()) // CORS Configuration
+	r.Use(middleware.SecurityHeadersMiddleware()) // Standard Security Headers
 	
 	v1 := r.Group("/api/v1")
-	v1.Use(middleware.AuthMiddleware()) // Apply Auth
+	v1.Use(middleware.AuthMiddleware(walletService)) // Apply Auth with Service injection 🛡️
 	v1.Use(middleware.RateLimiterMiddleware(redisClient)) // Pass Redis to RateLimiter
 	{
 		v1.POST("/transfer", transferHandler.HandleTransfer)
@@ -126,15 +129,23 @@ func main() {
 		
 		// KYC Routes (Encrypted)
 		v1.POST("/kyc", kycHandler.HandleSubmitKYC)
+		v1.POST("/kyc/nfc", kycHandler.HandleSubmitNfcPassport) // Highly secure NFC Validation
+		v1.POST("/kyc/selfie", kycHandler.HandleSubmitSelfie)  // Biometric matching
 		v1.GET("/kyc", kycHandler.HandleGetKYC)
 	}
 
 	// Webhooks (Public)
 	r.POST("/hooks/stripe", paymentHandler.HandleWebhook)
 
+	// SEO (Search Engine Optimization)
+	r.GET("/robots.txt", func(c *gin.Context) {
+		c.String(200, "User-agent: *\nAllow: /\nSitemap: https://paycif.com/sitemap.xml")
+	})
+
 	// 5. Start Server
-	log.Println("Starting server on :8080")
+	slog.Info("Starting server", "port", 8080)
 	if err := r.Run(":8080"); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+		slog.Error("Failed to start server", "error", err)
+		os.Exit(1)
 	}
 }

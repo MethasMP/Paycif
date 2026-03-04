@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"paysif/database"
 	"paysif/internal/service"
 	"strings"
 	"time"
@@ -25,9 +24,9 @@ type TransferRequestDTO struct {
 	FromWalletID   string `json:"from_wallet_id" binding:"required,uuid"`
 	ToWalletID     string `json:"to_wallet_id" binding:"required,uuid"`
 	Amount         int64  `json:"amount" binding:"required,gt=0"`
-	Currency       string `json:"currency" binding:"required,len=3"`
-	IdempotencyKey string `json:"idempotency_key" binding:"required"`
-	Description    string `json:"description"`
+	Currency       string `json:"currency" binding:"required,len=3,uppercase"`
+	IdempotencyKey string `json:"idempotency_key" binding:"required,uuid"`
+	Description    string `json:"description" binding:"max=200"`
 }
 
 // HandleTransfer processes the transfer request.
@@ -62,11 +61,10 @@ func (h *TransferHandler) HandleTransfer(c *gin.Context) {
 	}
 
 	// Fetch Public Key for this device and user
-	var publicKey string
-	err = database.DB.QueryRow("SELECT public_key FROM user_device_bindings WHERE user_id = $1 AND device_id = $2 AND is_active = true", userID, deviceId).Scan(&publicKey)
+	publicKey, err := h.SignatureService.GetDevicePublicKey(c.Request.Context(), userID, deviceId)
 	if err != nil {
-		log.Printf("⚠️ Signature Error: Device not found or inactive (%s) for user %s\n", deviceId, userID)
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Device not recognized or link revoked"})
+		log.Printf("⚠️ Signature Error: %v for user %s\n", err, userID)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -121,9 +119,9 @@ func (h *TransferHandler) HandleTransfer(c *gin.Context) {
 
 // HandleBalance returns the balance for the authenticated user.
 func (h *TransferHandler) HandleBalance(c *gin.Context) {
-	currency := c.Query("currency")
-	if currency == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "currency query param required"})
+	currency := strings.ToUpper(strings.TrimSpace(c.Query("currency")))
+	if len(currency) != 3 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid currency format (ISO 4217 required)"})
 		return
 	}
 
@@ -194,6 +192,11 @@ func (h *TransferHandler) HandleGetLatestRate(c *gin.Context) {
 	homeCurrency := strings.ToUpper(strings.TrimSpace(c.Query("home_currency")))
 	if homeCurrency == "" {
 		homeCurrency = "USD"
+	}
+
+	if len(homeCurrency) != 3 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid currency format"})
+		return
 	}
 
 	// Base currency is fixed to THB for this iteration (Thai Wallet System)

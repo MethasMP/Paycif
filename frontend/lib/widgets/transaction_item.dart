@@ -64,66 +64,74 @@ class TransactionItem extends StatelessWidget {
     // Subtitle: Time + Source (simulated)
     final timeStr = DateFormat('MMM d, h:mm a').format(transaction.createdAt);
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-        child: Row(
-          children: [
-            // --- Icon Container ---
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: iconBgColor,
-                borderRadius: BorderRadius.circular(22), // Circular/Pill shape
-              ),
-              child: Icon(iconData, color: iconColor, size: 20),
-            ),
-            const SizedBox(width: 16),
-
-            // --- Title & Subtitle ---
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      fontWeight: FontWeight.w600, // Semi-bold for title
-                      color: isDark ? Colors.white : const Color(0xFF111827),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+    return Semantics(
+      label: 'Transaction: $title, $prefix$formattedAmount, $timeStr',
+      button: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          child: Row(
+            children: [
+              // --- Icon Container ---
+              ExcludeSemantics(
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: iconBgColor,
+                    borderRadius: BorderRadius.circular(
+                      22,
+                    ), // Circular/Pill shape
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    timeStr, // Simplify subtitle to just time/date for now
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: isDark
-                          ? Colors.grey[400]
-                          : const Color(0xFF6B7280),
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
+                  child: Icon(iconData, color: iconColor, size: 20),
+                ),
               ),
-            ),
+              const SizedBox(width: 16),
 
-            // --- Amount ---
-            const SizedBox(width: 8),
-            Text(
-              '$prefix$formattedAmount',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                fontWeight: FontWeight.w600, // Medium weight for numbers
-                color: amountColor,
-                fontFamily:
-                    'RobotoMono', // Optional: Monospaced for numbers alignment if available, else default
-                letterSpacing: -0.5,
+              // --- Title & Subtitle ---
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w600, // Semi-bold for title
+                        color: isDark ? Colors.white : const Color(0xFF111827),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      timeStr, // Simplify subtitle to just time/date for now
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: isDark
+                            ? Colors.grey[400]
+                            : const Color(0xFF6B7280),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+
+              // --- Amount ---
+              const SizedBox(width: 8),
+              Text(
+                '$prefix$formattedAmount',
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w600, // Medium weight for numbers
+                  color: amountColor,
+                  fontFamily:
+                      'RobotoMono', // Optional: Monospaced for numbers alignment if available, else default
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -12,6 +12,7 @@ import 'top_up_view.dart';
 import 'transaction_detail_screen.dart';
 import 'history_screen.dart';
 import '../utils/error_translator.dart';
+import 'nfc_scan_screen.dart'; // <--- Added for NFC Prototype
 
 class HomeView extends StatefulWidget {
   const HomeView({super.key});
@@ -38,6 +39,17 @@ class _HomeViewState extends State<HomeView> {
       child: Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: _buildAppBar(context),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const NfcScanScreen()),
+            );
+          },
+          label: const Text('Test NFC Passport'),
+          icon: const Icon(Icons.nfc),
+          backgroundColor: Colors.amber,
+        ),
         body: LayoutBuilder(
           builder: (context, constraints) {
             final screenWidth = constraints.maxWidth;

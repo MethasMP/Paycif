@@ -3,7 +3,6 @@ package main
 import (
 	"net/http"
 
-	"paysif/database"
 	"paysif/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -27,9 +26,9 @@ func NewPayoutHandler(svc *service.WalletService, sigSvc *service.SignatureServi
 // PromptPayPayoutRequest is the JSON body for PromptPay payout.
 type PromptPayPayoutRequest struct {
 	Amount         int64  `json:"amount" binding:"required,gt=0"` // In satang (minor units)
-	PromptPayID    string `json:"promptpay_id" binding:"required"`
-	RecipientName  string `json:"recipient_name" binding:"required"`
-	IdempotencyKey string `json:"idempotency_key" binding:"required"`
+	PromptPayID    string `json:"promptpay_id" binding:"required,min=10,max=13"` // Mobile or ID
+	RecipientName  string `json:"recipient_name" binding:"required,min=3,max=100"`
+	IdempotencyKey string `json:"idempotency_key" binding:"required,uuid"`
 }
 
 // HandlePromptPayPayout processes a payout to a PromptPay account.
@@ -63,10 +62,9 @@ func (h *PayoutHandler) HandlePromptPayPayout(c *gin.Context) {
 	}
 
 	// Fetch Public Key for this device and user
-	var publicKey string
-	err = database.DB.QueryRow("SELECT public_key FROM user_device_bindings WHERE user_id = $1 AND device_id = $2 AND is_active = true", userID, deviceId).Scan(&publicKey)
+	publicKey, err := h.SignatureService.GetDevicePublicKey(c.Request.Context(), userID, deviceId)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Device not recognized or link revoked"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
 

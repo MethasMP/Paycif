@@ -115,27 +115,30 @@ class HistoryScreen extends StatelessWidget {
 
   Widget _buildEmptyState(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.history_toggle_off,
-            size: 60,
-            color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            l10n.historyNoActivity,
-            style: TextStyle(
-              color: Theme.of(
-                context,
-              ).textTheme.bodySmall?.color?.withValues(alpha: 0.5),
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
+    return Semantics(
+      label: 'No transaction activity found',
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.history_toggle_off,
+              size: 60,
+              color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
             ),
-          ),
-        ],
+            const SizedBox(height: 16),
+            Text(
+              l10n.historyNoActivity,
+              style: TextStyle(
+                color: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.color?.withValues(alpha: 0.5),
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
