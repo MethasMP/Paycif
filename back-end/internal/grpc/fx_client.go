@@ -123,7 +123,6 @@ func NewFXClientWithConfig(cfg *FXClientConfig) (*FXClient, error) {
 	// Production-ready gRPC options
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(creds),
-		grpc.WithBlock(),
 		// Keepalive for long-running connections
 		grpc.WithKeepaliveParams(keepalive.ClientParameters{
 			Time:                cfg.KeepAliveTime,
@@ -163,7 +162,7 @@ func NewFXClientWithConfig(cfg *FXClientConfig) (*FXClient, error) {
 
 	conn, err := grpc.DialContext(ctx, cfg.Address, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to fx-engine at %s: %w", cfg.Address, err)
+		return nil, fmt.Errorf("failed to init grpc connection at %s: %w", cfg.Address, err)
 	}
 
 	client := &FXClient{
@@ -172,20 +171,15 @@ func NewFXClientWithConfig(cfg *FXClientConfig) (*FXClient, error) {
 		address: cfg.Address,
 	}
 
-	// Verify connection with health check if enabled
+	// Verify connection with health check asynchronously if enabled
 	if cfg.EnableHealthChecks {
-		healthCtx, healthCancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer healthCancel()
+		go func() {
+			healthCtx, healthCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer healthCancel()
 
-		resp, err := client.HealthCheck(healthCtx)
-		if err != nil {
-			conn.Close()
-			return nil, fmt.Errorf("health check failed for fx-engine: %w", err)
-		}
-		if !resp.Healthy {
-			conn.Close()
-			return nil, fmt.Errorf("fx-engine reported unhealthy status")
-		}
+			_, _ = client.HealthCheck(healthCtx)
+			// Non-fatal if it fails during boot; gRPC will keep trying in bg
+		}()
 	}
 
 	return client, nil

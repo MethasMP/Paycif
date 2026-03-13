@@ -1,13 +1,38 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:cryptography/cryptography.dart';
+import 'hardware_security_bridge.dart';
 
-/// Service responsible for cryptographic operations using Ed25519.
-/// This service handles key generation, signing, and public key extraction.
+/// Service responsible for cryptographic operations.
+/// Supports Ed25519 (Software) and P256 (Hardware-Backed Secure Enclave).
 class CryptoService {
   final _algorithm = Ed25519();
+  final _hardwareBridge = HardwareSecurityBridge();
 
-  /// Generates a new Ed25519 KeyPair.
+  // 🛡️ [NEW] Hardware-Backed Operations
+  
+  /// Creates a hardware-backed identity in the Secure Enclave / TEE.
+  Future<String?> createHardwareIdentity() async {
+    return await _hardwareBridge.createHardwareKeyPair(keyName: 'paycif_sentinel_key');
+  }
+
+  /// Signs a payload using hardware-protected keys.
+  /// Triggers Biometric Prompt.
+  Future<String?> signWithHardware({
+    required String payload,
+  }) async {
+    return await _hardwareBridge.signPayload(
+      payload: payload,
+    );
+  }
+
+  Future<void> revokeHardwareIdentity(String keyName) async {
+    await _hardwareBridge.deleteHardwareKey(keyName);
+  }
+
+  // --- Software Fallbacks & PIN Hashing ---
+
+  /// Generates a new Ed25519 KeyPair (Software-only).
   Future<SimpleKeyPair> generateKeyPair() async {
     return await _algorithm.newKeyPair();
   }

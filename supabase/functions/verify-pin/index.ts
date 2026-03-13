@@ -10,11 +10,11 @@
 // 3. Rate Limiting / Lockout Punishment (3 attempts -> Lock)
 // ============================================================================
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
+import { serve } from 'std/server';
+import { createClient } from '@supabase/supabase-js';
 // 🛡️ Use WASM-based Argon2id for Edge Compatibility
-import { argon2id } from 'https://esm.sh/hash-wasm@4.12.0';
-import { decode as base64Decode } from 'https://deno.land/std@0.168.0/encoding/base64.ts';
+import { argon2id } from 'hash-wasm';
+import { decode as base64Decode } from 'std/encoding/base64';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -22,7 +22,7 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -206,10 +206,11 @@ function jsonError(message: string, status: number): Response {
 }
 
 // ----------------------------------------------------------------------------
-// HELPER: Verify Ed25519 Signature
+// HELPER: Dual-Algorithm Signature Verification (Ed25519 & P256)
 // ----------------------------------------------------------------------------
-import * as ed from 'https://esm.sh/@noble/ed25519@2.0.0';
-import { sha512 } from 'https://esm.sh/@noble/hashes@1.3.1/sha512';
+import * as ed from '@noble/ed25519';
+import { p256 } from '@noble/curves/p256';
+import { sha512 } from '@noble/hashes/sha512';
 
 // 🛡️ CRITICAL: Configure SHA-512 for @noble/ed25519 v2
 ed.etc.sha512Sync = (...m: Uint8Array[]) => sha512(ed.etc.concatBytes(...m));
@@ -219,9 +220,25 @@ async function verifySignature(sigB64: string, msg: string, pubKeyB64: string): 
     const sig = base64Decode(sigB64);
     const pub = base64Decode(pubKeyB64);
     const msgBytes = new TextEncoder().encode(msg);
-    return await ed.verify(sig, msgBytes, pub);
+
+    // 🛡️ Algorithm Intelligence: Detection by Key Length
+    // Ed25519 = 32 bytes
+    // P256 (Compressed) = 33 bytes
+    // P256 (Uncompressed) = 65 bytes
+    
+    if (pub.length === 32) {
+      // 🚀 Path A: Legacy Ed25519 (Software)
+      return await ed.verify(sig, msgBytes, pub);
+    } else if (pub.length === 33 || pub.length === 65) {
+      // 🚀 Path B: Banking-Grade P256 (Hardware Secure Enclave)
+      // Note: noble-curves p256.verify expects (sig, msg, pub)
+      return p256.verify(sig, msgBytes, pub);
+    } else {
+      console.error(`[VerifyPin] Unsupported public key length: ${pub.length}`);
+      return false;
+    }
   } catch (err) {
-    console.error('Ed25519 verify error:', err);
+    console.error('Signature verification error:', err);
     return false;
   }
 }

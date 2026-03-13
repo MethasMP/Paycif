@@ -2,7 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:nfc_manager/nfc_manager.dart';
-import 'package:nfc_manager/platform_tags.dart';
+import 'package:nfc_manager/nfc_manager_android.dart';
+import 'package:nfc_manager/nfc_manager_ios.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../api_service.dart';
@@ -66,13 +67,16 @@ class _ChipReadResult {
 /// Step 2) Phone taps passport → reads DG1 (text) and DG2 (face photo) from chip
 class NfcPassportService {
   /// Checks if the current device hardware supports NFC.
-  Future<bool> get isNfcAvailable => NfcManager.instance.isAvailable();
+  Future<bool> get isNfcAvailable async {
+    final availability = await NfcManager.instance.checkAvailability();
+    return availability == NfcAvailability.enabled;
+  }
 
   /// Main entry point: reads the e-Passport NFC chip using the BAC key
   /// derived from the MRZ data.
   Future<PassportData?> readPassportNfc({required MrzData mrz}) async {
-    bool? isAvailable = await NfcManager.instance.isAvailable();
-    if (!isAvailable) {
+    final availability = await NfcManager.instance.checkAvailability();
+    if (availability != NfcAvailability.enabled) {
       debugPrint('[NFC] NFC is not available on this device.');
       return null;
     }
@@ -81,7 +85,8 @@ class NfcPassportService {
 
     try {
       await NfcManager.instance.startSession(
-        alertMessage:
+        pollingOptions: {NfcPollingOption.iso14443},
+        alertMessageIos:
             'Hold your phone against the back cover of your passport.',
         onDiscovered: (NfcTag tag) async {
           try {
@@ -93,7 +98,7 @@ class NfcPassportService {
             final String? sid = responseMap?['session_id'];
 
             await NfcManager.instance.stopSession(
-              alertMessage: isSuccess
+              alertMessageIos: isSuccess
                   ? 'Passport verified! ✓'
                   : 'Verification failed.',
             );
@@ -115,13 +120,13 @@ class NfcPassportService {
               completer.complete(null);
             }
           } on NfcException catch (e) {
-            await NfcManager.instance.stopSession(errorMessage: e.message);
+            await NfcManager.instance.stopSession(errorMessageIos: e.message);
             debugPrint('[NFC] NFC chip read error: ${e.message}');
             completer.completeError(e);
           } catch (e) {
             debugPrint('[NFC] Unexpected error: $e');
             await NfcManager.instance.stopSession(
-              errorMessage: 'Read failed. Try again.',
+              errorMessageIos: 'Read failed. Try again.',
             );
             completer.completeError(e);
           }
@@ -139,27 +144,28 @@ class NfcPassportService {
     NfcTag tag,
     MrzData mrz,
   ) async {
-    final iso7816 = Iso7816.from(tag);
+    final iso7816ios = Iso7816Ios.from(tag);
+    final isoDep = IsoDepAndroid.from(tag);
 
-    if (iso7816 == null) {
-      // If it's not an ISO7816 tag (e.g. testing with mock), fallback to mock logic
-      debugPrint('⚠️ Not an ISO7816 tag, using simulation mode.');
+    if (iso7816ios == null && isoDep == null) {
+      // If it's not a supported tag (e.g. testing with mock), fallback to mock logic
+      debugPrint('⚠️ Not a supported tag, using simulation mode.');
       return _decodeMockOrReal(tag, mrz);
     }
 
     try {
       // 1. 📂 DG1: MRZ Info
       debugPrint('📂 Reading Data Group 1 (MRZ)...');
-      final dg1 = await _selectAndReadEF(iso7816, efId: 0x0101);
+      final dg1 = await _selectAndReadEF(tag, efId: 0x0101);
 
       // 2. 🖼️ DG2: Face Image
       debugPrint('🖼️ Fetching Data Group 2 (Face Image)...');
-      final dg2 = await _selectAndReadEF(iso7816, efId: 0x0102);
+      final dg2 = await _selectAndReadEF(tag, efId: 0x0102);
       final faceImage = dg2 != null ? _extractJpegFromDG2(dg2) : null;
 
       // 3. 🔐 SOD: Document Security Object (For Passive Authentication)
       debugPrint('🔐 Fetching SOD Signature Object...');
-      final sod = await _selectAndReadEF(iso7816, efId: 0x011D);
+      final sod = await _selectAndReadEF(tag, efId: 0x011D);
 
       // Parse DG1 to get Names (ICAO 9303 layout)
       // Note: In real app, we'd use a full parser library here.
@@ -273,29 +279,48 @@ class NfcPassportService {
 
   /// Low-level APDU helpers for future real implementation
   // ignore: unused_element
-  Future<Uint8List?> _selectAndReadEF(Iso7816 tag, {required int efId}) async {
+  Future<Uint8List?> _selectAndReadEF(NfcTag tag, {required int efId}) async {
     final byte1 = (efId >> 8) & 0xFF;
     final byte2 = efId & 0xFF;
+    final data = Uint8List.fromList([byte1, byte2]);
 
-    final selectResp = await tag.sendCommand(
-      instructionClass: 0x00,
-      instructionCode: 0xA4,
-      p1Parameter: 0x02,
-      p2Parameter: 0x04,
-      data: Uint8List.fromList([byte1, byte2]),
-      expectedResponseLength: 256,
-    );
-    if (selectResp.statusWord1 != 0x90) return null;
+    final ios = Iso7816Ios.from(tag);
+    if (ios != null) {
+      final selectResp = await ios.sendCommand(
+        instructionClass: 0x00,
+        instructionCode: 0xA4,
+        p1Parameter: 0x02,
+        p2Parameter: 0x04,
+        data: data,
+        expectedResponseLength: 256,
+      );
+      if (selectResp.statusWord1 != 0x90) return null;
 
-    final readResp = await tag.sendCommand(
-      instructionClass: 0x00,
-      instructionCode: 0xB0,
-      p1Parameter: 0x00,
-      p2Parameter: 0x00,
-      data: Uint8List(0),
-      expectedResponseLength: 256,
-    );
-    return readResp.statusWord1 == 0x90 ? readResp.payload : null;
+      final readResp = await ios.sendCommand(
+        instructionClass: 0x00,
+        instructionCode: 0xB0,
+        p1Parameter: 0x00,
+        p2Parameter: 0x00,
+        data: Uint8List(0),
+        expectedResponseLength: 256,
+      );
+      return readResp.statusWord1 == 0x90 ? readResp.payload : null;
+    }
+
+    final android = IsoDepAndroid.from(tag);
+    if (android != null) {
+      // Select APDU: 00 A4 02 04 02 [ID1 ID2] 00
+      final selectApdu = Uint8List.fromList([0x00, 0xA4, 0x02, 0x04, 0x02, byte1, byte2, 0x00]);
+      final selectResp = await android.transceive(selectApdu);
+      if (selectResp.length < 2 || selectResp[selectResp.length - 2] != 0x90) return null;
+
+      // Read APDU: 00 B0 00 00 00 (Read Binary)
+      final readApdu = Uint8List.fromList([0x00, 0xB0, 0x00, 0x00, 0x00]);
+      final readResp = await android.transceive(readApdu);
+      if (readResp.length < 2 || readResp[readResp.length - 2] != 0x90) return null;
+      return readResp.sublist(0, readResp.length - 2);
+    }
+    return null;
   }
 
   // ignore: unused_element

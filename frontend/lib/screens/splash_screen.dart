@@ -116,7 +116,7 @@ class _SplashScreenState extends State<SplashScreen> {
       backgroundColor: const Color(0xFF1A1F71), // Navy
       body: Center(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment: .center,
           children: [
             // Paycif Logo (Shield)
             Container(
@@ -125,10 +125,10 @@ class _SplashScreenState extends State<SplashScreen> {
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+                      begin: .topLeft,
+                      end: .bottomRight,
                     ),
-                    shape: BoxShape.circle,
+                    shape: .circle,
                     boxShadow: [
                       BoxShadow(
                         color: const Color(0xFFF59E0B).withValues(alpha: 0.4),
@@ -154,7 +154,7 @@ class _SplashScreenState extends State<SplashScreen> {
                   'Paycif',
                   style: Theme.of(context).textTheme.displayMedium?.copyWith(
                     color: Colors.white,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: .w800,
                   ),
                 )
                 .animate()

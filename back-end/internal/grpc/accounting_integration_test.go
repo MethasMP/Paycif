@@ -112,20 +112,3 @@ func BenchmarkRustTransfer(b *testing.B) {
 			fmt.Sprintf("bench-req-%d", i))
 	}
 }
-
-// PerformanceComparison shows the expected improvements
-func ExamplePerformanceComparison() {
-	fmt.Println("Expected Performance Improvements (Rust vs Go):")
-	fmt.Println()
-	fmt.Println("Operation          Go (ms)    Rust (μs)    Improvement")
-	fmt.Println("-----------------------------------------------------")
-	fmt.Println("Limit Check        10-50      10-100       100-1000x")
-	fmt.Println("Transfer           50-100     5-20         10-50x")
-	fmt.Println("JSON Parse         1000       50-100       10-20x")
-	fmt.Println("Cache Read         500        0.05         10,000x")
-	fmt.Println("Decimal Math       200        10           20x")
-	fmt.Println()
-	fmt.Println("Throughput:")
-	fmt.Println("  Go:  ~1,000 transfers/second")
-	fmt.Println("  Rust: ~25,000 transfers/second (25x)")
-}

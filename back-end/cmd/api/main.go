@@ -62,16 +62,14 @@ func main() {
 
 	fxClient, err := fxrpc.NewFXClientWithConfig(fxClientConfig)
 	if err != nil {
-		// Log but don't fatal? No, for Survivability, if Engine is critical, maybe warn.
-		// But since we have DB fallback, we can proceed!
-		slog.Warn("Could not connect to Rust FX Engine. Running in degraded mode (DB-only).", "error", err)
-		// fxClient remains nil
-	} else {
-		slog.Info("Connected to High-Performance Rust FX Engine")
-		defer fxClient.Close()
-		fxClientInterface = fxClient
-		sigServiceClient = fxClient.GetClient()
+		slog.Error("Failed to initialize FX Client infrastructure", "error", err)
+		os.Exit(1)
 	}
+	
+	slog.Info("Rust FX Engine integration initialized", "address", fxAddress)
+	defer fxClient.Close()
+	fxClientInterface = fxClient
+	sigServiceClient = fxClient.GetClient()
 
 	// 2. Service Initialization
 	auditService := service.NewAuditService(database.DB)
@@ -108,6 +106,12 @@ func main() {
 	r.Use(middleware.CORSMiddleware()) // CORS Configuration
 	r.Use(middleware.SecurityHeadersMiddleware()) // Standard Security Headers
 	
+	publicV1 := r.Group("/api/v1")
+	{
+		publicV1.GET("/rates/latest", transferHandler.HandleGetLatestRate)
+		publicV1.GET("/quote", routingHandler.HandleGetQuote)
+	}
+
 	v1 := r.Group("/api/v1")
 	v1.Use(middleware.AuthMiddleware(walletService)) // Apply Auth with Service injection 🛡️
 	v1.Use(middleware.RateLimiterMiddleware(redisClient)) // Pass Redis to RateLimiter
@@ -116,10 +120,6 @@ func main() {
 		v1.GET("/balance", transferHandler.HandleBalance)
 		v1.GET("/limits", transferHandler.HandleGetLimits) // New Route for Rust Limits
 		v1.GET("/transactions", transferHandler.HandleGetTransactions)
-		v1.GET("/rates/latest", transferHandler.HandleGetLatestRate)
-
-		// Smart Routing
-		v1.GET("/quote", routingHandler.HandleGetQuote)
 
 		// Payment Routes (Protected)
 		v1.POST("/payments/create-intent", paymentHandler.HandleCreateIntent)

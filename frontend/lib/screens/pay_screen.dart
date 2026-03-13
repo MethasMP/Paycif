@@ -60,10 +60,8 @@ class _PayScreenState extends State<PayScreen> {
       try {
         isAuthenticated = await _auth.authenticate(
           localizedReason: 'Scan to pay ฿${widget.amount.toStringAsFixed(2)}',
-          options: const AuthenticationOptions(
-            stickyAuth: true,
-            biometricOnly: true,
-          ),
+          persistAcrossBackgrounding: true,
+          biometricOnly: true,
         );
       } catch (_) {
         // Biometric canceled/failed, fall through to PIN

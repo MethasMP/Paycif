@@ -1,7 +1,12 @@
 {
   "deno.enable": true,
-  "terminal.integrated.enablePersistentSessions": false,
-  "deno.config": "./supabase/functions/deno.json",
+  "deno.enablePaths": ["supabase/functions", "/Users/maemp/Desktop/Paycif/supabase/functions"],
+  "deno.config": "supabase/functions/deno.json",
+  "deno.importMap": "supabase/functions/import_map.json",
   "editor.defaultFormatter": "denoland.vscode-deno",
+  "[typescript]": {
+    "editor.defaultFormatter": "denoland.vscode-deno"
+  },
+  "typescript.disableAutomaticTypeAcquisition": true,
   "git.ignoreLimitWarning": true
 }

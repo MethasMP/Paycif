@@ -43,10 +43,8 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
       final auth = LocalAuthentication();
       final authenticated = await auth.authenticate(
         localizedReason: 'Please verify your identity to unlock Paycif',
-        options: const AuthenticationOptions(
-          stickyAuth: true,
-          biometricOnly: true,
-        ),
+        persistAcrossBackgrounding: true,
+        biometricOnly: true,
       );
 
       if (authenticated && mounted) {

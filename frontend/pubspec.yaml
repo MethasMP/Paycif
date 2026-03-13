@@ -38,19 +38,19 @@ dependencies:
   provider: ^6.0.0
   flutter_bloc: ^9.1.1
   equatable: ^2.0.8
-  google_fonts: ^7.0.0
+  google_fonts: ^8.0.2
   logger: ^2.6.2
   http: ^1.6.0
   intl: ^0.20.2
   jwt_decoder: ^2.0.1
   mobile_scanner: ^7.1.4
-  local_auth: ^2.1.6
+  local_auth: ^3.0.1
   flutter_dotenv: ^6.0.0
   image_picker: ^1.2.1
-  google_sign_in: ^6.2.1
+  google_sign_in: ^7.2.0
   sign_in_with_apple: ^7.0.1
   flutter_animate: ^4.5.2
-  flutter_stripe: ^10.1.1
+  flutter_stripe: ^12.4.0
   image_gallery_saver_plus: ^4.0.1
   qr_flutter: ^4.1.0
   flutter_localizations:
@@ -67,19 +67,20 @@ dependencies:
   uuid: ^4.5.2
   decimal: ^3.0.1
   rational: ^2.2.3
-  firebase_core: ^3.10.1
-  firebase_messaging: ^15.2.1
-  flutter_local_notifications: ^18.0.1
+  firebase_core: ^4.5.0
+  firebase_messaging: ^16.1.2
+  flutter_local_notifications: ^21.0.0
 
   # ── KYC: Core (NFC & MRZ) ───────────────────────────────────────────────────
-  nfc_manager: ^3.3.0
+  nfc_manager: ^4.1.1
   flutter_mrz_scanner: ^2.2.1
   mrz_parser: ^2.0.1
 
   # ── KYC: Advanced (Tesla-level) Features ─────────────────────────────────────
-  google_mlkit_face_detection: ^0.11.0
-  rive: ^0.13.11
-  camera: ^0.11.0
+  google_mlkit_face_detection: ^0.13.2
+  rive: ^0.14.4
+  camera: ^0.12.0
+  biometric_signature: ^10.2.0
 
 dev_dependencies:
   flutter_test:

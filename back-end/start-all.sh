@@ -22,21 +22,20 @@ lsof -ti:8080 | xargs kill -9 2>/dev/null || true
 # Function to cleanup on exit
 cleanup() {
     echo "🛑 Shutting down services..."
-    kill $FX_PID $GO_PID 2>/dev/null
+    kill $FX_WATCH_PID $GO_PID 2>/dev/null
     exit
 }
 
 # Trap signals for graceful shutdown
 trap cleanup SIGINT SIGTERM
 
-# 1. Start Rust FX Engine
-echo "💱 Building Rust FX Engine..."
+# 1. Start Rust FX Engine (with Supervisor)
+echo "💱 Starting Rust FX Engine Supervisor..."
 cd rust/fx-engine
 cargo build --release
-export FX_ENGINE_UDS="/tmp/fx_engine.sock"
-./target/release/fx_engine > ../../fx_engine.log 2>&1 &
-FX_PID=$!
-echo "✅ FX Engine started [PID: $FX_PID]"
+./watch-fx.sh &
+FX_WATCH_PID=$!
+echo "✅ FX Engine Supervisor started [PID: $FX_WATCH_PID]"
 cd ../..
 
 echo "⏳ Waiting for FX Engine socket..."
@@ -52,7 +51,7 @@ done
 echo "🐹 Building Go API..."
 go build -o tmp_go_build/api ./cmd/api
 echo "🚀 Starting Go API..."
-export GIN_MODE=release
+export GIN_MODE=debug
 ./tmp_go_build/api > api.log 2>&1 &
 GO_PID=$!
 echo "✅ Go API started [PID: $GO_PID]"
@@ -60,4 +59,4 @@ echo "✅ Go API started [PID: $GO_PID]"
 echo "✨ All services are running! Press Ctrl+C to stop."
 
 # Monitor
-wait $FX_PID $GO_PID
+wait $FX_WATCH_PID $GO_PID

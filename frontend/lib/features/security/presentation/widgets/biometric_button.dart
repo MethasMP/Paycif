@@ -24,7 +24,7 @@ class BiometricButton extends StatelessWidget {
     try {
       final didAuthenticate = await localAuth.authenticate(
         localizedReason: 'Authenticate to confirm identity',
-        options: const AuthenticationOptions(biometricOnly: true),
+        biometricOnly: true,
       );
 
       if (didAuthenticate) {

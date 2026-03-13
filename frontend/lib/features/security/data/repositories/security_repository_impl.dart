@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:cryptography/cryptography.dart';
 import 'package:uuid/uuid.dart';
 import '../../domain/repositories/security_repository.dart';
 import '../datasources/crypto_service.dart';
@@ -34,10 +33,9 @@ class SecurityRepositoryImpl implements SecurityRepository {
   static const _kLocalPinSaltKey = 'local_pin_salt';
   static const _kDevicesCacheKey = 'linked_devices_cache';
   static const _kHasPinCacheKey = 'cache_has_pin_configured';
+  static const _kIsHardwareKey = 'is_hardware_backed'; // 🛡️ Sentinel Flag
 
   // ⚡ Lightning-Fast Cache: In-memory storage to skip Disk I/O & Reconstruction
-  String? _cachedDeviceId;
-  SimpleKeyPair? _cachedKeyPair;
   List<Map<String, dynamic>>? _devicesCache;
 
   // ⚡ Security Fast-Path: Memory-cached local hash for instant PIN entry
@@ -84,106 +82,81 @@ class SecurityRepositoryImpl implements SecurityRepository {
       await _secureStorage.write(_kDeviceIdKey, deviceId);
     }
 
-    // 2. Generate Cryptographic Identity
-    final keyPair = await _cryptoService.generateKeyPair();
-    final privateKeySeed = await _cryptoService.getPrivateKeyBytes(keyPair);
-    final publicKeyBase64 = await _cryptoService.getPublicKeyBase64(keyPair);
+    // 2. Generate Banking-Grade Cryptographic Identity (Secure Enclave / TEE)
+    final publicKeyBase64 = await _cryptoService.createHardwareIdentity();
+
+    if (publicKeyBase64 == null) {
+      throw Exception('Hardware security module failure. Secure Enclave unavailable.');
+    }
 
     // 🔬 DEBUG: Print public key prefix for tracing
     debugPrint('🔑 [Bind] DeviceID: $deviceId');
-    debugPrint(
-      '🔑 [Bind] PubKey Prefix: ${publicKeyBase64.substring(0, 10)}...',
-    );
+    debugPrint('🔑 [Bind] Hardware PubKey Prefix: ${publicKeyBase64.substring(0, 10)}...');
 
-    // 3. Store Private Key Securely (Biometric Gated)
-    await _secureStorage.write(
-      _kPrivateKeySeedKey,
-      base64Encode(privateKeySeed),
-    );
+    // 3. Mark as Hardware Backed (No Private Key extraction!)
+    await _secureStorage.write(_kIsHardwareKey, 'true');
+    await _secureStorage.delete(_kPrivateKeySeedKey); // Wipe any old software seeds
 
     // 4. Get Device Metadata
     String deviceName = 'Unknown Device';
-    String osType = 'web'; // Default fallback that satisfies constraint
-    Map<String, dynamic> metadata = {};
+    String osType = 'web';
+    Map<String, dynamic> metadata = {'security_level': 'hardware_enclave'};
 
     try {
       if (Platform.isAndroid) {
         final androidInfo = await _deviceInfoPlugin.androidInfo;
         deviceName = '${androidInfo.brand} ${androidInfo.model}';
         osType = 'android';
-        metadata = {
-          'brand': androidInfo.brand,
-          'model': androidInfo.model,
-          'product': androidInfo.product,
-          'version': androidInfo.version.release,
-          'sdkInt': androidInfo.version.sdkInt,
-          'isPhysicalDevice': androidInfo.isPhysicalDevice,
-        };
       } else if (Platform.isIOS) {
         final iosInfo = await _deviceInfoPlugin.iosInfo;
         deviceName = iosInfo.name;
         osType = 'ios';
-        metadata = {
-          'name': iosInfo.name,
-          'systemName': iosInfo.systemName,
-          'systemVersion': iosInfo.systemVersion,
-          'model': iosInfo.model,
-          'localizedModel': iosInfo.localizedModel,
-          'isPhysicalDevice': iosInfo.isPhysicalDevice,
-        };
       }
     } catch (e) {
       deviceName = 'Mobile App';
     }
 
-    // 5. Send to Server (Bind call itself is usually not signed by the key being created,
-    // strictly speaking, but authenticated by User Token).
+    // 5. Send to Server
     await _remoteDataSource.bindDevice(
       publicKey: publicKeyBase64,
       deviceId: deviceId,
       deviceName: deviceName,
       osType: osType,
       metadata: metadata,
-      trustScore: 100,
+      trustScore: 100, // Hardware-backed keys get full trust score
     );
 
-    // ⚡ Post-Bind Cache Update: Immediate availability for PIN entry
-    _cachedDeviceId = deviceId;
-    _cachedKeyPair = keyPair;
+    // ⚡ Post-Bind (No memory caching for hardware/secure keys)
   }
 
   /// Helper to generate headers with signature for critical actions.
   @override
   Future<Map<String, String>> generateSignatureHeaders(String payload) async {
-    // ⚡ Lightning-Fast Check (In-Memory)
-    if (_cachedDeviceId != null && _cachedKeyPair != null) {
-      final signature = await _cryptoService.signPayload(
-        _cachedKeyPair!,
-        payload,
-      );
-      // 🔬 DEBUG: Print what we're sending
-      final pubKeyB64 = await _cryptoService.getPublicKeyBase64(
-        _cachedKeyPair!,
-      );
-      debugPrint('🔑 [Verify] Using CACHED key. DeviceID: $_cachedDeviceId');
-      debugPrint('🔑 [Verify] PubKey Prefix: ${pubKeyB64.substring(0, 10)}...');
-      return {'X-Device-Id': _cachedDeviceId!, 'X-Device-Signature': signature};
+    final isHardware = await _secureStorage.read(_kIsHardwareKey) == 'true';
+    final deviceId = await _secureStorage.read(_kDeviceIdKey);
+
+    if (deviceId == null) {
+      throw Exception('Device not bound. Cannot sign request.');
     }
 
-    // Fallback: Slow Path (SecureStorage + Key Reconstruction)
-    final deviceId = await _secureStorage.read(_kDeviceIdKey);
-    final privateKeyB64 = await _secureStorage.read(_kPrivateKeySeedKey);
+    if (isHardware) {
+      // 🛡️ Hardware Path (Secure Enclave)
+      final signature = await _cryptoService.signWithHardware(
+        payload: payload,
+      );
+      if (signature == null) throw Exception('Biometric authentication failed.');
+      
+      return {'X-Device-Id': deviceId, 'X-Device-Signature': signature};
+    }
 
-    if (deviceId == null || privateKeyB64 == null) {
-      throw Exception('Device not bound. Cannot sign request.');
+    // 🐢 Legacy Software Path (SecureStorage + Key Reconstruction)
+    final privateKeyB64 = await _secureStorage.read(_kPrivateKeySeedKey);
+    if (privateKeyB64 == null) {
+      throw Exception('Security credentials missing. Please re-bind device.');
     }
 
     final seed = base64Decode(privateKeyB64);
     final keyPair = await _cryptoService.keyPairFromSeed(seed);
-
-    // ⚡ Update Cache for next time
-    _cachedDeviceId = deviceId;
-    _cachedKeyPair = keyPair;
 
     final signature = await _cryptoService.signPayload(keyPair, payload);
     return {'X-Device-Id': deviceId, 'X-Device-Signature': signature};
@@ -434,8 +407,6 @@ class SecurityRepositoryImpl implements SecurityRepository {
   @override
   Future<void> clearSecurityData() async {
     // 1. Wipe Memory Cache
-    _cachedDeviceId = null;
-    _cachedKeyPair = null;
     _devicesCache = null;
     _cachedLocalHash = null;
     _cachedLocalSalt = null;

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:io' show Platform;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
 import '../utils/error_translator.dart';
@@ -19,6 +20,13 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   late final Stream<AuthState> _authStream;
+
+  bool _isCanceledAuthError(Object error) {
+    final raw = error.toString().toLowerCase();
+    return raw.contains('googlesigninexceptioncode.canceled') ||
+        raw.contains('activity is cancelled by the user') ||
+        raw.contains('canceled');
+  }
 
   @override
   void initState() {
@@ -58,30 +66,29 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // 1. Native Google Sign In
-      final GoogleSignIn googleSignIn = GoogleSignIn(
-        // iOS Client ID
-        clientId: dotenv.env['GOOGLE_CLIENT_ID_IOS'],
-        // Web Client ID (Server) - Helps with ID Token audience validation
-        serverClientId: dotenv.env['GOOGLE_CLIENT_ID_WEB'],
-        scopes: ['email', 'profile'],
-      );
-
-      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-
-      if (googleUser == null) {
-        // User canceled
-        setState(() => _isLoading = false);
-        return;
+      final webClientId = dotenv.env['GOOGLE_CLIENT_ID_WEB'];
+      if (webClientId == null || webClientId.isEmpty) {
+        throw Exception('Missing GOOGLE_CLIENT_ID_WEB in .env');
       }
 
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-      final accessToken = googleAuth.accessToken;
+      // 1. Native Google Sign In
+      // In 7.0.0+, initialization is required.
+      // Use iOS client id only on iOS. Android should rely on package/SHA config.
+      await GoogleSignIn.instance.initialize(
+        clientId: Platform.isIOS ? dotenv.env['GOOGLE_CLIENT_ID_IOS'] : null,
+        serverClientId: webClientId,
+      );
+
+      final GoogleSignInAccount googleUser =
+          await GoogleSignIn.instance.authenticate();
+
+      final GoogleSignInAuthentication googleAuth = googleUser.authentication;
       final idToken = googleAuth.idToken;
 
       if (idToken == null) {
-        throw 'No ID Token found.';
+        throw Exception(
+          'No Google ID token. Verify GOOGLE_CLIENT_ID_WEB and Android SHA-1/SHA-256 setup in Google Cloud.',
+        );
       }
 
       // 2. Exchange with Supabase
@@ -90,11 +97,36 @@ class _LoginScreenState extends State<LoginScreen> {
       await Supabase.instance.client.auth.signInWithIdToken(
         provider: OAuthProvider.google,
         idToken: idToken,
-        accessToken: accessToken,
       );
 
       // Navigation is handled by the _authStream listener.
+    } on GoogleSignInException catch (error) {
+      if (error.code == GoogleSignInExceptionCode.canceled) {
+        // User/system canceled the native Google flow; don't show an error toast.
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+        return;
+      }
+      debugPrint('Google Sign-In error: $error');
+      if (mounted) {
+        PayNotify.error(
+          context,
+          ErrorTranslator.translate(
+            AppLocalizations.of(context)!,
+            error.toString(),
+          ),
+        );
+        setState(() => _isLoading = false);
+      }
     } catch (error) {
+      if (_isCanceledAuthError(error)) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+        return;
+      }
+      debugPrint('Google Sign-In error: $error');
       if (mounted) {
         PayNotify.error(
           context,
@@ -137,8 +169,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           const Color(0xFFF59E0B), // Gold
                           const Color(0xFFD97706), // Darker Gold
                         ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+                        begin: .topLeft,
+                        end: .bottomRight,
                       ),
                       shape: BoxShape.circle,
                       boxShadow: [
@@ -175,7 +207,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         style: Theme.of(context).textTheme.displayLarge
                             ?.copyWith(
                               color: Colors.white,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: .w800,
                               letterSpacing: -1.0,
                             ),
                       ),
@@ -185,7 +217,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         height: 10,
                         decoration: BoxDecoration(
                           color: const Color(0xFFF59E0B), // Gold Dot
-                          shape: BoxShape.circle,
+                          shape: .circle,
                         ),
                       ).animate().scale(delay: 800.ms, duration: 300.ms),
                     ],

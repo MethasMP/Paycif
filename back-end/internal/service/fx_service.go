@@ -230,7 +230,7 @@ func (s *FXService) ConvertToBase(ctx context.Context, amount int64, currency st
 			return resp.ConvertedAmount, rate, nil
 		}
 		// If failed, log and fall back to DB
-		log.Printf("⚠️ Rust FX Engine unavailable or failed: %v. Falling back to DB.", err)
+		log.Printf("⚠️ Rust FX Engine unreachable or failed: %v. Falling back to DB.", err)
 	}
 
 	// 2. Fallback: Stateless Query Logic
@@ -268,7 +268,7 @@ func (s *FXService) GetLimits(ctx context.Context, userID, currency string) (map
 				"max_transaction_amount": resp.MaxTransactionAmount,
 			}, nil
 		}
-		log.Printf("⚠️ Rust Limit Check failed: %v. Falling back to DB.", err)
+		log.Printf("⚠️ Rust Limit Check unreachable or failed: %v. Falling back to DB/Cache.", err)
 	}
 	// 2. Redis Cache Check (Database Query Result Caching - Article Step)
 	// Key: "limits:user:{userID}:{currency}"

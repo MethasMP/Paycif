@@ -68,7 +68,7 @@ class ApiService {
       return 'http://10.0.2.2:8080/api/v1';
     } else {
       // 🍎 On iOS, we distinguish between Simulator and Physical Device
-      return 'http://localhost:8080/api/v1';
+      return 'http://192.168.0.109:8080/api/v1';
     }
   }
 

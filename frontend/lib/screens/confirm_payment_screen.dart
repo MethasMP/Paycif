@@ -202,10 +202,8 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
         localizedReason: l10n.confirmReason(
           '฿${_formatNumber(_enteredAmount)}',
         ),
-        options: const AuthenticationOptions(
-          stickyAuth: true,
-          biometricOnly: true, // Use biometric only for high-stakes payment
-        ),
+        persistAcrossBackgrounding: true,
+        biometricOnly: true, // Use biometric only for high-stakes payment
       );
 
       if (!mounted || !context.mounted) return;
