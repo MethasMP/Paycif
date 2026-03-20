@@ -49,7 +49,9 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
 
       if (authenticated && mounted) {
         HapticFeedback.mediumImpact();
-        _onUnlockSuccess();
+        // Give time for iOS native Face ID dialog to dismiss fully before replacing route
+        await Future.delayed(const Duration(milliseconds: 300));
+        if (mounted) _onUnlockSuccess();
       }
     } catch (e) {
       debugPrint('Biometric unlock failed: $e');

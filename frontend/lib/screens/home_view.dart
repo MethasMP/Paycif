@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
+import 'package:intl/intl.dart';
 
 import '../controllers/dashboard_controller.dart';
 import '../models/transaction.dart';
@@ -12,7 +13,8 @@ import 'top_up_view.dart';
 import 'transaction_detail_screen.dart';
 import 'history_screen.dart';
 import '../utils/error_translator.dart';
-import 'nfc_scan_screen.dart'; // <--- Added for NFC Prototype
+import 'profile_page.dart';
+import 'package:flutter/services.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({super.key});
@@ -30,33 +32,25 @@ class _HomeViewState extends State<HomeView> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return BlocListener<DashboardController, DashboardState>(
-      listenWhen: (previous, current) =>
-          previous.wallet?.id != current.wallet?.id && current.wallet != null,
-      listener: (context, state) {
-        // Transactions are now auto-subscribed in controller
-      },
-      child: Scaffold(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        appBar: _buildAppBar(context),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const NfcScanScreen()),
-            );
-          },
-          label: const Text('Test NFC Passport'),
-          icon: const Icon(Icons.nfc),
-          backgroundColor: Colors.amber,
-        ),
-        body: LayoutBuilder(
-          builder: (context, constraints) {
-            final screenWidth = constraints.maxWidth;
-            // final padding = screenWidth * 0.05; // Unused
+    return BlocBuilder<DashboardController, DashboardState>(
+      builder: (context, state) {
+        final bool isVerified = state.kycTier == 'verified';
 
-            return BlocBuilder<DashboardController, DashboardState>(
-              builder: (context, state) {
+        return BlocListener<DashboardController, DashboardState>(
+          listenWhen: (previous, current) =>
+              previous.wallet?.id != current.wallet?.id &&
+              current.wallet != null,
+          listener: (context, state) {
+            // Transactions are now auto-subscribed in controller
+          },
+          child: Scaffold(
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            appBar: _buildAppBar(context),
+            body: LayoutBuilder(
+              builder: (context, constraints) {
+                final screenWidth = constraints.maxWidth;
+                // final padding = screenWidth * 0.05; // Unused
+
                 if (state.status == 'error') {
                   return Center(
                     child: Text(
@@ -80,7 +74,7 @@ class _HomeViewState extends State<HomeView> {
                           },
                           color: const Color(0xFF1A1F71),
                           child: SingleChildScrollView(
-                            padding: EdgeInsets.all(screenWidth * 0.05),
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                             physics: const AlwaysScrollableScrollPhysics(),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -89,8 +83,9 @@ class _HomeViewState extends State<HomeView> {
                                   context,
                                   state,
                                   screenWidth,
+                                  isVerified,
                                 ),
-                                SizedBox(height: screenWidth * 0.08),
+                                const SizedBox(height: 28),
                                 // Actions
                                 Row(
                                   mainAxisAlignment:
@@ -122,7 +117,7 @@ class _HomeViewState extends State<HomeView> {
                                     ),
                                   ],
                                 ),
-                                SizedBox(height: screenWidth * 0.06),
+                                const SizedBox(height: 24),
                                 // Recent Transactions Header
                                 Row(
                                   mainAxisAlignment:
@@ -172,10 +167,10 @@ class _HomeViewState extends State<HomeView> {
                       : _buildSkeletonDashboard(context, screenWidth),
                 );
               },
-            );
-          },
-        ),
-      ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -205,7 +200,16 @@ class _HomeViewState extends State<HomeView> {
             Icons.settings_outlined,
             color: Theme.of(context).iconTheme.color,
           ),
-          onPressed: () {},
+          onPressed: () {
+            // Navigator.push(context, MaterialPageRoute(builder: (context) => const ProfilePage()));
+            // For now, let's just show the profile page as a dedicated screen if accessed from here
+            // Or better, if it's already in the main screen, we can handle tab switching.
+            // But a direct push is cleaner for a "Settings" action from Home.
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const ProfilePage()),
+            );
+          },
         ),
       ],
     );
@@ -217,6 +221,7 @@ class _HomeViewState extends State<HomeView> {
     BuildContext context,
     DashboardState state,
     double screenWidth,
+    bool isVerified,
   ) {
     final currency = state.wallet?.currency ?? 'THB';
     final isLoading = state.status == 'loading' || state.status == 'initial';
@@ -329,9 +334,9 @@ class _HomeViewState extends State<HomeView> {
                                             .textTheme
                                             .labelSmall
                                             ?.copyWith(
-                                              color: Colors.amber,
+                                              color: Colors.white70,
                                               fontSize: 10,
-                                              fontWeight: FontWeight.bold,
+                                              fontWeight: FontWeight.w600,
                                               letterSpacing: 1.0,
                                             ),
                                       ),
@@ -346,118 +351,67 @@ class _HomeViewState extends State<HomeView> {
                         ],
                       ),
                       const Spacer(),
-                      // EMV + Balance
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
+                      // Balance display (chip removed for premium minimalism)
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Chip Simulation (Simplified for brevity in replace)
-                          Container(
-                            width: 45,
-                            height: 35,
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [
-                                  Color(0xFFFFD700),
-                                  Color(0xFFB8860B),
-                                  Color(0xFFFFD700),
-                                ],
-                                stops: [0.1, 0.5, 0.9],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            // ... internal chip details omitted for cleaner code, add back if strict ...
-                            // Adding back simple chip details
-                            child: Stack(
-                              children: [
-                                Center(
-                                  child: Container(
-                                    width: 45,
-                                    height: 1,
-                                    color: Colors.black.withValues(alpha: 0.2),
-                                  ),
+                          Text(
+                            AppLocalizations.of(context)!.homeTotalBalance,
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(
+                                  color: Colors.white.withValues(alpha: 0.6),
+                                  letterSpacing: 0.5,
                                 ),
-                                Center(
-                                  child: Container(
-                                    width: 1,
-                                    height: 35,
-                                    color: Colors.black.withValues(alpha: 0.2),
-                                  ),
-                                ),
-                                Center(
-                                  child: Container(
-                                    width: 18,
-                                    height: 12,
-                                    decoration: BoxDecoration(
-                                      border: Border.all(
-                                        color: Colors.black.withValues(
-                                          alpha: 0.2,
-                                        ),
-                                      ),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
                           ),
-                          const SizedBox(width: 20),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                          const SizedBox(height: 6),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.baseline,
+                              textBaseline: TextBaseline.alphabetic,
                               children: [
-                                Text(
-                                  AppLocalizations.of(
-                                    context,
-                                  )!.homeTotalBalance,
-                                  style: Theme.of(context).textTheme.labelSmall
-                                      ?.copyWith(
-                                        color: Colors.white.withValues(
-                                          alpha: 0.6,
-                                        ),
-                                        letterSpacing: 0.5,
-                                      ),
-                                ),
-                                const SizedBox(height: 4),
-                                FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  alignment: Alignment.centerLeft,
-                                  child: Row(
-                                    children: [
-                                      Text(
-                                        isLoading
-                                            ? '...'
-                                            : state.formattedBalance,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .displaySmall
-                                            ?.copyWith(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                              letterSpacing: 1.0,
-                                              fontFamily: 'Courier',
-                                            ),
-                                      ),
-                                      if (state.isBalanceVisible &&
-                                          !isLoading) ...[
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          currency,
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .titleMedium
-                                              ?.copyWith(
-                                                color: const Color(0xFFF59E0B),
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                        ),
-                                      ],
-                                    ],
+                                TweenAnimationBuilder<double>(
+                                  tween: Tween<double>(
+                                    begin: 0,
+                                    end: isLoading
+                                        ? 0
+                                        : (state.wallet?.balance ?? 0) / 100.0,
                                   ),
+                                  duration: const Duration(milliseconds: 1500),
+                                  curve: Curves.easeOutQuart,
+                                  builder: (context, value, child) {
+                                    final formatter = NumberFormat.currency(
+                                      symbol: '',
+                                      decimalDigits: 2,
+                                      locale: 'en_US',
+                                    );
+                                    return Text(
+                                      isLoading ? '...' : formatter.format(value),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .displayMedium
+                                          ?.copyWith(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: -1.0,
+                                          ),
+                                    );
+                                  },
                                 ),
-
-                                // Dual currency display removed
+                                if (state.isBalanceVisible && !isLoading) ...[
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    currency,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(
+                                          color: const Color(0xFFF59E0B),
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                  ),
+                                ],
                               ],
                             ),
                           ),
@@ -469,9 +423,12 @@ class _HomeViewState extends State<HomeView> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           GestureDetector(
-                            onTap: () => context
-                                .read<DashboardController>()
-                                .toggleBalanceVisibility(),
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              context
+                                  .read<DashboardController>()
+                                  .toggleBalanceVisibility();
+                            },
                             child: Row(
                               children: [
                                 Icon(
@@ -516,6 +473,35 @@ class _HomeViewState extends State<HomeView> {
           duration: 30.seconds,
           color: const Color(0xFFFFFFFF).withValues(alpha: 0.1),
           angle: 0.8,
+        )
+        .animate(target: isVerified ? 1 : 0)
+        .custom(
+          duration: 2.seconds,
+          curve: Curves.easeInOut,
+          builder: (context, value, child) {
+            if (value == 0) return child;
+            return Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: const Color(
+                    0xFFF59E0B,
+                  ).withValues(alpha: value * 0.5),
+                  width: 2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(
+                      0xFFF59E0B,
+                    ).withValues(alpha: value * 0.2),
+                    blurRadius: 20 * value,
+                    spreadRadius: 2 * value,
+                  ),
+                ],
+              ),
+              child: child,
+            );
+          },
         );
   }
 
@@ -531,40 +517,53 @@ class _HomeViewState extends State<HomeView> {
     final isSmall = screenWidth < 380;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        children: [
-          Container(
-            width: isSmall ? 50 : 60,
-            height: isSmall ? 50 : 60,
-            decoration: BoxDecoration(
-              color: Theme.of(context).cardColor,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+    final buttonSize = isSmall ? 56.0 : 64.0;
+    final iconSize = isSmall ? 24.0 : 28.0;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
+        onHighlightChanged: (highlighted) {
+          if (highlighted) HapticFeedback.selectionClick();
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Column(
+            children: [
+              Container(
+                width: buttonSize,
+                height: buttonSize,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).cardColor,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.07),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            child: Icon(
-              icon,
-              color: isDark ? Colors.white : const Color(0xFF1A1F71),
-              size: isSmall ? 24 : 28,
-            ),
+                child: Icon(
+                  icon,
+                  color: isDark ? Colors.white : const Color(0xFF1A1F71),
+                  size: iconSize,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white60 : const Color(0xFF374151),
+                  fontSize: isSmall ? 12 : 13,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: isDark ? Colors.white60 : const Color(0xFF374151),
-              fontSize: isSmall ? 12 : 13,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -651,7 +650,7 @@ class _HomeViewState extends State<HomeView> {
         : Colors.grey.withValues(alpha: 0.1);
 
     return SingleChildScrollView(
-      padding: EdgeInsets.all(screenWidth * 0.05),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       physics: const NeverScrollableScrollPhysics(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

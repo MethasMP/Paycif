@@ -19,6 +19,8 @@ import '../utils/pay_notify.dart';
 import '../utils/fee_calculator.dart';
 import 'package:uuid/uuid.dart';
 import '../features/security/domain/repositories/security_repository.dart';
+import '../widgets/kyc/kyc_gate.dart';
+import '../widgets/kyc/payment_method_picker.dart';
 
 class TopUpView extends StatefulWidget {
   const TopUpView({super.key});
@@ -427,122 +429,25 @@ class _TopUpViewState extends State<TopUpView> {
   }
 
   void _showMethodPicker() {
+    final paymentController = Provider.of<PaymentController>(
+      context,
+      listen: false,
+    );
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        final l10n = AppLocalizations.of(ctx)!;
-        final paymentController = Provider.of<PaymentController>(
-          context,
-          listen: false,
-        );
-        final cards = paymentController.savedCards;
-        final prefId = paymentController.preferredMethodId;
-        final prefType = paymentController.preferredMethodType;
-
-        return Container(
-          decoration: BoxDecoration(
-            color: Theme.of(ctx).scaffoldBackgroundColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 12),
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: Row(
-                  children: [
-                    Text(
-                      l10n.walletPaymentMethod,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(ctx),
-                    ),
-                  ],
-                ),
-              ),
-              if (Platform.isIOS)
-                _buildPickerTile(
-                  icon: Icons.apple,
-                  title: l10n.applePay,
-                  isSelected: prefType == 'apple_pay',
-                  onTap: () {
-                    paymentController.updatePreference(
-                      'apple_pay',
-                      'apple_pay',
-                    );
-                    Navigator.pop(ctx);
-                  },
-                ),
-              ...cards.map(
-                (card) => _buildPickerTile(
-                  icon: Icons.credit_card_rounded,
-                  title: '${card.brand} •••• ${card.lastDigits}',
-                  isSelected:
-                      prefType == 'card' &&
-                      _normalizeId(prefId ?? '', 'card') ==
-                          _normalizeId(card.id, 'card'),
-                  onTap: () {
-                    paymentController.updatePreference(card.id, 'card');
-                    Navigator.pop(ctx);
-                  },
-                ),
-              ),
-              const Divider(),
-              _buildPickerTile(
-                icon: Icons.add_rounded,
-                title: l10n.paymentAddMethod,
-                isSelected: false,
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _showOpnPaymentSheet();
-                },
-              ),
-              const SizedBox(height: 32),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildPickerTile({
-    required IconData icon,
-    required String title,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return ListTile(
-      leading: Icon(
-        icon,
-        color: isSelected ? const Color(0xFF10B981) : Colors.grey,
+      builder: (ctx) => PaymentMethodPicker(
+        preferredMethodId: paymentController.preferredMethodId,
+        preferredMethodType: paymentController.preferredMethodType,
+        savedCards: paymentController.savedCards,
+        onMethodSelected: (id, type) {
+          paymentController.updatePreference(id, type);
+        },
+        onAddMethod: () {
+          _showOpnPaymentSheet();
+        },
       ),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          color: isSelected ? const Color(0xFF10B981) : null,
-        ),
-      ),
-      trailing: isSelected
-          ? const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981))
-          : null,
-      onTap: onTap,
     );
   }
 
@@ -636,9 +541,12 @@ class _TopUpViewState extends State<TopUpView> {
     );
     HapticFeedback.mediumImpact();
 
-    // 🛡️ CRITICAL: Ensure session is fresh BEFORE any payment operation
-    // This prevents race conditions where payment starts with stale/expired token
-    await ApiService.ensureSessionValid();
+    // 🔒 KYC GATE: Prevent high-value transactions for unverified users
+    final canProceed = await KycGate.checkAndGate(
+      context: context,
+      amountBaht: _enteredAmount,
+    );
+    if (!canProceed) return;
 
     try {
       String? token;

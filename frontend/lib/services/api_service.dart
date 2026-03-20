@@ -515,8 +515,11 @@ class ApiService {
   // Pay to PromptPay (Wallet -> External)
   Future<Map<String, dynamic>> payToPromptPay({
     required int amountInSatang,
-    required String promptPayId,
+    String? promptPayId,
     required String recipientName,
+    String? billerId,
+    String? reference1,
+    String? reference2,
     required String idempotencyKey,
     Map<String, String>? headers,
   }) async {
@@ -524,6 +527,9 @@ class ApiService {
       'amount': amountInSatang,
       'promptpay_id': promptPayId,
       'recipient_name': recipientName,
+      'biller_id': billerId,
+      'reference1': reference1,
+      'reference2': reference2,
       'idempotency_key': idempotencyKey,
     });
 
@@ -702,8 +708,10 @@ class ApiService {
   Future<Map<String, dynamic>> executePayout({
     required String walletId,
     required double amountSatang,
-    required String targetType, // MOBILE, NATID, EWALLET
+    required String targetType, // MOBILE, NATID, EWALLET, BILLER
     required String targetValue,
+    String? reference1,
+    String? reference2,
     required String idempotencyKey, // 🛡️ Mandatory for survivability
     String? description,
     Map<String, String>? headers,
@@ -729,6 +737,8 @@ class ApiService {
           'amount_satang': amountSatang.toInt(),
           'target_type': targetType,
           'target_value': targetValue,
+          'reference1': reference1,
+          'reference2': reference2,
           'idempotency_key': idempotencyKey, // Hardened
           'description': description ?? 'Paycif Payment',
         },
@@ -1029,4 +1039,41 @@ class ApiService {
         return "Something went wrong (Error $statusCode).";
     }
   }
+
+  /// 🔐 SDK: Fetch Sumsub verification token
+  static Future<Map<String, dynamic>> getSumsubToken() async {
+    final url = Uri.parse('$baseUrl/kyc/sumsub-token');
+    await ensureSessionValid();
+    final session = Supabase.instance.client.auth.currentSession;
+    final token = session?.accessToken ?? '';
+
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+    throw Exception('Failed to fetch verification token: ${response.body}');
+  }
+
+  /// 👤 Identity: Fetch user status and tier
+  static Future<String> getUserTier() async {
+    // Current profile data from Supabase
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return 'tier0';
+
+    final res = await Supabase.instance.client
+        .from('profiles')
+        .select('kyc_tier')
+        .eq('id', user.id)
+        .single();
+    
+    return res['kyc_tier'] ?? 'tier0';
+  }
 }
+

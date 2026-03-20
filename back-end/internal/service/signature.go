@@ -41,7 +41,7 @@ func (s *SignatureService) GetDevicePublicKey(ctx context.Context, userID uuid.U
 
 // VerifySignature delegates verification to the high-performance Rust service.
 // publicKey and signature are expected to be base64 encoded strings.
-func (s *SignatureService) VerifySignature(publicKeyB64, signatureB64, message string) (bool, error) {
+func (s *SignatureService) VerifySignature(ctx context.Context, publicKeyB64, signatureB64, message string) (bool, error) {
 	// 1. Decode Base64 Inputs
 	pubKeyBytes, err := base64.StdEncoding.DecodeString(publicKeyB64)
 	if err != nil {
@@ -58,10 +58,10 @@ func (s *SignatureService) VerifySignature(publicKeyB64, signatureB64, message s
 		return false, fmt.Errorf("signature verification unavailable: rust engine is offline")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second) // Fast timeout for auth
+	rpcCtx, cancel := context.WithTimeout(ctx, 2*time.Second) // Fast timeout for auth
 	defer cancel()
 
-	resp, err := s.grpcClient.VerifySignature(ctx, &pb.VerifySignatureRequest{
+	resp, err := s.grpcClient.VerifySignature(rpcCtx, &pb.VerifySignatureRequest{
 		PublicKey: pubKeyBytes,
 		Signature: sigBytes,
 		Message:   []byte(message),

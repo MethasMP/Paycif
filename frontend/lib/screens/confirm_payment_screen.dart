@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'dart:ui' as ui;
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -210,6 +211,8 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
 
       if (authenticated) {
         HapticFeedback.heavyImpact();
+        // Give time for iOS native Face ID dialog to dismiss fully before replacing route
+        await Future.delayed(const Duration(milliseconds: 300));
         await _executePayment();
       } else {
         setState(() {
@@ -460,10 +463,10 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
           if (widget.isLockedAmount)
             Text(
               '฿${currencyFormat.format(_enteredAmount)}',
-              style: const TextStyle(
+              style: Theme.of(context).textTheme.displayMedium?.copyWith(
                 color: Colors.white,
-                fontSize: 42,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.5,
               ),
             )
           else
@@ -488,10 +491,10 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
                     inputFormatters: [
                       FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
                     ],
-                    style: const TextStyle(
+                    style: Theme.of(context).textTheme.displayMedium?.copyWith(
                       color: Colors.white,
-                      fontSize: 42,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.5,
                     ),
                     textAlign: TextAlign.center,
                     decoration: const InputDecoration(
@@ -556,18 +559,20 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
               icon: Icons.account_balance_wallet_rounded,
               color: const Color(0xFF10B981),
             ),
-            _buildPaymentMethodChip(
-              id: 'apple_pay',
-              label: 'Apple Pay',
-              icon: Icons.apple,
-              color: Colors.black,
-            ),
-            _buildPaymentMethodChip(
-              id: 'google_pay',
-              label: 'Google Pay',
-              icon: Icons.g_mobiledata_rounded,
-              color: const Color(0xFF4285F4),
-            ),
+            if (Platform.isIOS || Platform.isMacOS)
+              _buildPaymentMethodChip(
+                id: 'apple_pay',
+                label: 'Apple Pay',
+                icon: Icons.apple,
+                color: isDark ? Colors.white : Colors.black,
+              ),
+            if (Platform.isAndroid)
+              _buildPaymentMethodChip(
+                id: 'google_pay',
+                label: 'Google Pay',
+                icon: Icons.g_mobiledata_rounded,
+                color: const Color(0xFF4285F4),
+              ),
             _buildPaymentMethodChip(
               id: 'card',
               label: '•••• 4242',

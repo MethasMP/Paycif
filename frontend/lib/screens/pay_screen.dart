@@ -16,12 +16,18 @@ class PayScreen extends StatefulWidget {
   final double amount;
   final String merchantName;
   final String? promptPayId;
+  final String? billerId;
+  final String? reference1;
+  final String? reference2;
 
   const PayScreen({
     super.key,
     required this.amount,
     required this.merchantName,
     this.promptPayId,
+    this.billerId,
+    this.reference1,
+    this.reference2,
   });
 
   @override
@@ -71,7 +77,9 @@ class _PayScreenState extends State<PayScreen> {
     if (isAuthenticated) {
       // ✅ Biometric Success -> Execute with Processing Overlay
       if (mounted) {
-        _executePaymentWithProcessingOverlay(cubit);
+        // Give time for iOS native Face ID dialog to dismiss fully
+        await Future.delayed(const Duration(milliseconds: 300));
+        if (mounted) _executePaymentWithProcessingOverlay(cubit);
       }
       return;
     }
@@ -132,8 +140,11 @@ class _PayScreenState extends State<PayScreen> {
 
     // Fire API and wait for result
     cubit.pay(
-      recipientPromptPayId: widget.promptPayId ?? '',
+      recipientPromptPayId: widget.promptPayId,
       recipientName: _displayName,
+      billerId: widget.billerId,
+      reference1: widget.reference1,
+      reference2: widget.reference2,
     );
   }
 
@@ -262,11 +273,10 @@ class _PayScreenState extends State<PayScreen> {
         // 1. Amount Display (Large, Clear)
         Text(
           '฿${widget.amount.toStringAsFixed(2)}',
-          style: TextStyle(
-            fontSize: 56,
-            fontWeight: FontWeight.bold,
+          style: Theme.of(context).textTheme.displayLarge?.copyWith(
+            fontWeight: FontWeight.w800,
             color: isDark ? Colors.white : Colors.black87,
-            letterSpacing: -2,
+            letterSpacing: -1.5,
           ),
         ),
         const SizedBox(height: 8),

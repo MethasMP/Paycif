@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/utils/pay_notify.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,6 +21,7 @@ import '../features/security/presentation/logic/security_controller.dart';
 import '../features/security/presentation/pages/linked_devices_screen.dart';
 import 'package:provider/provider.dart';
 import 'notification_settings_screen.dart';
+import 'nfc_scan_screen.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -310,6 +312,34 @@ class _ProfilePageState extends State<ProfilePage> {
             _buildSectionHeader(context, l10n.accountSecurity),
             const SizedBox(height: 16),
             _buildMenuContainer(context, [
+              if (!isVerified)
+                _buildMenuItem(
+                  Icons.assignment_ind_outlined,
+                  l10n.verifyIdentity,
+                  subtitle: 'Required to unlock higher limits',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const NfcScanScreen()),
+                  ),
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      'START',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ),
+                ),
               _buildBiometricTile(context, l10n),
               _buildMenuItem(
                 Icons.lock_outline,
@@ -495,201 +525,254 @@ class _ProfilePageState extends State<ProfilePage> {
     return Semantics(
       label:
           'Digital Passport for $name, ID $id, KYC Status: ${isVerified ? 'Verified' : 'Pending'}',
-      child: Container(
-        height: 220,
-        width: double.infinity,
-        decoration: BoxDecoration(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onLongPress: () {
+            PayNotify.vibrate(style: PayNotifyVibrationStyle.longSuccess);
+          },
           borderRadius: BorderRadius.circular(24),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: isDark
-                ? [
-                    const Color(0xFF0F172A), // Slate 900
-                    const Color(0xFF1E293B), // Slate 800
-                  ]
-                : [
-                    const Color(0xFF1A1F71), // Navy
-                    const Color(0xFF2C3E50), // Lighter Navy
-                  ],
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: (isDark ? Colors.black : const Color(0xFF1A1F71))
-                  .withValues(alpha: 0.2),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            // Background Pattern
-            Positioned(
-              right: -40,
-              top: -40,
-              child: Icon(
-                Icons.public,
-                size: 200,
-                color: Colors.white.withValues(alpha: 0.05),
+          child: Container(
+            height: 220,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isDark
+                    ? [
+                        const Color(0xFF0F172A), // Slate 900
+                        const Color(0xFF1E293B), // Slate 800
+                      ]
+                    : [
+                        const Color(0xFF1A1F71), // Navy
+                        const Color(0xFF2C3E50), // Lighter Navy
+                      ],
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: (isDark ? Colors.black : const Color(0xFF1A1F71))
+                      .withValues(alpha: 0.2),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
             ),
+            child: Stack(
+              children: [
+                // Background Pattern
+                Positioned(
+                  right: -40,
+                  top: -40,
+                  child: Icon(
+                    Icons.public,
+                    size: 200,
+                    color: Colors.white.withValues(alpha: 0.05),
+                  ),
+                ),
 
-            Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Logo / Brand
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.2),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Logo / Brand
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.2),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.bolt_rounded,
+                                  color: Color(0xFFF59E0B),
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  l10n.passportLabel,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1.0,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.bolt_rounded,
-                              color: Color(0xFFF59E0B),
-                              size: 16,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              l10n.passportLabel,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1.0,
+                          GestureDetector(
+                            onTap: isVerified
+                                ? null
+                                : () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const NfcScanScreen(),
+                                      ),
+                                    ),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // KYC Status Badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isVerified
-                              ? const Color(0xFF10B981).withValues(alpha: 0.2)
-                              : Colors.orange.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              isVerified ? Icons.verified : Icons.pending,
-                              color: isVerified
-                                  ? const Color(0xFF10B981)
-                                  : Colors.orange,
-                              size: 14,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              isVerified
-                                  ? l10n.kycStatusVerified
-                                  : l10n.kycStatusPending,
-                              style: TextStyle(
+                              decoration: BoxDecoration(
                                 color: isVerified
-                                    ? const Color(0xFF10B981)
-                                    : Colors.orange,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
+                                    ? const Color(0xFF10B981).withValues(
+                                        alpha: 0.2,
+                                      )
+                                    : Colors.orange.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isVerified
+                                      ? const Color(0xFF10B981).withValues(
+                                          alpha: 0.3,
+                                        )
+                                      : Colors.orange.withValues(alpha: 0.3),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    isVerified ? Icons.verified : Icons.pending,
+                                    color: isVerified
+                                        ? const Color(0xFF10B981)
+                                        : Colors.orange,
+                                    size: 14,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    isVerified
+                                        ? l10n.kycStatusVerified
+                                        : l10n.kycStatusPending,
+                                    style: TextStyle(
+                                      color: isVerified
+                                          ? const Color(0xFF10B981)
+                                          : Colors.orange,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
+                      ),
+
+                      const Spacer(),
+
+                      // ID Info
+                      Row(
+                        children: [
+                          // Avatar with Ring
+                          Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: const Color(0xFFF59E0B),
+                                width: 2,
+                              ), // Gold Ring
+                            ),
+                            child: CircleAvatar(
+                              radius: 32,
+                              backgroundColor: Colors.black26,
+                              backgroundImage: avatarUrl != null
+                                  ? NetworkImage(avatarUrl)
+                                  : null,
+                              child: avatarUrl == null
+                                  ? const Icon(Icons.person, color: Colors.white)
+                                  : null,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  name,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'ID: $id',
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.7),
+                                    fontSize: 14,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Mini QR
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: QrImageView(
+                              data: id,
+                              version: QrVersions.auto,
+                              size: 40,
+                              padding: EdgeInsets.zero,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-
-                  const Spacer(),
-
-                  // ID Info
-                  Row(
-                    children: [
-                      // Avatar with Ring
-                      Container(
-                        padding: const EdgeInsets.all(3),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: const Color(0xFFF59E0B),
-                            width: 2,
-                          ), // Gold Ring
-                        ),
-                        child: CircleAvatar(
-                          radius: 32,
-                          backgroundColor: Colors.black26,
-                          backgroundImage: avatarUrl != null
-                              ? NetworkImage(avatarUrl)
-                              : null,
-                          child: avatarUrl == null
-                              ? const Icon(Icons.person, color: Colors.white)
-                              : null,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              name,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'ID: $id',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.7),
-                                fontSize: 14,
-                                fontFamily: 'monospace',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Mini QR
-                      Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: QrImageView(
-                          data: id,
-                          version: QrVersions.auto,
-                          size: 40,
-                          padding: EdgeInsets.zero,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
+      )
+          .animate(target: isVerified ? 1 : 0)
+          .custom(
+            duration: 2.seconds,
+            curve: Curves.easeInOut,
+            builder: (context, value, child) {
+              if (value == 0) return child;
+              return Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: const Color(0xFFF59E0B).withValues(alpha: value * 0.5),
+                    width: 2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color:
+                          const Color(0xFFF59E0B).withValues(alpha: value * 0.2),
+                      blurRadius: 20 * value,
+                      spreadRadius: 2 * value,
+                    ),
+                  ],
+                ),
+                child: child,
+              );
+            },
+          ),
     );
   }
 

@@ -1,9 +1,12 @@
 package main
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
 	"paysif/internal/service"
 	"paysif/pkg/nfc" // New import for NFC crypto module
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -11,12 +14,13 @@ import (
 
 // KYCHandler handles identity verification requests.
 type KYCHandler struct {
-	Service *service.KYCService
+	Service       *service.KYCService
+	SumsubService *service.SumsubService
 }
 
 // NewKYCHandler creates a new KYCHandler.
-func NewKYCHandler(svc *service.KYCService) *KYCHandler {
-	return &KYCHandler{Service: svc}
+func NewKYCHandler(svc *service.KYCService, sumsub *service.SumsubService) *KYCHandler {
+	return &KYCHandler{Service: svc, SumsubService: sumsub}
 }
 
 // SubmitKYCRequest matches the JSON input.
@@ -153,4 +157,77 @@ func (h *KYCHandler) HandleSubmitSelfie(c *gin.Context) {
 		"status":  "success",
 		"message": "Identity verified with 1:1 Biometric matching.",
 	})
+}
+
+// HandleGetSumsubToken generates a new SDK access token for the user.
+func (h *KYCHandler) HandleGetSumsubToken(c *gin.Context) {
+	userIDStr, _ := c.Get("user_id")
+	userID, _ := uuid.Parse(userIDStr.(string))
+
+	// Create Applicant if not exists
+	applicantID, err := h.SumsubService.CreateApplicant(userID.String(), "basic-kyc-level")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create Sumsub applicant: " + err.Error()})
+		return
+	}
+
+	// Update DB with Applicant ID
+	if err := h.Service.UpdateSumsubApplicantID(c.Request.Context(), userID, applicantID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update record"})
+		return
+	}
+
+	// Generate SDK Token
+	token, err := h.SumsubService.GenerateAccessToken(userID.String(), "basic-kyc-level")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate Sumsub token"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"token":      token,
+		"expires_at": time.Now().Add(30 * time.Minute).Unix(),
+	})
+}
+
+// HandleSumsubWebhook handles status updates from Sumsub.
+func (h *KYCHandler) HandleSumsubWebhook(c *gin.Context) {
+	payload, _ := io.ReadAll(c.Request.Body)
+	signature := c.GetHeader("X-App-Access-Sig")
+
+	if !h.SumsubService.VerifyWebhookSignature(payload, signature) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid signature"})
+		return
+	}
+
+	var event struct {
+		Type           string `json:"type"`
+		ExternalUserID string `json:"externalUserId"`
+		ReviewResult   struct {
+			ReviewAnswer string `json:"reviewAnswer"`
+		} `json:"reviewResult"`
+	}
+
+	if err := json.Unmarshal(payload, &event); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON"})
+		return
+	}
+
+	if event.Type == "applicantReviewed" {
+		userID, _ := uuid.Parse(event.ExternalUserID)
+		status := "REJECTED"
+		tier := "tier0"
+
+		if event.ReviewResult.ReviewAnswer == "GREEN" {
+			status = "VERIFIED"
+			tier = "tier2"
+		}
+
+		if err := h.Service.UpdateVerificationStatus(c.Request.Context(), userID, status, tier); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update status"})
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }

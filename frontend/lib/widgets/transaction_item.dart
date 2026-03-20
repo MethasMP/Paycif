@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../models/transaction.dart';
 
@@ -68,7 +69,19 @@ class TransactionItem extends StatelessWidget {
       label: 'Transaction: $title, $prefix$formattedAmount, $timeStr',
       button: true,
       child: InkWell(
-        onTap: onTap,
+        onTap: () {
+          // 🧠 Haptic Language:
+          // Debit = Double Thump (Heavy) | Credit = Success Chirp (Light)
+          if (isDebit) {
+            HapticFeedback.heavyImpact(); // First thump
+            Future.delayed(const Duration(milliseconds: 80), () {
+              HapticFeedback.mediumImpact(); // Second thump
+            });
+          } else {
+            HapticFeedback.lightImpact(); // Chirp
+          }
+          onTap?.call();
+        },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -81,9 +94,15 @@ class TransactionItem extends StatelessWidget {
                   height: 44,
                   decoration: BoxDecoration(
                     color: iconBgColor,
-                    borderRadius: BorderRadius.circular(
-                      22,
-                    ), // Circular/Pill shape
+                    borderRadius: BorderRadius.circular(22),
+                    // 🪄 Steve Jobs Soft Glow: Light emanates from the transaction
+                    boxShadow: [
+                      BoxShadow(
+                        color: amountColor.withValues(alpha: 0.15),
+                        blurRadius: 10,
+                        spreadRadius: 2,
+                      ),
+                    ],
                   ),
                   child: Icon(iconData, color: iconColor, size: 20),
                 ),

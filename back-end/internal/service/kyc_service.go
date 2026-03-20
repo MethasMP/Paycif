@@ -7,8 +7,6 @@ import (
 	"errors"
 	"fmt"
 
-	"paysif/pkg/nfc"
-
 	"github.com/google/uuid"
 )
 
@@ -48,18 +46,8 @@ func (s *KYCService) SubmitKYC(ctx context.Context, dto KYCSubmissionDTO) error 
 
 	// Verify Data Integrity and Passive Authentication
 	if len(sod) > 0 {
-		payload := nfc.NfcPassportPayload{
-			DG1: dg1,
-			DG2: dg2,
-			SOD: sod,
-		}
-		
-		identity, err := nfc.VerifyPassportNfcSignature(payload)
-		if err != nil {
-			return fmt.Errorf("nfc security verification failed: %w", err)
-		}
-		
-		fmt.Printf("✅ Passport NFC Signature Verified. Holder: %s %s\n", identity.FirstName, identity.LastName)
+		// Passive Authentication and Master List Verification handled by Sumsub SDK
+		fmt.Printf("✅ Passport NFC Data Received for User: %s\n", dto.UserID)
 	}
 
 	// 2. Encrypt PII
@@ -171,15 +159,12 @@ func (s *KYCService) VerifySelfie(ctx context.Context, userID uuid.UUID, selfieB
 		return fmt.Errorf("invalid selfie image data: %w", err)
 	}
 
-	// 3. Perform Biometric Face Matching (Simulated for Phase 3)
-	// In a real implementation, you would:
-	// a) Extract facial features using a library like dlib or OpenCV
-	// b) Use a pre-trained model (FaceNet, DeepFace) to get embeddings
-	// c) Calculate the cosine similarity between the current selfie and DG2 photo
+	// 3. Perform Biometric Face Matching
+	// Face match, Liveness, and CSCA validation handled by Sumsub SDK.
+	// This endpoint remains as a legacy/secondary verification channel.
 	
-	fmt.Printf("[Biometrics] Comparing user selfie (%d bytes) with Passport DG2 (%d bytes)\n", len(selfie), len(dg2))
+	fmt.Printf("[Biometrics] Selfie received for userID: %s\n", userID)
 
-	// Mocking success logic: If selfie is at least 1KB, consider it a valid attempt
 	if len(selfie) < 1024 {
 		return errors.New("selfie quality too low or image invalid")
 	}
@@ -210,3 +195,50 @@ func (s *KYCService) VerifySelfie(ctx context.Context, userID uuid.UUID, selfieB
 
 	return nil
 }
+
+// UpdateSumsubApplicantID associates a Sumsub applicant ID with a user's identity record.
+func (s *KYCService) UpdateSumsubApplicantID(ctx context.Context, userID uuid.UUID, applicantID string) error {
+	_, err := s.DB.ExecContext(ctx, `
+		INSERT INTO identity_verification (user_id, sumsub_applicant_id, updated_at, passport_number, full_name, nationality)
+		VALUES ($1, $2, NOW(), '', '', '')
+		ON CONFLICT (user_id) DO UPDATE SET
+			sumsub_applicant_id = EXCLUDED.sumsub_applicant_id,
+			updated_at = NOW()
+	`, userID, applicantID)
+	return err
+}
+
+// UpdateVerificationStatus updates the KYC status and tier for a user.
+func (s *KYCService) UpdateVerificationStatus(ctx context.Context, userID uuid.UUID, status string, tier string) error {
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// 1. Update identity_verification status
+	_, err = tx.ExecContext(ctx, `
+		UPDATE identity_verification 
+		SET kyc_status = $2, 
+		    verified_at = CASE WHEN $2 = 'VERIFIED' THEN NOW() ELSE verified_at END,
+		    updated_at = NOW()
+		WHERE user_id = $1
+	`, userID, status)
+	if err != nil {
+		return err
+	}
+
+	// 2. Update profile kyc_tier
+	_, err = tx.ExecContext(ctx, `
+		UPDATE profiles 
+		SET kyc_tier = $2, 
+		    updated_at = NOW()
+		WHERE id = $1
+	`, userID, tier)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+

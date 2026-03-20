@@ -51,13 +51,26 @@ impl TransferExecutor {
 
         if let Some((existing_id,)) = existing {
             info!("Idempotent request - returning existing transaction {}", existing_id);
+            
+            // Fetch balances recorded at that time for consistency
+            let balances: (i64, i64) = sqlx::query_as(
+                r#"
+                SELECT 
+                    (SELECT balance_after FROM ledger_entries WHERE transaction_id = $1::uuid AND amount < 0 LIMIT 1),
+                    (SELECT balance_after FROM ledger_entries WHERE transaction_id = $1::uuid AND amount > 0 LIMIT 1)
+                "#
+            )
+            .bind(&existing_id)
+            .fetch_one(&mut *tx)
+            .await?;
+
             return Ok(TransferResponse {
                 success: true,
                 transaction_id: existing_id,
                 error_code: "".to_string(),
                 error_message: "Already processed (idempotent)".to_string(),
-                sender_balance_after: 0,
-                receiver_balance_after: 0,
+                sender_balance_after: balances.0,
+                receiver_balance_after: balances.1,
                 used_existing: true,
             });
         }

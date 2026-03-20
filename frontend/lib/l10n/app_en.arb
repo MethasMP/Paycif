@@ -23,6 +23,7 @@
   "contactSupport": "Contact Support",
   "signOut": "Sign Out",
   "version": "Version",
+  "verifyIdentity": "Verify Identity",
 
   "paymentStatus": "Payment Status",
   "paymentReady": "READY",

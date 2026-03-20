@@ -7,9 +7,9 @@ LOG_FILE="../../fx_engine.log"
 export FX_ENGINE_UDS="/tmp/fx_engine.sock"
 
 # Load environment variables if available
-if [ -f ../.env ]; then
+if [ -f ../../.env ]; then
     set -a
-    source ../.env
+    source ../../.env
     set +a
 fi
 

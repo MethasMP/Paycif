@@ -80,11 +80,11 @@ impl PayloadWorker {
 
     /// Process pending outbox events using SIMD-JSON
     pub async fn process_outbox_batch(&mut self) -> Result<usize> {
-        // Fetch pending events
+        // Fetch pending events from the correct table matching Go backend
         let events: Vec<(String, String, String, i32)> = sqlx::query_as(
             r#"
-            SELECT id::text, event_type, payload, retry_count
-            FROM outbox_events
+            SELECT id::text, event_type, payload::text, retry_count
+            FROM transaction_outbox
             WHERE status = 'PENDING' AND retry_count < $1
             ORDER BY created_at ASC
             LIMIT $2
@@ -109,7 +109,7 @@ impl PayloadWorker {
                 Ok(_) => {
                     // Mark as processed
                     sqlx::query(
-                        "UPDATE outbox_events SET status = 'PROCESSED', processed_at = NOW() WHERE id = $1::uuid",
+                        "UPDATE transaction_outbox SET status = 'PROCESSED', processed_at = NOW() WHERE id = $1::uuid",
                     )
                     .bind(&id)
                     .execute(&self.db)
@@ -120,9 +120,10 @@ impl PayloadWorker {
                     error!(event_id = %id, error = %e, "Failed to process event");
                     // Increment retry count
                     sqlx::query(
-                        "UPDATE outbox_events SET retry_count = $1, status = CASE WHEN $1 >= $2 THEN 'FAILED' ELSE 'PENDING' END WHERE id = $3::uuid",
+                        "UPDATE transaction_outbox SET retry_count = $1, last_attempt_at = NOW(), error_message = $2, status = CASE WHEN $1 >= $3 THEN 'FAILED' ELSE 'PENDING' END WHERE id = $4::uuid",
                     )
                     .bind(retry_count + 1)
+                    .bind(e.to_string())
                     .bind(self.config.max_retries)
                     .bind(&id)
                     .execute(&self.db)
@@ -169,6 +170,20 @@ impl PayloadWorker {
                     event_id = %id,
                     transaction_id = %transfer.transaction_id,
                     "Transfer event processed"
+                );
+            }
+            "PROMPTPAY_PAYOUT" | "PAYOUT_REQUESTED" | "PAYOUT_INITIATED" => {
+                // Here we would call the actual Payout Provider API
+                // For now, we broadcast the status update
+                let _: () = self
+                    .redis
+                    .publish("payout:updates", payload)
+                    .await?;
+
+                info!(
+                    event_id = %id,
+                    event_type = %event_type,
+                    "Payout event processed/forwarded"
                 );
             }
             "NOTIFICATION" => {
@@ -288,9 +303,14 @@ async fn main() -> Result<()> {
         .unwrap_or_else(|_| "redis://localhost:6379".to_string());
 
     info!("Connecting to database...");
+    use sqlx::postgres::PgConnectOptions;
+    use std::str::FromStr;
+    let connection_options = PgConnectOptions::from_str(&database_url)?
+        .statement_cache_capacity(0); // ⚡ CRITICAL: Fix for Supabase Transaction Pooler
+
     let pool = PgPoolOptions::new()
         .max_connections(5)
-        .connect(&database_url)
+        .connect_with(connection_options)
         .await?;
 
     let config = WorkerConfig {

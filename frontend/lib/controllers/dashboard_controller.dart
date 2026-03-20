@@ -9,6 +9,7 @@ import '../repositories/dashboard_repository.dart';
 
 import '../models/transaction.dart';
 import '../services/connectivity_service.dart';
+import '../services/api_service.dart';
 
 // State
 class DashboardState {
@@ -24,6 +25,7 @@ class DashboardState {
   final bool isTransactionsLoaded;
   final bool isDataWarmed;
   final bool isOffline;
+  final String kycTier;
 
   DashboardState({
     this.wallet,
@@ -38,6 +40,7 @@ class DashboardState {
     this.isTransactionsLoaded = false,
     this.isDataWarmed = false,
     this.isOffline = false,
+    this.kycTier = 'tier0',
   });
 
   DashboardState copyWith({
@@ -53,6 +56,7 @@ class DashboardState {
     bool? isTransactionsLoaded,
     bool? isDataWarmed,
     bool? isOffline,
+    String? kycTier,
   }) {
     return DashboardState(
       wallet: wallet ?? this.wallet,
@@ -67,6 +71,7 @@ class DashboardState {
       isTransactionsLoaded: isTransactionsLoaded ?? this.isTransactionsLoaded,
       isDataWarmed: isDataWarmed ?? this.isDataWarmed,
       isOffline: isOffline ?? this.isOffline,
+      kycTier: kycTier ?? this.kycTier,
     );
   }
 }
@@ -155,6 +160,14 @@ class DashboardController extends Cubit<DashboardState> {
 
     // ⚡ [Fast-Path] Warm up UI immediately from Disk Cache
     await _loadCache();
+
+    // 🛡️ Fetch KYC Tier
+    try {
+      final tier = await ApiService.getUserTier();
+      emit(state.copyWith(kycTier: tier));
+    } catch (e) {
+      debugPrint('⚠️ [Dashboard] KYC Tier fetch failed: $e');
+    }
 
     _startSubscriptions(showLoading: state.wallet == null);
 

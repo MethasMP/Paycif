@@ -75,6 +75,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get version => 'Version';
 
   @override
+  String get verifyIdentity => 'Verify Identity';
+
+  @override
   String get paymentStatus => 'Payment Status';
 
   @override

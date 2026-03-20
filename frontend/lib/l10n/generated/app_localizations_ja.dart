@@ -75,6 +75,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get version => 'バージョン';
 
   @override
+  String get verifyIdentity => 'Verify Identity';
+
+  @override
   String get paymentStatus => '支払いステータス';
 
   @override

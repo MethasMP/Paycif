@@ -5,6 +5,16 @@ import 'package:flutter_animate/flutter_animate.dart';
 
 enum PayNotifyType { success, error, info }
 
+enum PayNotifyVibrationStyle {
+  selection,
+  light,
+  medium,
+  heavy,
+  success,
+  error,
+  longSuccess,
+}
+
 class PayNotify {
   static void show(
     BuildContext context,
@@ -49,6 +59,46 @@ class PayNotify {
       show(context, message, type: PayNotifyType.error);
   static void info(BuildContext context, String message) =>
       show(context, message, type: PayNotifyType.info);
+
+  static void vibrate({
+    PayNotifyVibrationStyle style = PayNotifyVibrationStyle.selection,
+  }) {
+    switch (style) {
+      case PayNotifyVibrationStyle.selection:
+        HapticFeedback.selectionClick();
+        break;
+      case PayNotifyVibrationStyle.light:
+        HapticFeedback.lightImpact();
+        break;
+      case PayNotifyVibrationStyle.medium:
+        HapticFeedback.mediumImpact();
+        break;
+      case PayNotifyVibrationStyle.heavy:
+        HapticFeedback.heavyImpact();
+        break;
+      case PayNotifyVibrationStyle.success:
+        HapticFeedback.lightImpact();
+        Future.delayed(const Duration(milliseconds: 50), () {
+          HapticFeedback.lightImpact();
+        });
+        break;
+      case PayNotifyVibrationStyle.error:
+        HapticFeedback.heavyImpact();
+        Future.delayed(const Duration(milliseconds: 100), () {
+          HapticFeedback.heavyImpact();
+        });
+        break;
+      case PayNotifyVibrationStyle.longSuccess:
+        HapticFeedback.mediumImpact();
+        Future.delayed(const Duration(milliseconds: 100), () {
+          HapticFeedback.mediumImpact();
+          Future.delayed(const Duration(milliseconds: 100), () {
+            HapticFeedback.heavyImpact();
+          });
+        });
+        break;
+    }
+  }
 }
 
 class _PayNotifyWidget extends StatefulWidget {

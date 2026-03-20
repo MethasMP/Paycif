@@ -234,6 +234,12 @@ abstract class AppLocalizations {
   /// **'Version'**
   String get version;
 
+  /// No description provided for @verifyIdentity.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify Identity'**
+  String get verifyIdentity;
+
   /// No description provided for @paymentStatus.
   ///
   /// In en, this message translates to:

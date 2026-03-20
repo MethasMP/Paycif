@@ -69,7 +69,7 @@ func (h *PayoutHandler) HandlePromptPayPayout(c *gin.Context) {
 	}
 
 	// Verify Signature: The payload being signed is the IdempotencyKey
-	isValid, err := h.SignatureService.VerifySignature(publicKey, signature, req.IdempotencyKey)
+	isValid, err := h.SignatureService.VerifySignature(c.Request.Context(), publicKey, signature, req.IdempotencyKey)
 	if err != nil || !isValid {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Request integrity check failed"})
 		return

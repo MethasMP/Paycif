@@ -5,6 +5,6 @@ fn main() -> Result<()> {
     tonic_build::configure()
         .build_server(true)
         .build_client(true) // Build client for tests
-        .compile(&["proto/accounting.proto"], &["proto"])?;
+        .compile_protos(&["proto/accounting.proto"], &["proto"])?;
     Ok(())
 }

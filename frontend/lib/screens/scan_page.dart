@@ -5,10 +5,12 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
 import 'package:frontend/utils/emv_parser.dart';
-import 'package:frontend/utils/pay_notify.dart';
 import 'package:frontend/widgets/premium_scanner_overlay.dart';
+import 'package:frontend/services/qr_aggregator_service.dart';
+import 'package:frontend/widgets/kyc/payment_preview_sheet.dart';
 
 import 'package:frontend/screens/amount_entry_screen.dart';
+import '../utils/pay_notify.dart';
 import 'pay_screen.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -56,10 +58,10 @@ class _ScanPageState extends State<ScanPage> {
   void _handleCode(String code) {
     if (_isProcessing) return;
 
-    final emvData = EMVCoParser.parse(code);
+    final paymentContext = QrAggregatorService.aggregate(code);
 
     // "Tactile Luxury" UX
-    if (emvData.isValid) {
+    if (paymentContext.isSafe) {
       // High-precision haptic sequence
       HapticFeedback.mediumImpact();
       Future.delayed(const Duration(milliseconds: 100), () {
@@ -73,7 +75,7 @@ class _ScanPageState extends State<ScanPage> {
     _cameraController.stop();
 
     if (!mounted) return;
-    _handleValidQR(emvData);
+    _handleValidPayment(paymentContext);
   }
 
   void _resumeScanning() {
@@ -109,27 +111,50 @@ class _ScanPageState extends State<ScanPage> {
     });
   }
 
-  void _handleValidQR(EMFData data) async {
-    await _cameraController.stop();
+  void _handleValidPayment(PaymentContext payContext) async {
     if (!mounted) return;
 
-    if (!data.isValid) {
+    if (!payContext.isSafe && payContext.title == 'Unknown QR') {
       _showError(AppLocalizations.of(context)!.scanUnknownRecipient);
       return;
     }
 
-    final hasAmount = (data.amount ?? 0) > 0;
+    // High-End Preview Ritual
+    final confirm = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (c) => PaymentPreviewBottomSheet(
+        context: payContext,
+        onConfirm: () => Navigator.pop(c, true),
+        onCancel: () => Navigator.pop(c, false),
+      ),
+    );
+
+    if (confirm != true) {
+      _resumeScanning();
+      return;
+    }
+
+    final hasAmount = (payContext.amount ?? 0) > 0;
+
+    if (!mounted) return;
 
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => hasAmount
+        builder: (c) => hasAmount
             ? PayScreen(
-                amount: data.amount!,
-                merchantName: data.merchantName,
-                promptPayId: data.promptPayId,
+                amount: payContext.amount!,
+                merchantName: payContext.title,
+                promptPayId: payContext.accountId,
+                billerId: payContext.billerId,
+                reference1: payContext.reference1,
+                reference2: payContext.reference2,
               )
-            : AmountEntryScreen(data: data),
+            : AmountEntryScreen(
+                data: EMVCoParser.parse(payContext.metadata['raw'] ?? ''),
+              ),
       ),
     );
 

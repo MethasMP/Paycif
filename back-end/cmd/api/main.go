@@ -76,11 +76,17 @@ func main() {
 	alertService := service.NewAlertService()
 	cryptoService := service.NewCryptoService() // Security Init
 	fxService := service.NewFXService(database.DB, fxClientInterface, redisClient) // Inject Rust Client and Redis
-	fxService.StartFXScheduler(context.Background()) // Start FX loop
+	fxService.StartFXScheduler(context.Background())                               // Start FX loop
+	
+	// 2.5 Payment Engine Initialization (Provider Abstraction)
+	paymentEngine := service.NewPaymentEngine("omise") // Default to Omise for now
+	paymentEngine.RegisterProvider(&service.OmiseProvider{APIKey: os.Getenv("OMISE_API_KEY")})
+	paymentEngine.RegisterProvider(&service.WiseProvider{Token: os.Getenv("WISE_API_TOKEN")})
 
 	// Pass redisClient and AuditService to WalletService
-	walletService := service.NewWalletService(database.DB, fxService, alertService, redisClient, auditService)
+	walletService := service.NewWalletService(database.DB, fxService, alertService, redisClient, auditService, paymentEngine)
 	kycService := service.NewKYCService(database.DB, cryptoService, auditService)
+	sumsubService := service.NewSumsubService()
 	sigService := service.NewSignatureService(sigServiceClient, database.DB) // Inject Rust gRPC Client and DB 🛡️
 
 	// 3. Handler Initialization
@@ -90,7 +96,7 @@ func main() {
 	}
 	paymentHandler := NewPaymentHandler(walletService)
 	payoutHandler := NewPayoutHandler(walletService, sigService)
-	kycHandler := NewKYCHandler(kycService)
+	kycHandler := NewKYCHandler(kycService, sumsubService)
 	routingService := routing.NewStaticRouter(walletService)
 	routingHandler := NewRoutingHandler(routingService)
 
@@ -110,6 +116,7 @@ func main() {
 	{
 		publicV1.GET("/rates/latest", transferHandler.HandleGetLatestRate)
 		publicV1.GET("/quote", routingHandler.HandleGetQuote)
+		publicV1.POST("/kyc/sumsub-webhook", kycHandler.HandleSumsubWebhook)
 	}
 
 	v1 := r.Group("/api/v1")
@@ -131,6 +138,7 @@ func main() {
 		v1.POST("/kyc", kycHandler.HandleSubmitKYC)
 		v1.POST("/kyc/nfc", kycHandler.HandleSubmitNfcPassport) // Highly secure NFC Validation
 		v1.POST("/kyc/selfie", kycHandler.HandleSubmitSelfie)  // Biometric matching
+		v1.POST("/kyc/sumsub-token", kycHandler.HandleGetSumsubToken)
 		v1.GET("/kyc", kycHandler.HandleGetKYC)
 	}
 

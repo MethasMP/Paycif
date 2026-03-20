@@ -4,6 +4,14 @@ enum QRType {
   unknown,
 }
 
+enum PromptPayType {
+  mobile,
+  taxId,
+  eWallet,
+  billPayment,
+  unknown,
+}
+
 class EMFData {
   final Map<String, String> rawTags;
   final String merchantName;
@@ -14,8 +22,11 @@ class EMFData {
   final String rawValue;
   final QRType type;
   final String? promptPayId;
-  final bool
-  isPersonal; // True if no Tag 59 (Merchant Name) - indicates Personal QR
+  final PromptPayType promptPayType;
+  final String? billerId;
+  final String? reference1;
+  final String? reference2;
+  final bool isPersonal;
 
   EMFData({
     required this.rawTags,
@@ -27,159 +38,148 @@ class EMFData {
     required this.rawValue,
     required this.type,
     this.promptPayId,
+    this.promptPayType = PromptPayType.unknown,
+    this.billerId,
+    this.reference1,
+    this.reference2,
     this.isPersonal = false,
   });
 }
 
 class EMVCoParser {
-  // static const String _crcTag = '63'; // Unused for now as we hardcode '6304' check
-
   /// Parses a raw EMVCo string into a structured object
   static EMFData parse(String raw) {
     if (raw.isEmpty) return _empty();
 
     final tags = _parseTLV(raw);
-
-    // 1. Validate CRC (Tag 63)
     bool isValid = _validateCRC(raw);
 
-    // 2. Extract PromptPay ID first (needed for fallback name)
-    String? promptPayId = _extractPromptPayID(tags);
+    // 1. Point of Initiation Method (Tag 01)
+    QRType type = QRType.unknown;
+    if (tags['01'] == '11') type = QRType.static;
+    if (tags['01'] == '12') type = QRType.dynamic;
 
-    // 3. Extract Basic Info - with Smart Fallback for Personal QR
-    String merchantName = tags['59'] ?? '';
-    if (merchantName.isEmpty && promptPayId != null) {
-      // Personal PromptPay: Format ID as display name
-      merchantName = _formatPromptPayDisplayName(promptPayId);
-    } else if (merchantName.isEmpty) {
-      merchantName = 'Unknown Merchant';
+    // 2. Extract Merchant Info
+    String? promptPayId;
+    PromptPayType ppType = PromptPayType.unknown;
+    String? billerId;
+    String? ref1;
+    String? ref2;
+
+    // Tag 29: PromptPay Credit Transfer
+    if (tags.containsKey('29')) {
+      final subTags = _parseTLV(tags['29']!);
+      if (subTags['00']?.startsWith('A000000677') == true) {
+        promptPayId = subTags['01'];
+        ppType = _identifyPromptPayType(promptPayId);
+      }
     }
 
-    final merchantCity = tags['60'];
+    // Tag 30: Bill Payment
+    if (tags.containsKey('30')) {
+      final subTags = _parseTLV(tags['30']!);
+      if (subTags['00']?.startsWith('A000000677') == true) {
+        billerId = subTags['01'];
+        ref1 = subTags['02'];
+        ref2 = subTags['03'];
+        ppType = PromptPayType.billPayment;
+      }
+    }
 
-    // 4. Extract Amount (Tag 54)
+    // 3. Extract Display Name
+    String merchantName = tags['59'] ?? '';
+    final bool isPersonal = merchantName.isEmpty && promptPayId != null;
+
+    if (merchantName.isEmpty) {
+      if (ppType == PromptPayType.billPayment) {
+        merchantName = 'Bill Payment: $billerId';
+      } else if (promptPayId != null) {
+        merchantName = _formatPromptPayDisplayName(promptPayId);
+      } else {
+        merchantName = 'Unknown Recipient';
+      }
+    }
+
+    // 4. Amount & Currency
     double? amount;
     if (tags['54'] != null) {
       amount = double.tryParse(tags['54']!);
     }
 
-    // 5. Extract Point of Initiation Method (Tag 01)
-    // 11 = Static (Reusable), 12 = Dynamic (One-time)
-    QRType type = QRType.unknown;
-    if (tags['01'] == '11') type = QRType.static;
-    if (tags['01'] == '12') type = QRType.dynamic;
-    // Determine if this is a Personal QR (no merchant name in QR)
-    final bool isPersonal = (tags['59'] ?? '').isEmpty && promptPayId != null;
-
     return EMFData(
       rawTags: tags,
       merchantName: merchantName,
-      merchantCity: merchantCity,
+      merchantCity: tags['60'],
       amount: amount,
-      currencyCode: tags['53'] ?? '764', // Default to THB if missing
+      currencyCode: tags['53'] ?? '764',
       isValid: isValid,
       rawValue: raw,
       type: type,
       promptPayId: promptPayId,
+      promptPayType: ppType,
+      billerId: billerId,
+      reference1: ref1,
+      reference2: ref2,
       isPersonal: isPersonal,
     );
   }
 
-  /// Formats a PromptPay ID for user-friendly display
-  /// Input: "0066812345678" -> Output: "PromptPay: 081-234-5678"
-  /// Input: "1234567890123" (13 digits) -> Output: "PromptPay: X-XXXX-12345"
+  static PromptPayType _identifyPromptPayType(String? id) {
+    if (id == null) return PromptPayType.unknown;
+    if (id.length == 13 && id.startsWith('0066')) return PromptPayType.mobile;
+    if (id.length == 13) return PromptPayType.taxId;
+    if (id.length == 15) return PromptPayType.eWallet;
+    if (id.length == 10 && id.startsWith('0')) return PromptPayType.mobile;
+    return PromptPayType.unknown;
+  }
+
   static String _formatPromptPayDisplayName(String id) {
-    // Remove country code prefix if present (0066 -> local format)
     String localId = id;
     if (id.startsWith('0066')) {
       localId = '0${id.substring(4)}';
     }
 
-    // Format based on type
     if (localId.length == 10 && localId.startsWith('0')) {
-      // Mobile Number: 0XX-XXX-XXXX (mask middle)
-      return 'PromptPay: ${localId.substring(0, 3)}-XXX-${localId.substring(7)}';
+      return 'Mobile: ${localId.substring(0, 3)}-XXX-${localId.substring(7)}';
     } else if (localId.length == 13) {
-      // National ID: X-XXXX-XXXXX (heavy mask for privacy)
-      return 'PromptPay: ${localId.substring(0, 1)}-XXXX-${localId.substring(8)}';
-    } else {
-      // Fallback: Just show last 4 digits
-      final suffix = localId.length > 4
-          ? localId.substring(localId.length - 4)
-          : localId;
-      return 'PromptPay: ***$suffix';
+      return 'ID: ${localId.substring(0, 1)}-XXXX-${localId.substring(9, 13)}';
+    } else if (localId.length == 15) {
+      return 'E-Wallet: ***${localId.substring(localId.length - 4)}';
     }
+    return 'PromptPay: $id';
   }
 
   static Map<String, String> _parseTLV(String raw) {
     final Map<String, String> tags = {};
     int index = 0;
     while (index < raw.length) {
-      // ID (2 chars)
-      if (index + 2 > raw.length) break;
+      if (index + 4 > raw.length) break;
       final id = raw.substring(index, index + 2);
-      index += 2;
-
-      // Length (2 chars)
-      if (index + 2 > raw.length) break;
-      final lenStr = raw.substring(index, index + 2);
-      index += 2;
-
+      final lenStr = raw.substring(index + 2, index + 4);
       final len = int.tryParse(lenStr);
-      if (len == null) break;
-
-      // Value
-      if (index + len > raw.length) break;
-      final value = raw.substring(index, index + len);
-      tags[id] = value;
-
-      index += len;
+      if (len == null || index + 4 + len > raw.length) break;
+      tags[id] = raw.substring(index + 4, index + 4 + len);
+      index += 4 + len;
     }
     return tags;
   }
 
   static bool _validateCRC(String raw) {
-    // CRC is usually the last tag '63' length '04'
-    // Calculate CRC of string up to the value of tag 63
-    try {
-      if (!raw.contains('6304')) return false;
-
-      final splitIndex = raw.lastIndexOf('6304');
-      if (splitIndex == -1) return false;
-
-      final dataToVerify = raw.substring(0, splitIndex + 4); // Include '6304'
-      final targetCrc = raw.substring(splitIndex + 4);
-
-      if (targetCrc.length != 4) return false;
-
-      final calculatedCrc = _calculateCRC16(dataToVerify);
-      return calculatedCrc.toUpperCase() == targetCrc.toUpperCase();
-    } catch (e) {
-      return false;
-    }
+    if (raw.length < 8) return false;
+    final data = raw.substring(0, raw.length - 4);
+    final expectedCrc = raw.substring(raw.length - 4).toUpperCase();
+    final calculatedCrc = _calculateCRC16(data);
+    return calculatedCrc == expectedCrc;
   }
 
   static String _calculateCRC16(String data) {
-    int crc = 0xFFFF; // Initial value
+    int crc = 0xFFFF;
     for (int i = 0; i < data.length; i++) {
       int x = ((crc >> 8) ^ data.codeUnitAt(i)) & 0xFF;
       x ^= x >> 4;
       crc = ((crc << 8) ^ (x << 12) ^ (x << 5) ^ x) & 0xFFFF;
     }
     return crc.toRadixString(16).toUpperCase().padLeft(4, '0');
-  }
-
-  static String? _extractPromptPayID(Map<String, String> tags) {
-    // Check Tag 29 (Merchant Account Information)
-    if (tags.containsKey('29')) {
-      final subTags = _parseTLV(tags['29']!);
-      // AID for PromptPay is usually in subtag 00 with value A000000677...
-      if (subTags['00']?.startsWith('A000000677') == true) {
-        // Tag 01 is usually the Mobile No or Tax ID
-        return subTags['01'];
-      }
-    }
-    return null;
   }
 
   static EMFData _empty() {
@@ -193,3 +193,4 @@ class EMVCoParser {
     );
   }
 }
+

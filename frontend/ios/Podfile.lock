@@ -52,6 +52,9 @@ PODS:
     - GoogleUtilities/UserDefaults (~> 8.1)
     - nanopb (~> 3.30910.0)
   - Flutter (1.0.0)
+  - flutter_idensic_mobile_sdk_plugin (1.41.2):
+    - Flutter
+    - IdensicMobileSDK (= 1.41.1)
   - flutter_local_notifications (0.0.1):
     - Flutter
   - flutter_mrz_scanner (0.0.1):
@@ -122,6 +125,11 @@ PODS:
   - GTMSessionFetcher/Core (3.5.0)
   - GTMSessionFetcher/Full (3.5.0):
     - GTMSessionFetcher/Core
+  - IdensicMobileSDK (1.41.1):
+    - IdensicMobileSDK/Default (= 1.41.1)
+  - IdensicMobileSDK/Core (1.41.1)
+  - IdensicMobileSDK/Default (1.41.1):
+    - IdensicMobileSDK/Core
   - image_gallery_saver_plus (0.0.1):
     - Flutter
   - image_picker_ios (0.0.1):
@@ -239,6 +247,7 @@ DEPENDENCIES:
   - firebase_core (from `.symlinks/plugins/firebase_core/ios`)
   - firebase_messaging (from `.symlinks/plugins/firebase_messaging/ios`)
   - Flutter (from `Flutter`)
+  - flutter_idensic_mobile_sdk_plugin (from `.symlinks/plugins/flutter_idensic_mobile_sdk_plugin/ios`)
   - flutter_local_notifications (from `.symlinks/plugins/flutter_local_notifications/ios`)
   - flutter_mrz_scanner (from `.symlinks/plugins/flutter_mrz_scanner/ios`)
   - flutter_secure_storage_darwin (from `.symlinks/plugins/flutter_secure_storage_darwin/darwin`)
@@ -258,6 +267,8 @@ DEPENDENCIES:
   - url_launcher_ios (from `.symlinks/plugins/url_launcher_ios/ios`)
 
 SPEC REPOS:
+  https://github.com/SumSubstance/Specs.git:
+    - IdensicMobileSDK
   trunk:
     - AppAuth
     - AppCheckCore
@@ -307,6 +318,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/firebase_messaging/ios"
   Flutter:
     :path: Flutter
+  flutter_idensic_mobile_sdk_plugin:
+    :path: ".symlinks/plugins/flutter_idensic_mobile_sdk_plugin/ios"
   flutter_local_notifications:
     :path: ".symlinks/plugins/flutter_local_notifications/ios"
   flutter_mrz_scanner:
@@ -358,6 +371,7 @@ SPEC CHECKSUMS:
   FirebaseInstallations: 7b64ffd006032b2b019a59b803858df5112d9eaa
   FirebaseMessaging: 7d6cdbff969127c4151c824fe432f0e301210f15
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
+  flutter_idensic_mobile_sdk_plugin: d469616f07170f56729bf07647578649f45ac90c
   flutter_local_notifications: 643a3eda1ce1c0599413ca31672536d423dee214
   flutter_mrz_scanner: 92a07a9dfbe21cff91cfe6ee3fd0d1e6d2f2843f
   flutter_secure_storage_darwin: acdb3f316ed05a3e68f856e0353b133eec373a23
@@ -371,6 +385,7 @@ SPEC CHECKSUMS:
   GoogleUtilities: 00c88b9a86066ef77f0da2fab05f65d7768ed8e1
   GTMAppAuth: 217a876b249c3c585a54fd6f73e6b58c4f5c4238
   GTMSessionFetcher: 5aea5ba6bd522a239e236100971f10cb71b96ab6
+  IdensicMobileSDK: dffe78563f393fc6535fa1f85d6a4f7fe640855a
   image_gallery_saver_plus: e597bf65a7846979417a3eae0763b71b6dfec6c3
   image_picker_ios: e0ece4aa2a75771a7de3fa735d26d90817041326
   local_auth_darwin: c3ee6cce0a8d56be34c8ccb66ba31f7f180aaebb
@@ -399,6 +414,6 @@ SPEC CHECKSUMS:
   SwiftyTesseract: 1f3d96668ae92dc2208d9842c8a59bea9fad2cbb
   url_launcher_ios: 7a95fa5b60cc718a708b8f2966718e93db0cef1b
 
-PODFILE CHECKSUM: cadb542251bef85e7d52326f9cb7f3e3c805ea65
+PODFILE CHECKSUM: 7a4a8881b5b3e52a97a31f69fa58e97d298bb3e3
 
 COCOAPODS: 1.16.2

@@ -82,8 +82,8 @@ impl Default for LimitCacheConfig {
             stale_after: Duration::from_secs(300), // 5 minutes
             database_url: std::env::var("DATABASE_URL")
                 .unwrap_or_else(|_| "postgres://localhost/paysif".to_string()),
-            max_daily_limit: Decimal::from(3000),      // ฿3,000
-            max_transaction_limit: Decimal::from(3000), // ฿3,000
+            max_daily_limit: Decimal::from(20000),      // ฿20,000 (standardized)
+            max_transaction_limit: Decimal::from(5000), // ฿5,000 (standardized)
         }
     }
 }
@@ -183,7 +183,7 @@ impl LimitCache {
 
     /// Apply an increment from a remote node (via Pub/Sub)
     /// This ensures all Rust instances stay in sync in real-time.
-    pub fn handle_remote_increment(&self, user_id: &str, amount: Decimal) {
+    pub fn apply_remote_increment(&self, user_id: &str, amount: Decimal) {
         let today = Utc::now().date_naive();
         
         self.cache

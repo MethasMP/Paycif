@@ -8,7 +8,6 @@
 
 use dashmap::DashMap;
 use rust_decimal::Decimal;
-use rust_decimal::prelude::*;
 use sqlx::PgPool;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -27,11 +26,13 @@ pub struct UserLimitEntry {
     /// When this entry was last synced from DB
     pub last_synced: Instant,
     /// Whether this entry was hydrated from DB
+    #[allow(dead_code)]
     pub hydrated: bool,
 }
 
 impl UserLimitEntry {
     /// Create a new entry for today with zero usage
+    #[allow(dead_code)]
     pub fn new_empty() -> Self {
         Self {
             daily_total: Decimal::ZERO,
@@ -95,7 +96,7 @@ pub struct UnifiedLimitCache {
 }
 
 #[derive(Default)]
-struct CacheStats {
+pub(crate) struct CacheStats {
     hits: u64,
     misses: u64,
     hydrations: u64,
@@ -255,6 +256,7 @@ impl UnifiedLimitCache {
 
     /// Apply remote increment (from Pub/Sub)
     /// Used to sync between multiple Rust instances
+    #[allow(dead_code)]
     pub fn apply_remote_increment(&self, user_id: &str, amount: Decimal) {
         let today = Utc::now().date_naive();
         
@@ -324,6 +326,7 @@ impl UnifiedLimitCache {
     }
 
     /// Get cache statistics
+    #[allow(dead_code)]
     pub async fn get_stats(&self) -> CacheStats {
         self.stats.read().await.clone()
     }

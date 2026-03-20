@@ -86,8 +86,11 @@ class PaymentCubit extends Cubit<PaymentState> {
 
   /// Executes the payment from the wallet to PromptPay.
   Future<void> pay({
-    required String recipientPromptPayId,
+    String? recipientPromptPayId,
     required String recipientName,
+    String? billerId,
+    String? reference1,
+    String? reference2,
   }) async {
     final currentState = state;
     if (currentState is! PaymentReady) return;
@@ -116,6 +119,9 @@ class PaymentCubit extends Cubit<PaymentState> {
         amountInSatang: amountInSatang,
         promptPayId: recipientPromptPayId,
         recipientName: recipientName,
+        billerId: billerId,
+        reference1: reference1,
+        reference2: reference2,
         idempotencyKey: idempotencyKey,
         headers: signatureHeaders,
       );

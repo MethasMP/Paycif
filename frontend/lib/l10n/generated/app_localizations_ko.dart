@@ -75,6 +75,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get version => '버전';
 
   @override
+  String get verifyIdentity => 'Verify Identity';
+
+  @override
   String get paymentStatus => '결제 상태';
 
   @override

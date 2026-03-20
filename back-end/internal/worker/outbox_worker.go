@@ -93,7 +93,7 @@ func (w *OutboxWorker) processBatch(ctx context.Context) error {
 
 func (w *OutboxWorker) handleEvent(ctx context.Context, outboxID string, eventType string, payload []byte) error {
 	switch eventType {
-	case "PROMPTPAY_PAYOUT":
+	case "PROMPTPAY_PAYOUT", "PAYOUT_REQUESTED":
 		return w.processPromptPayPayout(ctx, outboxID, payload)
 	case "TRANSFER_COMPLETED":
 		// Logic for notification or other side effects

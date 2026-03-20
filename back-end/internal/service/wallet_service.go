@@ -21,8 +21,8 @@ import (
 )
 
 const (
-	MaxTransactionAmount  = 300000   // ฿3,000.00 (in minor units)
-	MaxDailyUserAmount    = 300000   // ฿3,000.00
+	MaxTransactionAmount  = 500000   // ฿5,000.00 (Standardized with Rust)
+	MaxDailyUserAmount    = 2000000  // ฿20,000.00 (Standardized with Rust)
 	MaxHourlySystemAmount = 10000000 // ฿100,000.00
 )
 
@@ -33,7 +33,8 @@ type WalletService struct {
 	FX    *FXService
 	Alert *AlertService
 	Redis *redis.Client
-	Audit *AuditService
+	Audit          *AuditService
+	PaymentEngine  *PaymentEngine
 	localRateCache sync.Map // Local In-Memory Cache (Layer 1)
 }
 
@@ -64,7 +65,7 @@ type TransferResponse struct {
 }
 
 // NewWalletService creates a new instance of WalletService with Circuit Breaker.
-func NewWalletService(db *sql.DB, fx *FXService, alert *AlertService, redisClient *redis.Client, audit *AuditService) *WalletService {
+func NewWalletService(db *sql.DB, fx *FXService, alert *AlertService, redisClient *redis.Client, audit *AuditService, pe *PaymentEngine) *WalletService {
 	cbSettings := gobreaker.Settings{
 		Name:        "ExternalPaymentProvider",
 		MaxRequests: 5,
@@ -76,12 +77,13 @@ func NewWalletService(db *sql.DB, fx *FXService, alert *AlertService, redisClien
 		},
 	}
 	return &WalletService{
-		DB:    db,
-		cb:    gobreaker.NewCircuitBreaker(cbSettings),
-		FX:    fx,
-		Alert: alert,
-		Redis: redisClient,
-		Audit: audit,
+		DB:            db,
+		cb:            gobreaker.NewCircuitBreaker(cbSettings),
+		FX:            fx,
+		Alert:         alert,
+		Redis:         redisClient,
+		Audit:         audit,
+		PaymentEngine: pe,
 	}
 }
 
@@ -648,10 +650,8 @@ type PayoutResponse struct {
 }
 
 // PayoutToPromptPay deducts from user's wallet and queues a payout to PromptPay.
-// Production: This would integrate with a bank API (e.g., SCB, KBANK, BOT).
-// For now, it simulates the payout by just deducting from the wallet.
 func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest) (*PayoutResponse, error) {
-	// 1. Validate Amount
+	// 1. Basic Validation
 	if req.Amount <= 0 {
 		return nil, errors.New("amount must be positive")
 	}
@@ -659,15 +659,23 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 		return nil, fmt.Errorf("amount exceeds single transaction limit of %.2f", float64(MaxTransactionAmount)/100)
 	}
 
-	// 2. Get User's THB Wallet and Profile Name
+	// 2. Begin Transaction (SERIALIZABLE to prevent race conditions)
+	tx, err := s.DB.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// 3. Get User's THB Wallet and Profile Name (INSIDE TX with FOR UPDATE)
 	var walletID uuid.UUID
 	var currentBalance int64
 	var senderFullName string
-	err := s.DB.QueryRowContext(ctx, `
+	err = tx.QueryRowContext(ctx, `
 		SELECT w.id, w.balance, p.full_name 
 		FROM wallets w
 		JOIN profiles p ON w.profile_id = p.id
 		WHERE w.profile_id = $1 AND w.currency = 'THB'
+		FOR UPDATE
 	`, req.UserID).Scan(&walletID, &currentBalance, &senderFullName)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -676,14 +684,14 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 		return nil, fmt.Errorf("failed to fetch wallet/profile: %w", err)
 	}
 
-	// 3. Check Sufficient Balance
+	// 4. Check Sufficient Balance
 	if currentBalance < req.Amount {
 		return nil, errors.New("insufficient balance")
 	}
 
-	// 4. Check Daily Limit
+	// 5. Check Daily Limit (INSIDE TX)
 	var dailyDebitTotal sql.NullInt64
-	err = s.DB.QueryRowContext(ctx, `
+	err = tx.QueryRowContext(ctx, `
 		SELECT COALESCE(SUM(ABS(le.amount)), 0) FROM ledger_entries le
 		JOIN transactions t ON le.transaction_id = t.id
 		WHERE le.wallet_id = $1 
@@ -694,31 +702,20 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 		return nil, fmt.Errorf("failed to check daily limit: %w", err)
 	}
 	if dailyDebitTotal.Valid && (dailyDebitTotal.Int64+req.Amount > MaxDailyUserAmount) {
-		return nil, errors.New("daily payout limit of ฿3,000 exceeded")
+		return nil, fmt.Errorf("daily payout limit of ฿%.2f exceeded", float64(MaxDailyUserAmount)/100)
 	}
 
-	// 5. Begin Transaction
-	tx, err := s.DB.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
-	if err != nil {
-		return nil, fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer tx.Rollback()
-
-	// 6. Check Idempotency
+	// 6. Check Idempotency (INSIDE TX)
 	var existingID uuid.UUID
 	err = tx.QueryRowContext(ctx, "SELECT id FROM transactions WHERE reference_id = $1", req.IdempotencyKey).Scan(&existingID)
 	if err == nil {
-		// For idempotency, we still want to show the current balance
-		var currentBal int64
-		_ = tx.QueryRowContext(ctx, "SELECT balance FROM wallets WHERE id = $1", walletID).Scan(&currentBal)
-
 		// Already processed - return success (idempotent)
 		return &PayoutResponse{
 			TransactionID: existingID.String(),
 			Status:        "already_processed",
 			Message:       "This payout was already processed",
 			SenderName:    senderFullName,
-			NewBalance:    currentBal,
+			NewBalance:    currentBalance,
 		}, nil
 	} else if !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("error checking idempotency: %w", err)
@@ -763,31 +760,58 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 		return nil, fmt.Errorf("failed to create ledger entry: %w", err)
 	}
 
-	// 10. Queue for Payout Processing (Outbox Pattern)
-	payload := fmt.Sprintf(`{
-		"transaction_id": "%s",
-		"promptpay_id": "%s",
-		"recipient_name": "%s",
-		"amount": %d
-	}`, newTxID, req.PromptPayID, req.RecipientName, req.Amount)
+	// 10. Execute Payout via PaymentEngine (Provider Abstraction)
+	// We call this BEFORE final outbox/commit to ensure we capture the external ID if possible.
+	// For production, the provider name could come from user preference or system config.
+	payoutResult, pErr := s.PaymentEngine.ExecutePayout(ctx, "", req.Amount, "THB", req.PromptPayID, req.RecipientName, req.IdempotencyKey)
+	
+	finalStatus := "PENDING"
+	externalID := ""
+	if pErr == nil {
+		finalStatus = payoutResult.Status
+		externalID = payoutResult.ExternalID
+	} else {
+		log.Printf("⚠️ PaymentEngine payout call failed (will be retried by worker): %v", pErr)
+	}
+
+	// 11. Queue for Payout Processing (Outbox Pattern - for background retry/sync)
+	payloadObj := map[string]interface{}{
+		"transaction_id": newTxID,
+		"promptpay_id":   req.PromptPayID,
+		"recipient_name": req.RecipientName,
+		"amount":         req.Amount,
+		"external_id":    externalID,
+		"payout_status":  finalStatus,
+	}
+	payloadBytes, _ := json.Marshal(payloadObj)
 
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO transaction_outbox (id, transaction_id, event_type, payload, status)
 		VALUES ($1, $2, 'PROMPTPAY_PAYOUT', $3, 'PENDING')
-	`, uuid.New(), newTxID, payload)
+	`, uuid.New(), newTxID, string(payloadBytes))
 	if err != nil {
-		return nil, fmt.Errorf("failed to queue payout: %w", err)
+		return nil, fmt.Errorf("failed to queue payout outbox: %w", err)
 	}
 
-	// 11. Commit
+	// 12. Update Transaction with External Info (if available)
+	if externalID != "" {
+		_, _ = tx.ExecContext(ctx, `
+			UPDATE transactions 
+			SET provider_metadata = jsonb_set(provider_metadata, '{external_id}', $1),
+			    settlement_status = $2
+			WHERE id = $3
+		`, fmt.Sprintf(`"%s"`, externalID), finalStatus, newTxID)
+	}
+
+	// 13. Commit
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return &PayoutResponse{
 		TransactionID: newTxID.String(),
-		Status:        "SUCCESS",
-		Message:       "Payout processed successfully",
+		Status:        finalStatus,
+		Message:       "Payout initiated and recorded successfully",
 		SenderName:    senderFullName,
 		NewBalance:    newBalance,
 	}, nil

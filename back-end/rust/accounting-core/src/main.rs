@@ -33,7 +33,7 @@ mod transfer;
 mod metrics;
 
 use limit_cache::UnifiedLimitCache;
-use payout_engine::PoutEngine;
+use payout_engine::PayoutEngine;
 use transfer::TransferExecutor;
 
 // Include generated protobuf code
@@ -56,7 +56,7 @@ use accounting::{
 pub struct AccountingServiceImpl {
     pool: PgPool,
     limit_cache: Arc<UnifiedLimitCache>,
-    payout_engine: Arc<PoutEngine>,
+    payout_engine: Arc<PayoutEngine>,
     transfer_executor: Arc<TransferExecutor>,
     start_time: Instant,
     redis_client: Option<redis::aio::ConnectionManager>,
@@ -65,7 +65,7 @@ pub struct AccountingServiceImpl {
 impl AccountingServiceImpl {
     pub async fn new(pool: PgPool) -> anyhow::Result<Self> {
         let limit_cache = Arc::new(UnifiedLimitCache::new(pool.clone()));
-        let payout_engine = Arc::new(PoutEngine::new(pool.clone()));
+        let payout_engine = Arc::new(PayoutEngine::new(pool.clone()));
         let transfer_executor = Arc::new(TransferExecutor::new(pool.clone(), limit_cache.clone()));
         
         // Initialize limit cache from database
@@ -104,7 +104,7 @@ impl AccountingService for AccountingServiceImpl {
         &self,
         request: Request<TransferRequest>,
     ) -> Result<Response<TransferResponse>, Status> {
-        let start = Instant::now();
+        let _start = Instant::now();
         let req = request.into_inner();
         
         metrics::counter!("transfer_requests_total").increment(1);
@@ -112,13 +112,13 @@ impl AccountingService for AccountingServiceImpl {
         // Execute transfer with unified limit checking
         match self.transfer_executor.execute(&req).await {
             Ok(response) => {
-                let duration = start.elapsed();
-                metrics::histogram!("transfer_duration_seconds").record(duration.as_secs_f64());
-                metrics::counter!("transfer_success_total").increment(1);
+                let amount = req.amount; // Use amount from request
                 
-                // Broadcast limit update via Redis
-                // Note: Redis operations don't actually require &mut self in this context
-                // The publish method from AsyncCommands can work with immutable reference
+                // Broadcast limit update via Redis for multi-node sync
+                if let Some(mut redis) = self.redis_client.clone() {
+                    let payload = format!("{}:{}", req.user_id, amount);
+                    let _: Result<(), _> = redis.publish("user_limit_updates", payload).await;
+                }
                 
                 Ok(Response::new(response))
             }
@@ -296,11 +296,16 @@ async fn main() -> anyhow::Result<()> {
     let database_url = std::env::var("DATABASE_URL")
         .expect("DATABASE_URL must be set");
     
+    use sqlx::postgres::PgConnectOptions;
+    use std::str::FromStr;
+    let connection_options = PgConnectOptions::from_str(&database_url)?
+        .statement_cache_capacity(0); // ⚡ CRITICAL: Fix for Supabase Transaction Pooler
+    
     let pool = PgPoolOptions::new()
-        .max_connections(20)
+        .max_connections(25) // Adjusted for Supabase limits
         .min_connections(5)
-        .acquire_timeout(std::time::Duration::from_secs(5))
-        .connect(&database_url)
+        .acquire_timeout(std::time::Duration::from_secs(10))
+        .connect_with(connection_options)
         .await?;
     
     info!("✅ Database pool initialized");

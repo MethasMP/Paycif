@@ -10,13 +10,14 @@ use sqlx::PgPool;
 use uuid::Uuid;
 use tracing::{info, instrument};
 
+use std::sync::Arc;
 use crate::accounting::{PayoutRequest, PayoutResponse};
 
-pub struct PoutEngine {
+pub struct PayoutEngine {
     pool: PgPool,
 }
 
-impl PoutEngine {
+impl PayoutEngine {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -202,20 +203,37 @@ impl PoutEngine {
         })
     }
 
-    /// Batch process payouts (for high-volume scenarios)
-    pub async fn batch_payout(&self, requests: Vec<PayoutRequest>) -> Vec<PayoutResponse> {
-        let mut responses = Vec::with_capacity(requests.len());
+    /// Batch process payouts using true parallel tasks (for high-volume scenarios)
+    #[allow(dead_code)]
+    pub async fn batch_payout(self: Arc<Self>, requests: Vec<PayoutRequest>) -> Vec<PayoutResponse> {
+        let mut set: tokio::task::JoinSet<anyhow::Result<PayoutResponse>> = tokio::task::JoinSet::new();
         
-        // Process in parallel where possible
         for req in requests {
-            match self.execute_payout(&req).await {
-                Ok(resp) => responses.push(resp),
-                Err(e) => {
+            let engine = self.clone();
+            set.spawn(async move {
+                engine.execute_payout(&req).await
+            });
+        }
+        
+        let mut responses = Vec::new();
+        while let Some(res) = set.join_next().await {
+            match res {
+                Ok(Ok(resp)) => responses.push(resp),
+                Ok(Err(e)) => {
                     responses.push(PayoutResponse {
                         success: false,
                         transaction_id: "".to_string(),
                         status: "ERROR".to_string(),
                         message: e.to_string(),
+                        new_balance: 0,
+                    });
+                }
+                Err(e) => {
+                    responses.push(PayoutResponse {
+                        success: false,
+                        transaction_id: "".to_string(),
+                        status: "PANIC".to_string(),
+                        message: format!("Task panic: {}", e),
                         new_balance: 0,
                     });
                 }

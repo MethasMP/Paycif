@@ -75,6 +75,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get version => '版本';
 
   @override
+  String get verifyIdentity => 'Verify Identity';
+
+  @override
   String get paymentStatus => '支付状态';
 
   @override

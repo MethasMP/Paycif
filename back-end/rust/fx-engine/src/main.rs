@@ -144,7 +144,7 @@ impl FxEngineService {
         // 2. Try Inverse match
         let inv_key = Self::key(&to, &from);
         if let Some(entry) = self.cache.get(&inv_key) {
-            if !entry.is_expired() {
+            if !entry.is_expired() && !entry.rate.is_zero() {
                 return Some((
                     Decimal::ONE / entry.rate,
                     format!("{}-inverted", entry.source),
@@ -642,8 +642,10 @@ async fn main() -> Result<()> {
                         if parts.len() == 2 {
                             let user_id = parts[0];
                             if let Ok(amount) = Decimal::from_str(parts[1]) {
-                                lc_pubsub.handle_remote_increment(user_id, amount);
+                                lc_pubsub.apply_remote_increment(user_id, amount);
                             }
+                        } else {
+                            tracing::warn!("⚠️ Invalid Redis sync payload: {}", payload);
                         }
                     }
                 }

@@ -277,15 +277,17 @@ class NfcPassportService {
     }
   }
 
-  /// Low-level APDU helpers for future real implementation
-  // ignore: unused_element
+  /// Low-level APDU helpers for reading large elementary files (EF) in chunks
   Future<Uint8List?> _selectAndReadEF(NfcTag tag, {required int efId}) async {
     final byte1 = (efId >> 8) & 0xFF;
     final byte2 = efId & 0xFF;
     final data = Uint8List.fromList([byte1, byte2]);
 
     final ios = Iso7816Ios.from(tag);
+    final android = IsoDepAndroid.from(tag);
+
     if (ios != null) {
+      // 1. SELECT FILE
       final selectResp = await ios.sendCommand(
         instructionClass: 0x00,
         instructionCode: 0xA4,
@@ -296,29 +298,79 @@ class NfcPassportService {
       );
       if (selectResp.statusWord1 != 0x90) return null;
 
-      final readResp = await ios.sendCommand(
-        instructionClass: 0x00,
-        instructionCode: 0xB0,
-        p1Parameter: 0x00,
-        p2Parameter: 0x00,
-        data: Uint8List(0),
-        expectedResponseLength: 256,
-      );
-      return readResp.statusWord1 == 0x90 ? readResp.payload : null;
+      // 2. READ BINARY (Looping for large files like DG2)
+      final List<int> fullFile = [];
+      int offset = 0;
+      bool hasMore = true;
+
+      while (hasMore) {
+        final readResp = await ios.sendCommand(
+          instructionClass: 0x00,
+          instructionCode: 0xB0,
+          p1Parameter: (offset >> 8) & 0x7F, // High offset byte
+          p2Parameter: offset & 0xFF,        // Low offset byte
+          data: Uint8List(0),
+          expectedResponseLength: 256,
+        );
+
+        if (readResp.statusWord1 == 0x90) {
+          fullFile.addAll(readResp.payload);
+          offset += readResp.payload.length;
+          // Most passports return 0x90 even for partial reads
+          // We look for 0-length payload or EOF status 0x6282
+          if (readResp.payload.isEmpty) hasMore = false;
+        } else if (readResp.statusWord1 == 0x62 && readResp.statusWord2 == 0x82) {
+          // EOF Reached
+          hasMore = false;
+        } else {
+          hasMore = false;
+        }
+        
+        // Safety break for extremely large files
+        if (offset > 500000) break; 
+      }
+      return Uint8List.fromList(fullFile);
     }
 
-    final android = IsoDepAndroid.from(tag);
     if (android != null) {
-      // Select APDU: 00 A4 02 04 02 [ID1 ID2] 00
+      // 1. SELECT APDU: 00 A4 02 04 02 [ID1 ID2] 00
       final selectApdu = Uint8List.fromList([0x00, 0xA4, 0x02, 0x04, 0x02, byte1, byte2, 0x00]);
       final selectResp = await android.transceive(selectApdu);
       if (selectResp.length < 2 || selectResp[selectResp.length - 2] != 0x90) return null;
 
-      // Read APDU: 00 B0 00 00 00 (Read Binary)
-      final readApdu = Uint8List.fromList([0x00, 0xB0, 0x00, 0x00, 0x00]);
-      final readResp = await android.transceive(readApdu);
-      if (readResp.length < 2 || readResp[readResp.length - 2] != 0x90) return null;
-      return readResp.sublist(0, readResp.length - 2);
+      // 2. READ BINARY (Looping)
+      final List<int> fullFile = [];
+      int offset = 0;
+      bool hasMore = true;
+
+      while (hasMore) {
+        // Read binary APDU: 00 B0 [P1] [P2] [Le]
+        final readApdu = Uint8List.fromList([
+          0x00, 
+          0xB0, 
+          (offset >> 8) & 0x7F, 
+          offset & 0xFF, 
+          0x00 // Le = 256
+        ]);
+        final readResp = await android.transceive(readApdu);
+        if (readResp.length < 2) break;
+
+        final sw1 = readResp[readResp.length - 2];
+        final sw2 = readResp[readResp.length - 1];
+        final payload = readResp.sublist(0, readResp.length - 2);
+
+        if (sw1 == 0x90) {
+          fullFile.addAll(payload);
+          offset += payload.length;
+          if (payload.isEmpty) hasMore = false;
+        } else if (sw1 == 0x62 && sw2 == 0x82) {
+          hasMore = false;
+        } else {
+          hasMore = false;
+        }
+        if (offset > 500000) break;
+      }
+      return Uint8List.fromList(fullFile);
     }
     return null;
   }

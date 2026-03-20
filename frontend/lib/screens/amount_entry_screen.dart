@@ -69,6 +69,9 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
           amount: amount,
           merchantName: _displayName, // Use looked up name
           promptPayId: widget.data.promptPayId,
+          billerId: widget.data.billerId,
+          reference1: widget.data.reference1,
+          reference2: widget.data.reference2,
         ),
       ),
     ).then((result) {
