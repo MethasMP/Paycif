@@ -110,7 +110,7 @@ export interface ServiceResponse<T = unknown> {
 export interface Profile {
   id: string;
   email: string;
-  omise_customer_id: string | null;
+  external_customer_id: string | null;
 }
 
 export interface IdentityVerification {

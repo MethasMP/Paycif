@@ -154,7 +154,7 @@ serve(async (req: Request) => {
 
     const { data: profile, error: profileError } = await adminClient
       .from('profiles')
-      .select('omise_customer_id, preferred_payment_method_id')
+      .select('external_customer_id, preferred_payment_method_id')
       .eq('id', userId)
       .single();
 
@@ -167,7 +167,7 @@ serve(async (req: Request) => {
     }
 
     // No saved cards if no Omise customer ID
-    if (!profile?.omise_customer_id) {
+    if (!profile?.external_customer_id) {
       return new Response(
         JSON.stringify({ cards: [] }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
@@ -213,7 +213,7 @@ serve(async (req: Request) => {
     console.log(`[Omise] Cache miss/expired. Fetching from API for ${userId}...`);
     // Fetch Customer object to get default_card and cards list
     const customerResp = await fetch(
-      `https://api.omise.co/customers/${profile.omise_customer_id}`,
+      `https://api.omise.co/customers/${profile.external_customer_id}`,
       {
         headers: { 'Authorization': authHeaderOpn },
       },

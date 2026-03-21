@@ -1,12 +1,14 @@
 {
   "deno.enable": true,
-  "deno.enablePaths": ["supabase/functions", "/Users/maemp/Desktop/Paycif/supabase/functions"],
+  "deno.enablePaths": [
+    "supabase/functions",
+    "./supabase/functions"
+  ],
   "deno.config": "supabase/functions/deno.json",
   "deno.importMap": "supabase/functions/import_map.json",
-  "editor.defaultFormatter": "denoland.vscode-deno",
-  "[typescript]": {
-    "editor.defaultFormatter": "denoland.vscode-deno"
-  },
+  "[typescript]": {},
   "typescript.disableAutomaticTypeAcquisition": true,
+  "typescript.validate.enable": false,
+  "javascript.validate.enable": false,
   "git.ignoreLimitWarning": true
 }

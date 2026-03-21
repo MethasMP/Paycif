@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
-import '../services/omise_service.dart';
+
 import '../services/api_service.dart';
 import '../utils/pay_notify.dart';
 import '../utils/payment_utils.dart';
@@ -16,7 +16,7 @@ class AddCardScreen extends StatefulWidget {
 
 class _AddCardScreenState extends State<AddCardScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _omiseService = OmiseService();
+
   final _apiService = ApiService();
 
   String cardNumber = '';
@@ -230,23 +230,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
                               final month = parts[0];
                               final year = '20${parts[1]}';
 
-                              // 1. Tokenize Card details
-                              final token = await _omiseService.createToken(
-                                name: cardHolderName,
-                                number: cardNumber.replaceAll(' ', ''),
-                                expiryMonth: month,
-                                expiryYear: year,
-                                securityCode: cvvCode,
-                              );
-
-                              if (!mounted) return;
-
-                              setState(
-                                () => _loadingMessage = 'Registering card...',
-                              );
-
-                              // 2. Save card to backend
-                              await _apiService.saveCard(token);
+                              throw Exception('Card binding is temporarily disabled. Moving to Coinflow.');
 
                               if (!mounted || !context.mounted) return;
 

@@ -8,7 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
 import '../models/saved_card.dart';
 import '../services/api_service.dart';
-import '../services/omise_service.dart';
+
 import '../controllers/dashboard_controller.dart';
 import '../controllers/payment_controller.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -33,7 +33,7 @@ class _TopUpViewState extends State<TopUpView> {
   // ... (Keep existing State logic) ...
   final TextEditingController _amountController = TextEditingController();
   final ApiService _apiService = ApiService();
-  final OmiseService _omiseService = OmiseService(); // New Service
+
   int? _selectedChipIndex;
   final bool _isLoading = false;
   final List<int> _smartAmounts = [500, 1000, 2000, 3000]; // Max 3000/day
@@ -552,14 +552,7 @@ class _TopUpViewState extends State<TopUpView> {
       String? token;
 
       if (!useSaved) {
-        // Only create token for new cards (Saved cards skip this entirely)
-        token = await _omiseService.createToken(
-          name: _nameController.text,
-          number: _cardNumberController.text,
-          expiryMonth: _expiryController.text.split('/').first,
-          expiryYear: '20${_expiryController.text.split('/').last}',
-          securityCode: _cvvController.text,
-        );
+        throw Exception('Credit card top-up is temporarily disabled. Moving to Coinflow.');
       }
 
       // 🛡️ SECURITY: Hardened Idempotency + Non-Repudiation (Signature)

@@ -1,4 +1,7 @@
+/// <reference lib="deno.ns" />
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
 
 const corsHeaders = {
@@ -15,7 +18,8 @@ const omiseSecretKey = Deno.env.get('OMISE_SECRET_KEY')!;
 const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 const authHeaderOpn = `Basic ${btoa(omiseSecretKey + ':')}`;
 
-serve(async (req) => {
+serve(async (req: Request) => {
+
   const startTime = Date.now();
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -52,11 +56,11 @@ serve(async (req) => {
       // Get Profile
       const { data: profile } = await adminClient
         .from('profiles')
-        .select('omise_customer_id, email')
+        .select('external_customer_id, email')
         .eq('id', userId)
         .single();
 
-      let currentCustomerId = profile?.omise_customer_id;
+      let currentCustomerId = profile?.external_customer_id;
 
       if (!currentCustomerId) {
         // Case A: New Customer
@@ -85,7 +89,7 @@ serve(async (req) => {
         // Perform profile update
         await adminClient
           .from('profiles')
-          .update({ omise_customer_id: currentCustomerId })
+          .update({ external_customer_id: currentCustomerId, external_customer_type: 'OMISE' })
           .eq('id', userId);
       } else {
         // Case B: Existing Customer - Attach Card
@@ -139,14 +143,14 @@ serve(async (req) => {
 
       const { data: profile } = await adminClient
         .from('profiles')
-        .select('omise_customer_id, preferred_payment_method_id')
+        .select('external_customer_id, preferred_payment_method_id')
         .eq('id', userId)
         .single();
 
-      if (!profile?.omise_customer_id) return jsonError('Omise customer not found', 404);
+      if (!profile?.external_customer_id) return jsonError('Payment profile not found', 404);
 
       const deleteResp = await fetch(
-        `https://api.omise.co/customers/${profile.omise_customer_id}/cards/${card_id}`,
+        `https://api.omise.co/customers/${profile.external_customer_id}/cards/${card_id}`,
         {
           method: 'DELETE',
           headers: { 'Authorization': authHeaderOpn },

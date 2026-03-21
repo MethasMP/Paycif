@@ -1,9 +1,10 @@
+/// <reference lib="deno.ns" />
 // ============================================================================
 // Inbound Handler - Card Vaulting + Security Hardening Edition
 // ============================================================================
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
+import { serve } from 'std/server';
+import { createClient } from '@supabase/supabase-js';
 import {
   InboundRequest,
   OpnChargeRequest,
@@ -12,9 +13,9 @@ import {
   OpnCustomerResponse,
   ServiceResponse,
 } from './types.ts';
-import * as ed from 'https://esm.sh/@noble/ed25519@2.0.0';
-import { sha512 } from 'https://esm.sh/@noble/hashes@1.3.1/sha512';
-import { decode as base64Decode } from 'https://deno.land/std@0.168.0/encoding/base64.ts';
+import * as ed from '@noble/ed25519';
+import { sha512 } from '@noble/hashes/sha512';
+import { decode as base64Decode } from 'std/encoding/base64';
 
 // 🛡️ CRITICAL: Configure SHA-512 for @noble/ed25519 v2
 // v2 requires manual hash configuration, otherwise verify() fails silently!
@@ -110,7 +111,7 @@ class OpnClient {
 // Main Handler
 // ============================================================================
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -210,12 +211,13 @@ serve(async (req) => {
       );
     }
 
-    // Check daily limit using intended Net amount
+    console.log(`[Limits] Checking and Reserving limit for user: ${userId}`);
     const { data: limitCheck, error: limitError } = await adminClient.rpc(
-      'check_and_update_daily_topup',
+      'check_and_reserve_daily_topup',
       {
         p_user_id: userId,
         p_amount_satang: effectiveWalletAmount,
+        p_wallet_id: userId, // Assuming wallet_id is same as profile_id for now or fetch it
       },
     );
 
@@ -226,19 +228,22 @@ serve(async (req) => {
 
     const limitResult = limitCheck as {
       success: boolean;
+      reservation_id?: string;
       error?: string;
       remaining_limit?: number;
     };
 
     if (!limitResult.success) {
       return jsonError(
-        `Daily top-up limit reached. You can top up up to ${MAX_DAILY / 100} THB per day. ` +
-          `Remaining: ${(limitResult.remaining_limit || 0) / 100} THB`,
+        `Daily top-up limit reached. ` +
+          (limitResult.error || '') +
+          ` Remaining: ${(limitResult.remaining_limit || 0) / 100} THB`,
         400,
       );
     }
 
-    console.log(`[Limits] Approved. Remaining: ${(limitResult.remaining_limit || 0) / 100} THB`);
+    const reservationId = limitResult.reservation_id;
+    console.log(`[Limits] Approved & Reserved. ID: ${reservationId}. Remaining: ${(limitResult.remaining_limit || 0) / 100} THB`);
 
     // ========================================================================
     // 3. SECURE DEVICE CHALLENGE (Signature Verification)
@@ -316,7 +321,7 @@ serve(async (req) => {
     // ========================================================================
     const { data: profile } = await adminClient
       .from('profiles')
-      .select('id, email, omise_customer_id')
+      .select('id, email, external_customer_id')
       .eq('id', userId)
       .single();
 
@@ -324,7 +329,7 @@ serve(async (req) => {
       return jsonError('Profile not found', 404);
     }
 
-    let omiseCustomerId = profile.omise_customer_id;
+    let omiseCustomerId = profile.external_customer_id;
     let chargeCard: string | undefined;
 
     if (!omiseCustomerId) {
@@ -341,10 +346,10 @@ serve(async (req) => {
       // Save to profile
       await adminClient
         .from('profiles')
-        .update({ omise_customer_id: omiseCustomerId })
+        .update({ external_customer_id: omiseCustomerId, external_customer_type: 'OMISE' })
         .eq('id', userId);
 
-      console.log(`[Vault] Saved omise_customer_id: ${omiseCustomerId}`);
+      console.log(`[Vault] Saved external_customer_id: ${omiseCustomerId}`);
       // Card is already attached during customer creation
       chargeCard = customer.default_card || undefined;
     } else {
