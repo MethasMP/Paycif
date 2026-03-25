@@ -991,8 +991,25 @@
 
             .grid-2,
             .steps-grid,
-            .stats-row {
+            .stats-row,
+            .freedom-grid {
                 grid-template-columns: 1fr;
+            }
+
+            .freedom-grid {
+                margin-top: 40px;
+            }
+
+            .fee-card {
+                padding: 32px 24px;
+            }
+
+            .fee-card.magical {
+                transform: none;
+            }
+
+            #marketing-ads > div {
+                grid-template-columns: 1fr !important;
             }
 
             footer {
@@ -2354,10 +2371,12 @@
                     x: 100, y: -60, scale: 1.1
                 });
 
-                gsap.to('#device-mockup', {
-                    scrollTrigger: { trigger: '#hero', start: 'top top', end: 'bottom top', scrub: true },
-                    y: 200, scale: 1.05, opacity: 0.3
-                });
+                if (window.innerWidth > 768) {
+                    gsap.to('#device-mockup', {
+                        scrollTrigger: { trigger: '#hero', start: 'top top', end: 'bottom top', scrub: true },
+                        y: 200, scale: 1.05, opacity: 0.3
+                    });
+                }
 
                 // === MAGNETIC ELEMENTS (Design-Spells: sensory pull) ===
                 document.querySelectorAll('.cta-magnetic').forEach(btn => {
