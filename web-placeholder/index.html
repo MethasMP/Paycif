@@ -148,20 +148,21 @@
             left: 50%;
             transform: translateX(-50%);
             z-index: 1000;
-            width: calc(100% - 48px);
-            max-width: 1100px;
-            background: rgba(10, 10, 12, 0.7);
+            width: fit-content;
+            background: rgba(10, 10, 12, 0.85);
             backdrop-filter: blur(24px) saturate(180%);
             -webkit-backdrop-filter: blur(24px) saturate(180%);
-            border: 1px solid var(--border);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 100px;
-            padding: 14px 28px;
+            padding: 10px 10px 10px 32px;
+            /* Extra left padding for logo balance */
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            opacity: 1;
-            /* Fallback visibility */
+            gap: 40px;
+            opacity: 0;
+            /* JS will reveal */
             will-change: transform, opacity;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
         }
 
         .nav-logo {
@@ -1527,11 +1528,6 @@
     <!-- Nav -->
     <nav id="nav">
         <div class="nav-logo">Paycif</div>
-        <div class="nav-links">
-            <a href="#intro">Intro</a>
-            <a href="#how">How It Works</a>
-            <a href="#security">Security</a>
-        </div>
         <button class="cta-magnetic" id="nav-cta" onclick="openDemoModal(event)">Access Protocol</button>
     </nav>
 
@@ -1543,7 +1539,6 @@
                 <div class="hero-orb orb-2"></div>
             </div>
 
-            <div class="hero-eyebrow" id="hero-tag">The Future of Travel Payments • Thailand 2026</div>
 
             <h1 class="hero-headline">
                 <div class="word"><span class="word-inner">The</span></div>
@@ -1557,8 +1552,7 @@
 
             <p class="hero-sub" id="hero-sub"
                 style="font-weight: 300; letter-spacing: -0.01em; max-width: 500px; margin: 0 auto; line-height: 1.5; font-size: 20px; opacity: 0.9;">
-                Banks are silos. Paycif is a protocol.<br>
-                Connect your global liquidity to Thailand in milliseconds.<br>
+                Direct global liquidity to Thailand in milliseconds.<br>
                 No intermediaries. Just magic.
             </p>
 
@@ -2334,17 +2328,15 @@
                 const heroTl = gsap.timeline({ delay: 0.3 });
 
                 heroTl
-                    // Nav slides in
-                    .to('#nav', { opacity: 1, duration: 0.8, ease: 'power3.out' })
-                    // Eyebrow tag
-                    .to('#hero-tag', { opacity: 1, y: 0, duration: 0.6, ease: 'power3.out' }, '-=0.4')
+                    // Nav slides in with authority
+                    .to('#nav', { opacity: 1, y: 0, duration: 1, ease: 'power4.out' })
                     // Word-by-word reveal (Design-Spells signature move)
                     .to('.word-inner', {
                         y: '0%',
                         duration: 1,
                         stagger: 0.08,
                         ease: 'power4.out'
-                    }, '-=0.2')
+                    }, '-=0.4')
                     // Subhead
                     .to('#hero-sub', { opacity: 1, y: 0, duration: 0.8, ease: 'power3.out' }, '-=0.6')
                     // CTAs

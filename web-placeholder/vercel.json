@@ -1,0 +1,27 @@
+{
+    "version": 2,
+    "cleanUrls": true,
+    "trailingSlash": false,
+    "routes": [
+        {
+            "src": "/assets/(.*)",
+            "dest": "/assets/$1"
+        },
+        {
+            "src": "/favicon.png",
+            "dest": "/favicon.png"
+        },
+        {
+            "src": "/(.*).html",
+            "dest": "/$1.html"
+        },
+        {
+            "src": "/supabase-bridge.js",
+            "dest": "/supabase-bridge.js"
+        },
+        {
+            "src": "/(.*)",
+            "dest": "/index.html"
+        }
+    ]
+}
