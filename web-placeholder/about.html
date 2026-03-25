@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About | The Paycif Manifesto</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg: #000000;
+            --surface: rgba(255, 255, 255, 0.04);
+            --border: rgba(255, 255, 255, 0.08);
+            --text-primary: #F5F5F7;
+            --text-secondary: #86868B;
+            --accent-teal: #00E5C8;
+            --font-main: "SF Pro Display", "SF Pro Icons", "Inter", -apple-system, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-main);
+            background-color: var(--bg);
+            color: var(--text-primary);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 80px 24px;
+        }
+
+        .manifesto-header {
+            margin-bottom: 80px;
+            text-align: left;
+        }
+
+        .eyebrow {
+            color: var(--accent-teal);
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            margin-bottom: 16px;
+            display: block;
+        }
+
+        h1 {
+            font-size: 56px;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            line-height: 1.1;
+            margin-bottom: 24px;
+        }
+
+        .lead {
+            font-size: 20px;
+            color: var(--text-secondary);
+            max-width: 600px;
+        }
+
+        section {
+            margin-bottom: 100px;
+        }
+
+        section h2 {
+            font-size: 24px;
+            margin-bottom: 24px;
+            color: white;
+            border-left: 2px solid var(--accent-teal);
+            padding-left: 20px;
+        }
+
+        p {
+            margin-bottom: 24px;
+            font-size: 17px;
+            color: var(--text-secondary);
+        }
+
+        b {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .disclosure-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            padding: 40px;
+            border-radius: 24px;
+            backdrop-filter: blur(20px);
+            margin-top: 60px;
+        }
+
+        .disclosure-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+            margin-top: 24px;
+        }
+
+        .disclosure-item label {
+            display: block;
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--accent-teal);
+            margin-bottom: 8px;
+            letter-spacing: 0.1em;
+        }
+
+        .disclosure-item span {
+            font-size: 15px;
+            color: white;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .nav-back {
+            position: fixed;
+            top: 40px;
+            left: 40px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: color 0.2s;
+            z-index: 100;
+        }
+
+        .nav-back:hover {
+            color: var(--accent-teal);
+        }
+
+        .footer-link {
+            display: block;
+            color: var(--text-secondary);
+            margin-bottom: 14px;
+            font-size: 14px;
+            text-decoration: none;
+            transition: color 0.2s, transform 0.2s;
+        }
+
+        .footer-link:hover {
+            color: white;
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, white 0%, var(--accent-teal) 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 38px;
+            }
+
+            .disclosure-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .nav-back {
+                position: absolute;
+                top: 20px;
+                left: 20px;
+            }
+
+            .container {
+                padding-top: 100px;
+            }
+
+            .footer-explorer-grid {
+                grid-template-columns: 1fr !important;
+                gap: 40px !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <a href="index.html" class="nav-back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+        Back to Protocol
+    </a>
+
+    <div class="container">
+        <header class="manifesto-header">
+            <span class="eyebrow">The Manifesto</span>
+            <h1>Vertical Progress <br><span class="gradient-text">Beyond Currency.</span></h1>
+            <p class="lead">Payments should be a bridge, not a barrier. We are re-engineering the physics of travel
+                capital in Thailand.</p>
+        </header>
+
+        <section id="vision">
+            <h2>The First Principles</h2>
+            <p>
+                Why do global travelers still carry physical cash across oceans to buy a meal? Why must a European
+                executive navigate 4 banking handshakes across 3 time zones just to pay for a taxi in Bangkok?
+            </p>
+            <p>
+                The current financial system is <b>horizontally fragmented</b>. Adding more bank accounts or apps is not
+                the answer. The answer is a <b>vertical leap</b>.
+            </p>
+            <p>
+                Paycif reduces the multi-step friction of global travel capital into a single, light-speed scan. We
+                accelerate the transition to a borderless Thai economy by solving the fundamental physics of the
+                payment rail.
+            </p>
+        </section>
+
+        <section id="focus">
+            <h2>The Uncontested Ocean</h2>
+            <p>
+                The world doesn't need another generic digital wallet. While regional giants dominate the Asian wallet
+                landscape, a massive segment of global travelers remains underserved.
+            </p>
+            <p>
+                We explicitly empower those <b>outside the Alipay and WeChat ecosystems</b>—high-value professionals
+                reliant on global credit networks and digital assets who currently lack a native bridge to Thailand's
+                PromptPay network. We are building a unique monopoly on this unaddressed capital flow.
+            </p>
+        </section>
+
+        <section id="integrity">
+            <h2>Protocol Integrity</h2>
+            <p>
+                Complexity is the enemy of security. We believe in <b>radical transparency</b> and insanely simple UX.
+                Our sustenance comes from a clear 1.5% protocol fee and a transparent FX spread—calculated at the
+                moment of top-up to ensure zero hidden leakage.
+            </p>
+            <p>
+                Dedicated to engineering excellence, Paycif is more than a tool: it is an <b>institutional
+                    commitment</b>
+                to the future of international settlement.
+            </p>
+        </section>
+
+        <section id="contact" class="disclosure-card">
+            <span class="eyebrow" style="color: white; opacity: 0.5;">Corporate Disclosure</span>
+            <h3 style="font-size: 20px; margin: 16px 0 32px;">Institutional Contact</h3>
+
+            <div class="disclosure-grid">
+                <div class="disclosure-item">
+                    <label>Founder & Systems Lead</label>
+                    <span>Methas Pakpoompong</span>
+                </div>
+                <div class="disclosure-item">
+                    <label>Physical HQ</label>
+                    <span>199 Moo 4, Dong Krathong Yam, Si Maha Phot, Prachin Buri 25140, Thailand</span>
+                </div>
+                <div class="disclosure-item">
+                    <label>Operations & Support</label>
+                    <span>support@paycif.com</span>
+                </div>
+                <div class="disclosure-item">
+                    <label>Official Inquiries</label>
+                    <span>+66 96 924 0925</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Redesigned Institutional Footer -->
+        <footer
+            style="border-top: 1px solid var(--border); padding-top: 80px; padding-bottom: 60px; margin-top: 100px; text-align: left;">
+            <!-- Zone 1: Link Exploration -->
+            <div class="footer-explorer-grid"
+                style="display: grid; grid-template-columns: 2fr repeat(3, 1fr); gap: 60px; margin-bottom: 80px;">
+                <div>
+                    <span
+                        style="display: block; margin-bottom: 24px; font-size: 24px; font-weight: 700; color: white;">Paycif</span>
+                    <p
+                        style="color: var(--text-secondary); font-size: 14px; max-width: 320px; line-height: 1.6; font-family: 'JetBrains Mono', monospace; opacity: 0.8;">
+                        Digital liquidity bridge for global credit networks and Thai commerce. Engineered for
+                        high-throughput institutional settlement.
+                    </p>
+                    <div style="display: flex; gap: 12px; margin-top: 32px; opacity: 0.6;">
+                        <div
+                            style="background: #111; border: 1px solid #333; border-radius: 8px; padding: 8px 16px; font-size: 11px;">
+                            iOS Terminal·Coming 2026</div>
+                        <div
+                            style="background: #111; border: 1px solid #333; border-radius: 8px; padding: 8px 16px; font-size: 11px;">
+                            Android Terminal·Coming 2026</div>
+                    </div>
+                </div>
+                <div class="footer-links-col">
+                    <h4
+                        style="font-size: 14px; font-weight: 700; color: white; margin-bottom: 24px; text-transform: uppercase; letter-spacing: 0.1em;">
+                        Protocol</h4>
+                    <a href="index.html#how" class="footer-link">How it Works</a>
+                    <a href="index.html#faq" class="footer-link">Internal Settlement</a>
+                    <a href="index.html#security" class="footer-link">Security Logic</a>
+                </div>
+                <div class="footer-links-col">
+                    <h4
+                        style="font-size: 14px; font-weight: 700; color: white; margin-bottom: 24px; text-transform: uppercase; letter-spacing: 0.1em;">
+                        Institutional</h4>
+                    <a href="about.html" class="footer-link">The Manifesto</a>
+                    <a href="about.html#contact" class="footer-link">Official Inquiries</a>
+                </div>
+                <div class="footer-links-col">
+                    <h4
+                        style="font-size: 14px; font-weight: 700; color: white; margin-bottom: 24px; text-transform: uppercase; letter-spacing: 0.1em;">
+                        Compliance</h4>
+                    <a href="privacy.html" class="footer-link">Privacy Rights (PDPA)</a>
+                    <a href="terms.html" class="footer-link">Terms of Service</a>
+                    <a href="aml.html" class="footer-link">AML/KYC Measures</a>
+                    <a href="refund.html" class="footer-link">Settlement Finality</a>
+                </div>
+            </div>
+
+            <!-- Zone 2: Info Section -->
+            <div style="padding: 40px 0; border-top: 1px solid var(--border); margin-bottom: 40px;">
+                <p
+                    style="font-size: 14px; color: var(--text-secondary); line-height: 1.8; max-width: 800px; margin-bottom: 0;">
+                    <b>Institutional Information:</b> Paycif Protocol is a technology provider bridging digital capital
+                    to the PromptPay network. Managed by <b>Methas Pakpoompong</b>. Registered Physical HQ: 199 Moo 4,
+                    Dong Krathong Yam, Si Maha Phot, Prachin Buri 25140, Thailand.
+                </p>
+            </div>
+
+            <!-- Zone 3: Bottom Legal Row -->
+            <div
+                style="padding-top: 30px; border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; font-size: 12px; color: rgba(255,255,255,0.3);">
+                <div>
+                    © 2026 Paycif Protocol. All rights reserved. <span
+                        style="margin-left: 14px; opacity: 0.5;">v1.2.4</span>
+                </div>
+                <div style="display: flex; gap: 32px; align-items: center;">
+                    <a href="privacy.html" style="color: inherit; text-decoration: none;">Data Protection</a>
+                    <a href="terms.html" style="color: inherit; text-decoration: none;">Governance</a>
+                    <span style="color:var(--accent-teal); font-weight: 700;">● SYSTEMS OPERATIONAL</span>
+                </div>
+            </div>
+        </footer>
+    </div>
+</body>
+
+</html>

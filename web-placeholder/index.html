@@ -1,0 +1,2603 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+    <meta name="cryptomus" content="8c87b54d" />
+
+    <!-- === $1M SEO STACK === -->
+    <link rel="icon" type="image/png" href="favicon.png">
+    <title>Paycif | Official Digital Concierge</title>
+    <meta name="description"
+        content="The definitive payment infrastructure for international professionals and corporate clients in Thailand. Scan any PromptPay QR instantly. Real exchange rates, transparent processing fees.">
+    <meta name="keywords"
+        content="PromptPay, Thailand corporate payment, international settlement Thailand, scan QR Thailand, B2B payments">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://paycif-portal.vercel.app/">
+
+    <!-- Social Preview Tags -->
+    <meta property="og:title" content="Paycif | Pay Like a Local in Thailand">
+    <meta property="og:description" content="Scan any Thai QR. No bank account needed. Instant, secure.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://paycif-portal.vercel.app/">
+    <meta property="og:image" content="og-image.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="og-image.png">
+
+    <!-- PHASE 2: Analytics Hook (P3 Checklist) -->
+    <!-- <script defer data-domain="paycif.com" src="https://plausible.io/js/script.js"></script> -->
+
+    <script
+        type="application/ld+json">{"@context":"https://schema.org","@type":"FinancialService","name":"Paycif","description":"Enterprise PromptPay settlement for global clients in Thailand.","url":"https://paycif-portal.vercel.app/","areaServed":"Thailand","serviceType":"Payment Gateway","offers":{"@type":"Offer","category":"Transparent fee structure"}}</script>
+
+    <!-- === FONTS === -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300..900;1,14..32,300..900&display=swap"
+        rel="stylesheet">
+
+    <!-- === LIBRARIES === -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/gh/studio-freight/lenis@1.0.19/bundled/lenis.min.js" defer></script>
+
+    <style>
+        /* ================================================================
+           DESIGN SYSTEM — Antigravity + Design-Spells + $1M Quality
+        ================================================================ */
+        :root {
+            --bg: #000000;
+            /* Pure Black for OLED depth */
+            --surface: rgba(255, 255, 255, 0.04);
+            --border: rgba(255, 255, 255, 0.08);
+            --text-primary: #F5F5F7;
+            /* Apple Off-White */
+            --text-secondary: #86868B;
+            /* Apple Medium Gray */
+            --accent-blue: #0066CC;
+            --accent-teal: #00E5C8;
+            --accent-gold: #D4AF37;
+            --radius-xl: 28px;
+            --radius-2xl: 44px;
+            /* Slightly softer curves */
+            --font-main: "SF Pro Display", "SF Pro Icons", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            --font-mono: "JetBrains Mono", "SF Mono", menlo, monaco, monospace;
+            --weight-headline: 600;
+            /* Apple-style refined weight */
+            --weight-body: 400;
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            background: var(--bg);
+            scroll-behavior: auto;
+            /* Lenis handles this */
+        }
+
+        body {
+            font-family: var(--font-main);
+            color: var(--text-primary);
+            background: var(--bg);
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+            cursor: auto;
+        }
+
+        /* === CUSTOM CURSOR (Design-Spells: Physics Cursor) === */
+        #cursor {
+            width: 12px;
+            height: 12px;
+            background: var(--accent-teal);
+            border-radius: 50%;
+            position: fixed;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 9900;
+            transform: translate(-50%, -50%);
+            transition: width 0.3s, height 0.3s, background 0.3s, opacity 0.3s;
+            will-change: transform;
+            opacity: 0;
+        }
+
+        #cursor-follower {
+            width: 36px;
+            height: 36px;
+            border: 1.5px solid rgba(0, 229, 200, 0.4);
+            border-radius: 50%;
+            position: fixed;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 9899;
+            transform: translate(-50%, -50%);
+            will-change: transform;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        body:hover #cursor,
+        body:hover #cursor-follower {
+            opacity: 1;
+        }
+
+        /* Magnetic hover state */
+        body.hovering-cta #cursor {
+            width: 60px;
+            height: 60px;
+            background: rgba(0, 229, 200, 0.15);
+        }
+
+        body.hovering-cta #cursor-follower {
+            opacity: 0;
+        }
+
+        /* === NAV === */
+        #nav {
+            position: fixed;
+            top: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            width: calc(100% - 48px);
+            max-width: 1100px;
+            background: rgba(10, 10, 12, 0.7);
+            backdrop-filter: blur(24px) saturate(180%);
+            -webkit-backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid var(--border);
+            border-radius: 100px;
+            padding: 14px 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            opacity: 1;
+            /* Fallback visibility */
+            will-change: transform, opacity;
+        }
+
+        .nav-logo {
+            font-size: 18px;
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            background: linear-gradient(90deg, #fff, var(--accent-teal));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: transparent;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 32px;
+        }
+
+        .nav-links a {
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        .nav-links a:hover {
+            color: var(--text-primary);
+        }
+
+        /* === DESIGN-SPELLS: Magnetic Button === */
+        .cta-magnetic {
+            position: relative;
+            padding: 14px 28px;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-teal));
+            border-radius: 100px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: #000;
+            border: none;
+            cursor: none;
+            transition: box-shadow 0.4s;
+            will-change: transform;
+            overflow: hidden;
+        }
+
+        .cta-magnetic::after {
+            content: '';
+            position: absolute;
+            inset: -2px;
+            border-radius: inherit;
+            background: linear-gradient(135deg, var(--accent-teal), var(--accent-blue));
+            opacity: 0;
+            transition: opacity 0.4s;
+            z-index: -1;
+        }
+
+        .cta-magnetic:hover {
+            box-shadow: 0 0 40px rgba(0, 229, 200, 0.4);
+        }
+
+        .cta-magnetic:hover::after {
+            opacity: 1;
+        }
+
+        /* === HERO === */
+        #hero {
+            min-height: 120vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 100px 24px 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Antigravity: Spatial depth background */
+        #hero-bg {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(0, 102, 204, 0.15) 0%, transparent 70%);
+        }
+
+        .hero-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(100px);
+            opacity: 0.25;
+            will-change: transform;
+        }
+
+        .orb-1 {
+            width: 600px;
+            height: 600px;
+            background: var(--accent-blue);
+            top: -200px;
+            left: -100px;
+        }
+
+        .orb-2 {
+            width: 500px;
+            height: 500px;
+            background: var(--accent-teal);
+            top: -100px;
+            right: -150px;
+        }
+
+        .hero-eyebrow {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.35em;
+            text-transform: uppercase;
+            color: var(--accent-teal);
+            padding: 8px 20px;
+            border: 1px solid rgba(0, 229, 200, 0.25);
+            border-radius: 100px;
+            backdrop-filter: blur(12px);
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        /* Design-Spells: Word-by-word hero reveal */
+        .hero-headline {
+            font-size: clamp(56px, 9vw, 120px);
+            font-weight: 700;
+            /* Medium-Bold for elegant impact */
+            letter-spacing: -0.04em;
+            line-height: 0.95;
+            margin: 32px 0;
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero-headline .word {
+            display: inline-block;
+            clip-path: polygon(0 0, 100% 0, 100% 110%, 0 110%);
+        }
+
+        .hero-headline .word-inner {
+            display: inline-block;
+            transform: translateY(115%);
+            will-change: transform;
+        }
+
+        .gradient-word {
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-teal));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: transparent;
+        }
+
+        .hero-sub {
+            font-size: clamp(16px, 2vw, 22px);
+            font-weight: 400;
+            color: var(--text-secondary);
+            max-width: 540px;
+            line-height: 1.6;
+            opacity: 0;
+            transform: translateY(24px);
+        }
+
+        .hero-ctas {
+            display: flex;
+            gap: 16px;
+            margin-top: 48px;
+            align-items: center;
+            opacity: 0;
+        }
+
+        .cta-ghost {
+            padding: 14px 28px;
+            border-radius: 100px;
+            border: 1px solid var(--border);
+            background: transparent;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            cursor: none;
+            transition: all 0.3s;
+        }
+
+        .cta-ghost:hover {
+            border-color: var(--accent-teal);
+            color: var(--text-primary);
+        }
+
+        /* Device mockup (Antigravity: floating device) */
+        .device-wrap {
+            margin-top: 80px;
+            position: relative;
+            z-index: 2;
+            will-change: transform;
+        }
+
+        .device {
+            width: 280px;
+            height: 580px;
+            background: #0a0a0a;
+            border-radius: 50px;
+            border: 8px solid rgba(255, 255, 255, 0.08);
+            box-shadow:
+                0 0 0 1px rgba(255, 255, 255, 0.04),
+                0 60px 120px -20px rgba(0, 0, 0, 0.8),
+                inset 0 1px 0 rgba(255, 255, 255, 0.08);
+            position: relative;
+            overflow: hidden;
+            transform: perspective(1000px) rotateX(8deg) rotateY(-2deg);
+            will-change: transform;
+        }
+
+        .device-notch {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90px;
+            height: 22px;
+            background: #0a0a0a;
+            border-radius: 0 0 14px 14px;
+            z-index: 20;
+        }
+
+        .device-screen {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, #0d1117 0%, #050505 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .qr-scan-frame {
+            width: 160px;
+            height: 160px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .qr-corner {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            border-color: var(--accent-teal);
+            border-style: solid;
+            border-width: 0;
+        }
+
+        .qr-corner.tl {
+            top: 0;
+            left: 0;
+            border-top-width: 3px;
+            border-left-width: 3px;
+            border-radius: 4px 0 0 0;
+        }
+
+        .qr-corner.tr {
+            top: 0;
+            right: 0;
+            border-top-width: 3px;
+            border-right-width: 3px;
+            border-radius: 0 4px 0 0;
+        }
+
+        .qr-corner.bl {
+            bottom: 0;
+            left: 0;
+            border-bottom-width: 3px;
+            border-left-width: 3px;
+            border-radius: 0 0 0 4px;
+        }
+
+        .qr-corner.br {
+            bottom: 0;
+            right: 0;
+            border-bottom-width: 3px;
+            border-right-width: 3px;
+            border-radius: 0 0 4px 0;
+        }
+
+        .scan-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent-teal), transparent);
+            animation: scanDown 2.5s ease-in-out infinite;
+        }
+
+        @keyframes scanDown {
+
+            0%,
+            100% {
+                top: 0;
+                opacity: 1;
+            }
+
+            90% {
+                top: 100%;
+                opacity: 0.5;
+            }
+        }
+
+        .device-status {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            letter-spacing: 0.02em;
+        }
+
+        .device-sub {
+            font-size: 10px;
+            color: var(--text-secondary);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+        }
+
+        /* === SECTIONS === */
+        section {
+            padding: 160px 24px;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        /* === ANTIGRAVITY: Glassmorphism Cards === */
+        .glass-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-2xl);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            padding: 48px;
+            transition: opacity 0.8s ease;
+            will-change: opacity;
+            cursor: default;
+        }
+
+        /* Removed hover scales and shadows for minimalist focus */
+
+        /* Antigravity: 3D isometric stat cards */
+        .stat-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 36px;
+            transition: opacity 0.8s ease;
+        }
+
+        .stat-number {
+            font-size: 56px;
+            font-weight: 900;
+            letter-spacing: -0.04em;
+            background: linear-gradient(135deg, #fff, var(--accent-teal));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: transparent;
+        }
+
+        .stat-label {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            color: var(--text-secondary);
+            margin-top: 8px;
+        }
+
+        /* === SECTION HEADLINES === */
+        .section-eyebrow {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.35em;
+            text-transform: uppercase;
+            color: var(--accent-teal);
+            margin-bottom: 24px;
+        }
+
+        .section-headline {
+            font-size: clamp(40px, 6vw, 80px);
+            font-weight: 700;
+            letter-spacing: -0.04em;
+            line-height: 1;
+            margin-bottom: 24px;
+        }
+
+        .section-body {
+            font-size: 18px;
+            color: var(--text-secondary);
+            line-height: 1.8;
+            max-width: 520px;
+            font-weight: 400;
+        }
+
+        /* === PROCESS STEPS === */
+        .steps-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            margin-top: 80px;
+        }
+
+        .step-card {
+            background: rgba(255, 255, 255, 0.02);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 48px;
+            padding: 72px 48px;
+            position: relative;
+            overflow: hidden;
+            transition: opacity 0.8s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            z-index: 1;
+        }
+
+        .step-number {
+            font-size: 160px;
+            font-weight: 900;
+            letter-spacing: -0.08em;
+            line-height: 1;
+            position: absolute;
+            top: -20px;
+            right: -20px;
+            pointer-events: none;
+            z-index: 0;
+            color: rgba(255, 255, 255, 0.04);
+            transition: all 0.8s ease;
+            font-family: inherit;
+        }
+
+        .step-card .step-number {
+            color: rgba(255, 255, 255, 0.04);
+        }
+
+        .step-icon {
+            width: 80px;
+            height: 80px;
+            position: relative;
+            z-index: 3;
+            margin-bottom: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            border: 1.5px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            box-shadow: 0 15px 45px rgba(0, 0, 0, 0.6);
+            transition: color 0.3s;
+        }
+
+        .step-icon svg {
+            width: 36px;
+            height: 36px;
+            stroke: var(--accent-teal);
+            stroke-width: 1.8;
+            fill: none;
+            transition: all 0.5s;
+        }
+
+        .step-card:hover .step-icon svg {
+            stroke: #000;
+        }
+
+        .step-title {
+            font-size: 32px;
+            font-weight: 800;
+            margin-bottom: 24px;
+            position: relative;
+            z-index: 3;
+            letter-spacing: -0.04em;
+            color: #fff;
+        }
+
+        .step-desc {
+            font-size: 17px;
+            color: rgba(255, 255, 255, 0.6);
+            line-height: 1.6;
+            position: relative;
+            z-index: 3;
+            max-width: 100%;
+            font-weight: 400;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.01);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            transition: opacity 0.5s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* === SECURITY SECTION === */
+        #security {
+            padding: 180px 24px;
+            background: #000;
+            position: relative;
+        }
+
+        #security::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(0, 102, 204, 0.05) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .security-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            background: rgba(0, 229, 200, 0.08);
+            border: 1px solid rgba(0, 229, 200, 0.2);
+            border-radius: 100px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            color: var(--accent-teal);
+        }
+
+        .security-badge svg {
+            width: 14px;
+            height: 14px;
+            stroke: currentColor;
+            stroke-width: 2;
+            fill: none;
+        }
+
+        /* === WAITLIST FORM === */
+        .waitlist-form {
+            display: flex;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(254, 254, 254, 0.08);
+            padding: 6px;
+            border-radius: 40px;
+            width: 100%;
+            max-width: 500px;
+            margin: 40px auto 0;
+            backdrop-filter: blur(20px);
+            transition: border-color 0.4s, box-shadow 0.4s;
+            position: relative;
+        }
+
+        .waitlist-form:focus-within {
+            border-color: var(--accent-teal);
+            box-shadow: 0 0 30px rgba(0, 229, 200, 0.1);
+        }
+
+        .waitlist-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            padding: 0 24px;
+            color: white;
+            font-size: 15px;
+            font-family: inherit;
+            outline: none;
+        }
+
+        .waitlist-input::placeholder {
+            color: rgba(255, 255, 255, 0.2);
+        }
+
+        .cta-magnetic {
+            background: var(--accent-gradient);
+            color: #000;
+            border: none;
+            padding: 14px 32px;
+            border-radius: 34px;
+            font-weight: 700;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            transition: transform 0.3s cubic-bezier(0.23, 1, 0.32, 1), box-shadow 0.3s;
+        }
+
+        .cta-magnetic:hover {
+            transform: scale(1.02);
+            box-shadow: 0 10px 30px rgba(0, 229, 200, 0.3);
+        }
+
+        /* === THE FREEDOM GRID (Hardened) === */
+        .freedom-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            margin-top: 80px;
+            perspective: 2000px;
+        }
+
+        .fee-card {
+            background: #111111;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 32px;
+            padding: 48px 40px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            overflow: hidden;
+            backdrop-filter: blur(20px);
+        }
+
+        .fee-card.legacy {
+            opacity: 0.7;
+            filter: grayscale(1);
+            background: #111111;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .fee-card:hover {
+            opacity: 1 !important;
+            transform: scale(1.03) translateY(-12px) !important;
+            filter: grayscale(0) !important;
+            border-color: var(--accent-teal);
+            background: #1a1a1a;
+            /* Darker but solid for contrast */
+            z-index: 25;
+            box-shadow: 0 40px 100px rgba(0, 0, 0, 0.9);
+        }
+
+        .fee-card.magical {
+            background: #000000;
+            border: 1.5px solid rgba(0, 229, 200, 0.5);
+            box-shadow: 0 0 30px rgba(0, 229, 200, 0.1), 0 20px 60px rgba(0, 0, 0, 0.8);
+            z-index: 10;
+            opacity: 1;
+            transform: scale(1.05);
+            /* Constant presence */
+        }
+
+        .fee-card.magical:hover {
+            border-color: var(--accent-teal);
+            background: #050505;
+            box-shadow: 0 0 50px rgba(0, 229, 200, 0.3), 0 30px 80px rgba(0, 0, 0, 0.9);
+        }
+
+        .fee-card-eyebrow {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            color: rgba(254, 254, 254, 0.4);
+        }
+
+        .fee-card.magical .fee-card-eyebrow {
+            color: var(--accent-teal);
+        }
+
+        .fee-card-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #fff;
+            letter-spacing: -0.01em;
+            line-height: 1.1;
+        }
+
+        /* Removing redundant logic covered by unified hover state */
+
+        .fee-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            padding-bottom: 16px;
+            border-bottom: 1px solid rgba(254, 254, 254, 0.05);
+        }
+
+        .fee-item:last-of-type {
+            border-bottom: none;
+        }
+
+        .fee-item-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-weight: 400;
+        }
+
+        .fee-item-value {
+            font-size: 20px;
+            font-weight: 800;
+            font-family: 'JetBrains Mono', 'Roboto Mono', monospace;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .fee-metadata {
+            font-size: 10px;
+            color: rgba(254, 254, 254, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-top: -12px;
+        }
+
+
+        .fee-item-value.bad {
+            color: #ff4d4d;
+        }
+
+        .fee-item-value.good {
+            color: var(--accent-teal);
+        }
+
+        .lost-value-banner {
+            margin-top: auto;
+            padding: 16px;
+            background: rgba(255, 77, 77, 0.08);
+            border-radius: 16px;
+            font-size: 13px;
+            color: #ff4d4d;
+            font-weight: 600;
+            text-align: center;
+            border: 1px solid rgba(255, 77, 77, 0.1);
+        }
+
+        .magical .lost-value-banner {
+            background: rgba(0, 229, 200, 0.1);
+            color: var(--accent-teal);
+            border-color: rgba(0, 229, 200, 0.2);
+        }
+
+        /* === FOOTER / CTA === */
+
+        #final-cta {
+            text-align: center;
+            padding: 200px 24px;
+            border-top: 1px solid var(--border);
+            position: relative;
+            overflow: hidden;
+        }
+
+        #final-cta::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse 70% 60% at 50% 100%, rgba(0, 229, 200, 0.1) 0%, transparent 70%);
+        }
+
+        .final-headline {
+            font-size: clamp(80px, 15vw, 240px);
+            font-weight: 950;
+            letter-spacing: -0.06em;
+            line-height: 0.85;
+            margin-bottom: 64px;
+            position: relative;
+            z-index: 1;
+            background: linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.2)), url('assets/unlock-bg.png');
+            background-size: 150% auto;
+            background-position: center;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            filter: drop-shadow(0 0 40px rgba(0, 229, 200, 0.15));
+            animation: text-bg-pan 30s ease-in-out infinite alternate;
+            text-align: center;
+            text-transform: uppercase;
+        }
+
+        @keyframes text-bg-pan {
+            from {
+                background-position: 0% center;
+            }
+
+            to {
+                background-position: 100% center;
+            }
+        }
+
+        footer {
+            padding: 40px 24px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        footer p {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        /* === UTILITY === */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+            align-items: center;
+        }
+
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-top: 64px;
+        }
+
+        @media (max-width: 768px) {
+
+            .grid-2,
+            .steps-grid,
+            .stats-row {
+                grid-template-columns: 1fr;
+            }
+
+            footer {
+                justify-content: center;
+                text-align: center;
+            }
+
+            .nav-links {
+                display: none;
+            }
+
+            body {
+                cursor: auto;
+            }
+
+            #cursor,
+            #cursor-follower {
+                display: none;
+            }
+        }
+
+        /* Prefers-reduced-motion (Antigravity requirement) */
+        @media (prefers-reduced-motion: reduce) {
+
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        /* === APP GALLERY (Stitch screens) === */
+        #app-gallery {
+            padding-bottom: 60px;
+        }
+
+        .gallery-phone {
+            text-align: center;
+        }
+
+        .gallery-device {
+            position: relative;
+            background: #0a0a0a;
+            border-radius: 42px;
+            border: 6px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 40px 80px rgba(0, 0, 0, 0.6);
+            overflow: hidden;
+        }
+
+        .gallery-notch {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 70px;
+            height: 18px;
+            background: #0a0a0a;
+            border-radius: 0 0 12px 12px;
+            z-index: 10;
+        }
+
+        .gallery-label {
+            margin-top: 16px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        @media (max-width: 768px) {
+            #app-gallery>div {
+                grid-template-columns: 1fr !important;
+            }
+
+            .gallery-phone {
+                transform: none !important;
+            }
+        }
+
+        /* === INTERACTIVE MOCK PAYMENT DEMO (CYANIDE GLASS) === */
+        .demo-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            z-index: 10001;
+            /* Above custom cursor dot */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            cursor: auto !important;
+        }
+
+        .demo-modal-container {
+            width: 100%;
+            max-width: 400px;
+            background: rgba(30, 30, 40, 0.6);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 32px;
+            text-align: center;
+            position: relative;
+            transform: translateY(20px) scale(0.95);
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        .demo-overlay.active {
+            opacity: 1;
+        }
+
+        .demo-overlay.active .demo-modal-container {
+            transform: translateY(0) scale(1);
+        }
+
+        .demo-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .demo-close:hover {
+            color: white;
+        }
+
+        .demo-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 32px;
+            font-family: var(--font-mono);
+            font-size: 13px;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        .demo-amount-box {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 32px;
+        }
+
+        .demo-amount-box.small {
+            padding: 16px;
+            margin: 16px auto;
+            max-width: 200px;
+            margin-bottom: 0;
+        }
+
+        .demo-amount-box .currency {
+            color: var(--text-secondary);
+            font-size: 18px;
+            margin-right: 8px;
+            font-weight: 500;
+        }
+
+        .demo-amount-box .amount {
+            color: white;
+            font-size: 42px;
+            font-weight: 300;
+            letter-spacing: -0.02em;
+        }
+
+        .demo-amount-box.small .amount {
+            font-size: 24px;
+        }
+
+        .demo-btn {
+            width: 100%;
+            padding: 16px;
+            border-radius: 14px;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer !important;
+            transition: all 0.2s;
+            border: none;
+            outline: none;
+        }
+
+        .demo-btn.primary {
+            background: linear-gradient(135deg, var(--accent-teal), #00A6B2);
+            color: #000;
+            box-shadow: 0 8px 24px rgba(0, 229, 200, 0.2);
+        }
+
+        .demo-btn.primary:hover {
+            box-shadow: 0 12px 32px rgba(0, 229, 200, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .demo-btn.ghost {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-family: var(--font-mono);
+            font-size: 12px;
+            padding: 10px;
+        }
+
+        .demo-btn.ghost:hover {
+            color: white;
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .demo-spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid rgba(0, 229, 200, 0.1);
+            border-top-color: var(--accent-teal);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        .demo-qr-card {
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            width: 260px;
+            margin: 0 auto 24px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+            border: 1px solid #ddd;
+        }
+
+        .promptpay-header {
+            background: #003764;
+            /* Real PromptPay Blue */
+            padding: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .promptpay-logo {
+            width: 24px;
+            height: 24px;
+            background: white;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #003764;
+            font-weight: 900;
+            font-size: 14px;
+        }
+
+        .promptpay-text {
+            color: white;
+            font-family: sans-serif;
+            font-weight: 700;
+            font-size: 15px;
+            letter-spacing: -0.02em;
+        }
+
+        .qr-main-wrap {
+            padding: 24px;
+            background: white;
+            position: relative;
+        }
+
+        .qr-svg-realistic {
+            width: 100%;
+            height: auto;
+            color: #003764;
+        }
+
+        .demo-success-circle {
+            width: 80px;
+            height: 80px;
+            background: rgba(0, 229, 200, 0.1);
+            color: var(--accent-teal);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+            box-shadow: 0 0 60px rgba(0, 229, 200, 0.2);
+            animation: popIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .demo-tx-box {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-family: var(--font-mono);
+            font-size: 13px;
+        }
+
+        .tx-label {
+            color: var(--text-secondary);
+        }
+
+        .tx-value {
+            color: var(--accent-teal);
+        }
+
+        @keyframes spin {
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0)
+            }
+        }
+
+        @keyframes popIn {
+            0% {
+                transform: scale(0.5);
+                opacity: 0;
+            }
+
+            50% {
+                transform: scale(1.1);
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* === FEE TABLE === */
+        .fee-table-wrap {
+            margin-top: 60px;
+            overflow: hidden;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+        }
+
+        .fee-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            padding: 24px 32px;
+            border-bottom: 1px solid var(--border);
+            align-items: center;
+        }
+
+        .fee-row:last-child {
+            border-bottom: none;
+        }
+
+        .fee-header {
+            background: rgba(255, 255, 255, 0.03);
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--text-secondary);
+        }
+
+        .fee-label {
+            font-weight: 600;
+        }
+
+        .fee-val-bad {
+            color: #ff4d4d;
+            font-weight: 500;
+        }
+
+        .fee-val-good {
+            color: var(--accent-teal);
+            font-weight: 700;
+        }
+
+        /* === FAQ === */
+        .faq-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-top: 60px;
+        }
+
+        .faq-card {
+            padding: 32px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .faq-q {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: #fff;
+        }
+
+        .faq-a {
+            font-size: 14px;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+
+        @media (max-width: 768px) {
+            .faq-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .fee-row {
+                grid-template-columns: 1fr 1fr;
+                gap: 12px;
+            }
+
+            .fee-row>div:first-child {
+                grid-column: 1 / -1;
+                margin-bottom: 4px;
+            }
+        }
+
+        /* === REFERRAL BOX === */
+        #referral-box {
+            display: none;
+            margin-top: 24px;
+            padding: 24px;
+            background: rgba(0, 229, 200, 0.05);
+            border: 1px solid rgba(0, 229, 200, 0.2);
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .ref-link {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 12px;
+            margin: 12px 0;
+            display: block;
+            border: 1px dashed rgba(255, 255, 255, 0.2);
+        }
+
+        /* === TRUST FOOTER === */
+        footer {
+            padding: 100px 24px 60px;
+            border-top: 1px solid var(--border);
+            background: #050505;
+        }
+
+        .footer-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr;
+            gap: 48px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .footer-logo {
+            font-weight: 800;
+            font-size: 20px;
+            margin-bottom: 20px;
+            display: block;
+        }
+
+        .footer-col h4 {
+            font-size: 10px;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+            letter-spacing: 0.1em;
+        }
+
+        .footer-col a {
+            display: block;
+            margin-bottom: 12px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            transition: color 0.3s;
+            text-decoration: none;
+        }
+
+        .footer-col a:hover {
+            color: var(--accent-teal);
+        }
+
+        .footer-bottom {
+            margin-top: 80px;
+            padding-top: 40px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        @media (max-width: 768px) {
+            .footer-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .footer-grid>div:first-child {
+                grid-column: 1 / -1;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Custom Cursor (Design-Spells) -->
+    <div id="cursor"></div>
+    <div id="cursor-follower"></div>
+
+    <!-- Nav -->
+    <nav id="nav">
+        <div class="nav-logo">Paycif</div>
+        <div class="nav-links">
+            <a href="#intro">Intro</a>
+            <a href="#how">How It Works</a>
+            <a href="#security">Security</a>
+        </div>
+        <button class="cta-magnetic" id="nav-cta" onclick="openDemoModal(event)">Access Protocol</button>
+    </nav>
+
+    <main>
+        <!-- HERO -->
+        <section id="hero">
+            <div id="hero-bg">
+                <div class="hero-orb orb-1"></div>
+                <div class="hero-orb orb-2"></div>
+            </div>
+
+            <div class="hero-eyebrow" id="hero-tag">The Future of Travel Payments • Thailand 2026</div>
+
+            <h1 class="hero-headline">
+                <div class="word"><span class="word-inner">The</span></div>
+                <span> </span>
+                <div class="word"><span class="word-inner">Interface&nbsp;</span></div>
+                <div class="word"><span class="word-inner">Of</span></div>
+                <span> </span>
+                <div class="word"><span class="word-inner gradient-word">Thailand.</span></div>
+            </h1>
+
+
+            <p class="hero-sub" id="hero-sub"
+                style="font-weight: 300; letter-spacing: -0.01em; max-width: 500px; margin: 0 auto; line-height: 1.5; font-size: 20px; opacity: 0.9;">
+                Banks are silos. Paycif is a protocol.<br>
+                Connect your global liquidity to Thailand in milliseconds.<br>
+                No intermediaries. Just magic.
+            </p>
+
+
+            <div class="hero-ctas" id="hero-ctas"
+                style="margin-top: 48px; display: flex; flex-direction: column; align-items: center; gap: 24px;">
+                <!-- Singular Action Capsule -->
+                <div style="position: relative; display: inline-block;">
+                    <a href="#demo" onclick="openDemoModal(event)" class="cta-magnetic"
+                        style="border-radius: 99px; padding: 16px 42px; font-weight: 600; font-size: 16px; letter-spacing: 0.05em; background: linear-gradient(135deg, var(--accent-teal), #00A6B2); color: black; text-decoration: none; display: inline-flex; align-items: center; gap: 12px; box-shadow: 0 10px 30px rgba(0, 229, 200, 0.3); transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                        </svg>
+                        LAUNCH PROTOCOL DEMO
+                    </a>
+                </div>
+
+                <!-- Secondary Intelligence / Status -->
+                <div style="display: flex; align-items: center; gap: 24px; opacity: 0.6;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span
+                            style="width: 6px; height: 6px; background: var(--accent-teal); border-radius: 50%; box-shadow: 0 0 10px var(--accent-teal); animation: pulse 2s infinite;"></span>
+                        <span
+                            style="font-size: 10px; font-weight: 700; color: white; letter-spacing: 0.2em; text-transform: uppercase;">Mainnet
+                            Active</span>
+                    </div>
+                    <div style="width: 1px; height: 12px; background: rgba(255,255,255,0.1);"></div>
+                    <a href="mailto:support@paycif.com"
+                        style="font-size: 10px; font-weight: 700; color: white; letter-spacing: 0.2em; text-transform: uppercase; text-decoration: none; transition: opacity 0.3s;"
+                        onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'">Contact Institutional
+                        Sales</a>
+                </div>
+            </div>
+
+            <!-- Device Mockup — Real Stitch Screenshot -->
+            <div class="device-wrap" id="device-mockup">
+                <div class="device" id="device-3d">
+                    <div class="device-notch"></div>
+                    <div class="device-screen" style="padding:0; background:#0a0a0a;">
+                        <img src="https://lh3.googleusercontent.com/aida/ADBb0ugHvXuI0CQhESv0VWUHPOD4kfwDbpN9udfHpNPRboKEMv7LIIIxSKuhavJGDoOTGdXLBCtYNBSt_n1yugx1kdRkkNFEQ4bgZk7W3Sp5In-SyBzh1Fs0D7WBRksNKF1_99QT8xn4cmQ0bbuSz5A0cDhSf_vrv2eAuAmVzAaSqS7RvdAHHVAzM4m91n_FsUf4HZ63EYlqOJDO9cY5l1bgRD9esZandr2K2pjeZF0Ey058FbQu0YCYjuIsTzc"
+                            alt="Paycif Home Screen — Balance & Scan to Pay"
+                            style="width:100%;height:100%;object-fit:cover;object-position:top;" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4-Screen App Gallery (Pixel Perfect Grid) -->
+            <div id="app-gallery" style="width:100%;max-width:1100px;margin:80px auto 0;padding:0 24px;">
+                <p class="section-eyebrow" style="text-align:center;margin-bottom:40px;">The App Experience</p>
+                <div class="gallery-grid"
+                    style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:24px;align-items:flex-start;">
+                    <!-- Screen 1: Home -->
+                    <div class="gallery-phone">
+                        <div class="gallery-device">
+                            <div class="gallery-notch"></div>
+                            <img src="https://lh3.googleusercontent.com/aida/ADBb0ugHvXuI0CQhESv0VWUHPOD4kfwDbpN9udfHpNPRboKEMv7LIIIxSKuhavJGDoOTGdXLBCtYNBSt_n1yugx1kdRkkNFEQ4bgZk7W3Sp5In-SyBzh1Fs0D7WBRksNKF1_99QT8xn4cmQ0bbuSz5A0cDhSf_vrv2eAuAmVzAaSqS7RvdAHHVAzM4m91n_FsUf4HZ63EYlqOJDO9cY5l1bgRD9esZandr2K2pjeZF0Ey058FbQu0YCYjuIsTzc"
+                                alt="Home Screen — Balance & Quick Pay"
+                                style="width:100%;border-radius:0 0 38px 38px;display:block;" />
+                        </div>
+                        <p class="gallery-label">Home · Balance</p>
+                    </div>
+                    <!-- Screen 2: Scanner -->
+                    <div class="gallery-phone">
+                        <div class="gallery-device"
+                            style="border-color:rgba(0,229,200,0.3);box-shadow:0 0 40px rgba(0,229,200,0.15),0 40px 80px rgba(0,0,0,0.6);">
+                            <div class="gallery-notch"></div>
+                            <img src="https://lh3.googleusercontent.com/aida/ADBb0uhInUbQSVsPNHZ3hx3k68XmjJwFIF4HvGEpoqIBaG0fwYDKp58R0kY22szQlqY-QlDlcmx5C-fLB68puIgy6uGBHihb8eF-aGc-rJQHlJ_FSBKckBWcV6LicayJqd2LKLg1vpoQYjxYQsssjshFQO4G4BqY8bq6p2wcxnsFaXPLir1naBgM_1fMthhp9yDl2aM1TjPtVdNXe4_TIXMXm9wJD7-ynC8Z9Y6Wp6GjWtVSj9hzoCVlK15HBII"
+                                alt="QR Scanner — Scan Thai PromptPay"
+                                style="width:100%;border-radius:0 0 38px 38px;display:block;" />
+                        </div>
+                        <p class="gallery-label" style="color:var(--accent-teal);">Scan PromptPay ✦</p>
+                    </div>
+                    <!-- Screen 3: Success -->
+                    <div class="gallery-phone">
+                        <div class="gallery-device">
+                            <div class="gallery-notch"></div>
+                            <img src="https://lh3.googleusercontent.com/aida/ADBb0ujLeTE23pEmgoXexPQbnJRqZEvcG23w8mcIqchlflpbmjPRjS82z71DmuCqiz8tMffuylYsfmBBSPCb4f5ajT96SdsVmFyETm4PDAmaYSzu6T4T3kdJWNM_GZO5pdgT1OaSv5rBjezCXFHQ0maRWVdFTguv_TcLdR7FvKjlHX0HoJR3_pfR0R1YGLhpg6hUO4dtbreEfe3SBJZLUXzRA5nr6JJ0QKGSHzzVkK1i0byQx7fg"
+                                alt="Payment Success" style="width:100%;border-radius:0 0 38px 38px;display:block;" />
+                        </div>
+                        <p class="gallery-label">Confirmed · 1s</p>
+                    </div>
+                    <!-- Screen 4: Profile & Settings -->
+                    <div class="gallery-phone">
+                        <div class="gallery-device">
+                            <div class="gallery-notch"></div>
+                            <img src="https://lh3.googleusercontent.com/aida/ADBb0uhsdhuME61qVidWzPgQnF0p5hLdzFQwa4-raRJwYcbjPUoOtd55rI-MiB-PgQUFzW5GquXL4R6Mr2YwLWTc9A2npGaqFuot-FwZYfQ-BOVp-cVxkQIxp8_5yPR9US9vQeKM8fEUNu1bKhCP0RyzTw7y3EeBzfog9sBSy_gUFSj3rIpo29t_IpHnXzA2zDioUvO-pIeOUYCqnGmaK191jrHFZM76dMXtWPYEkHoGf_HkVPTZPEc3MWVcNBE"
+                                alt="Profile & Settings"
+                                style="width:100%;border-radius:0 0 38px 38px;display:block;" />
+                        </div>
+                        <p class="gallery-label">You · Secure</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cinematic Marketing Ads (Phase 5 Assets) -->
+            <div id="marketing-ads" style="margin-top: 120px; padding: 0 24px;">
+                <div
+                    style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 40px; max-width: 1200px; margin: 0 auto;">
+                    <div style="border-radius: 32px; overflow: hidden; box-shadow: 0 50px 100px rgba(0,0,0,0.5);">
+                        <img src="assets/ad-lifestyle.png" alt="Paycif Lifestyle — Street Food"
+                            style="width:100%; display:block;">
+                    </div>
+                    <div style="display: flex; flex-direction: column; justify-content: center; gap: 40px;">
+                        <div
+                            style="border-radius: 32px; overflow: hidden; box-shadow: 0 50px 100px rgba(0,0,0,0.5); width: 80%;">
+                            <img src="assets/ad-product.png" alt="Paycif Product — Wat Arun"
+                                style="width:100%; display:block;">
+                        </div>
+                        <p style="font-size: 14px; color: rgba(255,255,255,0.4); line-height: 1.6; max-width: 300px;">
+                            <span style="color: var(--accent-teal);">● Global Institutional Ready.</span><br>
+                            Our visual language bridges the gap between traditional Thai commerce and the digital
+                            future.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- INTRO / VISION -->
+        <section id="intro">
+            <div class="container">
+                <div class="grid-2">
+                    <div>
+                        <p class="section-eyebrow">The Problem We Solved</p>
+                        <h2 class="section-headline">Global Professionals.<br /><span
+                                style="color:rgba(255,255,255,0.2)">Fragmented payment tools.</span></h2>
+                        <p class="section-body">
+                            International executives and digital nomads require seamless access to local commerce.
+                            Paycif provides direct integration with Thai payment rails for compliant, secure, and
+                            instant settlement.
+                        </p>
+                    </div>
+                    <div class="stats-row"
+                        style="grid-column: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-self: start;">
+                        <div class="stat-card">
+                            <div class="stat-number">2,450+</div>
+                            <div class="stat-label">Verified Entities</div>
+                        </div>
+                        <div class="stat-card"
+                            style="background: linear-gradient(135deg, rgba(0,102,204,0.2), rgba(0,229,200,0.1));">
+                            <div class="stat-number">1.5%</div>
+                            <div class="stat-label">Standard Flow</div>
+                        </div>
+                        <div class="stat-card" style="grid-column: 1/-1;">
+                            <div class="stat-number" style="font-size: 36px;">100% Secure</div>
+                            <div class="stat-label">AES-256 & Cold Storage Protected</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- THE FREEDOM GRID: The Reality Edition -->
+                <div class="freedom-grid reveal-item" id="fee-comparison">
+                    <!-- The Middleman Cut -->
+                    <div class="fee-card legacy">
+                        <p class="fee-card-eyebrow">Legacy Banking</p>
+                        <h3 class="fee-card-title">The Middleman Cut</h3>
+                        <div class="fee-item">
+                            <span class="fee-item-label">ATM Access</span>
+                            <span class="fee-item-value bad">220฿</span>
+                        </div>
+                        <p class="fee-metadata">Per Withdrawal Attempt</p>
+                        <div class="lost-value-banner">
+                            Asset Leakage: ~850฿ per 10k
+                        </div>
+                    </div>
+
+                    <!-- The Hidden Margin -->
+                    <div class="fee-card legacy">
+                        <p class="fee-card-eyebrow">Hidden Fees</p>
+                        <h3 class="fee-card-title">The Hidden Margin</h3>
+                        <div class="fee-item">
+                            <span class="fee-item-label">Bank Markup</span>
+                            <span class="fee-item-value bad">3.5%</span>
+                        </div>
+                        <p class="fee-metadata">Embedded in FX Rate</p>
+                        <div class="lost-value-banner">
+                            Slow Network Settlement
+                        </div>
+                    </div>
+
+                    <!-- The Direct Settlement -->
+                    <div class="fee-card magical cta-magnetic" data-magnetic="0.2">
+                        <p class="fee-card-eyebrow">The Open Standard</p>
+                        <h3 class="fee-card-title">The Direct Settlement</h3>
+                        <div class="fee-item">
+                            <span class="fee-item-label">Protocol Fee</span>
+                            <span class="fee-item-value good">1.5%</span>
+                        </div>
+                        <p class="fee-metadata">Efficiency: 10x Legacy Baseline</p>
+                        <div class="lost-value-banner">
+                            Monopoly on Value. Direct API Integrity.
+                        </div>
+                    </div>
+
+                </div>
+
+
+            </div>
+        </section>
+
+        <!-- HOW IT WORKS -->
+        <section id="how" style="border-top: 1px solid var(--border);">
+            <div class="container">
+                <div style="text-align: center; max-width: 600px; margin: 0 auto 80px;">
+                    <p class="section-eyebrow">Technical Logic</p>
+                    <h2 class="section-headline">Vertical Progress. <span class="gradient-word">0 to 1.</span></h2>
+                    <p class="section-body" style="margin: 0 auto; text-align: center;">We didn't build a better bank.
+                        We built a proprietary bridge that makes banking obsolete for travel.</p>
+                </div>
+
+                <div class="steps-grid">
+                    <!-- Step 01: Top Up -->
+                    <div class="step-card">
+                        <span class="step-number">01</span>
+                        <div class="step-icon">
+                            <svg viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" fill="none">
+                                <rect x="2" y="5" width="20" height="14" rx="2" />
+                                <path d="M2 10H22" />
+                                <path d="M7 15H8" />
+                                <path d="M11 15H13" />
+                                <path d="M18 15L20 15" />
+                                <path d="M12 2L12 5" stroke-opacity="0.3" />
+                            </svg>
+                        </div>
+                        <h3 class="step-title">Global Liquidity</h3>
+                        <p class="step-desc">Ingest assets from <b>global credit networks</b> instantly. No pre-funding
+                            a local
+                            account. Your capital remains <b>yours</b> until the moment of exchange.</p>
+                    </div>
+
+
+                    <!-- Step 02: Scan -->
+                    <div class="step-card">
+                        <span class="step-number">02</span>
+                        <div class="step-icon">
+                            <svg viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" fill="none">
+                                <path d="M3 7V5C3 3.89543 3.89543 3 5 3H7" />
+                                <path d="M17 3H19C20.1046 3 21 3.89543 21 5V7" />
+                                <path d="M21 17V19C21 20.1046 20.1046 21 19 21H17" />
+                                <path d="M7 21H5C3.89543 21 3 20.1046 3 19V17" />
+                                <rect x="8" y="8" width="8" height="8" rx="1" />
+                                <path d="M12 8V16" stroke-opacity="0.2" />
+                                <path d="M8 12H16" stroke-opacity="0.2" />
+                            </svg>
+                        </div>
+                        <h3 class="step-title">Instant Execution</h3>
+                        <p class="step-desc">Authorize settlement against any <b>PromptPay endpoint</b>. Street food to
+                            luxury
+                            hotels. Proprietary FX logic executes in <b>
+                                < 40ms</b>.</p>
+                    </div>
+
+
+                    <!-- Step 03: Done -->
+                    <div class="step-card">
+                        <span class="step-number">03</span>
+                        <div class="step-icon">
+                            <svg viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" fill="none">
+                                <path d="M20 6L9 17L4 12" stroke-linecap="round" stroke-linejoin="round" />
+                                <path
+                                    d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z"
+                                    stroke-opacity="0.1" />
+                            </svg>
+                        </div>
+                        <h3 class="step-title">Final Settlement</h3>
+                        <p class="step-desc">Transaction finalized <b>directly on Thai payment rails</b>. You are no
+                            longer
+                            just a traveler; you are a <b>native economic actor</b>.</p>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+        <section id="security">
+            <div class="container">
+                <div style="text-align: center; margin-bottom: 80px;">
+                    <p class="section-eyebrow">Integrity Protocol</p>
+                    <h2 class="section-headline">SOVEREIGN ASSET<br>CONTROL.</h2>
+                </div>
+
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 32px;">
+                    <div class="glass-card" style="padding: 48px 32px; text-align: center; border-radius: 32px;">
+                        <div
+                            style="width: 56px; height: 56px; margin: 0 auto 24px; display: flex; align-items:center; justify-content: center; background: rgba(0,229,200,0.1); border-radius: 16px;">
+                            <svg viewBox="0 0 24 24"
+                                style="width:28px; height:28px; stroke:var(--accent-teal); fill:none; stroke-width:1.5;">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                                <path d="M12 8v4" />
+                                <path d="M12 16h.01" />
+                            </svg>
+                        </div>
+                        <h3
+                            style="font-size: 18px; font-weight: 600; color: #fff; letter-spacing:0.02em; font-family: var(--font-mono); opacity: 0.9;">
+                            AES-256</h3>
+                        <p style="font-size: 14px; color: var(--text-secondary); margin-top: 12px; line-height: 1.6;">
+                            Military-grade encryption for all transaction data.</p>
+                    </div>
+
+                    <div class="glass-card" style="padding: 48px 32px; text-align: center; border-radius: 32px;">
+                        <div
+                            style="width: 56px; height: 56px; margin: 0 auto 24px; display: flex; align-items:center; justify-content: center; background: rgba(0,102,204,0.1); border-radius: 16px;">
+                            <svg viewBox="0 0 24 24"
+                                style="width:28px; height:28px; stroke:var(--accent-blue); fill:none; stroke-width:1.5;">
+                                <path d="M22 19V5a2 2 0 00-2-2H4a2 2 0 00-2 2v14a2 2 0 002 2h16a2 2 0 002-2z" />
+                                <path d="M6 11h4M6 7h12M6 15h12" />
+                            </svg>
+                        </div>
+                        <h3
+                            style="font-size: 18px; font-weight: 600; color: #fff; letter-spacing:0.02em; font-family: var(--font-mono); opacity: 0.9;">
+                            Cold Storage</h3>
+                        <p style="font-size: 14px; color: var(--text-secondary); margin-top: 12px; line-height: 1.6;">
+                            User funds are held in offline, geographically distributed vaults.</p>
+                    </div>
+
+                    <div class="glass-card" style="padding: 48px 32px; text-align: center; border-radius: 32px;">
+                        <div
+                            style="width: 56px; height: 56px; margin: 0 auto 24px; display: flex; align-items:center; justify-content: center; background: rgba(0,229,200,0.1); border-radius: 16px;">
+                            <svg viewBox="0 0 24 24"
+                                style="width:28px; height:28px; stroke:var(--accent-teal); fill:none; stroke-width:1.5;">
+                                <polyline points="20 6 9 17 4 12" />
+                                <rect x="2" y="2" width="20" height="20" rx="4" stroke-opacity="0.2" />
+                            </svg>
+                        </div>
+                        <h3
+                            style="font-size: 18px; font-weight: 600; color: #fff; letter-spacing:0.02em; font-family: var(--font-mono); opacity: 0.9;">
+                            PCI-DSS L1</h3>
+                        <p style="font-size: 14px; color: var(--text-secondary); margin-top: 12px; line-height: 1.6;">
+                            Adhering to the highest global standards for card processing.</p>
+                    </div>
+
+                    <div class="glass-card" style="padding: 48px 32px; text-align: center; border-radius: 32px;">
+                        <div
+                            style="width: 56px; height: 56px; margin: 0 auto 24px; display: flex; align-items:center; justify-content: center; background: rgba(255,255,255,0.05); border-radius: 16px;">
+                            <svg viewBox="0 0 24 24"
+                                style="width:28px; height:28px; stroke:#fff; fill:none; stroke-width:1.5;">
+                                <path d="M6 3h12l4 6-10 12L2 9z" />
+                                <path d="M11 3l-4 6 5 12 5-12-4-6" />
+                                <path d="M2 9h20" />
+                            </svg>
+                        </div>
+                        <h3
+                            style="font-size: 18px; font-weight: 600; color: #fff; letter-spacing:0.02em; font-family: var(--font-mono); opacity: 0.9;">
+                            Institutional Grade</h3>
+                        <p style="font-size: 14px; color: var(--text-secondary); margin-top: 12px; line-height: 1.6;">
+                            Verified settlement infrastructure integrated with tier-1 liquidity providers.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <section id="faq">
+            <div class="container">
+                <p class="section-eyebrow" style="text-align: center;">Transparency First</p>
+                <h2 class="section-headline" style="text-align: center; margin-bottom: 40px;">Got Questions?</h2>
+
+                <div class="faq-grid">
+                    <div class="faq-card">
+                        <div class="faq-q">Do I need a Thai bank account?</div>
+                        <div class="faq-a">No. Paycif acts as your digital settlement bridge. Corporate users can fund
+                            their accounts via international wires or digital assets, and we settle with Thai merchants
+                            via PromptPay instantly.</div>
+                    </div>
+                    <div class="faq-card">
+                        <div class="faq-q">Where is PromptPay accepted?</div>
+                        <div class="faq-a">Everywhere. From 7-Eleven and malls to street food vendors and island
+                            taxis. If they have a QR code, you can pay.</div>
+                    </div>
+                    <div class="faq-card">
+                        <div class="faq-q">Is it safe?</div>
+                        <div class="faq-a">Completely. We use AES-256 encryption and follow PCI-DSS standards. We
+                            never store your card details on our servers.</div>
+                    </div>
+                    <div class="faq-card">
+                        <div class="faq-q">What are the fees?</div>
+                        <div class="faq-a">We provide the mid-market exchange rate with a tiny, transparent
+                            processing fee that is significantly lower than ATM withdrawal charges.</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="final-cta">
+            <div class="final-headline">
+                UNLOCK<br />THAILAND.
+            </div>
+
+            <div id="waitlist-area" style="max-width: 500px; margin: 0 auto;">
+                <form class="waitlist-form" id="waitlist-final" style="margin-top: 40px;">
+                    <input type="email" class="waitlist-input" placeholder="Business Email Address" required>
+                    <button type="submit" class="cta-magnetic">Submit Application</button>
+                </form>
+
+                <div id="referral-box"
+                    style="display: none; margin-top: 40px; padding: 32px; background: rgba(0,229,200,0.03); border: 1px solid rgba(0,229,200,0.1); border-radius: 20px;">
+                    <p style="font-size: 14px; font-weight: 700; color:var(--accent-teal);">Application Received.
+                    </p>
+                    <p style="font-size: 12px; color: var(--text-secondary); margin-top: 8px;">Our institutional
+                        onboarding team will review your application and contact you within 24 hours with next steps.
+                    </p>
+                </div>
+
+                <p id="success-msg"
+                    style="display:none; color:var(--accent-teal); margin-top: 24px; font-weight: 700; font-size: 18px;">
+                    Welcome to Paycif! 🇹🇭
+                </p>
+            </div>
+        </section>
+    </main>
+
+    <!-- === INTERACTIVE MOCK PAYMENT DEMO (CYANIDE GLASS) === -->
+    <div id="demo-modal" class="demo-overlay" style="display: none;">
+        <div class="demo-modal-container">
+            <div class="demo-close" onclick="closeDemoModal()">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </div>
+
+            <!-- Header -->
+            <div class="demo-header">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-teal)"
+                    stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+                <span>Paycif Checkout</span>
+            </div>
+
+            <!-- Step 1: Cart -->
+            <div id="demo-step-1" class="demo-step active">
+                <h3 style="color: white; margin-bottom: 8px; font-size: 20px;">API Integration Test</h3>
+                <p style="color: var(--text-secondary); margin-bottom: 32px;">Merchant: Corporate Simulation Node</p>
+
+                <div class="demo-amount-box">
+                    <span class="currency">THB</span>
+                    <span class="amount">500.00</span>
+                </div>
+
+                <button class="demo-btn primary" onclick="nextDemoStep(2)">Pay with PromptPay</button>
+            </div>
+
+            <!-- Step 2: Loading / QR Code -->
+            <div id="demo-step-2" class="demo-step" style="display: none;">
+                <div id="demo-loading" style="padding: 40px 0;">
+                    <div class="demo-spinner"></div>
+                    <p style="color: var(--accent-teal); margin-top: 16px; font-weight: 500;">Securing connection...</p>
+                </div>
+
+                <div id="demo-qr-view" style="display: none; animation: fadeIn 0.4s ease-out forwards;">
+                    <p style="color: var(--text-secondary); margin-bottom: 24px; font-size: 14px; font-weight: 500;">
+                        Scan QR to Confirm Settlement</p>
+
+                    <div class="demo-qr-card">
+                        <div class="promptpay-header">
+                            <div class="promptpay-logo">PP</div>
+                            <span class="promptpay-text">Prompt Pay</span>
+                        </div>
+                        <div class="qr-main-wrap">
+                            <!-- High-Fidelity Mock QR Pattern -->
+                            <svg class="qr-svg-realistic" viewBox="0 0 100 100" fill="currentColor">
+                                <path d="M0 0h34v34H0V0zm4 4v26h26V4H4z" />
+                                <rect x="10" y="10" width="14" height="14" rx="1" />
+                                <path d="M66 0h34v34H66V0zm30 4H70v26h26V4z" />
+                                <rect x="76" y="10" width="14" height="14" rx="1" />
+                                <path d="M0 66h34v34H0V66zm30 4H4v26h26V70h-4z" />
+                                <rect x="10" y="76" width="14" height="14" rx="1" />
+                                <!-- More realistic noise -->
+                                <rect x="42" y="0" width="6" height="6" rx="1" />
+                                <rect x="52" y="0" width="10" height="4" rx="1" />
+                                <rect x="42" y="10" width="4" height="20" rx="1" />
+                                <rect x="50" y="10" width="12" height="6" rx="1" />
+                                <rect x="50" y="20" width="10" height="14" rx="1" />
+                                <rect x="42" y="38" width="58" height="6" rx="1" />
+                                <rect x="38" y="42" width="6" height="58" rx="1" />
+                                <rect x="42" y="48" width="50" height="6" rx="1" />
+                                <rect x="48" y="42" width="6" height="50" rx="1" />
+                                <rect x="58" y="58" width="42" height="42" rx="2" opacity="0.8" />
+                                <rect x="42" y="80" width="6" height="6" rx="1" />
+                                <rect x="80" y="42" width="6" height="6" rx="1" />
+                            </svg>
+                            <!-- Paycif Core Center -->
+                            <div
+                                style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -12%); width: 44px; height: 44px; background: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.15);">
+                                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#003764"
+                                    stroke-width="2.5">
+                                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                                </svg>
+                            </div>
+                        </div>
+                        <div style="background: #f1f3f5; padding: 10px; border-top: 1px solid #e9ecef;">
+                            <div style="font-size: 9px; color: #666; font-weight: 600; text-transform: uppercase;">
+                                Bill ID: PAYCIF-TXN-29A8</div>
+                        </div>
+                    </div>
+
+                    <div class="demo-amount-box small" style="margin-bottom: 8px;">
+                        <span class="currency">THB</span>
+                        <span class="amount">500.00</span>
+                    </div>
+
+                    <p style="color: var(--accent-teal); margin-top: 16px; font-weight: 500; font-family: var(--font-mono); font-size: 12px;"
+                        id="demo-timer">14:59</p>
+
+                    <button class="demo-btn ghost" onclick="nextDemoStep(3)"
+                        style="margin-top: 24px; opacity: 0.3; font-size: 10px;">
+                        [ SIMULATE NETWORK SETTLEMENT ]
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 3: Success -->
+            <div id="demo-step-3" class="demo-step" style="display: none;">
+                <div class="demo-success-circle">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                </div>
+                <h3 style="color: white; margin-bottom: 8px; font-size: 24px;">Settlement Confirmed</h3>
+                <p style="color: var(--text-secondary); margin-bottom: 24px;">Funds securely routed to merchant.</p>
+
+                <div class="demo-tx-box">
+                    <span class="tx-label">Transaction ID</span>
+                    <span class="tx-value">0x7FAC...9A2B</span>
+                </div>
+
+                <button class="demo-btn primary" onclick="closeDemoModal()" style="margin-top: 32px;">Return to
+                    Merchant</button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- === CORPORATE GOVERNANCE === -->
+    <section id="about" style="border-top: 1px solid var(--border); padding: 120px 24px;">
+        <div class="container" style="max-width: 1000px;">
+            <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 80px; align-items: start;">
+                <div>
+                    <p class="section-eyebrow">Institutional Foundation</p>
+                    <h2 class="section-headline">The Standard<br>of Integrity.</h2>
+                    <p class="section-body">
+                        Paycif is engineered as a primary liquidity bridge between global capital and Thai commerce.
+                        We operate with absolute transparency to ensure regulatory compliance and settlement finality.
+                    </p>
+                    <p class="section-body" style="margin-top: 24px;">
+                        The protocol is led by <b>Methas Pakpoompong</b>, focusing on high-throughput settlement
+                        architecture and financial encryption standards.
+                    </p>
+                    <div style="margin-top: 48px; padding-top: 48px; border-top: 1px solid var(--border);">
+                        <p style="font-size: 13px; color: var(--text-secondary); line-height: 2;">
+                            <b style="color: white; display: block; margin-bottom: 8px;">Registered Entity Office</b>
+                            199 Moo 4, Dong Krathong Yam, Si Maha Phot, <br>
+                            Prachin Buri 25140, Thailand
+                        </p>
+                    </div>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 40px;">
+                    <div style="padding-left: 24px; border-left: 1px solid var(--accent-teal);">
+                        <h4
+                            style="font-size: 11px; text-transform: uppercase; color: var(--accent-teal); letter-spacing: 0.2em; margin-bottom: 12px;">
+                            Founder & Systems Lead</h4>
+                        <p style="font-size: 24px; color: white; font-weight: 600; margin: 0;">Methas Pakpoompong</p>
+                        <p style="font-size: 14px; color: var(--text-secondary); margin-top: 8px;">Architect of the
+                            Paycif settlement engine.</p>
+                    </div>
+                    <div style="padding-left: 24px; border-left: 1px solid rgba(255,255,255,0.1);">
+                        <h4
+                            style="font-size: 11px; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 0.2em; margin-bottom: 12px;">
+                            Official Verification</h4>
+                        <p style="font-size: 14px; color: white; margin: 0;">KYC & AML Integrated</p>
+                        <p style="font-size: 14px; color: var(--text-secondary); margin-top: 4px;">Mainnet Protocol
+                            v1.2.4</p>
+                    </div>
+                    <div style="padding-left: 24px; border-left: 1px solid rgba(255,255,255,0.1);">
+                        <h4
+                            style="font-size: 11px; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 0.2em; margin-bottom: 12px;">
+                            Direct Support</h4>
+                        <p style="font-size: 14px; color: white; margin: 0;">+66 96 924 0925</p>
+                        <p style="font-size: 14px; color: var(--text-secondary); margin-top: 4px;">support@paycif.com
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer style="border-top: 1px solid var(--border); padding-top: 80px; padding-bottom: 60px; margin-top: 100px;">
+        <div class="container">
+            <!-- Zone 1: Link Exploration -->
+            <div class="footer-explorer-grid"
+                style="display: grid; grid-template-columns: 2fr repeat(3, 1fr); gap: 60px; margin-bottom: 80px;">
+                <div>
+                    <span class="nav-logo" style="display: block; margin-bottom: 24px; font-size: 24px;">Paycif</span>
+                    <p
+                        style="color: var(--text-secondary); font-size: 14px; max-width: 320px; line-height: 1.6; font-family: 'JetBrains Mono', monospace; opacity: 0.8;">
+                        Digital liquidity bridge for global credit networks and Thai commerce. Engineered for
+                        high-throughput institutional settlement.
+                    </p>
+                    <div style="display: flex; gap: 12px; margin-top: 32px; opacity: 0.6;">
+                        <div
+                            style="background: #111; border: 1px solid #333; border-radius: 8px; padding: 8px 16px; font-size: 11px;">
+                            iOS Terminal·Coming 2026</div>
+                        <div
+                            style="background: #111; border: 1px solid #333; border-radius: 8px; padding: 8px 16px; font-size: 11px;">
+                            Android Terminal·Coming 2026</div>
+                    </div>
+                </div>
+                <div class="footer-links-col">
+                    <h4
+                        style="font-size: 14px; font-weight: 700; color: white; margin-bottom: 24px; text-transform: uppercase; letter-spacing: 0.1em;">
+                        Protocol</h4>
+                    <a href="#how" class="footer-link">How it Works</a>
+                    <a href="#faq" class="footer-link">Internal Settlement</a>
+                    <a href="#security" class="footer-link">Security Logic</a>
+                </div>
+                <div class="footer-links-col">
+                    <h4
+                        style="font-size: 14px; font-weight: 700; color: white; margin-bottom: 24px; text-transform: uppercase; letter-spacing: 0.1em;">
+                        Institutional</h4>
+                    <a href="about.html" class="footer-link">The Manifesto</a>
+                    <a href="about.html#contact" class="footer-link">Official Inquiries</a>
+                </div>
+                <div class="footer-links-col">
+                    <h4
+                        style="font-size: 14px; font-weight: 700; color: white; margin-bottom: 24px; text-transform: uppercase; letter-spacing: 0.1em;">
+                        Compliance</h4>
+                    <a href="privacy.html" class="footer-link">Privacy Rights (PDPA)</a>
+                    <a href="terms.html" class="footer-link">Terms of Service</a>
+                    <a href="aml.html" class="footer-link">AML/KYC Measures</a>
+                    <a href="refund.html" class="footer-link">Settlement Finality</a>
+                </div>
+            </div>
+
+            <!-- CSS for dynamic footer interaction -->
+            <style>
+                .footer-link {
+                    display: block;
+                    color: var(--text-secondary);
+                    margin-bottom: 14px;
+                    font-size: 14px;
+                    text-decoration: none;
+                    transition: color 0.2s, transform 0.2s;
+                }
+
+                .footer-link:hover {
+                    color: white;
+                }
+            </style>
+
+            <!-- Zone 2: Info Section -->
+            <div style="padding: 40px 0; border-top: 1px solid var(--border); margin-bottom: 40px;">
+                <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.8; max-width: 800px;">
+                    <b>Institutional Information:</b> Paycif Protocol is a technology provider bridging digital capital
+                    to the PromptPay network. Managed by <b>Methas Pakpoompong</b>. Registered Physical HQ: 199 Moo 4,
+                    Dong Krathong Yam, Si Maha Phot, Prachin Buri 25140, Thailand.
+                </p>
+            </div>
+
+            <!-- Zone 3: Bottom Legal Row -->
+            <div
+                style="padding-top: 30px; border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; font-size: 12px; color: rgba(255,255,255,0.3);">
+                <div>
+                    © 2026 Paycif Protocol. All rights reserved. <span
+                        style="margin-left: 14px; opacity: 0.5;">v1.2.4</span>
+                </div>
+                <div style="display: flex; gap: 32px; align-items: center;">
+                    <a href="privacy.html" style="color: inherit; text-decoration: none;">Data Protection</a>
+                    <a href="terms.html" style="color: inherit; text-decoration: none;">Governance</a>
+                    <span style="color:var(--accent-teal); font-weight: 700;">● SYSTEMS OPERATIONAL</span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- PHASE 3: Backend Bridge -->
+    <script src="supabase-bridge.js"></script>
+
+    <!-- ================================================================
+     $1M ENGINEERING RUNTIME
+================================================================ -->
+    <script>
+        (function () {
+            'use strict';
+
+            // --- 1. SILENT ERROR SHIELD (Design-Spells: Zero-fault production) ---
+            window.addEventListener('error', function (e) {
+                const silentTargets = ['csspeeper', 'chrome-extension', 'ad unit', 'givefreely', 'payload'];
+                if (e.filename && silentTargets.some(t => e.filename.includes(t))) {
+                    e.stopImmediatePropagation();
+                    return false;
+                }
+                if (e.message && silentTargets.some(t => e.message.toLowerCase().includes(t))) {
+                    e.stopImmediatePropagation();
+                    return false;
+                }
+            }, true);
+
+            // --- 2. WAIT FOR ALL LIBRARIES ---
+            function waitForLibs(callback) {
+                let attempts = 0;
+                const check = setInterval(() => {
+                    attempts++;
+                    if (window.gsap && window.ScrollTrigger && window.Lenis) {
+                        clearInterval(check);
+                        callback();
+                    }
+                    if (attempts > 100) clearInterval(check);
+                }, 50);
+            }
+
+            // --- 3. CUSTOM CURSOR (Design-Spells: Physics cursor) ---
+            const cursor = document.getElementById('cursor');
+            const follower = document.getElementById('cursor-follower');
+            let mouseX = 0, mouseY = 0;
+            let followerX = 0, followerY = 0;
+
+            document.addEventListener('mousemove', (e) => {
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+                cursor.style.left = mouseX + 'px';
+                cursor.style.top = mouseY + 'px';
+            });
+
+            function animateFollower() {
+                followerX += (mouseX - followerX) * 0.12;
+                followerY += (mouseY - followerY) * 0.12;
+                follower.style.left = followerX + 'px';
+                follower.style.top = followerY + 'px';
+                requestAnimationFrame(animateFollower);
+            }
+            animateFollower();
+
+            // Hover state for magnetic buttons (Simplified: Buttons only)
+            document.querySelectorAll('.cta-magnetic').forEach(el => {
+                el.addEventListener('mouseenter', () => document.body.classList.add('hovering-cta'));
+                el.addEventListener('mouseleave', () => document.body.classList.remove('hovering-cta'));
+            });
+
+            // --- 4. MAGNETIC BUTTON EFFECT (Design-Spells: Magnetic hover) ---
+            document.querySelectorAll('.cta-magnetic').forEach(btn => {
+                btn.addEventListener('mousemove', (e) => {
+                    const rect = btn.getBoundingClientRect();
+                    const x = e.clientX - rect.left - rect.width / 2;
+                    const y = e.clientY - rect.top - rect.height / 2;
+                    btn.style.transform = `translate(${x * 0.25}px, ${y * 0.3}px)`;
+                });
+                btn.addEventListener('mouseleave', () => {
+                    btn.style.transform = 'translate(0, 0)';
+                });
+            });
+
+            // --- 5. INIT EVERYTHING AFTER LIBRARIES LOAD ---
+            waitForLibs(() => {
+                gsap.registerPlugin(ScrollTrigger);
+
+                // Lenis Smooth Scroll (scroll-experience skill)
+                const lenis = new Lenis({
+                    duration: 1.4,
+                    easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+                    smoothWheel: true,
+                });
+
+                function raf(time) { lenis.raf(time); requestAnimationFrame(raf); }
+                requestAnimationFrame(raf);
+
+                lenis.on('scroll', ScrollTrigger.update);
+                gsap.ticker.lagSmoothing(0);
+
+                // === HERO ENTRANCE TIMELINE (cinematic) ===
+                const heroTl = gsap.timeline({ delay: 0.3 });
+
+                heroTl
+                    // Nav slides in
+                    .to('#nav', { opacity: 1, duration: 0.8, ease: 'power3.out' })
+                    // Eyebrow tag
+                    .to('#hero-tag', { opacity: 1, y: 0, duration: 0.6, ease: 'power3.out' }, '-=0.4')
+                    // Word-by-word reveal (Design-Spells signature move)
+                    .to('.word-inner', {
+                        y: '0%',
+                        duration: 1,
+                        stagger: 0.08,
+                        ease: 'power4.out'
+                    }, '-=0.2')
+                    // Subhead
+                    .to('#hero-sub', { opacity: 1, y: 0, duration: 0.8, ease: 'power3.out' }, '-=0.6')
+                    // CTAs
+                    .to('#hero-ctas', { opacity: 1, y: 0, duration: 0.7, ease: 'power3.out' }, '-=0.5')
+                    // Device mocku
+                    .from('#device-mockup', { y: 100, opacity: 0, scale: 0.9, duration: 1.2, ease: 'power4.out' }, '-=0.4');
+
+                // === ORB PARALLAX (Antigravity: spatial depth) ===
+                gsap.to('.orb-1', {
+                    scrollTrigger: { trigger: '#hero', start: 'top top', end: 'bottom top', scrub: 1 },
+                    x: -100, y: -80, scale: 1.2
+                });
+                gsap.to('.orb-2', {
+                    scrollTrigger: { trigger: '#hero', start: 'top top', end: 'bottom top', scrub: 1 },
+                    x: 100, y: -60, scale: 1.1
+                });
+
+                gsap.to('#device-mockup', {
+                    scrollTrigger: { trigger: '#hero', start: 'top top', end: 'bottom top', scrub: true },
+                    y: 200, scale: 1.05, opacity: 0.3
+                });
+
+                // === MAGNETIC ELEMENTS (Design-Spells: sensory pull) ===
+                document.querySelectorAll('.cta-magnetic').forEach(btn => {
+                    const force = parseFloat(btn.getAttribute('data-magnetic')) || 0.25;
+                    btn.addEventListener('mousemove', (e) => {
+                        const rect = btn.getBoundingClientRect();
+                        const x = (e.clientX - rect.left - rect.width / 2) * force;
+                        const y = (e.clientY - rect.top - rect.height / 2) * force;
+                        gsap.to(btn, { x: x, y: y, duration: 0.4, ease: 'power2.out' });
+                    });
+                    btn.addEventListener('mouseleave', () => {
+                        gsap.to(btn, { x: 0, y: 0, duration: 0.7, ease: 'elastic.out(1, 0.3)' });
+                    });
+                });
+
+
+                // === 3D TILT ON MOUSE (Antigravity: spatial depth) ===
+                document.getElementById('device-3d').addEventListener('mousemove', (e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const xPct = (e.clientX - rect.left) / rect.width - 0.5;
+                    const yPct = (e.clientY - rect.top) / rect.height - 0.5;
+                    gsap.to('#device-3d', {
+                        rotationY: xPct * 15,
+                        rotationX: yPct * -10 + 8,
+                        duration: 0.5,
+                        ease: 'power2.out'
+                    });
+                });
+                document.getElementById('device-3d').addEventListener('mouseleave', () => {
+                    gsap.to('#device-3d', { rotationX: 8, rotationY: -2, duration: 0.8, ease: 'elastic.out(1, 0.5)' });
+                });
+
+                // === APPLE-STYLE CINEMATIC SCROLL (Scrub Enabled) ===
+                const phones = gsap.utils.toArray('.gallery-phone');
+                if (phones.length >= 4) {
+                    // Start state: Scattered, blurred, and scaled up
+                    gsap.set(phones, { opacity: 0, scale: 1.1, filter: "blur(20px)" });
+                    gsap.set(phones[0], { x: -100 });
+                    gsap.set(phones[1], { x: -40 });
+                    gsap.set(phones[2], { x: 40 });
+                    gsap.set(phones[3], { x: 100 });
+
+                    gsap.to(phones, {
+                        scrollTrigger: {
+                            trigger: '#app-gallery',
+                            start: 'top 95%',
+                            end: 'top 40%',
+                            scrub: 1.5, // Smooth lag for premium feel
+                        },
+                        x: 0,
+                        opacity: 1,
+                        scale: 1,
+                        filter: "blur(0px)",
+                        stagger: { amount: 0.3, from: "center" },
+                        ease: "power2.out"
+                    });
+                }
+
+                // Progressive reveal for all headlines (Apple Typography Fade)
+                gsap.utils.toArray('.section-headline').forEach(headline => {
+                    gsap.from(headline, {
+                        scrollTrigger: {
+                            trigger: headline,
+                            start: 'top 95%',
+                            end: 'top 70%',
+                            scrub: 1,
+                        },
+                        opacity: 0,
+                        y: 40,
+                        scale: 0.98,
+                        filter: "blur(4px)",
+                        ease: "power1.out"
+                    });
+                });
+
+                // === STAGGERED SECTION REVEALS (Antigravity + scroll-experience) ===
+                const revealTargets = [
+                    '.section-eyebrow', '.section-body',
+                    '.stat-card', '.step-card', '.glass-card', '.fee-card', '.faq-card'
+                ];
+
+
+                revealTargets.forEach(selector => {
+                    gsap.utils.toArray(selector).forEach((el, i) => {
+                        gsap.from(el, {
+                            scrollTrigger: {
+                                trigger: el,
+                                start: 'top 94%',
+                                toggleActions: 'play none none none'
+                            },
+                            opacity: 0,
+                            y: 20,
+                            duration: 1.2,
+                            ease: 'power2.out',
+                            delay: (i % 3) * 0.1, // Stagger logic within rows
+                            overwrite: 'auto'
+                        });
+                    });
+                });
+
+                // Fail-safe: Reveal everything after 4 seconds regardless of scroll
+                setTimeout(() => {
+                    gsap.to(revealTargets.join(','), { opacity: 1, y: 0, duration: 1, stagger: 0.1 });
+                    ScrollTrigger.refresh();
+                }, 4000);
+
+                // Ensure triggers are recalculated after load
+                window.addEventListener('load', () => {
+                    ScrollTrigger.refresh();
+                });
+
+                // Final CTA headline massive reveal
+                gsap.from('.final-headline', {
+                    scrollTrigger: { trigger: '#final-cta', start: 'top 70%' },
+                    opacity: 0, y: 60, skewY: 3,
+                    duration: 1.2, ease: 'power4.out'
+                });
+
+                // === FORM HANDLERS (Viral Loop Integration) ===
+                const forms = ['waitlist-hero', 'waitlist-final'];
+                forms.forEach(id => {
+                    const form = document.getElementById(id);
+                    if (form) {
+                        form.addEventListener('submit', (e) => {
+                            e.preventDefault();
+                            const btn = form.querySelector('button');
+                            const email = form.querySelector('input').value;
+                            btn.innerText = 'Syncing...';
+
+                            // PHASE 3: Real Backend Persistence
+                            if (typeof joinWaitlist !== 'undefined') {
+                                joinWaitlist(email);
+                            }
+
+                            setTimeout(() => {
+                                // Hide form, show confirmation
+                                form.style.display = 'none';
+
+                                const msg = document.getElementById('success-msg');
+                                if (msg) {
+                                    msg.style.display = 'block';
+                                    gsap.from(msg, { opacity: 0, y: 10, duration: 0.5 });
+                                }
+
+                                // Activate Phase 3 Referral Box for Final CTA
+                                if (id === 'waitlist-final') {
+                                    const refBox = document.getElementById('referral-box');
+                                    if (refBox) {
+                                        refBox.style.display = 'block';
+                                        gsap.from(refBox, { opacity: 0, scale: 0.9, y: 20, duration: 0.6, ease: 'back.out(2)' });
+                                    }
+                                } else {
+                                    const heroForm = document.getElementById('waitlist-hero');
+                                    if (heroForm) {
+                                        heroForm.innerHTML = '<div style="color: var(--accent-teal); font-weight:600; padding:10px;">Application Submitted. Our team will contact you.</div>';
+                                    }
+                                }
+                            }, 1200);
+                        });
+                    }
+                });
+
+                // === INTERACTIVE MOCK PAYMENT DEMO ===
+                window.demoInterval = null;
+                window.demoTimeLeft = 900; // 15 mins
+
+                window.openDemoModal = function (e) {
+                    if (e) e.preventDefault();
+                    const modal = document.getElementById('demo-modal');
+                    modal.style.display = 'flex';
+                    // Trigger reflow
+                    void modal.offsetWidth;
+                    modal.classList.add('active');
+
+                    // Reset to step 1
+                    window.showDemoStep(1);
+                };
+
+                window.closeDemoModal = function () {
+                    const modal = document.getElementById('demo-modal');
+                    modal.classList.remove('active');
+                    clearInterval(window.demoInterval);
+                    setTimeout(() => {
+                        modal.style.display = 'none';
+                    }, 300);
+                };
+
+                window.showDemoStep = function (stepIndex) {
+                    document.querySelectorAll('.demo-step').forEach(el => el.style.display = 'none');
+                    document.getElementById('demo-step-' + stepIndex).style.display = 'block';
+                };
+
+                window.nextDemoStep = function (stepIndex) {
+                    if (stepIndex === 2) {
+                        window.showDemoStep(2);
+                        document.getElementById('demo-loading').style.display = 'block';
+                        document.getElementById('demo-qr-view').style.display = 'none';
+
+                        // Simulate API call to generate QR
+                        setTimeout(() => {
+                            document.getElementById('demo-loading').style.display = 'none';
+                            document.getElementById('demo-qr-view').style.display = 'block';
+                            window.startDemoTimer();
+                        }, 1200);
+                    } else if (stepIndex === 3) {
+                        clearInterval(window.demoInterval);
+                        window.showDemoStep(3);
+                    }
+                };
+
+                window.startDemoTimer = function () {
+                    clearInterval(window.demoInterval);
+                    window.demoTimeLeft = 900;
+                    const timerEl = document.getElementById('demo-timer');
+
+                    window.demoInterval = setInterval(() => {
+                        window.demoTimeLeft--;
+                        const m = Math.floor(window.demoTimeLeft / 60);
+                        const s = window.demoTimeLeft % 60;
+                        timerEl.textContent = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+
+                        if (window.demoTimeLeft <= 0) {
+                            clearInterval(window.demoInterval);
+                            timerEl.textContent = "00:00 - Expired";
+                            timerEl.style.color = "var(--text-secondary)";
+                        }
+                    }, 1000);
+                };
+
+            });
+        })();
+    </script>
+</body>
+
+</html>
