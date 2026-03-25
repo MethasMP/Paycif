@@ -4,11 +4,11 @@
 ! .env.example
 
 # 🏗️ Build Binaries (Go)
-api
-api_server
-verify
-verify_transfer
-worker
+/api
+/api_server
+/verify
+/verify_transfer
+/worker
 /bin/
 *.exe
 *.exe~
