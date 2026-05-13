@@ -93,13 +93,18 @@ class OpnClient {
     return resp.json();
   }
 
-  async createCharge(payload: OpnChargeRequest): Promise<OpnChargeResponse> {
+  async createCharge(payload: OpnChargeRequest, idempotencyKey?: string): Promise<OpnChargeResponse> {
+    const headers: Record<string, string> = {
+      'Authorization': this.authHeader(),
+      'Content-Type': 'application/json',
+    };
+    if (idempotencyKey) {
+      headers['Omise-Idempotency-Key'] = idempotencyKey;
+    }
+
     const resp = await fetch(`${this.baseUrl}/charges`, {
       method: 'POST',
-      headers: {
-        'Authorization': this.authHeader(),
-        'Content-Type': 'application/json',
-      },
+      headers: headers,
       body: JSON.stringify(payload),
     });
 
@@ -211,13 +216,13 @@ serve(async (req: Request) => {
       );
     }
 
-    console.log(`[Limits] Checking and Reserving limit for user: ${userId}`);
+    console.log(`[Limits] Checking and Updating limit for user: ${userId}`);
     const { data: limitCheck, error: limitError } = await adminClient.rpc(
-      'check_and_reserve_daily_topup',
+      'check_and_update_daily_topup',
       {
         p_user_id: userId,
         p_amount_satang: effectiveWalletAmount,
-        p_wallet_id: userId, // Assuming wallet_id is same as profile_id for now or fetch it
+        p_reference_id: reference_id,
       },
     );
 
@@ -228,7 +233,6 @@ serve(async (req: Request) => {
 
     const limitResult = limitCheck as {
       success: boolean;
-      reservation_id?: string;
       error?: string;
       remaining_limit?: number;
     };
@@ -242,8 +246,7 @@ serve(async (req: Request) => {
       );
     }
 
-    const reservationId = limitResult.reservation_id;
-    console.log(`[Limits] Approved & Reserved. ID: ${reservationId}. Remaining: ${(limitResult.remaining_limit || 0) / 100} THB`);
+    console.log(`[Limits] Approved & Updated. Remaining: ${(limitResult.remaining_limit || 0) / 100} THB`);
 
     // ========================================================================
     // 3. SECURE DEVICE CHALLENGE (Signature Verification)
@@ -405,7 +408,16 @@ serve(async (req: Request) => {
       // Apple Pay handling...
     }
 
-    const charge = await opn.createCharge(chargePayload);
+    let charge;
+    try {
+      charge = await opn.createCharge(chargePayload, reference_id);
+    } catch (err) {
+      console.error(`[Opn] Charge request crashed:`, err);
+      // Rollback limit on crash
+      await adminClient.rpc('rollback_daily_topup', { p_user_id: userId, p_reference_id: reference_id });
+      return jsonError('Payment service unavailable', 500, 'CHARGE_CRASH');
+    }
+
     // @ts-ignore: Handle both successful charge and error response objects
     const chargeError = charge.object === 'error' ? (charge as any).message : null;
     console.log(`[Opn] Charge result: ${charge.status || 'error'} (${charge.id || 'N/A'})`);
@@ -416,6 +428,11 @@ serve(async (req: Request) => {
       console.error(`[Opn] Charge failed: ${errorMsg}`);
       console.error(`[Opn] Full charge response:`, JSON.stringify(charge, null, 2));
       console.error(`[Opn] Charge payload was:`, JSON.stringify(chargePayload, null, 2));
+
+      // 🛡️ Rollback limit if charge failed
+      console.log(`[Limits] Rolling back limit for failed charge: ${reference_id}`);
+      await adminClient.rpc('rollback_daily_topup', { p_user_id: userId, p_reference_id: reference_id });
+
       return jsonError(errorMsg, 400, 'CHARGE_FAILED');
     }
 

@@ -142,6 +142,14 @@ BEGIN
     );
 
     -- =========================================================================
+    -- STEP 5.5: Update Reservation Status to COMMITTED
+    -- =========================================================================
+    UPDATE private.topup_reservations
+    SET status = 'COMMITTED',
+        updated_at = NOW()
+    WHERE reference_id = p_reference_id;
+
+    -- =========================================================================
     -- STEP 6: Outbox for Notification
     -- =========================================================================
     INSERT INTO transaction_outbox (
