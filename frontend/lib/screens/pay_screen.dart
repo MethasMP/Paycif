@@ -1,16 +1,24 @@
+import 'dart:io';
+import 'package:uuid/uuid.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:frontend/features/security/presentation/widgets/pin_entry_widget.dart';
+import 'package:provider/provider.dart';
 import '../controllers/dashboard_controller.dart';
+import '../controllers/payment_controller.dart';
 import '../cubit/payment_cubit.dart';
 import '../cubit/payment_state.dart';
+import '../models/saved_card.dart';
 import '../services/api_service.dart';
 import '../utils/error_translator.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
 import 'payment_success_screen.dart';
 import 'top_up_view.dart';
 import '../features/security/domain/repositories/security_repository.dart';
+import '../utils/fee_calculator.dart';
+import '../widgets/kyc/payment_method_picker.dart';
 
 class PayScreen extends StatefulWidget {
   final double amount;
@@ -35,6 +43,15 @@ class PayScreen extends StatefulWidget {
 }
 
 class _PayScreenState extends State<PayScreen> {
+  final ApiService _apiService = ApiService();
+
+  // Controllers for Custom Payment Sheet
+  final _cardNumberController = TextEditingController();
+  final _expiryController = TextEditingController(); // MM/YY
+  final _cvvController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+
   // ใช้ชื่อจาก QR Code โดยตรง (EMV Tag 59 = Merchant Name)
   // ถ้าไม่มีชื่อ (Personal QR) EMV Parser จะ format PromptPay ID ให้แล้ว
   String get _displayName => widget.merchantName;
@@ -49,6 +66,15 @@ class _PayScreenState extends State<PayScreen> {
     _prewarmBiometric();
   }
 
+  @override
+  void dispose() {
+    _cardNumberController.dispose();
+    _expiryController.dispose();
+    _cvvController.dispose();
+    _nameController.dispose();
+    super.dispose();
+  }
+
   /// Pre-warm biometric sensor to eliminate cold-start delay
   void _prewarmBiometric() {
     _auth.canCheckBiometrics
@@ -56,6 +82,29 @@ class _PayScreenState extends State<PayScreen> {
           _biometricReady = ready;
         })
         .catchError((_) {});
+  }
+
+  void _showMethodPicker() {
+    final paymentController = Provider.of<PaymentController>(
+      context,
+      listen: false,
+    );
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => PaymentMethodPicker(
+        preferredMethodId: paymentController.preferredMethodId,
+        preferredMethodType: paymentController.preferredMethodType,
+        savedCards: paymentController.savedCards,
+        onMethodSelected: (id, type) {
+          paymentController.updatePreference(id, type);
+        },
+        onAddMethod: () {
+          _showOpnPaymentSheet();
+        },
+      ),
+    );
   }
 
   Future<void> _authenticateAndPay(PaymentCubit cubit) async {
@@ -130,6 +179,32 @@ class _PayScreenState extends State<PayScreen> {
   /// Shows premium processing animation while API runs in parallel
   /// Never shows "Success" until we have real confirmation
   Future<void> _executePaymentWithProcessingOverlay(PaymentCubit cubit) async {
+    final paymentController = context.read<PaymentController>();
+    final prefId = paymentController.preferredMethodId;
+    final prefType = paymentController.preferredMethodType;
+    final currentCards = paymentController.savedCards;
+
+    final hasExactApplePay = prefType == 'apple_pay';
+    final exactCardIndex = currentCards.indexWhere(
+      (c) =>
+          prefType == 'card' &&
+          (prefId == c.id || (prefId != null && c.id.contains(prefId))),
+    );
+
+    bool useWallet = true;
+    bool isApplePay = false;
+    SavedCard? selectedCard;
+
+    if (prefType == 'wallet' || (prefId == null && prefType == null)) {
+      useWallet = true;
+    } else if (hasExactApplePay) {
+      useWallet = false;
+      isApplePay = true;
+    } else if (exactCardIndex != -1) {
+      useWallet = false;
+      selectedCard = currentCards[exactCardIndex];
+    }
+
     // Show processing overlay immediately
     showDialog(
       context: context,
@@ -138,13 +213,134 @@ class _PayScreenState extends State<PayScreen> {
       builder: (_) => const _ProcessingOverlay(),
     );
 
-    // Fire API and wait for result
-    cubit.pay(
-      recipientPromptPayId: widget.promptPayId,
-      recipientName: _displayName,
-      billerId: widget.billerId,
-      reference1: widget.reference1,
-      reference2: widget.reference2,
+    if (useWallet) {
+      // Fire standard Payout API
+      cubit.pay(
+        recipientPromptPayId: widget.promptPayId,
+        recipientName: _displayName,
+        billerId: widget.billerId,
+        reference1: widget.reference1,
+        reference2: widget.reference2,
+      );
+    } else {
+      // 💎 ORCHESTRATED DIRECT PAY (Pay-Per-Use)
+      _handleDirectPay(cubit, isApplePay, selectedCard);
+    }
+  }
+
+  Future<void> _handleDirectPay(
+    PaymentCubit cubit,
+    bool isApplePay,
+    SavedCard? card,
+  ) async {
+    final securityRepo = context.read<SecurityRepository>();
+    final l10n = AppLocalizations.of(context)!;
+
+    // 1. Calculate Fees
+    final feeBreakdown = FeeCalculator.calculateFromBaht(
+      widget.amount,
+      isChargeAmount: false,
+    );
+    final walletAmountSatang = feeBreakdown.walletAmount.toBigInt().toInt();
+    final chargeAmountSatang = feeBreakdown.chargeAmount.toBigInt().toInt();
+
+    final topupRefId = const Uuid().v4();
+    final payoutRefId = const Uuid().v4();
+
+    try {
+      // 2. Generate Signatures
+      final topupHeaders = await securityRepo.generateSignatureHeaders(topupRefId);
+      final payoutHeaders = await securityRepo.generateSignatureHeaders(payoutRefId);
+
+      // 3. STEP 1: Top up the exact amount needed
+      debugPrint('💎 [DirectPay] Step 1: Charging Card...');
+      await _apiService.executeOpnTopUp(
+        amountSatang: chargeAmountSatang,
+        walletAmountSatang: walletAmountSatang,
+        cardId: card?.id,
+        isApplePay: isApplePay,
+        referenceId: topupRefId,
+        description: 'Direct Pay Top-up',
+        headers: topupHeaders,
+      );
+
+      // 4. STEP 2: Execute Payout
+      debugPrint('💎 [DirectPay] Step 2: Executing Payout...');
+      // Get wallet ID (assuming THB wallet for now)
+      final balanceData = await _apiService.getBalance('THB');
+      final walletId = balanceData['wallet_id'];
+
+      final payoutResult = await _apiService.executePayout(
+        walletId: walletId,
+        amountSatang: walletAmountSatang.toDouble(),
+        targetType: widget.promptPayId != null ? 'MOBILE' : (widget.billerId != null ? 'BILLER' : 'MOBILE'),
+        targetValue: widget.promptPayId ?? widget.billerId ?? '',
+        idempotencyKey: payoutRefId,
+        description: 'Direct Payment to $_displayName',
+        headers: payoutHeaders,
+      );
+
+      if (mounted) {
+        // Close processing overlay
+        Navigator.of(context, rootNavigator: true).popUntil((route) => route is! DialogRoute);
+
+        // Finalize state in Cubit to trigger success navigation
+        cubit.finalizeDirectPaySuccess(
+          transactionId: payoutResult['transaction_id'],
+          remainingBalance: (payoutResult['new_balance'] ?? 0) / 100.0,
+          senderName: payoutResult['sender_name'],
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).popUntil((route) => route is! DialogRoute);
+
+        // 💎 Special Handling for Orchestration Failures
+        final isPayoutFailure = e.toString().contains('Payout') || e.toString().contains('payout');
+
+        if (isPayoutFailure) {
+          // Top-up likely succeeded but payout failed
+          _showPayoutFailedButTopupSucceeded(l10n);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Payment Failed: ${ErrorTranslator.translate(l10n, e.toString())}'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  void _showPayoutFailedButTopupSucceeded(AppLocalizations l10n) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+            SizedBox(width: 12),
+            Text('Partial Success'),
+          ],
+        ),
+        content: const Text(
+          'Your card was charged and your wallet was topped up successfully. However, the final payment to the merchant failed. The money remains safe in your Paysif wallet.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              // Trigger refresh to show the newly added funds from the successful top-up
+              context.read<DashboardController>().refresh();
+              Navigator.pop(context); // Exit PayScreen
+            },
+            child: Text(l10n.commonOk),
+          ),
+        ],
+      ),
     );
   }
 
@@ -266,49 +462,171 @@ class _PayScreenState extends State<PayScreen> {
     double balance,
     bool isProcessing,
   ) {
-    return Column(
-      children: [
-        const Spacer(flex: 2),
+    return Consumer<PaymentController>(
+      builder: (context, paymentController, child) {
+        final prefId = paymentController.preferredMethodId;
+        final prefType = paymentController.preferredMethodType;
+        final currentCards = paymentController.savedCards;
 
-        // 1. Amount Display (Large, Clear)
-        Text(
-          '฿${widget.amount.toStringAsFixed(2)}',
-          style: Theme.of(context).textTheme.displayLarge?.copyWith(
-            fontWeight: FontWeight.w800,
-            color: isDark ? Colors.white : Colors.black87,
-            letterSpacing: -1.5,
-          ),
+        final isApplePayAvailable = (Platform.isIOS || Platform.isMacOS);
+        final hasExactApplePay = prefType == 'apple_pay';
+        final exactCardIndex = currentCards.indexWhere(
+          (c) =>
+              prefType == 'card' &&
+              (prefId == c.id || (prefId != null && c.id.contains(prefId))),
+        );
+
+        bool useWallet = true;
+        bool isApplePay = false;
+        SavedCard? displayCard;
+
+        if (prefType == 'wallet' || (prefId == null && prefType == null)) {
+          useWallet = true;
+        } else if (hasExactApplePay) {
+          useWallet = false;
+          isApplePay = true;
+        } else if (exactCardIndex != -1) {
+          useWallet = false;
+          displayCard = currentCards[exactCardIndex];
+        } else {
+          useWallet = true;
+        }
+
+        // Calculate fees if using card
+        FeeBreakdown? feeBreakdown;
+        if (!useWallet) {
+          feeBreakdown = FeeCalculator.calculateFromBaht(
+            widget.amount,
+            isChargeAmount: false,
+          );
+        }
+
+        return Column(
+          children: [
+            const Spacer(flex: 2),
+
+            // 1. Amount Display
+            Text(
+              '฿${widget.amount.toStringAsFixed(2)}',
+              style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: isDark ? Colors.white : Colors.black87,
+                letterSpacing: -1.5,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _displayName,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+            if (widget.promptPayId != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  widget.promptPayId!,
+                  style: TextStyle(fontSize: 14, color: Colors.grey[400]),
+                ),
+              ),
+
+            const Spacer(flex: 1),
+
+            // 2. Payment Method Selector
+            InkWell(
+              onTap: _showMethodPicker,
+              borderRadius: BorderRadius.circular(20),
+              child: useWallet
+                  ? _buildWalletCard(isDark, balance)
+                  : _buildCardMethodCard(isDark, isApplePay, displayCard),
+            ),
+
+            if (!useWallet && feeBreakdown != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Text(
+                  '+ ฿${feeBreakdown.totalFeeBaht.toStringAsFixed(2)} fee (Total ฿${feeBreakdown.chargeAmountBaht.toStringAsFixed(2)})',
+                  style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+                ),
+              ),
+
+            const Spacer(flex: 2),
+
+            // 3. Pay Button
+            _buildPayButton(context, isDark, isProcessing, !useWallet),
+
+            const SizedBox(height: 48),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildCardMethodCard(
+    bool isDark,
+    bool isApplePay,
+    SavedCard? displayCard,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.1)
+              : Colors.black.withValues(alpha: 0.05),
         ),
-        const SizedBox(height: 8),
-        Text(
-          _displayName,
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: isDark ? Colors.white : Colors.black87,
-          ),
-        ),
-        if (widget.promptPayId != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              widget.promptPayId!,
-              style: TextStyle(fontSize: 14, color: Colors.grey[400]),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: Colors.grey[200],
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(
+              isApplePay ? Icons.apple : Icons.credit_card_rounded,
+              color: Colors.black87,
+              size: 24,
             ),
           ),
-
-        const Spacer(flex: 1),
-
-        // 2. Wallet Balance Card
-        _buildWalletCard(isDark, balance),
-
-        const Spacer(flex: 2),
-
-        // 3. Pay Button (Now with Auth)
-        _buildPayButton(context, isDark, isProcessing),
-
-        const SizedBox(height: 48),
-      ],
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isApplePay
+                      ? 'Apple Pay'
+                      : (displayCard != null
+                          ? '${displayCard.brand} •••• ${displayCard.lastDigits}'
+                          : 'Select Card'),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Direct Payment',
+                  style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                ),
+              ],
+            ),
+          ),
+          const Icon(
+            Icons.expand_more_rounded,
+            color: Colors.grey,
+            size: 24,
+          ),
+        ],
+      ),
     );
   }
 
@@ -381,7 +699,12 @@ class _PayScreenState extends State<PayScreen> {
     );
   }
 
-  Widget _buildPayButton(BuildContext context, bool isDark, bool isProcessing) {
+  Widget _buildPayButton(
+    BuildContext context,
+    bool isDark,
+    bool isProcessing,
+    bool isDirectPay,
+  ) {
     return Container(
       width: double.infinity,
       height: 64,
@@ -416,9 +739,12 @@ class _PayScreenState extends State<PayScreen> {
                   strokeWidth: 2.5,
                 ),
               )
-            : const Text(
-                'Confirm Payment',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            : Text(
+                isDirectPay ? 'Pay with Card' : 'Confirm Payment',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
       ),
     );
@@ -498,6 +824,209 @@ class _PayScreenState extends State<PayScreen> {
       ],
     );
   }
+
+  void _showOpnPaymentSheet() {
+    var sheetAutovalidateMode = AutovalidateMode.disabled;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setSheetState) {
+          final l10n = AppLocalizations.of(context)!;
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom,
+            ),
+            child: Container(
+              height: 600,
+              decoration: BoxDecoration(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
+              ),
+              child: Column(
+                children: [
+                  Center(
+                    child: Container(
+                      margin: const EdgeInsets.only(top: 12, bottom: 20),
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(24),
+                      child: Form(
+                        key: _formKey,
+                        autovalidateMode: sheetAutovalidateMode,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Add Payment Card',
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 32),
+                            _buildField(
+                              label: l10n.topUpCardNumber,
+                              hint: '0000 0000 0000 0000',
+                              controller: _cardNumberController,
+                              icon: Icons.credit_card,
+                              formatters: [CardNumberInputFormatter()],
+                              validator: (value) {
+                                final clean = value?.replaceAll(' ', '') ?? '';
+                                if (clean.isEmpty) return l10n.commonRequired;
+                                if (clean.length < 16) return l10n.cardInvalidNumber;
+                                return null;
+                              },
+                              maxLength: 19,
+                            ),
+                            const SizedBox(height: 20),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildField(
+                                    label: l10n.topUpExpiry,
+                                    hint: 'MM/YY',
+                                    controller: _expiryController,
+                                    icon: Icons.calendar_today,
+                                    formatters: [ExpiryDateInputFormatter()],
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) return l10n.commonRequired;
+                                      return null;
+                                    },
+                                    maxLength: 5,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: _buildField(
+                                    label: l10n.topUpCVV,
+                                    hint: '123',
+                                    controller: _cvvController,
+                                    icon: Icons.lock,
+                                    obscure: true,
+                                    formatters: [FilteringTextInputFormatter.digitsOnly],
+                                    maxLength: 3,
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) return l10n.commonRequired;
+                                      return null;
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+                            _buildField(
+                              label: l10n.topUpNameOnCard,
+                              hint: 'NAME ON CARD',
+                              controller: _nameController,
+                              icon: Icons.person,
+                              textCapitalization: TextCapitalization.characters,
+                              formatters: [UpperCaseTextFormatter()],
+                              validator: (value) {
+                                if (value == null || value.isEmpty) return l10n.commonRequired;
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 40),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 56,
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  if (_formKey.currentState!.validate()) {
+                                    Navigator.pop(ctx);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Card details accepted. Please proceed with payment.')),
+                                    );
+                                  } else {
+                                    setSheetState(() {
+                                      sheetAutovalidateMode = AutovalidateMode.onUserInteraction;
+                                    });
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF6366F1),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Confirm Card',
+                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildField({
+    required String label,
+    required String hint,
+    required TextEditingController controller,
+    required IconData icon,
+    bool obscure = false,
+    List<TextInputFormatter>? formatters,
+    int? maxLength,
+    TextCapitalization textCapitalization = TextCapitalization.none,
+    String? Function(String?)? validator,
+    void Function(String)? onChanged,
+    FocusNode? focusNode,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    List<TextInputFormatter> effectiveFormatters = formatters ?? [];
+    if (maxLength != null) {
+      effectiveFormatters.add(LengthLimitingTextInputFormatter(maxLength));
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          obscureText: obscure,
+          inputFormatters: effectiveFormatters,
+          textCapitalization: textCapitalization,
+          validator: validator,
+          onChanged: onChanged,
+          focusNode: focusNode,
+          decoration: InputDecoration(
+            hintText: hint,
+            counterText: '',
+            filled: true,
+            fillColor: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey[100],
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            prefixIcon: Icon(icon, size: 20, color: Colors.grey),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 /// World-Class Processing Overlay
@@ -551,5 +1080,42 @@ class _ProcessingOverlay extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class CardNumberInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.selection.baseOffset == 0) return newValue;
+    final text = newValue.text.replaceAll(RegExp(r'\D'), '');
+    final buffer = StringBuffer();
+    for (int i = 0; i < text.length; i++) {
+      buffer.write(text[i]);
+      if ((i + 1) % 4 == 0 && i != text.length - 1) buffer.write(' ');
+    }
+    final string = buffer.toString();
+    return newValue.copyWith(text: string, selection: TextSelection.collapsed(offset: string.length));
+  }
+}
+
+class ExpiryDateInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.selection.baseOffset == 0) return newValue;
+    final text = newValue.text.replaceAll(RegExp(r'\D'), '');
+    final buffer = StringBuffer();
+    for (int i = 0; i < text.length; i++) {
+      buffer.write(text[i]);
+      if (i == 1 && i != text.length - 1) buffer.write('/');
+    }
+    final string = buffer.toString();
+    return newValue.copyWith(text: string, selection: TextSelection.collapsed(offset: string.length));
+  }
+}
+
+class UpperCaseTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    return TextEditingValue(text: newValue.text.toUpperCase(), selection: newValue.selection);
   }
 }

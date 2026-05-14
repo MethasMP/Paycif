@@ -333,6 +333,8 @@ async function handlePayoutRequest(request: Request): Promise<Response> {
           transaction_id: transactionId,
           gateway_ref: gatewayResponse.gateway_ref,
           status: 'SUCCESS',
+          sender_name: result.sender_name,
+          new_balance: result.new_balance,
         } as PayoutResponse),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );

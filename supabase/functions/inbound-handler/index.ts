@@ -206,7 +206,7 @@ serve(async (req: Request) => {
     const finalChargeAmount = requiredChargeSatang;
 
     // 💎 DAILY TOP-UP LIMITS CHECK (Using the INTENDED amount)
-    const MIN_PER_TRANSACTION = 50000; // 500 THB
+    const MIN_PER_TRANSACTION = 2000; // 20 THB (Pay-Per-Use ready)
     const MAX_DAILY = 300000; // 3,000 THB
 
     if (effectiveWalletAmount < MIN_PER_TRANSACTION) {

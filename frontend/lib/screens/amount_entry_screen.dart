@@ -57,8 +57,13 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
   }
 
   void _onNext() {
-    final amount = double.tryParse(_controller.text) ?? 0.0;
-    if (amount <= 0) return;
+    final amount = double.tryParse(_controller.text.replaceAll(',', '')) ?? 0.0;
+    if (amount < 20.0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Minimum amount is ฿20.00')),
+      );
+      return;
+    }
 
     setState(() => _isProcessing = true);
 

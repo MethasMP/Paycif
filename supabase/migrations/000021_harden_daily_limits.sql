@@ -31,7 +31,7 @@ DECLARE
     v_today date := (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Bangkok')::date;
     v_current_total bigint;
     v_max_daily bigint := 300000;  -- 3,000 THB in satang
-    v_min_per_txn bigint := 50000; -- 500 THB in satang
+    v_min_per_txn bigint := 2000;  -- 20 THB in satang (Pay-Per-Use ready)
     v_remaining bigint;
     v_existing_status text;
 BEGIN
@@ -117,6 +117,25 @@ BEGIN
         'remaining_limit', v_remaining,
         'max_daily', v_max_daily
     );
+END;
+$$;
+
+-- ============================================================================
+-- COMMIT RESERVATION LOGIC (For inbound transactions)
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION public.commit_topup_reservation(
+    p_reference_id TEXT
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    UPDATE private.topup_reservations
+    SET status = 'COMMITTED',
+        updated_at = NOW()
+    WHERE reference_id = p_reference_id;
 END;
 $$;
 

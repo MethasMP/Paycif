@@ -163,4 +163,18 @@ class PaymentCubit extends Cubit<PaymentState> {
       );
     }
   }
+
+  void finalizeDirectPaySuccess({
+    required String transactionId,
+    required double remainingBalance,
+    String? senderName,
+  }) {
+    emit(
+      PaymentSuccess(
+        transactionId: transactionId,
+        remainingBalance: remainingBalance,
+        senderName: senderName,
+      ),
+    );
+  }
 }

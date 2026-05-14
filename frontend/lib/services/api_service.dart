@@ -193,6 +193,36 @@ class ApiService {
     }
   }
 
+  // Legacy Payout (calls back-end Go API directly)
+  // Used by existing PaymentCubit logic
+  Future<Map<String, dynamic>> payToPromptPay({
+    required int amountInSatang,
+    String? promptPayId,
+    required String recipientName,
+    String? billerId,
+    String? reference1,
+    String? reference2,
+    required String idempotencyKey,
+    Map<String, String>? headers,
+  }) async {
+    // 💎 Redirect to the more robust payout-executor Edge Function
+    // This provides unified security and orchestration logic.
+
+    // First, we need to find the wallet ID for THB
+    final balanceData = await getBalance('THB');
+    final walletId = balanceData['wallet_id'];
+
+    return executePayout(
+      walletId: walletId,
+      amountSatang: amountInSatang.toDouble(),
+      targetType: promptPayId != null ? 'MOBILE' : 'BILLER',
+      targetValue: promptPayId ?? billerId ?? '',
+      idempotencyKey: idempotencyKey,
+      description: 'Payment to $recipientName',
+      headers: headers,
+    );
+  }
+
   // 🛡️ Raw HTTP Invoker for Edge Functions
   // This provides absolute control over headers.
   static Future<FunctionResponse> invokeRaw(
@@ -512,43 +542,6 @@ class ApiService {
     }
   }
 
-  // Pay to PromptPay (Wallet -> External)
-  Future<Map<String, dynamic>> payToPromptPay({
-    required int amountInSatang,
-    String? promptPayId,
-    required String recipientName,
-    String? billerId,
-    String? reference1,
-    String? reference2,
-    required String idempotencyKey,
-    Map<String, String>? headers,
-  }) async {
-    final body = jsonEncode({
-      'amount': amountInSatang,
-      'promptpay_id': promptPayId,
-      'recipient_name': recipientName,
-      'biller_id': billerId,
-      'reference1': reference1,
-      'reference2': reference2,
-      'idempotency_key': idempotencyKey,
-    });
-
-    final response = await _safeRequest(
-      (headersMap) => http.post(
-        Uri.parse('$baseUrl/payout/promptpay'),
-        headers: {...headersMap, if (headers != null) ...headers},
-        body: body,
-      ),
-    );
-
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else if (response.statusCode == 402) {
-      throw Exception('Insufficient balance.');
-    } else {
-      throw Exception('Payout failed: ${_friendlyError(response.statusCode)}');
-    }
-  }
 
   /// Look up recipient name from PromptPay ID
   /// Note: In Thailand, real-time Proxy Lookup (ID -> Name) is restricted

@@ -54,6 +54,8 @@ export interface PayoutResponse {
   transaction_id?: string;
   gateway_ref?: string;
   status?: 'SUCCESS' | 'FAILED' | 'PENDING';
+  sender_name?: string | null;
+  new_balance?: number;
   error?: string;
 }
 
@@ -62,6 +64,8 @@ export interface PayoutResponse {
  */
 export interface RpcResult {
   transaction_id: string | null;
+  new_balance: number;
+  sender_name: string | null;
   status_code: number;
   status_message: string;
 }

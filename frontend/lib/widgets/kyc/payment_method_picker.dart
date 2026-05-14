@@ -65,6 +65,16 @@ class PaymentMethodPicker extends StatelessWidget {
               ],
             ),
           ),
+          _buildPickerTile(
+            context: context,
+            icon: Icons.account_balance_wallet_rounded,
+            title: 'Paysif Wallet',
+            isSelected: preferredMethodType == 'wallet' || (preferredMethodType == null && preferredMethodId == null),
+            onTap: () {
+              onMethodSelected('wallet', 'wallet');
+              Navigator.pop(context);
+            },
+          ),
           if (Platform.isIOS)
             _buildPickerTile(
               context: context,

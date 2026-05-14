@@ -21,6 +21,8 @@ CREATE OR REPLACE FUNCTION process_payout_request(
 )
 RETURNS TABLE (
     transaction_id UUID,
+    new_balance BIGINT,
+    sender_name TEXT,
     status_code INT,
     status_message TEXT
 )
@@ -35,14 +37,18 @@ DECLARE
     v_wallet_status TEXT;
     v_new_balance BIGINT;
     v_existing_id UUID;
+    v_full_name TEXT;
 BEGIN
+    -- Get User's Name
+    SELECT full_name INTO v_full_name FROM profiles WHERE id = p_user_id;
+
     -- =========================================================================
     -- STEP 0: Idempotency Check
     -- =========================================================================
     IF p_reference_id IS NOT NULL THEN
         SELECT id INTO v_existing_id FROM transactions WHERE reference_id = p_reference_id;
         IF v_existing_id IS NOT NULL THEN
-            RETURN QUERY SELECT v_existing_id, 200, 'Duplicate request - Return existing transaction'::TEXT;
+            RETURN QUERY SELECT v_existing_id, (SELECT balance FROM wallets WHERE id = p_wallet_id), v_full_name, 200, 'Duplicate request - Return existing transaction'::TEXT;
             RETURN;
         END IF;
     END IF;
@@ -58,6 +64,8 @@ BEGIN
     IF v_wallet_owner IS NULL THEN
         RETURN QUERY SELECT 
             NULL::UUID,
+            0::BIGINT,
+            NULL::TEXT,
             404,
             'Wallet not found'::TEXT;
         RETURN;
@@ -67,6 +75,8 @@ BEGIN
     IF v_wallet_owner != p_user_id THEN
         RETURN QUERY SELECT 
             NULL::UUID,
+            0::BIGINT,
+            NULL::TEXT,
             403,
             'Wallet does not belong to user'::TEXT;
         RETURN;
@@ -76,6 +86,8 @@ BEGIN
     IF LOWER(v_wallet_status) != 'active' THEN
         RETURN QUERY SELECT 
             NULL::UUID,
+            0::BIGINT,
+            NULL::TEXT,
             403,
             'Wallet is halted or inactive'::TEXT;
         RETURN;
@@ -87,6 +99,8 @@ BEGIN
     IF p_amount_satang <= 0 THEN
         RETURN QUERY SELECT 
             NULL::UUID,
+            0::BIGINT,
+            NULL::TEXT,
             400,
             'Amount must be positive'::TEXT;
         RETURN;
@@ -98,6 +112,8 @@ BEGIN
     IF v_current_balance < p_amount_satang THEN
         RETURN QUERY SELECT 
             NULL::UUID,
+            0::BIGINT,
+            NULL::TEXT,
             400,
             'Insufficient balance'::TEXT;
         RETURN;
@@ -106,11 +122,13 @@ BEGIN
     -- =========================================================================
     -- STEP 4: Validate target type
     -- =========================================================================
-    IF p_target_type NOT IN ('MOBILE', 'NATID', 'EWALLET') THEN
+    IF p_target_type NOT IN ('MOBILE', 'NATID', 'EWALLET', 'BILLER') THEN
         RETURN QUERY SELECT 
             NULL::UUID,
+            0::BIGINT,
+            NULL::TEXT,
             400,
-            'Invalid target type. Must be MOBILE, NATID, or EWALLET'::TEXT;
+            'Invalid target type. Must be MOBILE, NATID, EWALLET, or BILLER'::TEXT;
         RETURN;
     END IF;
 
@@ -219,6 +237,8 @@ BEGIN
     -- =========================================================================
     RETURN QUERY SELECT 
         v_transaction_id,
+        v_new_balance,
+        v_full_name,
         200,
         'Payout request created successfully'::TEXT;
 END;

@@ -27,7 +27,14 @@ void main() {
     mockRemoteDataSource = MockSecurityRemoteDataSource();
     mockCryptoService = MockCryptoService();
     mockSecureStorage = MockSecureStorageService();
+    when(() => mockSecureStorage.write(any(), any(), strict: any(named: 'strict'))).thenAnswer((_) async => {});
+    when(() => mockSecureStorage.write(any(), any())).thenAnswer((_) async => {});
+    when(() => mockSecureStorage.delete(any())).thenAnswer((_) async => {});
+    when(() => mockCryptoService.generateSalt()).thenReturn(List.filled(16, 0));
+    when(() => mockCryptoService.createHardwareIdentity()).thenAnswer((_) async => 'mock_pub_key_base64');
 
+        when(() => mockSecureStorage.read(any())).thenAnswer((_) async => null);
+    when(() => mockSecureStorage.read(any(), strict: any(named: 'strict'))).thenAnswer((_) async => null);
     repository = SecurityRepositoryImpl(
       remoteDataSource: mockRemoteDataSource,
       cryptoService: mockCryptoService,
@@ -86,10 +93,11 @@ void main() {
         ).called(1);
 
         // 2. Should have generated keypair and stored private key
-        verify(() => mockCryptoService.generateKeyPair()).called(1);
+        verify(() => mockCryptoService.createHardwareIdentity()).called(1);
         verify(
-          () => mockSecureStorage.write('device_private_key_seed', any()),
+          () => mockSecureStorage.write('is_hardware_backed', 'true'),
         ).called(1);
+        verify(() => mockSecureStorage.delete('device_private_key_seed')).called(1);
 
         // 3. Should have called backend
         verify(
@@ -145,9 +153,8 @@ void main() {
       // Should NOT have written a new device id
       verifyNever(() => mockSecureStorage.write('device_binding_id', any()));
       // But should have written private key
-      verify(
-        () => mockSecureStorage.write('device_private_key_seed', any()),
-      ).called(1);
+      verify(() => mockSecureStorage.write('is_hardware_backed', 'true')).called(1);
+      verify(() => mockSecureStorage.delete('device_private_key_seed')).called(1);
     });
 
     test('verifyPin should delegate to remote source (with headers)', () async {

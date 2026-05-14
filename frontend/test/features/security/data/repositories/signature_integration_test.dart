@@ -26,11 +26,17 @@ void main() {
     mockRemoteDataSource = MockSecurityRemoteDataSource();
     mockCryptoService = MockCryptoService();
     mockSecureStorage = MockSecureStorageService();
+    when(() => mockSecureStorage.write(any(), any(), strict: any(named: 'strict'))).thenAnswer((_) async => {});
+    when(() => mockSecureStorage.write(any(), any())).thenAnswer((_) async => {});
+    when(() => mockSecureStorage.delete(any())).thenAnswer((_) async => {});
+    when(() => mockCryptoService.generateSalt()).thenReturn(List.filled(16, 0));
 
     // Crypto Setup
     final algorithm = Ed25519();
     mockKeyPair = await algorithm.newKeyPair();
 
+        when(() => mockSecureStorage.read(any())).thenAnswer((_) async => null);
+    when(() => mockSecureStorage.read(any(), strict: any(named: 'strict'))).thenAnswer((_) async => null);
     repository = SecurityRepositoryImpl(
       remoteDataSource: mockRemoteDataSource,
       cryptoService: mockCryptoService,

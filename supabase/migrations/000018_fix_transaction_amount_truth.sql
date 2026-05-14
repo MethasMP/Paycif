@@ -90,6 +90,14 @@ BEGIN
         'CREDIT', 'THB', p_description, v_new_balance, NOW()
     );
 
+    -- 🛡️ Update Reservation Status if applicable (Handles migration sequentiality)
+    BEGIN
+        PERFORM commit_topup_reservation(p_reference_id);
+    EXCEPTION WHEN OTHERS THEN
+        -- If function doesn't exist yet (older migration), just ignore
+        NULL;
+    END;
+
     RETURN QUERY SELECT v_transaction_id, v_new_balance, 200, 'Top-up successful'::TEXT;
 END;
 $$;

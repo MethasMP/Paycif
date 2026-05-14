@@ -34,6 +34,7 @@ void main() {
   group('PinEntryWidget Audit', () {
     testWidgets('Renders keypad and dots', (tester) async {
       await pumpWidget(tester);
+      await tester.pump(const Duration(seconds: 1));
 
       expect(find.text('1'), findsOneWidget);
       expect(find.text('9'), findsOneWidget);
@@ -49,6 +50,7 @@ void main() {
 
     testWidgets('Enters digits and updates UI', (tester) async {
       await pumpWidget(tester);
+      await tester.pump(const Duration(seconds: 1));
 
       // Tap 1, 2, 3
       await tester.tap(find.text('1'));
@@ -68,6 +70,7 @@ void main() {
       when(() => mockController.verifyPin(any())).thenAnswer((_) async => true);
 
       await pumpWidget(tester);
+      await tester.pump(const Duration(seconds: 1));
 
       // Enter 6 digits
       for (int i = 0; i < 6; i++) {
@@ -88,7 +91,7 @@ void main() {
       // First Entry: 123456
       for (int i = 0; i < 6; i++) {
         await tester.tap(find.text('${i + 1}'));
-        await tester.pumpAndSettle();
+        await tester.pump(const Duration(seconds: 1));
       }
 
       // Should auto-clear for confirmation (check UI text or state)
@@ -98,7 +101,7 @@ void main() {
       // Second Entry: 123456
       for (int i = 0; i < 6; i++) {
         await tester.tap(find.text('${i + 1}'));
-        await tester.pumpAndSettle();
+        await tester.pump(const Duration(seconds: 1));
       }
 
       verify(() => mockController.setupPin('123456')).called(1);
@@ -113,10 +116,11 @@ void main() {
       );
 
       await pumpWidget(tester);
+      await tester.pump(const Duration(seconds: 1));
 
       expect(find.text('Security Lockout'), findsOneWidget);
       expect(find.text('Try again in 5m'), findsOneWidget);
-      expect(find.byIcon(Icons.lock), findsOneWidget);
+      expect(find.byIcon(Icons.lock_clock_rounded), findsOneWidget);
     });
   });
 }

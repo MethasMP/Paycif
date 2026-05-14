@@ -36,7 +36,7 @@ class _TopUpViewState extends State<TopUpView> {
 
   int? _selectedChipIndex;
   final bool _isLoading = false;
-  final List<int> _smartAmounts = [500, 1000, 2000, 3000]; // Max 3000/day
+  final List<int> _smartAmounts = [100, 500, 1000, 3000]; // Pay-Per-Use ready
   final NumberFormat _currencyFormat = NumberFormat('#,###');
   final NumberFormat _decimalFormat = NumberFormat('#,##0.00');
 
@@ -1076,10 +1076,10 @@ class _TopUpViewState extends State<TopUpView> {
         if (isBelowMinimum)
           _buildInlineError(
             icon: Icons.error_outline,
-            message: 'Minimum top-up is ฿500',
-            action: 'Set to ฿500',
+            message: 'Minimum top-up is ฿20',
+            action: 'Set to ฿20',
             isError: true,
-            onAction: () => _setAmount(500),
+            onAction: () => _setAmount(20),
           ),
 
         if (isAboveLimit)
