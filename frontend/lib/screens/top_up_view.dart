@@ -565,8 +565,10 @@ class _TopUpViewState extends State<TopUpView> {
       Map<String, String>? signatureHeaders;
 
       try {
+        // 🛡️ HARDENED: Sign canonical payload [ref_id]:[amount_satang]:[currency]
+        final canonicalPayload = '$referenceId:$chargeAmountSatang:THB';
         signatureHeaders = await securityRepo.generateSignatureHeaders(
-          referenceId,
+          canonicalPayload,
         );
       } catch (e) {
         debugPrint('⚠️ [Signing] Failed to sign request: $e');

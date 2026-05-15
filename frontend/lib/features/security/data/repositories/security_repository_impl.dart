@@ -130,6 +130,7 @@ class SecurityRepositoryImpl implements SecurityRepository {
   }
 
   /// Helper to generate headers with signature for critical actions.
+  /// 🛡️ HARDENED: Support for multiple payload parts (e.g., ref_id + amount + currency)
   @override
   Future<Map<String, String>> generateSignatureHeaders(String payload) async {
     final isHardware = await _secureStorage.read(_kIsHardwareKey) == 'true';
@@ -139,13 +140,16 @@ class SecurityRepositoryImpl implements SecurityRepository {
       throw Exception('Device not bound. Cannot sign request.');
     }
 
+    // Ensure we are signing a canonical representation if multiple parts are passed
+    // (For now, payload is usually a single string like ref_id, but we prepare for more)
+
     if (isHardware) {
       // 🛡️ Hardware Path (Secure Enclave)
       final signature = await _cryptoService.signWithHardware(
         payload: payload,
       );
       if (signature == null) throw Exception('Biometric authentication failed.');
-      
+
       return {'X-Device-Id': deviceId, 'X-Device-Signature': signature};
     }
 

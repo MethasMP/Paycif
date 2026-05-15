@@ -278,8 +278,9 @@ serve(async (req: Request) => {
       `[Security] Device ${deviceId} - DB PubKey Prefix: ${binding.public_key.substring(0, 10)}...`,
     );
 
-    // Verify Signature: Payload signed is the reference_id
-    const isValidSig = await verifySignature(signature, reference_id, binding.public_key);
+    // 🛡️ Verify Signature: Payload signed is canonical [reference_id]:[amount_satang]:[currency]
+    const canonicalPayload = `${reference_id}:${amount_satang}:THB`;
+    const isValidSig = await verifySignature(signature, canonicalPayload, binding.public_key);
     if (!isValidSig) {
       console.error(`[Security] Signature Mismatch for ref: ${reference_id}. Device: ${deviceId}`);
       return jsonError('Request integrity check failed', 401);
@@ -314,9 +315,21 @@ serve(async (req: Request) => {
       .eq('user_id', userId)
       .maybeSingle();
 
+    // 🛡️ KYC BOUNDARIES: Restrict high-value transactions for unverified users
+    const KYC_THRESHOLD_SATANG = 100000; // 1,000 THB
+
     if (kycRecord?.kyc_status === 'REJECTED') {
       console.log(`[KYC] User ${userId} is REJECTED`);
       return jsonError('KYC verification rejected. Contact support.', 403, 'KYC_REJECTED');
+    }
+
+    if (effectiveWalletAmount > KYC_THRESHOLD_SATANG && kycRecord?.kyc_status !== 'VERIFIED') {
+      console.warn(`[KYC] Unverified user ${userId} attempted high-value txn: ${effectiveWalletAmount}`);
+      return jsonError(
+        'Transaction exceeds unverified limit. Please complete KYC verification.',
+        403,
+        'KYC_REQUIRED',
+      );
     }
 
     // ========================================================================

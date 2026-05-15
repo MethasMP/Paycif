@@ -249,8 +249,12 @@ class _PayScreenState extends State<PayScreen> {
 
     try {
       // 2. Generate Signatures
-      final topupHeaders = await securityRepo.generateSignatureHeaders(topupRefId);
-      final payoutHeaders = await securityRepo.generateSignatureHeaders(payoutRefId);
+      // 🛡️ HARDENED: Sign canonical payload [ref_id]:[amount_satang]:[currency]
+      final topupPayload = '$topupRefId:$chargeAmountSatang:THB';
+      final payoutPayload = '$payoutRefId:$walletAmountSatang:THB';
+
+      final topupHeaders = await securityRepo.generateSignatureHeaders(topupPayload);
+      final payoutHeaders = await securityRepo.generateSignatureHeaders(payoutPayload);
 
       // 3. STEP 1: Top up the exact amount needed
       debugPrint('💎 [DirectPay] Step 1: Charging Card...');

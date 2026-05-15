@@ -9,7 +9,7 @@ export interface PayoutRequest {
   user_id: string;
   wallet_id: string;
   amount_satang: number;
-  target_type: 'MOBILE' | 'NATID' | 'EWALLET';
+  target_type: 'MOBILE' | 'NATID' | 'EWALLET' | 'BILLER';
   target_value: string;
   idempotency_key: string; // NEW: Signed for security
   description?: string;
@@ -20,8 +20,9 @@ export interface PayoutRequest {
  * MOBILE -> MOB (PromptPay Personal/Mobile)
  * NATID  -> NID (National ID / Tax ID)
  * EWALLET -> EWL (E-Wallet ID)
+ * BILLER -> BIL (Biller ID)
  */
-export type GatewayTargetType = 'MOB' | 'NID' | 'EWL';
+export type GatewayTargetType = 'MOB' | 'NID' | 'EWL' | 'BIL';
 
 /**
  * Gateway request payload
@@ -81,6 +82,8 @@ export function mapTargetType(appType: string): GatewayTargetType {
       return 'NID';
     case 'EWALLET':
       return 'EWL';
+    case 'BILLER':
+      return 'BIL';
     default:
       throw new Error(`Unknown target type: ${appType}`);
   }

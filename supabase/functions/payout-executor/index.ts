@@ -80,8 +80,8 @@ function validateRequest(body: unknown): PayoutRequest {
     throw new Error('amount_satang is required and must be a positive number');
   }
 
-  if (!req.target_type || !['MOBILE', 'NATID', 'EWALLET'].includes(req.target_type as string)) {
-    throw new Error('target_type is required and must be MOBILE, NATID, or EWALLET');
+  if (!req.target_type || !['MOBILE', 'NATID', 'EWALLET', 'BILLER'].includes(req.target_type as string)) {
+    throw new Error('target_type is required and must be MOBILE, NATID, EWALLET, or BILLER');
   }
 
   if (!req.target_value || typeof req.target_value !== 'string' || req.target_value.length < 5) {
@@ -96,7 +96,7 @@ function validateRequest(body: unknown): PayoutRequest {
     user_id: req.user_id as string,
     wallet_id: req.wallet_id as string,
     amount_satang: req.amount_satang as number,
-    target_type: req.target_type as 'MOBILE' | 'NATID' | 'EWALLET',
+      target_type: req.target_type as 'MOBILE' | 'NATID' | 'EWALLET' | 'BILLER',
     target_value: req.target_value as string,
     idempotency_key: req.idempotency_key as string,
     description: (req.description as string) || 'Paysif Payout',
@@ -222,10 +222,11 @@ async function handlePayoutRequest(request: Request): Promise<Response> {
       );
     }
 
-    // Verify Signature: Payload signed must be the idempotency_key
+    // 🛡️ Verify Signature: Payload signed must be canonical [idempotency_key]:[amount_satang]:[currency]
+    const canonicalPayload = `${payoutRequest.idempotency_key}:${payoutRequest.amount_satang}:THB`;
     const isValidSig = await verifySignature(
       signature,
-      payoutRequest.idempotency_key,
+      canonicalPayload,
       binding.public_key,
     );
     if (!isValidSig) {

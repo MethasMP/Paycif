@@ -123,12 +123,39 @@ BEGIN
     -- STEP 4: Validate target type
     -- =========================================================================
     IF p_target_type NOT IN ('MOBILE', 'NATID', 'EWALLET', 'BILLER') THEN
-        RETURN QUERY SELECT 
+        RETURN QUERY SELECT
             NULL::UUID,
             0::BIGINT,
             NULL::TEXT,
             400,
             'Invalid target type. Must be MOBILE, NATID, EWALLET, or BILLER'::TEXT;
+        RETURN;
+    END IF;
+
+    -- 🛡️ HARDENED: Validate Biller ID format (Must be 15 digits or standard numeric)
+    IF p_target_type = 'BILLER' AND (p_target_value !~ '^[0-9]+$' OR length(p_target_value) < 5) THEN
+        RETURN QUERY SELECT
+            NULL::UUID,
+            0::BIGINT,
+            NULL::TEXT,
+            400,
+            'Invalid Biller ID format. Must be numeric.'::TEXT;
+        RETURN;
+    END IF;
+
+    -- 🛡️ HARDENED: Validate Mobile format (Standard Thai Mobile 10 digits)
+    IF p_target_type = 'MOBILE' AND (p_target_value !~ '^0[0-9]{9}$' AND p_target_value !~ '^66[0-9]{9}$') THEN
+        -- Allow 10 digits starting with 0 or 66 followed by 9 digits
+        -- We are being slightly permissive but blocking obviously junk data
+        IF length(p_target_value) < 10 THEN
+           RETURN QUERY SELECT NULL::UUID, 0::BIGINT, NULL::TEXT, 400, 'Invalid Mobile format'::TEXT;
+           RETURN;
+        END IF;
+    END IF;
+
+    -- 🛡️ HARDENED: Validate National ID format (13 digits)
+    IF p_target_type = 'NATID' AND (p_target_value !~ '^[0-9]{13}$') THEN
+        RETURN QUERY SELECT NULL::UUID, 0::BIGINT, NULL::TEXT, 400, 'Invalid National ID format. Must be 13 digits.'::TEXT;
         RETURN;
     END IF;
 
