@@ -19,13 +19,17 @@ var jwks *keyfunc.JWKS
 
 // AuthMiddleware validates Supabase JWT using JWKS and sets userID in context.
 func AuthMiddleware(walletSvc *service.WalletService) gin.HandlerFunc {
+	// Load JWKS URL from environment variable with fallback to default
+	// CRITICAL: In production, always set JWKS_URL environment variable per environment
 	jwksURL := os.Getenv("JWKS_URL")
 	if jwksURL == "" {
+		// Default fallback - should be overridden in production via environment config
 		jwksURL = "https://iybequvtfiqoexnhfwvb.supabase.co/auth/v1/.well-known/jwks.json"
+		log.Printf("⚠️ WARNING: Using default JWKS URL. Set JWKS_URL environment variable for production deployments.")
 	}
 	expectedAudience := os.Getenv("JWT_AUDIENCE")
 
-	// Initialize JWKS once
+	// Initialize JWKS once with proper error handling
 	var err error
 	options := keyfunc.Options{
 		RefreshInterval: time.Hour,

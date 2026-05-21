@@ -384,18 +384,46 @@ func (c *TransferCommand) Execute(ctx context.Context) (*TransferResponse, error
 	// We increment the total and BROADCAST to all Rust instances for real-time consistency
 	if c.svc.Redis != nil {
 		go func() {
+			// Create context with timeout for async operations
+			asyncCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			
 			amountMajor := float64(c.req.Amount) / 100.0
 			key := fmt.Sprintf("stats:user:%s:daily_total", c.req.UserID)
 			
-			// 1. Update the persistent count in Redis
-			c.svc.Redis.IncrByFloat(context.Background(), key, amountMajor)
-			c.svc.Redis.Expire(context.Background(), key, 24*time.Hour)
+			// 1. Update the persistent count in Redis with retry logic
+			maxRetries := 3
+			for attempt := 1; attempt <= maxRetries; attempt++ {
+				_, err := c.svc.Redis.IncrByFloat(asyncCtx, key, amountMajor).Result()
+				if err == nil {
+					break
+				}
+				if attempt == maxRetries {
+					log.Printf("⚠️ Failed to update Redis daily total after %d attempts for user %s: %v", maxRetries, c.req.UserID, err)
+					// Alert monitoring system here if needed
+					break
+				}
+				time.Sleep(time.Duration(attempt*100) * time.Millisecond) // Exponential backoff
+			}
+			
+			// Set expiry
+			c.svc.Redis.Expire(asyncCtx, key, 24*time.Hour)
 
-			// 2. Broadcast to all Rust nodes via Pub/Sub
-			// Format: "user_id:amount"
+			// 2. Broadcast to all Rust nodes via Pub/Sub with retry
 			pubSubKey := "user_limit_updates"
 			msg := fmt.Sprintf("%s:%f", c.req.UserID, amountMajor)
-			c.svc.Redis.Publish(context.Background(), pubSubKey, msg)
+			
+			for attempt := 1; attempt <= maxRetries; attempt++ {
+				err := c.svc.Redis.Publish(asyncCtx, pubSubKey, msg).Err()
+				if err == nil {
+					break
+				}
+				if attempt == maxRetries {
+					log.Printf("⚠️ Failed to publish Redis pub/sub after %d attempts for user %s: %v", maxRetries, c.req.UserID, err)
+					break
+				}
+				time.Sleep(time.Duration(attempt*100) * time.Millisecond)
+			}
 		}()
 	}
 
