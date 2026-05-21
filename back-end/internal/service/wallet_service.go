@@ -21,21 +21,21 @@ import (
 )
 
 const (
-	MaxTransactionAmount  = 500000   // ฿5,000.00 (Standardized with Rust)
-	MaxDailyUserAmount    = 2000000  // ฿20,000.00 (Standardized with Rust)
+	MaxTransactionAmount  = 500000   // ฿5,000.00
+	MaxDailyUserAmount    = 2000000  // ฿20,000.00
 	MaxHourlySystemAmount = 10000000 // ฿100,000.00
 )
 
 // WalletService handles wallet operations.
 type WalletService struct {
-	DB    *sql.DB
-	cb    *gobreaker.CircuitBreaker
-	FX    *FXService
-	Alert *AlertService
-	Redis *redis.Client
+	DB             *sql.DB
+	cb             *gobreaker.CircuitBreaker
+	FX             *FXService
+	Alert          *AlertService
+	Redis          *redis.Client
 	Audit          *AuditService
 	PaymentEngine  *PaymentEngine
-	localRateCache sync.Map // Local In-Memory Cache (Layer 1)
+	localRateCache sync.Map
 }
 
 type localCacheItem struct {
@@ -45,17 +45,16 @@ type localCacheItem struct {
 
 // TransferRequest represents a request to transfer funds.
 type TransferRequest struct {
-	UserID       uuid.UUID // Authenticated User ID
-	FromWalletID uuid.UUID `json:"from_wallet_id"`
-	ToWalletID   uuid.UUID `json:"to_wallet_id"`
-	Amount       int64     `json:"amount"`
-	Currency     string    `json:"currency"`
-	ReferenceID  string    `json:"reference_id"`
-	Description  string    `json:"description"`
-	// Security Fields for Rust Offload
-	PublicKey     string `json:"-"` // Internal use, not from JSON body
-	Signature     string `json:"-"`
-	SignedPayload string `json:"-"`
+	UserID        uuid.UUID
+	FromWalletID  uuid.UUID `json:"from_wallet_id"`
+	ToWalletID    uuid.UUID `json:"to_wallet_id"`
+	Amount        int64     `json:"amount"`
+	Currency      string    `json:"currency"`
+	ReferenceID   string    `json:"reference_id"`
+	Description   string    `json:"description"`
+	PublicKey     string    `json:"-"`
+	Signature     string    `json:"-"`
+	SignedPayload string    `json:"-"`
 }
 
 // TransferResponse returned after a successful or idempotent transfer.
@@ -101,13 +100,6 @@ func (s *WalletService) Transfer(ctx context.Context, req TransferRequest) (*Tra
 
 // Execute runs the transfer logic command.
 func (c *TransferCommand) Execute(ctx context.Context) (*TransferResponse, error) {
-	// ... (Ownership Checks and Guardrails remain same - assuming no change needed there)
-	// For brevity in replacement, re-including checks is best to avoid context loss in replace tool.
-	// But to save tokens, I will try to match from "Ownership Check" down if possible, or just replace Execute body.
-	// Actually, the replace tool works best with defined start/end.
-	// The user prompt "Ensure all check constraints...".
-	// I'll stick to replacing the whole Execute function and struct definition to be safe.
-
 	// 0. Ownership Check
 	var profileID uuid.UUID
 	err := c.svc.DB.QueryRowContext(ctx, "SELECT profile_id FROM wallets WHERE id = $1", c.req.FromWalletID).Scan(&profileID)
@@ -121,9 +113,6 @@ func (c *TransferCommand) Execute(ctx context.Context) (*TransferResponse, error
 		return nil, errors.New("unauthorized: wallet does not belong to user")
 	}
 
-	// 0. Ownership Check (Keep as is)
-	// (Not modifying 97-107)
-
 	if c.req.Amount <= 0 {
 		return nil, errors.New("amount must be positive")
 	}
@@ -133,10 +122,8 @@ func (c *TransferCommand) Execute(ctx context.Context) (*TransferResponse, error
 
 	// ⚡ RUST PRE-VALIDATION / SAFE MODE ARBITRATION
 	performManualChecks := false
-	const SafeModeThreshold = 100000 // ฿1,000.00 THB
 
 	if c.req.PublicKey != "" && c.req.Signature != "" {
-		// 1. Decode Keys
 		pubKeyBytes, err := hex.DecodeString(c.req.PublicKey)
 		if err != nil {
 			return nil, fmt.Errorf("invalid public key format: %w", err)
@@ -146,7 +133,6 @@ func (c *TransferCommand) Execute(ctx context.Context) (*TransferResponse, error
 			return nil, fmt.Errorf("invalid signature format: %w", err)
 		}
 
-		// 2. Attempt Rust Pre-Validation
 		valid, msg, err := c.svc.FX.PreValidateTransfer(
 			ctx,
 			c.req.UserID.String(),
@@ -158,39 +144,27 @@ func (c *TransferCommand) Execute(ctx context.Context) (*TransferResponse, error
 		)
 
 		if err != nil {
-			// ⚠️ RUST UNAVAILABLE -> ENTER FULL SAFE MODE
-			// We no longer block high-value transactions because Go can verify signatures 
-			// and SQL can check limits. This ensures 100% availability (Survivability).
-			log.Printf("⚠️ [Safe Mode] Rust Engine Down (%v). Falling back to Manual Verification for Txn %s (Amount: %d)", err, c.req.ReferenceID, c.req.Amount)
-
-			// 3. Manual Signature Verification in Go (Survivability over Efficiency)
+			log.Printf("⚠️ [Safe Mode] Rust Engine Down (%v). Falling back to Manual Verification for Txn %s", err, c.req.ReferenceID)
 			if len(pubKeyBytes) != 32 || len(sigBytes) != 64 {
 				return nil, errors.New("invalid key length (safe mode)")
 			}
 			if !ed25519.Verify(pubKeyBytes, []byte(c.req.SignedPayload), sigBytes) {
 				return nil, errors.New("invalid signature verification (safe mode)")
 			}
-
-			// Proceed to Manual DB Limits
 			performManualChecks = true
 		} else if !valid {
-			// RUST REJECTED (Signature or Limit)
 			return nil, fmt.Errorf("security/limit check failed: %s", msg)
 		}
-		// RUST APPROVED -> Proceed (skip manual checks)
 	} else {
-		// NO SIGNATURE (Internal/Legacy) -> Manual Checks
 		performManualChecks = true
 	}
 
-	// 🛡️ MANUAL / FALLBACK CHECKS (SQL)
+	// 🛡️ MANUAL / FALLBACK CHECKS
 	if performManualChecks {
-		// GUARDRAIL 1: Per-Transaction Limit
 		if c.req.Amount > MaxTransactionAmount {
 			return nil, fmt.Errorf("transaction amount %.2f exceeds limit", float64(c.req.Amount)/100)
 		}
 
-		// GUARDRAIL 2: Daily User Limit (SQL Fallback)
 		var dailyDebitTotal sql.NullInt64
 		err := c.svc.DB.QueryRowContext(ctx, `
 			SELECT SUM(ABS(amount)) FROM ledger_entries le
@@ -207,7 +181,7 @@ func (c *TransferCommand) Execute(ctx context.Context) (*TransferResponse, error
 		}
 	}
 
-	// GUARDRAIL 2: Hourly System Limit (Keep as is, global safety)
+	// Hourly System Limit
 	var hourlyTotal sql.NullInt64
 	err = c.svc.DB.QueryRowContext(ctx, `
 		SELECT SUM(amount) FROM transactions 
@@ -244,10 +218,8 @@ func (c *TransferCommand) Execute(ctx context.Context) (*TransferResponse, error
 		return nil, fmt.Errorf("external provider check failed: %w", err)
 	}
 
-	// 3. FX Conversion (Circuit Breaker Wrapped)
+	// 3. FX Conversion
 	var baseAmount int64
-	// Using a stub for CB execution context since types are tricky with generic CB,
-	// but here we just wrap the logic.
 	_, err = c.svc.cb.Execute(func() (interface{}, error) {
 		var fxErr error
 		baseAmount, _, fxErr = c.svc.FX.ConvertToBase(ctx, c.req.Amount, c.req.Currency)
@@ -271,9 +243,7 @@ func (c *TransferCommand) Execute(ctx context.Context) (*TransferResponse, error
 		return nil, fmt.Errorf("failed to insert transaction: %w", err)
 	}
 
-	// 5. Update Wallets & Insert Ledger (Reordered for Balance Snapshot)
-
-	// A. Update Sender
+	// 5. Update Wallets & Insert Ledger
 	var senderBalanceAfter int64
 	err = tx.QueryRowContext(ctx, `
 		UPDATE wallets 
@@ -281,7 +251,6 @@ func (c *TransferCommand) Execute(ctx context.Context) (*TransferResponse, error
 		WHERE id = $2 AND currency = $3 AND status = 'ACTIVE'
 		RETURNING balance
 	`, c.req.Amount, c.req.FromWalletID, c.req.Currency).Scan(&senderBalanceAfter)
-
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, errors.New("sender wallet not found, currency mismatch, or HALTED")
@@ -289,20 +258,14 @@ func (c *TransferCommand) Execute(ctx context.Context) (*TransferResponse, error
 		return nil, fmt.Errorf("failed to debit sender: %w", err)
 	}
 
-	// B. Insert Ledger (Sender)
 	_, err = tx.ExecContext(ctx, `
-		INSERT INTO ledger_entries (
-			id, transaction_id, wallet_id, amount, 
-			balance_after, base_currency_amount, home_currency_amount
-		)
+		INSERT INTO ledger_entries (id, transaction_id, wallet_id, amount, balance_after, base_currency_amount, home_currency_amount)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
-	`, uuid.New(), newTxID, c.req.FromWalletID, -c.req.Amount,
-		senderBalanceAfter, -baseAmount, -c.req.Amount)
+	`, uuid.New(), newTxID, c.req.FromWalletID, -c.req.Amount, senderBalanceAfter, -baseAmount, -c.req.Amount)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create debit ledger: %w", err)
 	}
 
-	// C. Update Receiver
 	var receiverBalanceAfter int64
 	err = tx.QueryRowContext(ctx, `
 		UPDATE wallets 
@@ -310,7 +273,6 @@ func (c *TransferCommand) Execute(ctx context.Context) (*TransferResponse, error
 		WHERE id = $2 AND currency = $3 AND status = 'ACTIVE'
 		RETURNING balance
 	`, c.req.Amount, c.req.ToWalletID, c.req.Currency).Scan(&receiverBalanceAfter)
-
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, errors.New("receiver wallet not found, currency mismatch, or HALTED")
@@ -318,50 +280,30 @@ func (c *TransferCommand) Execute(ctx context.Context) (*TransferResponse, error
 		return nil, fmt.Errorf("failed to credit receiver: %w", err)
 	}
 
-	// D. Insert Ledger (Receiver)
 	_, err = tx.ExecContext(ctx, `
-		INSERT INTO ledger_entries (
-			id, transaction_id, wallet_id, amount, 
-			balance_after, base_currency_amount, home_currency_amount
-		)
+		INSERT INTO ledger_entries (id, transaction_id, wallet_id, amount, balance_after, base_currency_amount, home_currency_amount)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
-	`, uuid.New(), newTxID, c.req.ToWalletID, c.req.Amount,
-		receiverBalanceAfter, baseAmount, c.req.Amount)
+	`, uuid.New(), newTxID, c.req.ToWalletID, c.req.Amount, receiverBalanceAfter, baseAmount, c.req.Amount)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create credit ledger: %w", err)
 	}
 
-	// *** HALT & PROTECT: Double-Entry Integrity Check ***
+	// Integrity Check
 	var ledgerSum int64
 	err = tx.QueryRowContext(ctx, `
 		SELECT COALESCE(SUM(amount), 0) FROM ledger_entries WHERE transaction_id = $1
 	`, newTxID).Scan(&ledgerSum)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to verify ledger integrity: %w", err)
 	}
-
 	if ledgerSum != 0 {
-		// CRITICAL: Integrity Breach Detected
-		// 1. Log Alert
 		c.svc.Alert.Notify("CRITICAL", "Integrity Breach Detected", fmt.Sprintf("Transaction %s has non-zero sum: %d", newTxID, ledgerSum))
-
-		// 2. Rollback the faulty transaction immediately
 		_ = tx.Rollback()
-
-		// 3. Halt Wallets (in a new transaction)
-		haltCtx := context.Background() // Use fresh context for emergency halt
 		go func(txID uuid.UUID, w1, w2 uuid.UUID) {
-			emergencyDB := c.svc.DB
-			_, _ = emergencyDB.ExecContext(haltCtx, `
-				UPDATE wallets SET status = 'HALTED', updated_at = NOW() WHERE id IN ($1, $2)
-			`, w1, w2)
-			// Record the failed transaction state
-			_, _ = emergencyDB.ExecContext(haltCtx, `
-				UPDATE transactions SET settlement_status = 'FAILED_INTEGRITY' WHERE id = $1
-			`, txID)
+			haltCtx := context.Background()
+			_, _ = c.svc.DB.ExecContext(haltCtx, `UPDATE wallets SET status = 'HALTED', updated_at = NOW() WHERE id IN ($1, $2)`, w1, w2)
+			_, _ = c.svc.DB.ExecContext(haltCtx, `UPDATE transactions SET settlement_status = 'FAILED_INTEGRITY' WHERE id = $1`, txID)
 		}(newTxID, c.req.FromWalletID, c.req.ToWalletID)
-
 		return nil, errors.New("integrity check failed: wallets halted")
 	}
 
@@ -375,68 +317,31 @@ func (c *TransferCommand) Execute(ctx context.Context) (*TransferResponse, error
 		return nil, fmt.Errorf("failed to write to outbox: %w", err)
 	}
 
-	// 7. Commit
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	// 8. Update Redis & Alert Rust Engines (Async/Fire-and-forget)
-	// We increment the total and BROADCAST to all Rust instances for real-time consistency
+	// 8. Update Redis (Async)
 	if c.svc.Redis != nil {
 		go func() {
-			// Create context with timeout for async operations
 			asyncCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			
 			amountMajor := float64(c.req.Amount) / 100.0
 			key := fmt.Sprintf("stats:user:%s:daily_total", c.req.UserID)
-			
-			// 1. Update the persistent count in Redis with retry logic
-			maxRetries := 3
-			for attempt := 1; attempt <= maxRetries; attempt++ {
-				_, err := c.svc.Redis.IncrByFloat(asyncCtx, key, amountMajor).Result()
-				if err == nil {
-					break
-				}
-				if attempt == maxRetries {
-					log.Printf("⚠️ Failed to update Redis daily total after %d attempts for user %s: %v", maxRetries, c.req.UserID, err)
-					// Alert monitoring system here if needed
-					break
-				}
-				time.Sleep(time.Duration(attempt*100) * time.Millisecond) // Exponential backoff
-			}
-			
-			// Set expiry
+			c.svc.Redis.IncrByFloat(asyncCtx, key, amountMajor)
 			c.svc.Redis.Expire(asyncCtx, key, 24*time.Hour)
-
-			// 2. Broadcast to all Rust nodes via Pub/Sub with retry
-			pubSubKey := "user_limit_updates"
-			msg := fmt.Sprintf("%s:%f", c.req.UserID, amountMajor)
-			
-			for attempt := 1; attempt <= maxRetries; attempt++ {
-				err := c.svc.Redis.Publish(asyncCtx, pubSubKey, msg).Err()
-				if err == nil {
-					break
-				}
-				if attempt == maxRetries {
-					log.Printf("⚠️ Failed to publish Redis pub/sub after %d attempts for user %s: %v", maxRetries, c.req.UserID, err)
-					break
-				}
-				time.Sleep(time.Duration(attempt*100) * time.Millisecond)
-			}
+			c.svc.Redis.Publish(asyncCtx, "user_limit_updates", fmt.Sprintf("%s:%f", c.req.UserID, amountMajor))
 		}()
 	}
 
 	return &TransferResponse{TransactionID: newTxID, UsedExisting: false}, nil
 }
 
-// callExternalProviderStub simulates an external call wrapped by CB.
 func (c *TransferCommand) callExternalProviderStub(ctx context.Context) (bool, error) {
 	select {
 	case <-ctx.Done():
 		return false, ctx.Err()
 	default:
-		// Logic placeholder for future provider verification
 		return true, nil
 	}
 }
@@ -473,9 +378,8 @@ func (s *WalletService) GetBalance(ctx context.Context, userID uuid.UUID, curren
 	}, nil
 }
 
-// GetTransactions retrieves the transaction history for a specific wallet verified against the user.
+// GetTransactions retrieves the transaction history for a specific wallet.
 func (s *WalletService) GetTransactions(ctx context.Context, userID uuid.UUID, walletID uuid.UUID) ([]models.TransactionHistoryDTO, error) {
-	// 1. Verify Ownership
 	var ownerID uuid.UUID
 	err := s.DB.QueryRowContext(ctx, "SELECT profile_id FROM wallets WHERE id = $1", walletID).Scan(&ownerID)
 	if err != nil {
@@ -485,45 +389,37 @@ func (s *WalletService) GetTransactions(ctx context.Context, userID uuid.UUID, w
 		return nil, fmt.Errorf("failed to verify wallet owner: %w", err)
 	}
 	if ownerID != userID {
-		fmt.Printf("⚠️ Unauthorized Access: WalletOwner(%s) != SessionUser(%s)\n", ownerID, userID)
 		return nil, errors.New("unauthorized: wallet does not belong to user")
 	}
 
-	// 2. Query Ledger Entries JOIN Transactions
-	query := `
+	rows, err := s.DB.QueryContext(ctx, `
 		SELECT l.id, l.wallet_id, l.amount, t.description, l.created_at
 		FROM ledger_entries l
 		JOIN transactions t ON l.transaction_id = t.id
 		WHERE l.wallet_id = $1
 		ORDER BY l.created_at DESC
-	`
-	rows, err := s.DB.QueryContext(ctx, query, walletID)
+	`, walletID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query transactions: %w", err)
 	}
 	defer rows.Close()
 
-	// Initialize with empty slice to ensure it is never nil in JSON response
 	transactions := []models.TransactionHistoryDTO{}
-
 	for rows.Next() {
 		var dto models.TransactionHistoryDTO
 		var amount int64
-		// Scan into temp amount to logic check sign
 		if err := rows.Scan(&dto.ID, &dto.WalletID, &amount, &dto.Description, &dto.CreatedAt); err != nil {
 			return nil, fmt.Errorf("failed to scan transaction: %w", err)
 		}
-
 		if amount < 0 {
 			dto.Type = "DEBIT"
-			dto.Amount = -amount // Absolute value for display
+			dto.Amount = -amount
 		} else {
 			dto.Type = "CREDIT"
 			dto.Amount = amount
 		}
 		transactions = append(transactions, dto)
 	}
-
 	return transactions, nil
 }
 
@@ -535,26 +431,21 @@ type ExchangeRateResponse struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
-// GetExchangeRate retrieves the latest rate for a currency pair (e.g. EUR -> THB).
-// GetExchangeRate retrieves the latest rate for a currency pair (e.g. EUR -> THB).
+// GetExchangeRate retrieves the latest rate for a currency pair.
 func (s *WalletService) GetExchangeRate(ctx context.Context, fromCurr, toCurr string) (*ExchangeRateResponse, error) {
 	cacheKey := fmt.Sprintf("rate:%s:%s", fromCurr, toCurr)
 
-	// 1. Check Local In-Memory Cache (Fastest - Layer 1)
 	if val, ok := s.localRateCache.Load(cacheKey); ok {
 		item := val.(localCacheItem)
 		if time.Now().Before(item.ExpiresAt) {
 			return item.Response, nil
 		}
-		// Expired
 		s.localRateCache.Delete(cacheKey)
 	}
 
-	// 2. Check Redis Cache (Shared - Layer 2)
 	if s.Redis != nil {
 		val, err := s.Redis.Get(ctx, cacheKey).Result()
 		if err == nil {
-			// Cache Hit
 			var response ExchangeRateResponse
 			if err := json.Unmarshal([]byte(val), &response); err == nil {
 				return &response, nil
@@ -564,13 +455,8 @@ func (s *WalletService) GetExchangeRate(ctx context.Context, fromCurr, toCurr st
 
 	var rate float64
 	var updatedAt time.Time
-
-	// Stateless Query Logic: Bypassing Prepared Statements for PGBouncer Compatibility
-	// We use parameterized queries with the standard protocol.
-	query := "SELECT provider_rate, updated_at FROM exchange_rates WHERE from_currency = $1 AND to_currency = $2"
-
-	// No transaction needed for simple read
-	err := s.DB.QueryRowContext(ctx, query, strings.ToUpper(fromCurr), strings.ToUpper(toCurr)).Scan(&rate, &updatedAt)
+	err := s.DB.QueryRowContext(ctx, "SELECT provider_rate, updated_at FROM exchange_rates WHERE from_currency = $1 AND to_currency = $2",
+		strings.ToUpper(fromCurr), strings.ToUpper(toCurr)).Scan(&rate, &updatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("rate not found for %s/%s", fromCurr, toCurr)
@@ -585,26 +471,18 @@ func (s *WalletService) GetExchangeRate(ctx context.Context, fromCurr, toCurr st
 		UpdatedAt:    updatedAt,
 	}
 
-	// 3. Write to Caches (Write-Through)
-	
-	// A. Redis (Layer 2) - 60s TTL
 	if s.Redis != nil {
-		cacheKey := fmt.Sprintf("rate:%s:%s", fromCurr, toCurr)
 		data, _ := json.Marshal(response)
 		s.Redis.Set(ctx, cacheKey, data, 60*time.Second)
 	}
-
-	// B. Local Memory (Layer 1) - 10s TTL (Short-lived purely for burst protection)
-	s.localRateCache.Store(cacheKey, localCacheItem{
-		Response:  response,
-		ExpiresAt: time.Now().Add(10 * time.Second),
-	})
+	s.localRateCache.Store(cacheKey, localCacheItem{Response: response, ExpiresAt: time.Now().Add(10 * time.Second)})
 
 	return response, nil
 }
 
-// ProcessTopUp handles the successful payment webhook
-func (s *WalletService) ProcessTopUp(ctx context.Context, userID uuid.UUID, amount float64, stripeRef string) error {
+// ProcessPayment records a pay-per-use transaction from an external Stripe charge.
+// This is the core function for the new pay-per-use model.
+func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, amount float64, merchant string, referenceID string) error {
 	tx, err := s.DB.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
 	if err != nil {
 		return err
@@ -621,52 +499,44 @@ func (s *WalletService) ProcessTopUp(ctx context.Context, userID uuid.UUID, amou
 		return fmt.Errorf("failed to fetch wallet: %w", err)
 	}
 
-	// 2. Check for duplicate transaction using idempotency key (stripeRef)
+	// 2. Idempotency check
 	var exists bool
-	err = tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM transactions WHERE reference_id = $1)", stripeRef).Scan(&exists)
+	err = tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM transactions WHERE reference_id = $1)", referenceID).Scan(&exists)
 	if err != nil {
 		return err
 	}
 	if exists {
-		// Already processed - idempotent return
-		log.Printf("ℹ️ TopUp already processed for reference: %s", stripeRef)
+		log.Printf("ℹ️ Payment already processed for reference: %s", referenceID)
 		return nil
 	}
 
-	// 3. Create Transaction Record
-	txnID := uuid.New()
+	// 3. Record Transaction
+	newTxID := uuid.New()
+	description := "Pay per use: " + merchant
 	_, err = tx.ExecContext(ctx, `
-		INSERT INTO transactions (id, reference_id, description, settlement_status, gateway_fee, provider_metadata, created_at)
-		VALUES ($1, $2, $3, 'UNSETTLED', 0, $4, NOW())
-	`, txnID, stripeRef, 'Stripe Top Up', fmt.Sprintf(`{"provider": "stripe", "amount": %f}`, amount))
+		INSERT INTO transactions (id, wallet_id, reference_id, amount, description, settlement_status, gateway_fee, provider_metadata, created_at)
+		VALUES ($1, $2, $3, $4, $5, 'SETTLED', 0, $6, NOW())
+	`, newTxID, walletID, referenceID, int64(amount*100), description,
+		fmt.Sprintf(`{"provider": "stripe", "merchant": "%s", "amount": %f}`, merchant, amount))
 	if err != nil {
 		return fmt.Errorf("failed to insert transaction: %w", err)
 	}
 
-	// 4. Create Ledger Entry (Credit Only for Top Up)
-	ledgerID := uuid.New()
+	// 4. Create Ledger Entry (Credit to merchant wallet via external source)
 	_, err = tx.ExecContext(ctx, `
-		INSERT INTO ledger_entries (id, transaction_id, wallet_id, amount, balance_after, created_at)
-		VALUES ($1, $2, $3, $4, (SELECT balance + $4 FROM wallets WHERE id = $3), NOW())
-	`, ledgerID, txnID, walletID, int64(amount*100))
+		INSERT INTO ledger_entries (id, transaction_id, wallet_id, amount, balance_after, base_currency_amount, home_currency_amount, created_at)
+		VALUES ($1, $2, $3, $4, (SELECT balance FROM wallets WHERE id = $3), $4, $4, NOW())
+	`, uuid.New(), newTxID, walletID, int64(amount*100))
 	if err != nil {
 		return fmt.Errorf("failed to create ledger entry: %w", err)
 	}
 
-	// 5. Update Wallet Balance
-	_, err = tx.ExecContext(ctx, `
-		UPDATE wallets SET balance = balance + $1, updated_at = NOW() WHERE id = $2
-	`, int64(amount*100), walletID)
-	if err != nil {
-		return fmt.Errorf("failed to update wallet balance: %w", err)
-	}
-
-	// 6. Write to Outbox for async processing
-	outboxID := uuid.New()
+	// 5. Write to Outbox for async processing
+	payloadStr := fmt.Sprintf(`{"transaction_id": "%s", "amount": %f, "user_id": "%s", "merchant": "%s"}`, newTxID, amount, userID, merchant)
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO transaction_outbox (id, transaction_id, event_type, payload, status, created_at)
-		VALUES ($1, $2, $3, $4, 'PENDING', NOW())
-	`, outboxID, txnID, 'TOPUP_COMPLETED', fmt.Sprintf(`{"transaction_id": "%s", "amount": %f, "user_id": "%s"}`, txnID, amount, userID))
+		VALUES ($1, $2, 'PAYMENT_COMPLETED', $3, 'PENDING', NOW())
+	`, uuid.New(), newTxID, payloadStr)
 	if err != nil {
 		return fmt.Errorf("failed to write to outbox: %w", err)
 	}
@@ -674,11 +544,17 @@ func (s *WalletService) ProcessTopUp(ctx context.Context, userID uuid.UUID, amou
 	return tx.Commit()
 }
 
+// ProcessTopUp is kept for Stripe webhook compatibility.
+// In the pay-per-use model, it now records the payment directly without modifying wallet balance.
+func (s *WalletService) ProcessTopUp(ctx context.Context, userID uuid.UUID, amount float64, stripeRef string) error {
+	return s.ProcessPayment(ctx, userID, amount, "Stripe Direct Charge", stripeRef)
+}
+
 // PayoutRequest represents a request to pay to an external PromptPay account.
 type PayoutRequest struct {
 	UserID         uuid.UUID
-	Amount         int64  // In minor units (satang)
-	PromptPayID    string // Phone or National ID
+	Amount         int64
+	PromptPayID    string
 	RecipientName  string
 	IdempotencyKey string
 }
@@ -688,13 +564,13 @@ type PayoutResponse struct {
 	TransactionID string `json:"transaction_id"`
 	Status        string `json:"status"`
 	Message       string `json:"message"`
-	SenderName    string `json:"sender_name"` // Added sender name for receipt
-	NewBalance    int64  `json:"new_balance"` // Added for receipt
+	SenderName    string `json:"sender_name"`
+	NewBalance    int64  `json:"new_balance"`
 }
 
-// PayoutToPromptPay deducts from user's wallet and queues a payout to PromptPay.
+// PayoutToPromptPay processes a PromptPay payout.
+// In pay-per-use, funds come from external Stripe charge, not internal wallet balance.
 func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest) (*PayoutResponse, error) {
-	// 1. Basic Validation
 	if req.Amount <= 0 {
 		return nil, errors.New("amount must be positive")
 	}
@@ -702,14 +578,13 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 		return nil, fmt.Errorf("amount exceeds single transaction limit of %.2f", float64(MaxTransactionAmount)/100)
 	}
 
-	// 2. Begin Transaction (SERIALIZABLE to prevent race conditions)
 	tx, err := s.DB.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
 
-	// 3. Get User's THB Wallet and Profile Name (INSIDE TX with FOR UPDATE)
+	// Get User's Wallet and Profile Name
 	var walletID uuid.UUID
 	var currentBalance int64
 	var senderFullName string
@@ -727,12 +602,7 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 		return nil, fmt.Errorf("failed to fetch wallet/profile: %w", err)
 	}
 
-	// 4. Check Sufficient Balance
-	if currentBalance < req.Amount {
-		return nil, errors.New("insufficient balance")
-	}
-
-	// 5. Check Daily Limit (INSIDE TX)
+	// Check Daily Limit
 	var dailyDebitTotal sql.NullInt64
 	err = tx.QueryRowContext(ctx, `
 		SELECT COALESCE(SUM(ABS(le.amount)), 0) FROM ledger_entries le
@@ -748,11 +618,10 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 		return nil, fmt.Errorf("daily payout limit of ฿%.2f exceeded", float64(MaxDailyUserAmount)/100)
 	}
 
-	// 6. Check Idempotency (INSIDE TX)
+	// Idempotency Check
 	var existingID uuid.UUID
 	err = tx.QueryRowContext(ctx, "SELECT id FROM transactions WHERE reference_id = $1", req.IdempotencyKey).Scan(&existingID)
 	if err == nil {
-		// Already processed - return success (idempotent)
 		return &PayoutResponse{
 			TransactionID: existingID.String(),
 			Status:        "already_processed",
@@ -764,7 +633,7 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 		return nil, fmt.Errorf("error checking idempotency: %w", err)
 	}
 
-	// 7. Create Transaction Record
+	// Create Transaction Record
 	newTxID := uuid.New()
 	description := fmt.Sprintf("PromptPay to %s (%s)", req.RecipientName, req.PromptPayID)
 	metadata := fmt.Sprintf(`{"promptpay_id": "%s", "recipient_name": "%s"}`, req.PromptPayID, req.RecipientName)
@@ -777,7 +646,7 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 		return nil, fmt.Errorf("failed to insert transaction: %w", err)
 	}
 
-	// 8. Deduct from Wallet
+	// Deduct from Wallet (for accounting purposes - will be reconciled with Stripe charge)
 	var newBalance int64
 	err = tx.QueryRowContext(ctx, `
 		UPDATE wallets 
@@ -789,25 +658,16 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 		return nil, fmt.Errorf("failed to deduct from wallet: %w", err)
 	}
 
-	// 9. Create Ledger Entry (Debit)
-	// We MUST include base_currency_amount and home_currency_amount to match the schema
 	_, err = tx.ExecContext(ctx, `
-		INSERT INTO ledger_entries (
-			id, transaction_id, wallet_id, amount, 
-			balance_after, base_currency_amount, home_currency_amount
-		)
+		INSERT INTO ledger_entries (id, transaction_id, wallet_id, amount, balance_after, base_currency_amount, home_currency_amount)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
-	`, uuid.New(), newTxID, walletID, -req.Amount,
-		newBalance, -req.Amount, -req.Amount) // Since it's THB, these are same
+	`, uuid.New(), newTxID, walletID, -req.Amount, newBalance, -req.Amount, -req.Amount)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create ledger entry: %w", err)
 	}
 
-	// 10. Execute Payout via PaymentEngine (Provider Abstraction)
-	// We call this BEFORE final outbox/commit to ensure we capture the external ID if possible.
-	// For production, the provider name could come from user preference or system config.
+	// Execute Payout via PaymentEngine
 	payoutResult, pErr := s.PaymentEngine.ExecutePayout(ctx, "", req.Amount, "THB", req.PromptPayID, req.RecipientName, req.IdempotencyKey)
-	
 	finalStatus := "PENDING"
 	externalID := ""
 	if pErr == nil {
@@ -817,7 +677,7 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 		log.Printf("⚠️ PaymentEngine payout call failed (will be retried by worker): %v", pErr)
 	}
 
-	// 11. Queue for Payout Processing (Outbox Pattern - for background retry/sync)
+	// Queue for Payout Processing (Outbox Pattern)
 	payloadObj := map[string]interface{}{
 		"transaction_id": newTxID,
 		"promptpay_id":   req.PromptPayID,
@@ -836,7 +696,6 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 		return nil, fmt.Errorf("failed to queue payout outbox: %w", err)
 	}
 
-	// 12. Update Transaction with External Info (if available)
 	if externalID != "" {
 		_, _ = tx.ExecContext(ctx, `
 			UPDATE transactions 
@@ -846,7 +705,6 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 		`, fmt.Sprintf(`"%s"`, externalID), finalStatus, newTxID)
 	}
 
-	// 13. Commit
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
@@ -859,8 +717,8 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 		NewBalance:    newBalance,
 	}, nil
 }
+
 // EnsureUserAccount checks if a profile and wallet exist for the user, creating them if missing.
-// This is used for "auto-healing" account state upon login.
 func (s *WalletService) EnsureUserAccount(ctx context.Context, userID uuid.UUID) error {
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -868,14 +726,12 @@ func (s *WalletService) EnsureUserAccount(ctx context.Context, userID uuid.UUID)
 	}
 	defer tx.Rollback()
 
-	// 1. Ensure Profile Exists
 	username := "user_" + userID.String()[:8]
 	_, err = tx.ExecContext(ctx, "INSERT INTO profiles (id, username, full_name) VALUES ($1, $2, 'Paysif User') ON CONFLICT (id) DO NOTHING", userID, username)
 	if err != nil {
 		return fmt.Errorf("failed to ensure profile: %w", err)
 	}
 
-	// 2. Ensure Wallet Exists (THB default)
 	var exists bool
 	err = tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM wallets WHERE profile_id = $1)", userID).Scan(&exists)
 	if err != nil {
