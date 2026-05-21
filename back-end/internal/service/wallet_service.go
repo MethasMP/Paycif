@@ -583,11 +583,14 @@ func (s *WalletService) ProcessTopUp(ctx context.Context, userID uuid.UUID, amou
 	}
 	defer tx.Rollback()
 
-	// 1. Get User's Wallet
+	// 1. Get User's Wallet with FOR UPDATE lock to prevent race conditions
 	var walletID uuid.UUID
-	err = tx.QueryRowContext(ctx, "SELECT id FROM wallets WHERE user_id = $1", userID).Scan(&walletID)
+	err = tx.QueryRowContext(ctx, "SELECT id FROM wallets WHERE profile_id = $1 FOR UPDATE", userID).Scan(&walletID)
 	if err != nil {
-		return fmt.Errorf("wallet not found for user %s: %w", userID, err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("wallet not found for user %s: %w", userID, err)
+		}
+		return fmt.Errorf("failed to fetch wallet: %w", err)
 	}
 
 	// 2. Check for duplicate transaction using idempotency key (stripeRef)
@@ -597,25 +600,27 @@ func (s *WalletService) ProcessTopUp(ctx context.Context, userID uuid.UUID, amou
 		return err
 	}
 	if exists {
-		// Already processed
+		// Already processed - idempotent return
+		log.Printf("ℹ️ TopUp already processed for reference: %s", stripeRef)
 		return nil
 	}
 
 	// 3. Create Transaction Record
 	txnID := uuid.New()
 	_, err = tx.ExecContext(ctx, `
-		INSERT INTO transactions (id, wallet_id, type, amount, reference_id, status, description, created_at)
-		VALUES ($1, $2, 'TOPUP', $3, $4, 'SUCCESS', 'Stripe Top Up', NOW())
-	`, txnID, walletID, amount, stripeRef)
+		INSERT INTO transactions (id, reference_id, description, settlement_status, gateway_fee, provider_metadata, created_at)
+		VALUES ($1, $2, $3, 'UNSETTLED', 0, $4, NOW())
+	`, txnID, stripeRef, 'Stripe Top Up', fmt.Sprintf(`{"provider": "stripe", "amount": %f}`, amount))
 	if err != nil {
 		return fmt.Errorf("failed to insert transaction: %w", err)
 	}
 
 	// 4. Create Ledger Entry (Credit Only for Top Up)
+	ledgerID := uuid.New()
 	_, err = tx.ExecContext(ctx, `
-		INSERT INTO ledger_entries (id, transaction_id, wallet_id, type, amount, balance_after, created_at)
-		VALUES ($1, $2, $3, 'CREDIT', $4, (SELECT balance + $4 FROM wallets WHERE id = $3), NOW())
-	`, uuid.New(), txnID, walletID, amount)
+		INSERT INTO ledger_entries (id, transaction_id, wallet_id, amount, balance_after, created_at)
+		VALUES ($1, $2, $3, $4, (SELECT balance + $4 FROM wallets WHERE id = $3), NOW())
+	`, ledgerID, txnID, walletID, int64(amount*100))
 	if err != nil {
 		return fmt.Errorf("failed to create ledger entry: %w", err)
 	}
@@ -623,9 +628,19 @@ func (s *WalletService) ProcessTopUp(ctx context.Context, userID uuid.UUID, amou
 	// 5. Update Wallet Balance
 	_, err = tx.ExecContext(ctx, `
 		UPDATE wallets SET balance = balance + $1, updated_at = NOW() WHERE id = $2
-	`, amount, walletID)
+	`, int64(amount*100), walletID)
 	if err != nil {
 		return fmt.Errorf("failed to update wallet balance: %w", err)
+	}
+
+	// 6. Write to Outbox for async processing
+	outboxID := uuid.New()
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO transaction_outbox (id, transaction_id, event_type, payload, status, created_at)
+		VALUES ($1, $2, $3, $4, 'PENDING', NOW())
+	`, outboxID, txnID, 'TOPUP_COMPLETED', fmt.Sprintf(`{"transaction_id": "%s", "amount": %f, "user_id": "%s"}`, txnID, amount, userID))
+	if err != nil {
+		return fmt.Errorf("failed to write to outbox: %w", err)
 	}
 
 	return tx.Commit()
