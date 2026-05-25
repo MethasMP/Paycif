@@ -25,9 +25,12 @@ func GenerateTD3MRZ(docType, country, lastName, firstName, docNum, nationality, 
 	compositeSource := fmt.Sprintf("%s%d%s%d%s%d", docNum, c1, dob, c2, expiry, c3)
 	cOrg := nfc.CalculateMRZChecksum(compositeSource)
 
-	line2 := fmt.Sprintf("%-9s%d%-3s%-6s%d%-1s%-6s%d%-14s%d", 
+	line2 := fmt.Sprintf("%-9s%d%-3s%-6s%d%-1s%-6s%d%-15s%d",
 		docNum, c1, nationality, dob, c2, sex, expiry, c3, "", cOrg)
-	line2 = strings.ReplaceAll(line2, " ", "<")[:44]
+	line2 = strings.ReplaceAll(line2, " ", "<")
+	if len(line2) > 44 {
+		line2 = line2[:44]
+	}
 
 	return []string{line1, line2}
 }
