@@ -1,0 +1,25 @@
+[package]
+name = "payload_worker"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# SIMD-accelerated JSON parsing (10-15x faster than serde_json)
+simd-json = "0.13"
+# Zero-copy deserialization
+serde = { version = "1.0", features = ["derive"] }
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+# Redis for queue
+redis = { version = "0.32", features = ["tokio-comp", "connection-manager"] }
+# PostgreSQL
+sqlx = { version = "0.7", features = ["runtime-tokio-native-tls", "postgres", "uuid", "time"] }
+# Utilities
+uuid = { version = "1.7", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1.0"
+dotenv = "0.15"
+# Bytes for zero-copy
+bytes = "1.5"

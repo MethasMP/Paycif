@@ -1,0 +1,137 @@
+syntax = "proto3";
+
+package fx;
+
+option go_package = "paysif/internal/grpc/pb";
+
+// FXService provides high-performance currency conversion
+service FXService {
+    // Convert amount from one currency to another
+    rpc Convert(ConvertRequest) returns (ConvertResponse);
+    
+    // Get current exchange rate
+    rpc GetRate(RateRequest) returns (RateResponse);
+    
+    // Get all available rates for a base currency
+    rpc GetAllRates(AllRatesRequest) returns (AllRatesResponse);
+    
+    // Health check
+    rpc HealthCheck(FXHealthRequest) returns (FXHealthResponse);
+
+    // Admin/Control Plane: Update rate manually
+    rpc UpdateRate(UpdateRateRequest) returns (UpdateRateResponse);
+
+    // Cryptography: Offload signature verification to Rust (Ed25519-SIMD)
+    rpc VerifySignature(VerifySignatureRequest) returns (VerifySignatureResponse);
+
+    // Limits: Get remaining limits for user (Fast Path for UI)
+    rpc GetLimits(GetLimitsRequest) returns (GetLimitsResponse);
+
+    // Pre-Validation: Combined Signature + Amount + Limits Check (Fast Path for Payment)
+    rpc PreValidateTransfer(PreValidateTransferRequest) returns (PreValidateTransferResponse);
+}
+
+message VerifySignatureRequest {
+    bytes public_key = 1;
+    bytes signature = 2;
+    bytes message = 3; 
+}
+
+message VerifySignatureResponse {
+    bool valid = 1;
+    string error_message = 2;
+}
+
+message ConvertRequest {
+    string from_currency = 1;
+    string to_currency = 2;
+    int64 amount = 3;  // Amount in smallest unit (satang/cents)
+    string request_id = 4;
+}
+
+message ConvertResponse {
+    bool success = 1;
+    int64 converted_amount = 2;
+    string rate_used = 3;  // Decimal as string for precision
+    string error_message = 4;
+    int64 timestamp = 5;
+}
+
+message RateRequest {
+    string from_currency = 1;
+    string to_currency = 2;
+    string request_id = 3;
+}
+
+message RateResponse {
+    bool success = 1;
+    string rate = 2;  // Decimal as string
+    string inverse_rate = 3;
+    int64 last_updated = 4;
+    string source = 5;
+    string error_message = 6;
+}
+
+message AllRatesRequest {
+    string base_currency = 1;
+    string request_id = 2;
+}
+
+message AllRatesResponse {
+    bool success = 1;
+    string base_currency = 2;
+    map<string, string> rates = 3;  // Currency -> Rate
+    int64 last_updated = 4;
+}
+
+message FXHealthRequest {}
+
+message FXHealthResponse {
+    bool healthy = 1;
+    string version = 2;
+    int32 cached_pairs = 3;
+    int64 uptime_seconds = 4;
+}
+
+message UpdateRateRequest {
+    string from_currency = 1;
+    string to_currency = 2;
+    string rate = 3;         // Decimal as string
+    string source = 4;
+}
+
+message UpdateRateResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message GetLimitsRequest {
+    string user_id = 1;
+    string currency = 2; // e.g., "THB"
+}
+
+message GetLimitsResponse {
+    bool success = 1;
+    double max_daily_amount = 2;
+    double remaining_daily_amount = 3;
+    double current_daily_total = 4;
+    double max_transaction_amount = 5;
+    string error_message = 6;
+}
+
+message PreValidateTransferRequest {
+    string user_id = 1;
+    string currency = 2;
+    int64 amount = 3; // Amount in minor units (satang)
+    bytes public_key = 4;
+    bytes signature = 5;
+    bytes message = 6; // The critical data being signed
+}
+
+message PreValidateTransferResponse {
+    bool valid = 1;
+    bool signature_valid = 2;
+    bool limits_valid = 3;
+    string error_message = 4;
+    double remaining_daily_amount = 5; // Updated remaining amount if valid
+}

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "93085559291",
+    "project_id": "my-paysify-project",
+    "storage_bucket": "my-paysify-project.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:93085559291:android:9753d90b1a6e99f96ec35e",
+        "android_client_info": {
+          "package_name": "com.example.frontend"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAZD2ASI_95rC0yJSfDllyuEHeMvwX5kgc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

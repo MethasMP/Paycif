@@ -1,0 +1,57 @@
+[package]
+name = "fx_engine"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Decimal math with no floating point errors
+rust_decimal = { version = "1.33", features = ["serde"] }
+rust_decimal_macros = "1.33"
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+# gRPC server
+tonic = { version = "0.11", features = ["tls"] }
+prost = "0.12"
+# Fast HashMap
+ahash = "0.8"
+# Utilities
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1.0"
+dotenv = "0.15"
+# Lock-free concurrent map
+dashmap = "5.5"
+# High-performance memory allocator
+jemallocator = "0.5"
+# Signature Verification (The Secret Weapon)
+ed25519-dalek = { version = "2.1", features = ["batch", "rand_core"] }
+# HTTP client for fetching rates
+reqwest = { version = "0.11", features = ["json"] }
+# Async stream utilities
+tokio-stream = { version = "0.1", features = ["net"] }
+# Async trait support
+async-trait = "0.1"
+# XML parsing for ECB
+quick-xml = { version = "0.31", features = ["serialize"] }
+# Redis client with async support (DEPRECATED - kept for rate caching only)
+redis = { version = "0.32", features = ["tokio-comp", "connection-manager"] }
+deadpool-redis = "0.22"
+# Postgres client for limit hydration (replaces Redis for limits)
+sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "chrono", "bigdecimal"] }
+
+[dev-dependencies]
+tokio-test = "0.4"
+
+[build-dependencies]
+tonic-build = "0.11"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+
+[profile.test]
+opt-level = 2

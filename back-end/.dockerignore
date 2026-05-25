@@ -1,0 +1,22 @@
+# Docker Ignore File
+# Ignore all build artifacts, temporary files, and sensitive data
+
+# Go
+tmp_go_build/
+go_home/
+temp_gopath/
+api
+verify
+verify_transfer
+worker
+
+# Rust
+rust/fx-engine/target/
+
+# Environment and Logs
+.env
+*.log
+
+# Git
+.git
+.gitignore

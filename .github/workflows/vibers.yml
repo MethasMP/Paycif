@@ -1,0 +1,19 @@
+name: Vibers Code Review
+on:
+  push:
+    branches: [main, master]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: marsiandeployer/vibers-action@v1
+        with:
+          # 💎 ใส่ลิงก์ Spec ของโปรเจกต์คุณที่นี่ (เช่น Google Doc / Notion)
+          spec_url: 'https://docs.google.com/document/d/YOUR_SPEC_ID/view'
+          # 📲 ใส่ชื่อ Telegram ของคุณเพื่อให้ระบบแจ้งเตือนเมื่อรีวิวเสร็จ
+          telegram_contact: '@your_telegram'
+          review_scope: 'full'
