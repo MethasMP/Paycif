@@ -7,7 +7,6 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"fmt"
 	"math/big"
 	"time"
 )
@@ -24,7 +23,7 @@ type MockPassportData struct {
 func GenerateMockPassport(nationality string, firstName string, lastName string) (*MockPassportData, error) {
 	// 1. Generate MRZ and DG1
 	mrzLines := GenerateTD3MRZ("P<", "THA", lastName, firstName, "AA1234567", nationality, "900101", "M", "300101")
-	mrzText := fmt.Sprintf("%-44s\n%-44s", mrzLines[0], mrzLines[1])
+	mrzText := mrzLines[0] + mrzLines[1]
 	dg1 := []byte{0x61, byte(len(mrzText))} // TLV tag for DG1
 	dg1 = append(dg1, mrzText...)
 
