@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:flutter_mrz_scanner/flutter_mrz_scanner.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../data/datasources/nfc_passport_datasource.dart';
 import '../../domain/entities/passport_data.dart';
@@ -17,7 +16,6 @@ class PassportScannerPage extends StatefulWidget {
 }
 
 class _PassportScannerPageState extends State<PassportScannerPage> {
-  MRZController? _controller;
   bool _isNFCOverlayVisible = false;
   bool _isLivenessActive = false;
   int _blinkCount = 0;
@@ -27,7 +25,6 @@ class _PassportScannerPageState extends State<PassportScannerPage> {
 
   @override
   void dispose() {
-    _controller?.stopPreview();
     super.dispose();
   }
 
@@ -37,24 +34,28 @@ class _PassportScannerPageState extends State<PassportScannerPage> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // 📷 The Camera View (The Observer)
-          MRZScanner(
-            withOverlay: true,
-            onControllerCreated: (controller) {
-              _controller = controller;
-              controller.onParsed = (result) async {
-                if (_isNFCOverlayVisible || _isLivenessActive) return;
-                setState(() {
-                  _status = 'Passport Detected. Hold tight...';
-                });
-                await _startNFCHandshake(
-                  docNum: result.documentNumber,
-                  birth: result.birthDate.toString(),
-                  expiry: result.expiryDate.toString(),
-                );
-              };
-              controller.startPreview();
-            },
+          // 📷 Mock Camera View (Simulator Friendly)
+          Container(
+            color: Colors.grey[950],
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.camera_alt_outlined, color: Colors.white24, size: 64),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      _startNFCHandshake(
+                        docNum: "AA1234567",
+                        birth: "900101",
+                        expiry: "300101",
+                      );
+                    },
+                    child: const Text('Simulate Scan Passport'),
+                  ),
+                ],
+              ),
+            ),
           ),
 
           // 🎨 Steve Jobs Level UI Overlay

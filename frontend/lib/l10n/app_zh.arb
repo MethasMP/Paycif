@@ -399,5 +399,17 @@
   "privacySection5Title": "您的权利",
   "privacySection5Content": "您有权访问、更正或删除您的个人数据。您可以选择退出营销通讯。您可以请求以可移植格式获取您的数据副本。",
   "privacyContactTitle": "隐私咨询",
-  "privacyContactContent": "如果您对我们的隐私做法有疑问或希望行使您的数据权利，请联系我们的数据保护官："
+  "privacyContactContent": "如果您对我们的隐私做法有疑问或希望行使您的数据权利，请联系我们的数据保护官：",
+  "verifyIdentity": "验证身份",
+  "topUpFeePaysif": "Paycif 服务费",
+  "notificationSettingsTitle": "通知设置",
+  "notificationSecurityAlwaysOn": "安全（始终开启）",
+  "notificationAccountSecurity": "账户安全",
+  "notificationAccountSecurityDesc": "登录提醒、设备变更和密码更新。",
+  "notificationWalletActivity": "钱包动态",
+  "notificationTransactionAlerts": "交易提醒",
+  "notificationTransactionAlertsDesc": "发送、接收和充值通知。",
+  "notificationUpdates": "更新",
+  "notificationNewsPromotions": "新闻与推广",
+  "notificationNewsPromotionsDesc": "独家优惠和功能更新。"
 }

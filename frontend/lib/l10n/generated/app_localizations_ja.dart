@@ -75,7 +75,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get version => 'バージョン';
 
   @override
-  String get verifyIdentity => 'Verify Identity';
+  String get verifyIdentity => '本人確認';
 
   @override
   String get paymentStatus => '支払いステータス';
@@ -313,7 +313,7 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String get topUpFeePaysif => 'Paycif Service Fee';
+  String get topUpFeePaysif => 'Paycifサービス手数料';
 
   @override
   String get topUpFeeFree => '無料';
@@ -935,35 +935,32 @@ class AppLocalizationsJa extends AppLocalizations {
       'プライバシーに関するご質問やデータ権利の行使については、データ保護責任者までご連絡ください：';
 
   @override
-  String get notificationSettingsTitle => 'Notification Settings';
+  String get notificationSettingsTitle => '通知設定';
 
   @override
-  String get notificationSecurityAlwaysOn => 'Security (Always On)';
+  String get notificationSecurityAlwaysOn => 'セキュリティ（常にオン）';
 
   @override
-  String get notificationAccountSecurity => 'Account Security';
+  String get notificationAccountSecurity => 'アカウントセキュリティ';
 
   @override
-  String get notificationAccountSecurityDesc =>
-      'Login alerts, device changes, and password updates.';
+  String get notificationAccountSecurityDesc => 'ログインアラート、デバイス変更、パスワード更新。';
 
   @override
-  String get notificationWalletActivity => 'Wallet Activity';
+  String get notificationWalletActivity => 'ウォレット活動';
 
   @override
-  String get notificationTransactionAlerts => 'Transaction Alerts';
+  String get notificationTransactionAlerts => '取引アラート';
 
   @override
-  String get notificationTransactionAlertsDesc =>
-      'Sent, received, and top-up notifications.';
+  String get notificationTransactionAlertsDesc => '送金、受取、およびチャージ通知。';
 
   @override
-  String get notificationUpdates => 'Updates';
+  String get notificationUpdates => 'アップデート';
 
   @override
-  String get notificationNewsPromotions => 'News & Promotions';
+  String get notificationNewsPromotions => 'ニュース＆プロモーション';
 
   @override
-  String get notificationNewsPromotionsDesc =>
-      'Exclusive offers and feature updates.';
+  String get notificationNewsPromotionsDesc => '限定オファーと機能アップデート。';
 }

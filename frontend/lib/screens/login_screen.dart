@@ -6,9 +6,11 @@ import '../utils/error_translator.dart';
 import '../utils/pay_notify.dart';
 
 import 'package:flutter_animate/flutter_animate.dart';
+import 'dart:async';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'main_screen.dart';
+
+import 'splash_screen.dart' as import_splash;
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -19,7 +21,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
-  late final Stream<AuthState> _authStream;
+  late final StreamSubscription<AuthState> _authSubscription;
 
   bool _isCanceledAuthError(Object error) {
     final raw = error.toString().toLowerCase();
@@ -31,12 +33,17 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _authStream = Supabase.instance.client.auth.onAuthStateChange;
     _listenToAuthChanges();
   }
 
+  @override
+  void dispose() {
+    _authSubscription.cancel();
+    super.dispose();
+  }
+
   void _listenToAuthChanges() {
-    _authStream.listen((data) {
+    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
       if (data.event == AuthChangeEvent.signedIn) {
         _navigateToMain();
       }
@@ -44,15 +51,13 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _navigateToMain() {
-    // Guard against calling setState or Navigator during build
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        // Guard against redundant navigation
         Navigator.pushReplacement(
           context,
           PageRouteBuilder(
             pageBuilder: (context, animation, secondaryAnimation) =>
-                const MainScreen(),
+                const import_splash.SplashScreen(),
             transitionDuration: Duration.zero,
             reverseTransitionDuration: Duration.zero,
           ),
@@ -72,8 +77,9 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       // 1. Native Google Sign In
-      // In 7.0.0+, initialization is required.
-      // Use iOS client id only on iOS. Android should rely on package/SHA config.
+      // IMPORTANT: On Android, clientId MUST be null — the native client ID is
+      // read from google-services.json automatically.
+      // On iOS, clientId must be the iOS-type Client ID.
       await GoogleSignIn.instance.initialize(
         clientId: Platform.isIOS ? dotenv.env['GOOGLE_CLIENT_ID_IOS'] : null,
         serverClientId: webClientId,
@@ -87,13 +93,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (idToken == null) {
         throw Exception(
-          'No Google ID token. Verify GOOGLE_CLIENT_ID_WEB and Android SHA-1/SHA-256 setup in Google Cloud.',
+          'No Google ID token. Verify GOOGLE_CLIENT_ID_WEB setup.',
         );
       }
 
       // 2. Exchange with Supabase
-      // Note: We intentionally DO NOT pass a nonce here to avoid mismatches
-      // with the native Google ID Token.
       await Supabase.instance.client.auth.signInWithIdToken(
         provider: OAuthProvider.google,
         idToken: idToken,
@@ -102,7 +106,6 @@ class _LoginScreenState extends State<LoginScreen> {
       // Navigation is handled by the _authStream listener.
     } on GoogleSignInException catch (error) {
       if (error.code == GoogleSignInExceptionCode.canceled) {
-        // User/system canceled the native Google flow; don't show an error toast.
         if (mounted) {
           setState(() => _isLoading = false);
         }

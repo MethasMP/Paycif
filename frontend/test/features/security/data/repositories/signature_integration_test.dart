@@ -27,6 +27,11 @@ void main() {
     mockCryptoService = MockCryptoService();
     mockSecureStorage = MockSecureStorageService();
 
+    // Stub default secure storage calls to return null or complete normally
+    when(() => mockSecureStorage.read(any())).thenAnswer((_) async => null);
+    when(() => mockSecureStorage.write(any(), any())).thenAnswer((_) async {});
+    when(() => mockSecureStorage.delete(any())).thenAnswer((_) async {});
+
     // Crypto Setup
     final algorithm = Ed25519();
     mockKeyPair = await algorithm.newKeyPair();

@@ -19,10 +19,12 @@ class SecurityUnlockScreen extends StatefulWidget {
 
 class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
   bool _isAuthenticating = false;
+  Future<BiometricProfile>? _profileFuture;
 
   @override
   void initState() {
     super.initState();
+    _profileFuture = context.read<SecurityController>().getBiometricProfile();
     // 🚀 Auto-Trigger Biometric for a "Magical" Experience
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _tryBiometricUnlock();
@@ -31,15 +33,29 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
 
   Future<void> _tryBiometricUnlock() async {
     if (_isAuthenticating) return;
-
-    final controller = context.read<SecurityController>();
-    final profile = await controller.getBiometricProfile();
-
-    if (profile.availableTypes.isEmpty) return;
-
     setState(() => _isAuthenticating = true);
 
     try {
+      final controller = context.read<SecurityController>();
+      BiometricProfile? profile;
+      if (_profileFuture != null) {
+        profile = await _profileFuture;
+      } else {
+        profile = await controller.getBiometricProfile();
+      }
+
+      if (profile == null || profile.availableTypes.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Biometrics not available or not enrolled on this device.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        return;
+      }
+
       final auth = LocalAuthentication();
       final authenticated = await auth.authenticate(
         localizedReason: 'Please verify your identity to unlock Paycif',
@@ -61,6 +77,7 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
   }
 
   void _onUnlockSuccess() {
+    context.read<SecurityController>().recordBiometricVerificationSuccess();
     // 🛡️ World-Class Navigation: Smooth Fade to Home
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
@@ -147,14 +164,23 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
               const SizedBox(height: 24),
 
               // 🤳 Biometric Action (Primary Alternative)
-              TextButton.icon(
-                onPressed: _tryBiometricUnlock,
-                icon: const Icon(Icons.face_unlock_rounded),
-                label: const Text('Use Biometrics'),
-                style: TextButton.styleFrom(
-                  foregroundColor: Theme.of(context).primaryColor,
+              if (_profileFuture != null)
+                FutureBuilder<BiometricProfile>(
+                  future: _profileFuture,
+                  builder: (context, snapshot) {
+                    final profile = snapshot.data;
+                    if (profile == null) return const SizedBox.shrink();
+
+                    return TextButton.icon(
+                      onPressed: _tryBiometricUnlock,
+                      icon: Icon(profile.bioIcon),
+                      label: Text('Use ${profile.bioName}'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Theme.of(context).primaryColor,
+                      ),
+                    ).animate().fadeIn(delay: 800.ms);
+                  },
                 ),
-              ).animate().fadeIn(delay: 800.ms),
 
               const SizedBox(height: 40),
             ],

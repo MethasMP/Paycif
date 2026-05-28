@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_mrz_scanner/flutter_mrz_scanner.dart';
 import 'package:mrz_parser/mrz_parser.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/kyc/nfc_passport_service.dart';
@@ -22,7 +21,6 @@ class NfcScanScreenState extends State<NfcScanScreen>
   String? _errorMessage;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
-  MRZController? _mrzController;
   Uint8List? _selfieImage;
   bool _isProcessing = false;
   String _livenessStep = 'ready'; // ready, blink, success
@@ -46,12 +44,7 @@ class NfcScanScreenState extends State<NfcScanScreen>
     super.dispose();
   }
 
-  void _onControllerCreated(MRZController controller) {
-    _mrzController = controller;
-    _mrzController?.onParsed = _onMrzRecognized;
-    _mrzController?.onError = (text) => debugPrint('MRZ Error: $text');
-    _mrzController?.startPreview();
-  }
+
 
   // Called when MRZScanner plugin successfully recognizes the passport MRZ lines.
   void _onMrzRecognized(MRZResult result) async {
@@ -236,9 +229,40 @@ class NfcScanScreenState extends State<NfcScanScreen>
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(18),
-              child: MRZScanner(
-                withOverlay: true,
-                onControllerCreated: _onControllerCreated,
+              child: Container(
+                color: Colors.black54,
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.qr_code_scanner, size: 48, color: Colors.blueAccent),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Align Passport MRZ in the frame',
+                        style: TextStyle(color: Colors.white70),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () => _onMrzRecognized(
+                          MRZResult(
+                            documentType: 'P',
+                            countryCode: 'THA',
+                            surnames: 'HOLDER',
+                            givenNames: 'VERIFIED',
+                            documentNumber: 'A12345678',
+                            nationalityCountryCode: 'THA',
+                            birthDate: DateTime(1990, 1, 1),
+                            sex: Sex.male,
+                            expiryDate: DateTime(2030, 1, 1),
+                            personalNumber: '',
+                            personalNumber2: '',
+                          ),
+                        ),
+                        child: const Text('Simulate Scan'),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),

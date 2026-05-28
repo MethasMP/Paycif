@@ -1,16 +1,12 @@
 import 'dart:math';
-import 'dart:ui' as ui;
-import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/rendering.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
 import 'package:intl/intl.dart';
 import '../utils/error_translator.dart';
 import '../utils/pay_notify.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/api_service.dart';
 import 'package:uuid/uuid.dart';
 import '../features/security/domain/repositories/security_repository.dart';
@@ -43,7 +39,6 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
 
   double _slidePosition = 0.0;
   bool _isProcessing = false;
-  String _selectedPaymentMethod = 'card_default'; // Pay per use: Default to linked card
 
   @override
   void initState() {
@@ -60,13 +55,12 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
   }
 
   Future<void> _authenticate() async {
-    final l10n = AppLocalizations.of(context)!;
     setState(() => _isProcessing = true);
 
     try {
       final authenticated = await auth.authenticate(
         localizedReason: 'Confirm payment of ฿${NumberFormat('#,##0.00').format(widget.amount)}',
-        options: const AuthenticationOptions(biometricOnly: true),
+        biometricOnly: true,
       );
 
       if (authenticated) {
@@ -79,15 +73,19 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
         });
       }
     } catch (e) {
-      setState(() {
-        _slidePosition = 0.0;
-        _isProcessing = false;
-      });
-      PayNotify.error(context, ErrorTranslator.translate(l10n, e.toString()));
+      if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
+        setState(() {
+          _slidePosition = 0.0;
+          _isProcessing = false;
+        });
+        PayNotify.error(context, ErrorTranslator.translate(l10n, e.toString()));
+      }
     }
   }
 
   Future<void> _executePayment() async {
+    if (!mounted) return;
     final l10n = AppLocalizations.of(context)!;
     final securityRepo = context.read<SecurityRepository>();
     try {
@@ -202,7 +200,7 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
           decoration: BoxDecoration(
             color: theme.cardColor,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: theme.primaryColor.withOpacity(0.1)),
+            border: Border.all(color: theme.primaryColor.withValues(alpha: 0.1)),
           ),
           child: Row(
             children: [
@@ -243,7 +241,7 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
           child: Row(
             children: [
               CircleAvatar(
-                backgroundColor: theme.primaryColor.withOpacity(0.1),
+                backgroundColor: theme.primaryColor.withValues(alpha: 0.1),
                 child: Text(widget.recipient[0], style: TextStyle(color: theme.primaryColor)),
               ),
               const SizedBox(width: 16),
@@ -267,7 +265,7 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
       width: double.infinity,
       height: 60,
       decoration: BoxDecoration(
-        color: const Color(0xFFEF9F27).withOpacity(0.1),
+        color: const Color(0xFFEF9F27).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(30),
       ),
       child: Stack(

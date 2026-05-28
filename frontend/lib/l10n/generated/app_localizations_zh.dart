@@ -75,7 +75,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get version => '版本';
 
   @override
-  String get verifyIdentity => 'Verify Identity';
+  String get verifyIdentity => '验证身份';
 
   @override
   String get paymentStatus => '支付状态';
@@ -313,7 +313,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get topUpFeePaysif => 'Paycif Service Fee';
+  String get topUpFeePaysif => 'Paycif 服务费';
 
   @override
   String get topUpFeeFree => '免费';
@@ -923,35 +923,32 @@ class AppLocalizationsZh extends AppLocalizations {
   String get privacyContactContent => '如果您对我们的隐私做法有疑问或希望行使您的数据权利，请联系我们的数据保护官：';
 
   @override
-  String get notificationSettingsTitle => 'Notification Settings';
+  String get notificationSettingsTitle => '通知设置';
 
   @override
-  String get notificationSecurityAlwaysOn => 'Security (Always On)';
+  String get notificationSecurityAlwaysOn => '安全（始终开启）';
 
   @override
-  String get notificationAccountSecurity => 'Account Security';
+  String get notificationAccountSecurity => '账户安全';
 
   @override
-  String get notificationAccountSecurityDesc =>
-      'Login alerts, device changes, and password updates.';
+  String get notificationAccountSecurityDesc => '登录提醒、设备变更和密码更新。';
 
   @override
-  String get notificationWalletActivity => 'Wallet Activity';
+  String get notificationWalletActivity => '钱包动态';
 
   @override
-  String get notificationTransactionAlerts => 'Transaction Alerts';
+  String get notificationTransactionAlerts => '交易提醒';
 
   @override
-  String get notificationTransactionAlertsDesc =>
-      'Sent, received, and top-up notifications.';
+  String get notificationTransactionAlertsDesc => '发送、接收和充值通知。';
 
   @override
-  String get notificationUpdates => 'Updates';
+  String get notificationUpdates => '更新';
 
   @override
-  String get notificationNewsPromotions => 'News & Promotions';
+  String get notificationNewsPromotions => '新闻与推广';
 
   @override
-  String get notificationNewsPromotionsDesc =>
-      'Exclusive offers and feature updates.';
+  String get notificationNewsPromotionsDesc => '独家优惠和功能更新。';
 }

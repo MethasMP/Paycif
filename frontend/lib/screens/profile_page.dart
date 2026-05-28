@@ -791,7 +791,6 @@ class _ProfilePageState extends State<ProfilePage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: isDark
@@ -806,7 +805,11 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ],
       ),
-      child: Column(
+      child: Material(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(20),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
         children: children.asMap().entries.map((entry) {
           final index = entry.key;
           final widget = entry.value;
@@ -824,6 +827,7 @@ class _ProfilePageState extends State<ProfilePage> {
             ],
           );
         }).toList(),
+      ),
       ),
     );
   }

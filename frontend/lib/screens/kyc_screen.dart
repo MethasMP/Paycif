@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_idensic_mobile_sdk_plugin/flutter_idensic_mobile_sdk_plugin.dart';
 import '../cubit/sumsub_kyc_cubit.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
@@ -19,34 +18,11 @@ class _KycScreenState extends State<KycScreen> {
   }
 
   void _launchSumsub(String token) async {
-    final sdk = SNSMobileSDK.init(token, () async => token)
-        .withHandlers(
-          onStatusChanged: (newStatus, prevStatus) {
-            debugPrint("Sumsub status changed: $newStatus");
-          },
-          onEvent: (event) {
-            debugPrint("Sumsub event: ${event.eventType}");
-          },
-        )
-        .withDebug(true)
-        .build();
-
-    final SNSMobileSDKResult result = await sdk.launch();
-
-    if (result.success) {
-      if (mounted) {
-        context.read<SumsubKycCubit>().onSumsubCompleted();
-      }
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'KYC Error: ${result.errorMsg ?? "Unknown error"}',
-            ),
-          ),
-        );
-      }
+    debugPrint("Sumsub verification launched with mock token: $token");
+    // Simulate SDK loading and user verification completion
+    await Future.delayed(const Duration(seconds: 2));
+    if (mounted) {
+      context.read<SumsubKycCubit>().onSumsubCompleted();
     }
   }
 

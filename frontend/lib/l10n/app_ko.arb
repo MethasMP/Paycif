@@ -399,5 +399,17 @@
   "privacySection5Title": "귀하의 권리",
   "privacySection5Content": "개인 데이터에 대한 접근, 수정 또는 삭제를 요청할 권리가 있습니다. 마케팅 커뮤니케이션을 거부할 수 있습니다.",
   "privacyContactTitle": "개인정보 문의",
-  "privacyContactContent": "개인정보 보호 관행에 대한 질문이나 데이터 권리 행사를 원하시면 데이터 보호 담당자에게 연락하세요:"
+  "privacyContactContent": "개인정보 보호 관행에 대한 질문이나 데이터 권리 행사를 원하시면 데이터 보호 담당자에게 연락하세요:",
+  "verifyIdentity": "본인 확인",
+  "topUpFeePaysif": "Paycif 서비스 수수료",
+  "notificationSettingsTitle": "알림 설정",
+  "notificationSecurityAlwaysOn": "보안 (항상 켜짐)",
+  "notificationAccountSecurity": "계정 보안",
+  "notificationAccountSecurityDesc": "로그인 알림, 기기 변경 및 비밀번호 업데이트.",
+  "notificationWalletActivity": "지갑 활동",
+  "notificationTransactionAlerts": "거래 알림",
+  "notificationTransactionAlertsDesc": "송금, 수신 및 충전 알림.",
+  "notificationUpdates": "업데이트",
+  "notificationNewsPromotions": "뉴스 및 프로모션",
+  "notificationNewsPromotionsDesc": "독점 혜택 및 기능 업데이트."
 }

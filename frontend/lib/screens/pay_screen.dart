@@ -2,12 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:frontend/features/security/presentation/widgets/pin_entry_widget.dart';
-import '../controllers/dashboard_controller.dart';
 import '../cubit/payment_cubit.dart';
 import '../cubit/payment_state.dart';
 import '../services/api_service.dart';
-import '../utils/error_translator.dart';
-import 'package:frontend/l10n/generated/app_localizations.dart';
 import 'payment_success_screen.dart';
 import '../features/security/domain/repositories/security_repository.dart';
 
@@ -15,12 +12,18 @@ class PayScreen extends StatefulWidget {
   final double amount;
   final String merchantName;
   final String? promptPayId;
+  final String? billerId;
+  final String? reference1;
+  final String? reference2;
 
   const PayScreen({
     super.key,
     required this.amount,
     required this.merchantName,
     this.promptPayId,
+    this.billerId,
+    this.reference1,
+    this.reference2,
   });
 
   @override
@@ -38,7 +41,9 @@ class _PayScreenState extends State<PayScreen> {
   }
 
   void _prewarmBiometric() {
-    _auth.canCheckBiometrics.then((ready) => _biometricReady = ready).catchError((_) {});
+    _auth.canCheckBiometrics.then((ready) => _biometricReady = ready).catchError((_) {
+      return false;
+    });
   }
 
   Future<void> _authenticateAndPay(PaymentCubit cubit) async {
@@ -47,7 +52,7 @@ class _PayScreenState extends State<PayScreen> {
       try {
         authenticated = await _auth.authenticate(
           localizedReason: 'Confirm payment of ฿${widget.amount.toStringAsFixed(2)}',
-          options: const AuthenticationOptions(biometricOnly: true),
+          biometricOnly: true,
         );
       } catch (_) {}
     }
@@ -167,14 +172,14 @@ class _PayScreenState extends State<PayScreen> {
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: theme.primaryColor.withOpacity(0.1)),
+        border: Border.all(color: theme.primaryColor.withValues(alpha: 0.1)),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFEF9F27).withOpacity(0.1),
+              color: const Color(0xFFEF9F27).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(Icons.credit_card, color: Color(0xFFEF9F27)),

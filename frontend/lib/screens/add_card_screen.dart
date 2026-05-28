@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
 
-import '../services/api_service.dart';
 import '../utils/pay_notify.dart';
 import '../utils/payment_utils.dart';
 import '../utils/error_translator.dart';
@@ -16,8 +15,6 @@ class AddCardScreen extends StatefulWidget {
 
 class _AddCardScreenState extends State<AddCardScreen> {
   final _formKey = GlobalKey<FormState>();
-
-  final _apiService = ApiService();
 
   String cardNumber = '';
   String expiryDate = '';
@@ -217,28 +214,12 @@ class _AddCardScreenState extends State<AddCardScreen> {
                       ? null
                       : () async {
                           if (_formKey.currentState!.validate()) {
-                            // 0. Capture necessary values BEFORE async gaps
-                            final navigator = Navigator.of(context);
-                            final localL10n = l10n;
-
                             setState(() {
                               _isLoading = true;
                               _loadingMessage = 'Securing card data...';
                             });
                             try {
-                              final parts = expiryDate.split('/');
-                              final month = parts[0];
-                              final year = '20${parts[1]}';
-
                               throw Exception('Card binding is temporarily disabled. Moving to Coinflow.');
-
-                              if (!mounted || !context.mounted) return;
-
-                              PayNotify.success(
-                                context,
-                                localL10n.cardAddedSuccess,
-                              );
-                              navigator.pop(true); // Sign success
                             } catch (e) {
                               if (!mounted || !context.mounted) return;
                               setState(() {

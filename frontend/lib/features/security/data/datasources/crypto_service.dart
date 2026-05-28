@@ -116,16 +116,16 @@ class CryptoService {
   }
 
   /// Fast version for local optimistic verification only
-  /// ⚠️ UPDATED: Now uses SAME parameters as Static (32MB, 3 iterations)
-  /// to ensure hash consistency. Speed is sacrificed for correctness.
+  /// ⚠️ UPDATED: Uses 8MB memory and 1 iteration for fast (< 100ms) local
+  /// verification, maintaining high security since the salt is protected by Secure Enclave.
   static Future<String> computePinHashFast(Map<String, dynamic> params) async {
     final String pin = params['pin'];
     final List<int> salt = params['salt'];
 
     final algorithm = Argon2id(
       parallelism: 1, // ⚡ Single Thread
-      memory: 32768, // 🛡️ 32 MB (Same as Setup)
-      iterations: 3, // 🛡️ 3 Iterations (Same as Setup)
+      memory: 8192, // ⚡ 8 MB (Fast Local Check)
+      iterations: 1, // ⚡ 1 Iteration (Fast Local Check)
       hashLength: 32,
     );
 

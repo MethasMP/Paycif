@@ -75,7 +75,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get version => '버전';
 
   @override
-  String get verifyIdentity => 'Verify Identity';
+  String get verifyIdentity => '본인 확인';
 
   @override
   String get paymentStatus => '결제 상태';
@@ -313,7 +313,7 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String get topUpFeePaysif => 'Paycif Service Fee';
+  String get topUpFeePaysif => 'Paycif 서비스 수수료';
 
   @override
   String get topUpFeeFree => '무료';
@@ -935,35 +935,32 @@ class AppLocalizationsKo extends AppLocalizations {
       '개인정보 보호 관행에 대한 질문이나 데이터 권리 행사를 원하시면 데이터 보호 담당자에게 연락하세요:';
 
   @override
-  String get notificationSettingsTitle => 'Notification Settings';
+  String get notificationSettingsTitle => '알림 설정';
 
   @override
-  String get notificationSecurityAlwaysOn => 'Security (Always On)';
+  String get notificationSecurityAlwaysOn => '보안 (항상 켜짐)';
 
   @override
-  String get notificationAccountSecurity => 'Account Security';
+  String get notificationAccountSecurity => '계정 보안';
 
   @override
-  String get notificationAccountSecurityDesc =>
-      'Login alerts, device changes, and password updates.';
+  String get notificationAccountSecurityDesc => '로그인 알림, 기기 변경 및 비밀번호 업데이트.';
 
   @override
-  String get notificationWalletActivity => 'Wallet Activity';
+  String get notificationWalletActivity => '지갑 활동';
 
   @override
-  String get notificationTransactionAlerts => 'Transaction Alerts';
+  String get notificationTransactionAlerts => '거래 알림';
 
   @override
-  String get notificationTransactionAlertsDesc =>
-      'Sent, received, and top-up notifications.';
+  String get notificationTransactionAlertsDesc => '송금, 수신 및 충전 알림.';
 
   @override
-  String get notificationUpdates => 'Updates';
+  String get notificationUpdates => '업데이트';
 
   @override
-  String get notificationNewsPromotions => 'News & Promotions';
+  String get notificationNewsPromotions => '뉴스 및 프로모션';
 
   @override
-  String get notificationNewsPromotionsDesc =>
-      'Exclusive offers and feature updates.';
+  String get notificationNewsPromotionsDesc => '독점 혜택 및 기능 업데이트.';
 }

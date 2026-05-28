@@ -500,7 +500,7 @@ class ApiService {
     final response = await _safeRequest(
       (headersMap) => http.post(
         Uri.parse('$baseUrl/transfer'),
-        headers: {...headersMap, if (headers != null) ...headers},
+        headers: {...headersMap, ...?headers},
         body: body,
       ),
     );
@@ -536,7 +536,7 @@ class ApiService {
     final response = await _safeRequest(
       (headersMap) => http.post(
         Uri.parse('$baseUrl/payout/promptpay'),
-        headers: {...headersMap, if (headers != null) ...headers},
+        headers: {...headersMap, ...?headers},
         body: body,
       ),
     );
@@ -675,7 +675,7 @@ class ApiService {
       final queryParams = {
         'amount': amount.toString(),
         'currency': currency,
-        if (merchantId != null) 'merchant_id': merchantId,
+        'merchant_id': merchantId,
       };
 
       final uri = Uri.parse(
@@ -798,8 +798,8 @@ class ApiService {
         // Wallet amount: If specified, use it; otherwise backend calculates from Omise net
         if (walletAmountSatang != null)
           'wallet_amount_satang': walletAmountSatang.toInt(),
-        if (token != null) 'token': token,
-        if (cardId != null) 'card_id': cardId,
+        'token': token,
+        'card_id': cardId,
         if (isApplePay) 'is_apple_pay': true,
         'reference_id': referenceId,
         'description': description ?? 'Wallet Top Up',

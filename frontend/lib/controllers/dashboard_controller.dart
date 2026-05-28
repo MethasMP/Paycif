@@ -1,8 +1,6 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../models/wallet_model.dart';
 import '../repositories/dashboard_repository.dart';
 import '../models/transaction.dart';
 import '../services/connectivity_service.dart';
@@ -26,6 +24,8 @@ class DashboardState {
     this.kycTier = 'tier0',
     this.walletId,
   });
+
+  bool get isDataWarmed => status == 'success';
 
   DashboardState copyWith({
     String? status,

@@ -2,12 +2,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
 import '../models/wallet_model.dart';
 import '../models/transaction.dart';
-import '../services/api_service.dart';
 import 'dart:async';
 
 class DashboardRepository {
   final SupabaseClient _client;
-  final ApiService _api = ApiService();
 
   DashboardRepository(this._client);
 

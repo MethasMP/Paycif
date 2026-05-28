@@ -45,8 +45,8 @@ class SecurityRepositoryImpl implements SecurityRepository {
   Future<void> _updateLocalPinHash(String pin) async {
     try {
       final salt = _cryptoService.generateSalt();
-      // ⚡ Move to Isolate for UI smoothness
-      final hash = await compute(CryptoService.computePinHashStatic, {
+      // ⚡ Move to Isolate for UI smoothness. Uses Fast Hash for local storage.
+      final hash = await compute(CryptoService.computePinHashFast, {
         'pin': pin,
         'salt': salt,
       });
@@ -302,10 +302,16 @@ class SecurityRepositoryImpl implements SecurityRepository {
   @override
   Future<bool> isDeviceBound() async {
     final deviceId = await _secureStorage.read(_kDeviceIdKey);
-    final privateKey = await _secureStorage.read(_kPrivateKeySeedKey);
-
-    if (deviceId == null || privateKey == null) {
+    if (deviceId == null) {
       return false;
+    }
+
+    final isHardware = await _secureStorage.read(_kIsHardwareKey) == 'true';
+    if (!isHardware) {
+      final privateKey = await _secureStorage.read(_kPrivateKeySeedKey);
+      if (privateKey == null) {
+        return false;
+      }
     }
 
     try {

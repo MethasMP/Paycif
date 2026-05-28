@@ -11,7 +11,7 @@ import 'main_screen.dart';
 import 'package:provider/provider.dart';
 import '../features/security/presentation/logic/security_controller.dart';
 import '../features/security/presentation/pages/security_unlock_screen.dart';
-
+import '../features/security/presentation/pages/pin_setup_screen.dart';
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -29,65 +29,72 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _initializeApp() async {
     final startTime = DateTime.now();
 
-    // 1. Check Auth Session (Enhanced with Auto-Recovery)
-    final session = Supabase.instance.client.auth.currentSession;
+    try {
+      // 1. Check Auth Session (Enhanced with Auto-Recovery)
+      final session = Supabase.instance.client.auth.currentSession;
 
-    if (session == null) {
-      await _delayedNavigateToLogin();
-      return;
-    }
-
-    // 🛡️ Proactive Check: Is the cached session actually valid?
-    final isExpired = JwtDecoder.isExpired(session.accessToken);
-    if (isExpired) {
-      debugPrint("⚠️ Session expired on startup. Attempting recovery...");
-      try {
-        final refreshResponse = await Supabase.instance.client.auth
-            .refreshSession();
-        if (refreshResponse.session == null) {
-          throw Exception("Refresh failed");
-        }
-        debugPrint("✅ Session recovered successfully.");
-      } catch (e) {
-        debugPrint("❌ Recovery failed. Redirecting to login.");
-        await Supabase.instance.client.auth.signOut();
+      if (session == null) {
         await _delayedNavigateToLogin();
         return;
       }
-    }
 
-    // 2. User is Logged In -> Wait for "Dark Warming" (Data Readiness)
-    // We listen to the Bloc and proceed once warmed.
-    if (!mounted) return;
-    final dashboardController = context.read<DashboardController>();
+      // 🛡️ Proactive Check: Is the cached session actually valid?
+      final isExpired = JwtDecoder.isExpired(session.accessToken);
+      if (isExpired) {
+        debugPrint("⚠️ Session expired on startup. Attempting recovery...");
+        try {
+          final refreshResponse = await Supabase.instance.client.auth
+              .refreshSession();
+          if (refreshResponse.session == null) {
+            throw Exception("Refresh failed");
+          }
+          debugPrint("✅ Session recovered successfully.");
+        } catch (e) {
+          debugPrint("❌ Recovery failed. Redirecting to login.");
+          await Supabase.instance.client.auth.signOut();
+          await _delayedNavigateToLogin();
+          return;
+        }
+      }
 
-    // Start a timer for safety (Max 5s wait)
-    var isWarmed = dashboardController.state.isDataWarmed;
-    final timeout = DateTime.now().add(const Duration(seconds: 5));
-
-    while (!isWarmed && DateTime.now().isBefore(timeout)) {
-      await Future.delayed(const Duration(milliseconds: 100));
+      // 2. User is Logged In -> Wait for "Dark Warming" (Data Readiness)
+      // We listen to the Bloc and proceed once warmed.
       if (!mounted) return;
-      isWarmed = dashboardController.state.isDataWarmed;
-    }
+      final dashboardController = context.read<DashboardController>();
 
-    // 3. Ensure minimum branding time (at least 1.5s total)
-    final elapsed = DateTime.now().difference(startTime);
-    if (elapsed < const Duration(milliseconds: 1500)) {
-      await Future.delayed(const Duration(milliseconds: 1500) - elapsed);
-    }
+      // Start a timer for safety (Max 5s wait)
+      var isWarmed = dashboardController.state.isDataWarmed;
+      final timeout = DateTime.now().add(const Duration(seconds: 5));
 
-    // 🛡️ World-Class Security: Mandatory Pin/Biometric Check
-    if (!mounted) return;
-    final securityController = context.read<SecurityController>();
-    final hasPin = await securityController.hasPin();
+      while (!isWarmed && DateTime.now().isBefore(timeout)) {
+        await Future.delayed(const Duration(milliseconds: 100));
+        if (!mounted) return;
+        isWarmed = dashboardController.state.isDataWarmed;
+      }
 
-    if (hasPin) {
-      debugPrint("🚨 [Security] PIN detected. Challenging user identity...");
-      _navigateTo(const SecurityUnlockScreen());
-    } else {
-      debugPrint("🔓 [Security] No PIN set. Proceeding to MainScreen.");
-      _navigateTo(const MainScreen());
+      // 3. Ensure minimum branding time (at least 1.5s total)
+      final elapsed = DateTime.now().difference(startTime);
+      if (elapsed < const Duration(milliseconds: 1500)) {
+        await Future.delayed(const Duration(milliseconds: 1500) - elapsed);
+      }
+
+      // 🛡️ World-Class Security: Mandatory Pin/Biometric Check
+      if (!mounted) return;
+      final securityController = context.read<SecurityController>();
+      final hasPin = await securityController.hasPin();
+
+      if (hasPin) {
+        debugPrint("🚨 [Security] PIN detected. Challenging user identity...");
+        _navigateTo(const SecurityUnlockScreen());
+      } else {
+        debugPrint("🔓 [Security] No PIN set. Enforcing PIN setup...");
+        _navigateTo(const PinSetupScreen());
+      }
+    } catch (e) {
+      debugPrint("❌ Fatal error during startup: $e");
+      // Fallback: Clear session and force user to login to recover state
+      await Supabase.instance.client.auth.signOut();
+      await _delayedNavigateToLogin();
     }
   }
 

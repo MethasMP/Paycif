@@ -1,4 +1,6 @@
-import 'package:flutter/foundation.dart';
+import 'dart:io' show Platform;
+import 'package:flutter/material.dart';
+
 import 'package:local_auth/local_auth.dart';
 import '../../domain/repositories/security_repository.dart';
 
@@ -10,12 +12,16 @@ class BiometricProfile {
   final double
   identityConfidence; // 0.0 to 1.0 (How sure are we this is the owner?)
   final String contextualGuidance; // Intelligent message for User Experience
+  final String bioName;
+  final IconData bioIcon;
 
   const BiometricProfile({
     required this.availableTypes,
     this.primaryType,
     this.identityConfidence = 0.0,
     this.contextualGuidance = "Detecting Identity...",
+    this.bioName = "Biometrics",
+    this.bioIcon = Icons.fingerprint_rounded,
   });
 
   factory BiometricProfile.analyze(
@@ -24,21 +30,36 @@ class BiometricProfile {
   }) {
     BiometricType? primary;
     String guidance = "Locked"; // Default guidance if no primary type found
+    String name = "Biometrics";
+    IconData icon = Icons.fingerprint_rounded;
 
     // Priority Logic (The "Standard")
     if (types.contains(BiometricType.face)) {
       primary = BiometricType.face;
       guidance = "Looking for you...";
+      name = Platform.isIOS ? "Face ID" : "Face Unlock";
+      icon = Icons.face_unlock_rounded;
     } else if (types.contains(BiometricType.iris)) {
       primary = BiometricType.iris;
       guidance = "Scan your iris";
+      name = "Iris Scan";
+      icon = Icons.remove_red_eye_rounded;
     } else if (types.contains(BiometricType.fingerprint)) {
       primary = BiometricType.fingerprint;
       guidance = "Touch to Verify";
+      name = Platform.isIOS ? "Touch ID" : "Fingerprint";
+      icon = Icons.fingerprint_rounded;
+    } else if (types.contains(BiometricType.strong) || types.contains(BiometricType.weak)) {
+      primary = types.contains(BiometricType.strong) ? BiometricType.strong : BiometricType.weak;
+      guidance = "Verify your identity";
+      name = "Biometrics";
+      icon = Icons.fingerprint_rounded;
     } else if (types.isNotEmpty) {
-      // Fallback for future types (e.g. weak biometrics)
+      // Fallback for future types
       primary = types.first;
       guidance = "Verify your identity";
+      name = "Biometrics";
+      icon = Icons.fingerprint_rounded;
     }
 
     return BiometricProfile(
@@ -46,6 +67,8 @@ class BiometricProfile {
       primaryType: primary,
       identityConfidence: confidence,
       contextualGuidance: guidance,
+      bioName: name,
+      bioIcon: icon,
     );
   }
 
@@ -125,6 +148,16 @@ class SecurityController extends ChangeNotifier {
         ),
       );
     }
+  }
+
+  /// Records successful verification (e.g. from Biometrics)
+  void recordBiometricVerificationSuccess() {
+    _setState(
+      _state.copyWith(
+        status: SecurityStatus.success,
+        lastVerifiedAt: DateTime.now(), // 🛡️ Anchor the time
+      ),
+    );
   }
 
   /// Verifies the PIN. Handles Server-Side Lockout responses (423).

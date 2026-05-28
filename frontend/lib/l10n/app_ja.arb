@@ -398,5 +398,17 @@
   "privacySection5Title": "お客様の権利",
   "privacySection5Content": "個人データのアクセス、訂正、削除を要求する権利があります。マーケティング通知のオプトアウトも可能です。",
   "privacyContactTitle": "プライバシーに関するお問い合わせ",
-  "privacyContactContent": "プライバシーに関するご質問やデータ権利の行使については、データ保護責任者までご連絡ください："
+  "privacyContactContent": "プライバシーに関するご質問やデータ権利の行使については、データ保護責任者までご連絡ください：",
+  "verifyIdentity": "本人確認",
+  "topUpFeePaysif": "Paycifサービス手数料",
+  "notificationSettingsTitle": "通知設定",
+  "notificationSecurityAlwaysOn": "セキュリティ（常にオン）",
+  "notificationAccountSecurity": "アカウントセキュリティ",
+  "notificationAccountSecurityDesc": "ログインアラート、デバイス変更、パスワード更新。",
+  "notificationWalletActivity": "ウォレット活動",
+  "notificationTransactionAlerts": "取引アラート",
+  "notificationTransactionAlertsDesc": "送金、受取、およびチャージ通知。",
+  "notificationUpdates": "アップデート",
+  "notificationNewsPromotions": "ニュース＆プロモーション",
+  "notificationNewsPromotionsDesc": "限定オファーと機能アップデート。"
 }

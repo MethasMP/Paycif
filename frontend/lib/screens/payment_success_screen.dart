@@ -1,9 +1,5 @@
 import 'package:flutter/material.dart';
-import 'dart:typed_data';
-import 'dart:ui' as ui;
-import 'package:flutter/rendering.dart';
 import 'package:intl/intl.dart';
-import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 import 'package:provider/provider.dart';
 import '../controllers/dashboard_controller.dart';
 
@@ -101,7 +97,7 @@ class PaymentSuccessScreen extends StatelessWidget {
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF10B981).withOpacity(0.3),
+            color: const Color(0xFF10B981).withValues(alpha: 0.3),
             blurRadius: 24,
             offset: const Offset(0, 12),
           ),
@@ -119,7 +115,7 @@ class PaymentSuccessScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: theme.primaryColor.withOpacity(0.1)),
+        border: Border.all(color: theme.primaryColor.withValues(alpha: 0.1)),
       ),
       child: Column(
         children: [
@@ -151,7 +147,7 @@ class PaymentSuccessScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
-                color: const Color(0xFF10B981).withOpacity(0.1),
+                color: const Color(0xFF10B981).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: const Text(

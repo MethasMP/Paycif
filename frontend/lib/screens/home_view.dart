@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
-import 'package:intl/intl.dart';
 
 import '../controllers/dashboard_controller.dart';
 import '../models/transaction.dart';
@@ -117,7 +115,7 @@ class _HomeViewState extends State<HomeView> {
         ),
         boxShadow: [
           BoxShadow(
-            color: theme.primaryColor.withOpacity(0.3),
+            color: theme.primaryColor.withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -131,7 +129,7 @@ class _HomeViewState extends State<HomeView> {
             child: Icon(
               Icons.payments_outlined,
               size: 150,
-              color: Colors.white.withOpacity(0.05),
+              color: Colors.white.withValues(alpha: 0.05),
             ),
           ),
           Padding(
@@ -166,7 +164,7 @@ class _HomeViewState extends State<HomeView> {
                 Text(
                   "Scan QR to pay instantly from your linked card",
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: Colors.white.withOpacity(0.7),
+                    color: Colors.white.withValues(alpha: 0.7),
                   ),
                 ),
               ],
@@ -226,7 +224,7 @@ class _HomeViewState extends State<HomeView> {
             decoration: BoxDecoration(
               color: theme.cardColor,
               shape: BoxShape.circle,
-              border: Border.all(color: theme.primaryColor.withOpacity(0.1)),
+              border: Border.all(color: theme.primaryColor.withValues(alpha: 0.1)),
             ),
             child: Icon(icon, color: theme.primaryColor),
           ),

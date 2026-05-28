@@ -28,6 +28,17 @@ void main() {
     mockCryptoService = MockCryptoService();
     mockSecureStorage = MockSecureStorageService();
 
+    // Stub secure storage default behaviours
+    when(() => mockSecureStorage.read(any())).thenAnswer((_) async => null);
+    when(() => mockSecureStorage.write(any(), any())).thenAnswer((_) async {});
+    when(() => mockSecureStorage.delete(any())).thenAnswer((_) async {});
+
+    // Stub crypto service hardware enclave behaviours
+    when(() => mockCryptoService.createHardwareIdentity())
+        .thenAnswer((_) async => 'mock_hardware_pub_key_base64');
+    when(() => mockCryptoService.signWithHardware(payload: any(named: 'payload')))
+        .thenAnswer((_) async => 'mock_hardware_signature');
+
     repository = SecurityRepositoryImpl(
       remoteDataSource: mockRemoteDataSource,
       cryptoService: mockCryptoService,
@@ -53,6 +64,9 @@ void main() {
         // 3. Crypto Setup
         final algorithm = Ed25519();
         final keyPair = await algorithm.newKeyPair();
+        when(
+          () => mockCryptoService.createHardwareIdentity(),
+        ).thenAnswer((_) async => 'mock_pub_key_base64');
         when(
           () => mockCryptoService.generateKeyPair(),
         ).thenAnswer((_) async => keyPair);
@@ -85,10 +99,10 @@ void main() {
           () => mockSecureStorage.write('device_binding_id', any()),
         ).called(1);
 
-        // 2. Should have generated keypair and stored private key
-        verify(() => mockCryptoService.generateKeyPair()).called(1);
+        // 2. Should have generated hardware identity and marked as hardware backed
+        verify(() => mockCryptoService.createHardwareIdentity()).called(1);
         verify(
-          () => mockSecureStorage.write('device_private_key_seed', any()),
+          () => mockSecureStorage.write('is_hardware_backed', 'true'),
         ).called(1);
 
         // 3. Should have called backend
@@ -117,6 +131,9 @@ void main() {
       final algorithm = Ed25519();
       final keyPair = await algorithm.newKeyPair();
       when(
+        () => mockCryptoService.createHardwareIdentity(),
+      ).thenAnswer((_) async => 'mock_pub_key_base64');
+      when(
         () => mockCryptoService.generateKeyPair(),
       ).thenAnswer((_) async => keyPair);
       when(
@@ -124,7 +141,7 @@ void main() {
       ).thenAnswer((_) async => []);
       when(
         () => mockCryptoService.getPublicKeyBase64(keyPair),
-      ).thenAnswer((_) async => 'pk');
+      ).thenAnswer((_) async => 'mock_pub_key_base64');
 
       when(
         () => mockRemoteDataSource.bindDevice(
@@ -144,9 +161,9 @@ void main() {
       verify(() => mockSecureStorage.read('device_binding_id')).called(1);
       // Should NOT have written a new device id
       verifyNever(() => mockSecureStorage.write('device_binding_id', any()));
-      // But should have written private key
+      // But should have marked as hardware backed
       verify(
-        () => mockSecureStorage.write('device_private_key_seed', any()),
+        () => mockSecureStorage.write('is_hardware_backed', 'true'),
       ).called(1);
     });
 

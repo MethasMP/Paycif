@@ -113,10 +113,11 @@ void main() {
       );
 
       await pumpWidget(tester);
+      await tester.pumpAndSettle();
 
       expect(find.text('Security Lockout'), findsOneWidget);
       expect(find.text('Try again in 5m'), findsOneWidget);
-      expect(find.byIcon(Icons.lock), findsOneWidget);
+      expect(find.byIcon(Icons.lock_clock_rounded), findsOneWidget);
     });
   });
 }

@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
 class KineticGuide extends StatefulWidget {
   final Function(bool isLive, double confidence) onLivenessCapture;
@@ -15,7 +14,6 @@ class KineticGuide extends StatefulWidget {
 
 class _KineticGuideState extends State<KineticGuide> {
   CameraController? _cameraController;
-  late FaceDetector _faceDetector;
   bool _isBusy = false;
 
   // Real-time Rotation Values (from MLKit)
@@ -27,14 +25,6 @@ class _KineticGuideState extends State<KineticGuide> {
   void initState() {
     super.initState();
     _initializeCamera();
-    _faceDetector = FaceDetector(
-      options: FaceDetectorOptions(
-        enableLandmarks: false,
-        enableClassification: false,
-        enableTracking: true,
-        performanceMode: FaceDetectorMode.fast,
-      ),
-    );
   }
 
   Future<void> _initializeCamera() async {
@@ -85,7 +75,6 @@ class _KineticGuideState extends State<KineticGuide> {
   @override
   void dispose() {
     _cameraController?.dispose();
-    _faceDetector.close();
     super.dispose();
   }
 

@@ -133,8 +133,7 @@ class AppTheme {
         fillColor: surfaceColor,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: accentGold, width: 2)),
-        hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+        hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
       ),
     );
   }

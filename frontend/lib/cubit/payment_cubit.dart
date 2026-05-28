@@ -19,26 +19,10 @@ class PaymentCubit extends Cubit<PaymentState> {
   Future<void> initialize(double amount, {String? recipientName}) async {
     emit(PaymentLoading());
     try {
-      // 1. Fetch Wallet Balance (THB) with retry for race conditions
-      Map<String, dynamic>? balanceData;
-      int retries = 0;
-      const maxRetries = 3;
+      // 1. Fetch Wallet Balance (THB) (built-in backoff retries in ApiService)
+      final balanceData = await _apiService.getBalance('THB');
 
-      while (retries < maxRetries) {
-        try {
-          balanceData = await _apiService.getBalance('THB');
-          // If we got a valid response, break out of retry loop
-          if (balanceData['balance'] != null) break;
-        } catch (_) {
-          // Connection error, retry
-        }
-        retries++;
-        if (retries < maxRetries) {
-          await Future.delayed(Duration(milliseconds: 500 * retries));
-        }
-      }
-
-      final int balanceMinor = balanceData?['balance'] ?? 0;
+      final int balanceMinor = balanceData['balance'] ?? 0;
       final double balanceMajor = balanceMinor / 100.0;
 
       // 2. Check if sufficient funds

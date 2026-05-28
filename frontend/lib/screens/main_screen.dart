@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'login_screen.dart' as import_login;
 import '../services/api_service.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
 
 import 'home_view.dart';
 import 'payment_settings_screen.dart';
@@ -24,12 +25,13 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   final ApiService _apiService = ApiService();
+  late final StreamSubscription<AuthState> _authSubscription;
 
   @override
   void initState() {
     super.initState();
     _prewarmCache();
-    Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
       if (data.event == AuthChangeEvent.signedOut) {
         if (mounted) {
           Navigator.of(context).pushAndRemoveUntil(
@@ -41,11 +43,18 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
+  @override
+  void dispose() {
+    _authSubscription.cancel();
+    super.dispose();
+  }
+
   Future<void> _prewarmCache() async {
     final session = Supabase.instance.client.auth.currentSession;
     if (session == null) return;
     try {
-      context.read<SecurityController>().ensureDeviceBinding();
+      // Removed ensureDeviceBinding() here to prevent unexpected Biometric prompts.
+      // Device binding should only happen explicitly via settings or during onboarding.
       await Future.wait([
         _apiService.getUserProfile(),
         _apiService.getSavedCards(),
@@ -87,7 +96,7 @@ class _MainScreenState extends State<MainScreen> {
           decoration: BoxDecoration(
             color: theme.cardColor,
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5)),
+              BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, -5)),
             ],
           ),
           child: BottomNavigationBar(
@@ -104,7 +113,7 @@ class _MainScreenState extends State<MainScreen> {
                       color: theme.primaryColor,
                       shape: BoxShape.circle,
                       boxShadow: [
-                        BoxShadow(color: theme.primaryColor.withOpacity(0.4), blurRadius: 10, offset: const Offset(0, 5)),
+                        BoxShadow(color: theme.primaryColor.withValues(alpha: 0.4), blurRadius: 10, offset: const Offset(0, 5)),
                       ],
                     ),
                     child: const Icon(Icons.qr_code_scanner, color: Colors.white, size: 28),

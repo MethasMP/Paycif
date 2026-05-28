@@ -10,7 +10,6 @@ import 'utils/language_notifier.dart';
 import 'theme/app_theme.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
-// import 'package:jwt_decoder/jwt_decoder.dart'; // No longer needed
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
@@ -29,7 +28,6 @@ import 'features/security/domain/repositories/security_repository.dart';
 import 'features/security/data/repositories/security_repository_impl.dart';
 import 'features/security/presentation/logic/security_controller.dart';
 import 'features/security/presentation/pages/security_unlock_screen.dart';
-// import 'screens/main_screen.dart'; // No longer used in main.dart nav directly
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
