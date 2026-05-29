@@ -1,0 +1,3 @@
+## 2025-05-22 - [Optimizing Transaction Hot Paths]
+**Learning:** In high-concurrency financial systems using SERIALIZABLE isolation, every database round-trip inside a transaction increases the risk of serialization conflicts and latency. Redundant "integrity checks" that query what was just written add cost without providing new information that wasn't already available in the application state.
+**Action:** Remove post-insert aggregate checks within transactions if the logic is already unit-tested and guaranteed by the code. Use composite indexes on `(owner_id, created_at DESC)` to satisfy both history retrieval and time-windowed limit checks without joining to the transaction table.
