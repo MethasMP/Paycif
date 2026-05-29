@@ -36,5 +36,6 @@ GRANT USAGE ON SCHEMA realtime TO authenticated, anon;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO authenticated, anon;
 
 -- 6. Table-level Realtime Flags
-ALTER TABLE public.wallets SET (realtime = true);
-ALTER TABLE public.transactions SET (realtime = true);
+-- Note: 'SET (realtime = true)' is specific to some Supabase versions/environments.
+-- Realtime is already managed via the 'supabase_realtime' publication in step 3.
+-- Removing these to ensure CI compatibility with standard Postgres/Supabase CLI.
