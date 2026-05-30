@@ -1,9 +1,7 @@
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:frontend/utils/pay_notify.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'login_screen.dart'; // For redirection after logout
 import 'help_center_screen.dart';
@@ -23,7 +21,6 @@ import '../features/security/presentation/pages/linked_devices_screen.dart';
 import 'package:provider/provider.dart';
 import 'notification_settings_screen.dart';
 import 'nfc_scan_screen.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -278,16 +275,8 @@ class _ProfilePageState extends State<ProfilePage> {
     // Fallback if l10n is null (e.g. key missing), though it shouldn't be
     if (l10n == null) return const SizedBox.shrink();
 
-    final user = _supabase.auth.currentUser;
-    final String fullName =
-        _profile?['full_name'] ??
-        user?.userMetadata?['full_name'] ??
-        l10n.profileGuestUser;
-    final String? avatarUrl =
-        _profile?['avatar_url'] ?? user?.userMetadata?['avatar_url'];
     final String kycStatus = _profile?['kyc_status'] ?? 'pending';
     final bool isVerified = kycStatus == 'verified';
-    final String walletId = user?.id.substring(0, 8).toUpperCase() ?? 'ID-XXXX';
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -302,17 +291,7 @@ class _ProfilePageState extends State<ProfilePage> {
           children: [
             SizedBox(height: 10),
 
-            // ─── Digital Passport Card ──────────────────────────────
-            _buildDigitalPassport(
-              context,
-              fullName,
-              walletId,
-              avatarUrl,
-              isVerified,
-              l10n,
-            ),
-
-            SizedBox(height: 32),
+            // Digital Passport card removed as requested
 
             // ─── Account Settings ──────────────────────────────────
             _buildSectionHeader(context, l10n.accountSecurity),
@@ -517,266 +496,6 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildDigitalPassport(
-    BuildContext context,
-    String name,
-    String id,
-    String? avatarUrl,
-    bool isVerified,
-    AppLocalizations l10n,
-  ) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Semantics(
-      label:
-          'Digital Passport for $name, ID $id, KYC Status: ${isVerified ? 'Verified' : 'Pending'}',
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onLongPress: () {
-            PayNotify.vibrate(style: PayNotifyVibrationStyle.longSuccess);
-          },
-          borderRadius: BorderRadius.circular(24),
-          child: Container(
-            height: 220,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: isDark
-                    ? [
-                        const Color(0xFF0F172A), // Slate 900
-                        const Color(0xFF1E293B), // Slate 800
-                      ]
-                    : [
-                        const Color(0xFF1A1F71), // Navy
-                        const Color(0xFF2C3E50), // Lighter Navy
-                      ],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: (isDark ? Colors.black : const Color(0xFF1A1F71))
-                      .withValues(alpha: 0.2),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: Stack(
-              children: [
-                // Background Pattern
-                Positioned(
-                  right: -40,
-                  top: -40,
-                  child: Icon(
-                    PhosphorIcons.globe,
-                    size: 200,
-                    color: Colors.white.withValues(alpha: 0.05),
-                  ),
-                ),
-
-                Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          // Logo / Brand
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.2),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  PhosphorIcons.lightning,
-                                  color: Color(0xFFF59E0B),
-                                  size: 16,
-                                ),
-                                SizedBox(width: 4),
-                                Text(
-                                  l10n.passportLabel,
-                                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: 1.0,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: isVerified
-                                ? null
-                                : () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => const NfcScanScreen(),
-                                      ),
-                                    ),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: isVerified
-                                    ? const Color(0xFF10B981).withValues(
-                                        alpha: 0.2,
-                                      )
-                                    : Colors.orange.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: isVerified
-                                      ? const Color(0xFF10B981).withValues(
-                                          alpha: 0.3,
-                                        )
-                                      : Colors.orange.withValues(alpha: 0.3),
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    isVerified ? PhosphorIcons.sealCheck : PhosphorIcons.clock,
-                                    color: isVerified
-                                        ? const Color(0xFF10B981)
-                                        : Colors.orange,
-                                    size: 14,
-                                  ),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    isVerified
-                                        ? l10n.kycStatusVerified
-                                        : l10n.kycStatusPending,
-                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: isVerified
-                                          ? const Color(0xFF10B981)
-                                          : Colors.orange,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const Spacer(),
-
-                      // ID Info
-                      Row(
-                        children: [
-                          // Avatar with Ring
-                          Container(
-                            padding: const EdgeInsets.all(3),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: const Color(0xFFF59E0B),
-                                width: 2,
-                              ), // Gold Ring
-                            ),
-                            child: CircleAvatar(
-                              radius: 32,
-                              backgroundColor: Colors.black26,
-                              backgroundImage: avatarUrl != null
-                                  ? NetworkImage(avatarUrl)
-                                  : null,
-                              child: avatarUrl == null
-                                  ? Icon(PhosphorIcons.person, color: Colors.white)
-                                  : null,
-                            ),
-                          ),
-                          SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  name,
-                                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                SizedBox(height: 4),
-                                Text(
-                                  'ID: $id',
-                                  style: GoogleFonts.robotoMono(
-                                    textStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                      color: Colors.white.withValues(alpha: 0.7),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          // Mini QR
-                          Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: QrImageView(
-                              data: id,
-                              version: QrVersions.auto,
-                              size: 40,
-                              padding: EdgeInsets.zero,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      )
-          .animate(target: isVerified ? 1 : 0)
-          .custom(
-            duration: 2.seconds,
-            curve: Curves.easeInOut,
-            builder: (context, value, child) {
-              if (value == 0) return child;
-              return Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
-                    color: const Color(0xFFF59E0B).withValues(alpha: value * 0.5),
-                    width: 2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color:
-                          const Color(0xFFF59E0B).withValues(alpha: value * 0.2),
-                      blurRadius: 20 * value,
-                      spreadRadius: 2 * value,
-                    ),
-                  ],
-                ),
-                child: child,
-              );
-            },
-          ),
-    );
-  }
 
   Widget _buildSectionHeader(BuildContext context, String title) {
     return Text(
