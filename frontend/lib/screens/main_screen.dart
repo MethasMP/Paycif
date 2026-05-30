@@ -36,7 +36,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
   // Sizing constants for the premium navigation bar
   static const double _barHeight = 70.0;
   static const double _scanButtonSize = 72.0; // 72px circle as per design.md
-  static const double _iconSize = 26.0;
+  static const double _iconSize = 24.0;
   static const double _dotWidth = 14.0;
   static const double _scanButtonOffset = 16.0; // Overlapping overflow bottom offset
 
