@@ -36,5 +36,4 @@ GRANT USAGE ON SCHEMA realtime TO authenticated, anon;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO authenticated, anon;
 
 -- 6. Table-level Realtime Flags
-ALTER TABLE public.wallets SET (realtime = true);
-ALTER TABLE public.transactions SET (realtime = true);
+-- Note: 'realtime = true' is handled by the publication, explicit SET can fail in CI

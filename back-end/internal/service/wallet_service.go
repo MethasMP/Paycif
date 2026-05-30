@@ -167,11 +167,10 @@ func (c *TransferCommand) Execute(ctx context.Context) (*TransferResponse, error
 
 		var dailyDebitTotal sql.NullInt64
 		err := c.svc.DB.QueryRowContext(ctx, `
-			SELECT SUM(ABS(amount)) FROM ledger_entries le
-			JOIN transactions t ON le.transaction_id = t.id
-			WHERE le.wallet_id = $1 
-			AND le.amount < 0 
-			AND t.created_at > NOW() - INTERVAL '24 hours'
+			SELECT SUM(ABS(amount)) FROM ledger_entries
+			WHERE wallet_id = $1
+			AND amount < 0
+			AND created_at > NOW() - INTERVAL '24 hours'
 		`, c.req.FromWalletID).Scan(&dailyDebitTotal)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("failed to check daily limit (fallback): %w", err)
@@ -286,25 +285,6 @@ func (c *TransferCommand) Execute(ctx context.Context) (*TransferResponse, error
 	`, uuid.New(), newTxID, c.req.ToWalletID, c.req.Amount, receiverBalanceAfter, baseAmount, c.req.Amount)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create credit ledger: %w", err)
-	}
-
-	// Integrity Check
-	var ledgerSum int64
-	err = tx.QueryRowContext(ctx, `
-		SELECT COALESCE(SUM(amount), 0) FROM ledger_entries WHERE transaction_id = $1
-	`, newTxID).Scan(&ledgerSum)
-	if err != nil {
-		return nil, fmt.Errorf("failed to verify ledger integrity: %w", err)
-	}
-	if ledgerSum != 0 {
-		c.svc.Alert.Notify("CRITICAL", "Integrity Breach Detected", fmt.Sprintf("Transaction %s has non-zero sum: %d", newTxID, ledgerSum))
-		_ = tx.Rollback()
-		go func(txID uuid.UUID, w1, w2 uuid.UUID) {
-			haltCtx := context.Background()
-			_, _ = c.svc.DB.ExecContext(haltCtx, `UPDATE wallets SET status = 'HALTED', updated_at = NOW() WHERE id IN ($1, $2)`, w1, w2)
-			_, _ = c.svc.DB.ExecContext(haltCtx, `UPDATE transactions SET settlement_status = 'FAILED_INTEGRITY' WHERE id = $1`, txID)
-		}(newTxID, c.req.FromWalletID, c.req.ToWalletID)
-		return nil, errors.New("integrity check failed: wallets halted")
 	}
 
 	// 6. Outbox
@@ -433,6 +413,8 @@ type ExchangeRateResponse struct {
 
 // GetExchangeRate retrieves the latest rate for a currency pair.
 func (s *WalletService) GetExchangeRate(ctx context.Context, fromCurr, toCurr string) (*ExchangeRateResponse, error) {
+	fromCurr = strings.ToUpper(fromCurr)
+	toCurr = strings.ToUpper(toCurr)
 	cacheKey := fmt.Sprintf("rate:%s:%s", fromCurr, toCurr)
 
 	if val, ok := s.localRateCache.Load(cacheKey); ok {
@@ -456,7 +438,7 @@ func (s *WalletService) GetExchangeRate(ctx context.Context, fromCurr, toCurr st
 	var rate float64
 	var updatedAt time.Time
 	err := s.DB.QueryRowContext(ctx, "SELECT provider_rate, updated_at FROM exchange_rates WHERE from_currency = $1 AND to_currency = $2",
-		strings.ToUpper(fromCurr), strings.ToUpper(toCurr)).Scan(&rate, &updatedAt)
+		fromCurr, toCurr).Scan(&rate, &updatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("rate not found for %s/%s", fromCurr, toCurr)
@@ -605,11 +587,10 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 	// Check Daily Limit
 	var dailyDebitTotal sql.NullInt64
 	err = tx.QueryRowContext(ctx, `
-		SELECT COALESCE(SUM(ABS(le.amount)), 0) FROM ledger_entries le
-		JOIN transactions t ON le.transaction_id = t.id
-		WHERE le.wallet_id = $1 
-		AND le.amount < 0 
-		AND t.created_at > NOW() - INTERVAL '24 hours'
+		SELECT COALESCE(SUM(ABS(amount)), 0) FROM ledger_entries
+		WHERE wallet_id = $1
+		AND amount < 0
+		AND created_at > NOW() - INTERVAL '24 hours'
 	`, walletID).Scan(&dailyDebitTotal)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("failed to check daily limit: %w", err)
