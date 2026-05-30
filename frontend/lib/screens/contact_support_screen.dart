@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
 import 'package:frontend/utils/pay_notify.dart';
@@ -50,22 +51,22 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
       {
         'id': 'general',
         'label': l10n.supportCategoryGeneral,
-        'icon': Icons.help_outline,
+        'icon': PhosphorIcons.question,
       },
       {
         'id': 'payment',
         'label': l10n.supportCategoryPayment,
-        'icon': Icons.payment_outlined,
+        'icon': PhosphorIcons.creditCard,
       },
       {
         'id': 'account',
         'label': l10n.supportCategoryAccount,
-        'icon': Icons.person_outline,
+        'icon': PhosphorIcons.user,
       },
       {
         'id': 'technical',
         'label': l10n.supportCategoryTechnical,
-        'icon': Icons.build_outlined,
+        'icon': PhosphorIcons.wrench,
       },
     ];
 
@@ -98,13 +99,13 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                         color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(
-                        Icons.support_agent_rounded,
+                      child: Icon(
+                        PhosphorIcons.headset,
                         color: Colors.white,
                         size: 32,
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    SizedBox(width: 16),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -117,7 +118,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          const SizedBox(height: 4),
+                          SizedBox(height: 4),
                           Text(
                             l10n.supportHeaderSubtitle,
                             style: TextStyle(
@@ -132,7 +133,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                 ),
               ),
 
-              const SizedBox(height: 28),
+              SizedBox(height: 28),
 
               // Category Selection
               Text(
@@ -142,7 +143,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               Wrap(
                 spacing: 10,
                 runSpacing: 10,
@@ -179,7 +180,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                                 ? Colors.white
                                 : (isDark ? Colors.white70 : Colors.black54),
                           ),
-                          const SizedBox(width: 8),
+                          SizedBox(width: 8),
                           Text(
                             cat['label'] as String,
                             style: TextStyle(
@@ -197,7 +198,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                 }).toList(),
               ),
 
-              const SizedBox(height: 28),
+              SizedBox(height: 28),
 
               // Subject Field
               Text(
@@ -207,7 +208,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               TextFormField(
                 controller: _subjectController,
                 decoration: InputDecoration(
@@ -233,7 +234,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                 },
               ),
 
-              const SizedBox(height: 24),
+              SizedBox(height: 24),
 
               // Message Field
               Text(
@@ -243,7 +244,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               TextFormField(
                 controller: _messageController,
                 maxLines: 6,
@@ -270,7 +271,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                 },
               ),
 
-              const SizedBox(height: 32),
+              SizedBox(height: 32),
 
               // Submit Button
               SizedBox(
@@ -287,7 +288,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                     elevation: 0,
                   ),
                   child: _isSubmitting
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 24,
                           height: 24,
                           child: CircularProgressIndicator(
@@ -305,7 +306,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                 ),
               ),
 
-              const SizedBox(height: 24),
+              SizedBox(height: 24),
 
               // Alternative contact methods
               Center(
@@ -317,19 +318,19 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   _buildContactChip(
-                    Icons.email_outlined,
+                    PhosphorIcons.envelope,
                     'support@paycif.com',
                     isDark,
                   ),
                 ],
               ),
 
-              const SizedBox(height: 20),
+              SizedBox(height: 20),
             ],
           ),
         ),
@@ -350,7 +351,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 18, color: const Color(0xFFF59E0B)),
-          const SizedBox(width: 8),
+          SizedBox(width: 8),
           Text(
             label,
             style: TextStyle(

@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:frontend/utils/pay_notify.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -149,7 +150,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 const CircularProgressIndicator(
                   valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF1A1F71)),
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: 24),
                 Text(
                   'Signing out safely...',
                   style: TextStyle(
@@ -248,13 +249,13 @@ class _ProfilePageState extends State<ProfilePage> {
                   context,
                 ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               ...LanguageNotifier.supportedLocales.map((locale) {
                 final isSelected = languageNotifier.value == locale;
                 return ListTile(
                   title: Text(LanguageNotifier.getLanguageName(locale)),
                   trailing: isSelected
-                      ? const Icon(Icons.check_circle, color: Color(0xFF10B981))
+                      ? Icon(PhosphorIcons.checkCircle, color: Color(0xFF10B981))
                       : null,
                   onTap: () {
                     languageNotifier.value = locale;
@@ -299,7 +300,7 @@ class _ProfilePageState extends State<ProfilePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 10),
+            SizedBox(height: 10),
 
             // ─── Digital Passport Card ──────────────────────────────
             _buildDigitalPassport(
@@ -311,15 +312,15 @@ class _ProfilePageState extends State<ProfilePage> {
               l10n,
             ),
 
-            const SizedBox(height: 32),
+            SizedBox(height: 32),
 
             // ─── Account Settings ──────────────────────────────────
             _buildSectionHeader(context, l10n.accountSecurity),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             _buildMenuContainer(context, [
               if (!isVerified)
                 _buildMenuItem(
-                  Icons.assignment_ind_outlined,
+                  PhosphorIcons.identificationCard,
                   l10n.verifyIdentity,
                   subtitle: 'Required to unlock higher limits',
                   onTap: () => Navigator.push(
@@ -346,7 +347,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               _buildBiometricTile(context, l10n),
               _buildMenuItem(
-                Icons.lock_outline,
+                PhosphorIcons.lock,
                 l10n.changePin,
                 onTap: () {
                   showModalBottomSheet(
@@ -358,7 +359,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 },
               ),
               _buildMenuItem(
-                Icons.devices,
+                PhosphorIcons.devices,
                 l10n.linkedDevices,
                 onTap: () => Navigator.push(
                   context,
@@ -369,11 +370,11 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ]),
 
-            const SizedBox(height: 32),
+            SizedBox(height: 32),
 
             // ─── App Preferences ───────────────────────────────────
             _buildSectionHeader(context, l10n.preferences),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             _buildMenuContainer(context, [
               // Dark Mode Toggle
               ValueListenableBuilder<ThemeMode>(
@@ -381,7 +382,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 builder: (context, currentMode, _) {
                   final isDarkMode = currentMode == ThemeMode.dark;
                   return _buildMenuItem(
-                    isDarkMode ? Icons.dark_mode : Icons.light_mode,
+                    isDarkMode ? PhosphorIcons.moon : PhosphorIcons.sun,
                     isDarkMode ? l10n.darkMode : l10n.lightMode,
                     onTap: () {
                       themeNotifier.value = isDarkMode
@@ -401,7 +402,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 },
               ),
               _buildMenuItem(
-                Icons.language,
+                PhosphorIcons.globe,
                 l10n.language,
                 subtitle: LanguageNotifier.getLanguageName(
                   languageNotifier.value,
@@ -409,7 +410,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 onTap: () => _showLanguageSheet(context),
               ),
               _buildMenuItem(
-                Icons.notifications_outlined,
+                PhosphorIcons.bell,
                 l10n.notifications,
                 onTap: () => Navigator.push(
                   context,
@@ -420,14 +421,14 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ]),
 
-            const SizedBox(height: 32),
+            SizedBox(height: 32),
 
             // ─── Support ───────────────────────────────────────────
             _buildSectionHeader(context, l10n.support),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             _buildMenuContainer(context, [
               _buildMenuItem(
-                Icons.help_outline,
+                PhosphorIcons.question,
                 l10n.helpCenter,
                 onTap: () => Navigator.push(
                   context,
@@ -435,7 +436,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
               _buildMenuItem(
-                Icons.chat_bubble_outline,
+                PhosphorIcons.chat,
                 l10n.contactSupport,
                 onTap: () => Navigator.push(
                   context,
@@ -446,14 +447,14 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ]),
 
-            const SizedBox(height: 32),
+            SizedBox(height: 32),
 
             // ─── About ─────────────────────────────────────────────
             _buildSectionHeader(context, l10n.aboutApp),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             _buildMenuContainer(context, [
               _buildMenuItem(
-                Icons.description_outlined,
+                PhosphorIcons.fileText,
                 l10n.termsOfService,
                 onTap: () => Navigator.push(
                   context,
@@ -463,7 +464,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
               _buildMenuItem(
-                Icons.privacy_tip_outlined,
+                PhosphorIcons.shield,
                 l10n.privacyPolicy,
                 onTap: () => Navigator.push(
                   context,
@@ -474,7 +475,7 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ]),
 
-            const SizedBox(height: 48),
+            SizedBox(height: 48),
 
             // ─── Sign Out ──────────────────────────────────────────
             Center(
@@ -483,7 +484,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 button: true,
                 child: ElevatedButton.icon(
                   onPressed: () => _showSignOutConfirmation(context),
-                  icon: const Icon(Icons.logout_rounded, size: 20),
+                  icon: Icon(PhosphorIcons.signOut, size: 20),
                   label: Text(l10n.signOut),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.red.shade50,
@@ -501,7 +502,7 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ),
 
-            const SizedBox(height: 24),
+            SizedBox(height: 24),
 
             Center(
               child: Text(
@@ -509,7 +510,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
               ),
             ),
-            const SizedBox(height: 48),
+            SizedBox(height: 48),
           ],
         ),
       ),
@@ -570,7 +571,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   right: -40,
                   top: -40,
                   child: Icon(
-                    Icons.public,
+                    PhosphorIcons.globe,
                     size: 200,
                     color: Colors.white.withValues(alpha: 0.05),
                   ),
@@ -599,12 +600,12 @@ class _ProfilePageState extends State<ProfilePage> {
                             ),
                             child: Row(
                               children: [
-                                const Icon(
-                                  Icons.bolt_rounded,
+                                Icon(
+                                  PhosphorIcons.lightning,
                                   color: Color(0xFFF59E0B),
                                   size: 16,
                                 ),
-                                const SizedBox(width: 4),
+                                SizedBox(width: 4),
                                 Text(
                                   l10n.passportLabel,
                                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -649,13 +650,13 @@ class _ProfilePageState extends State<ProfilePage> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(
-                                    isVerified ? Icons.verified : Icons.pending,
+                                    isVerified ? PhosphorIcons.sealCheck : PhosphorIcons.clock,
                                     color: isVerified
                                         ? const Color(0xFF10B981)
                                         : Colors.orange,
                                     size: 14,
                                   ),
-                                  const SizedBox(width: 4),
+                                  SizedBox(width: 4),
                                   Text(
                                     isVerified
                                         ? l10n.kycStatusVerified
@@ -696,11 +697,11 @@ class _ProfilePageState extends State<ProfilePage> {
                                   ? NetworkImage(avatarUrl)
                                   : null,
                               child: avatarUrl == null
-                                  ? const Icon(Icons.person, color: Colors.white)
+                                  ? Icon(PhosphorIcons.person, color: Colors.white)
                                   : null,
                             ),
                           ),
-                          const SizedBox(width: 16),
+                          SizedBox(width: 16),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -712,7 +713,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                                const SizedBox(height: 4),
+                                SizedBox(height: 4),
                                 Text(
                                   'ID: $id',
                                   style: GoogleFonts.robotoMono(
@@ -868,7 +869,7 @@ class _ProfilePageState extends State<ProfilePage> {
           : null,
       trailing:
           trailing ??
-          const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
+          Icon(PhosphorIcons.caretRight, color: Colors.grey, size: 20),
     );
   }
 
@@ -883,7 +884,7 @@ class _ProfilePageState extends State<ProfilePage> {
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(
-          Icons.fingerprint_rounded,
+          PhosphorIcons.fingerprint,
           size: 20,
           color: Theme.of(context).iconTheme.color,
         ),
@@ -896,7 +897,7 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
       ),
       subtitle: _isBiometricLoading
-          ? const SizedBox(
+          ? SizedBox(
               height: 13,
               width: 50,
               child: LinearProgressIndicator(
@@ -912,7 +913,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
             ),
       trailing: _isBiometricLoading
-          ? const SizedBox(
+          ? SizedBox(
               width: 40,
               child: Center(
                 child: SizedBox(
@@ -988,7 +989,7 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
         child: Column(
           children: [
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             Container(
               width: 40,
               height: 4,
@@ -997,7 +998,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const SizedBox(height: 32),
+            SizedBox(height: 32),
             Text(
               l10n.biometricConfirmManage,
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
@@ -1006,14 +1007,14 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Text(
               'Please verify your PIN to continue.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppTheme.textSecondaryColor(context),
                   ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             Expanded(
               child: PinEntryWidget(
                 onSuccess: (pin) {

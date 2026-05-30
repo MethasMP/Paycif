@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -121,11 +122,11 @@ class HistoryScreen extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.history_toggle_off,
+              PhosphorIcons.clock,
               size: 60,
               color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             Text(
               l10n.historyNoActivity,
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(

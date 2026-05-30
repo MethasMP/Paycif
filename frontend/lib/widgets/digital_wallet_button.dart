@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -65,7 +66,7 @@ class DigitalWalletButton extends StatelessWidget {
               )
             else ...[
               _buildLogo(),
-              const SizedBox(width: 10),
+              SizedBox(width: 10),
               Text(
                 _getButtonText(),
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -75,7 +76,7 @@ class DigitalWalletButton extends StatelessWidget {
                     ),
               ),
               if (isLinked) ...[
-                const SizedBox(width: 12),
+                SizedBox(width: 12),
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,
@@ -88,12 +89,12 @@ class DigitalWalletButton extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(
-                        Icons.check_circle_rounded,
+                      Icon(
+                        PhosphorIcons.checkCircle,
                         size: 12,
                         color: Color(0xFF10B981),
                       ),
-                      const SizedBox(width: 4),
+                      SizedBox(width: 4),
                       Text(
                         'Linked',
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -151,10 +152,10 @@ class DigitalWalletButton extends StatelessWidget {
   Widget _buildLogo() {
     switch (type) {
       case DigitalWalletType.applePay:
-        return const Row(
+        return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.apple, color: Colors.white, size: 24),
+            Icon(PhosphorIcons.appleLogo, color: Colors.white, size: 24),
             SizedBox(width: 2),
           ],
         );
@@ -233,7 +234,7 @@ class DigitalWalletButton extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: 4),
+            SizedBox(width: 4),
           ],
         );
     }

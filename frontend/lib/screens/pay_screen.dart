@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:local_auth/local_auth.dart';
@@ -112,7 +113,7 @@ class _PayScreenState extends State<PayScreen> {
         appBar: AppBar(
           backgroundColor: const Color(0xFF0F6E56),
           leading: IconButton(
-            icon: const Icon(Icons.close_rounded, color: Colors.white),
+            icon: Icon(PhosphorIcons.x, color: Colors.white),
             onPressed: () => Navigator.pop(context),
           ),
         ),
@@ -146,11 +147,11 @@ class _PayScreenState extends State<PayScreen> {
                     amount: widget.amount,
                     style: theme.textTheme.displayLarge,
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: 8),
                   Text(widget.merchantName, style: theme.textTheme.titleLarge),
                   const Spacer(),
                   _buildPaymentMethodCard(theme, isDark),
-                  const SizedBox(height: 32),
+                  SizedBox(height: 32),
                   SizedBox(
                     width: double.infinity,
                     height: 60,
@@ -159,7 +160,7 @@ class _PayScreenState extends State<PayScreen> {
                       child: const Text("Confirm Payment"),
                     ),
                   ),
-                  const SizedBox(height: 48),
+                  SizedBox(height: 48),
                 ],
               ),
             );
@@ -179,8 +180,8 @@ class _PayScreenState extends State<PayScreen> {
       ),
       child: Row(
         children: [
-          const PaycifIconContainer(icon: Icons.credit_card),
-          const SizedBox(width: 16),
+          PaycifIconContainer(icon: PhosphorIcons.creditCard),
+          SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -200,7 +201,7 @@ class _PayScreenState extends State<PayScreen> {
               ],
             ),
           ),
-          const Icon(Icons.check_circle, color: Color(0xFF10B981)),
+          Icon(PhosphorIcons.checkCircle, color: Color(0xFF10B981)),
         ],
       ),
     );

@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
 import 'package:frontend/screens/contact_support_screen.dart';
@@ -28,7 +29,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
     // FAQ categories with questions
     final List<_FAQCategory> categories = [
       _FAQCategory(
-        icon: Icons.account_balance_wallet_outlined,
+        icon: PhosphorIcons.wallet,
         title: l10n.helpWalletTitle,
         questions: [
           _FAQ(l10n.helpWalletQ1, l10n.helpWalletA1),
@@ -37,7 +38,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
         ],
       ),
       _FAQCategory(
-        icon: Icons.payment_outlined,
+        icon: PhosphorIcons.creditCard,
         title: l10n.helpPaymentTitle,
         questions: [
           _FAQ(l10n.helpPaymentQ1, l10n.helpPaymentA1),
@@ -46,7 +47,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
         ],
       ),
       _FAQCategory(
-        icon: Icons.security_outlined,
+        icon: PhosphorIcons.shield,
         title: l10n.helpSecurityTitle,
         questions: [
           _FAQ(l10n.helpSecurityQ1, l10n.helpSecurityA1),
@@ -54,7 +55,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
         ],
       ),
       _FAQCategory(
-        icon: Icons.credit_card_outlined,
+        icon: PhosphorIcons.creditCard,
         title: l10n.helpCardTitle,
         questions: [
           _FAQ(l10n.helpCardQ1, l10n.helpCardA1),
@@ -108,10 +109,10 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
                 onChanged: (value) => setState(() => _searchQuery = value),
                 decoration: InputDecoration(
                   hintText: l10n.helpSearchHint,
-                  prefixIcon: const Icon(Icons.search_rounded),
+                  prefixIcon: Icon(PhosphorIcons.magnifyingGlass),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
-                          icon: const Icon(Icons.clear_rounded),
+                          icon: Icon(PhosphorIcons.x),
                           onPressed: () {
                             _searchController.clear();
                             setState(() => _searchQuery = '');
@@ -136,11 +137,11 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          Icons.search_off_rounded,
+                          PhosphorIcons.magnifyingGlass,
                           size: 64,
                           color: Colors.grey.shade400,
                         ),
-                        const SizedBox(height: 16),
+                        SizedBox(height: 16),
                         Text(
                           l10n.helpNoResults,
                           style: TextStyle(
@@ -181,13 +182,13 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
                     color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(
-                    Icons.headset_mic_rounded,
+                  child: Icon(
+                    PhosphorIcons.headset,
                     color: Colors.white,
                     size: 28,
                   ),
                 ),
-                const SizedBox(width: 16),
+                SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -200,7 +201,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      SizedBox(height: 4),
                       Text(
                         l10n.helpContactTeam,
                         style: TextStyle(
@@ -221,8 +222,8 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
                       ),
                     );
                   },
-                  icon: const Icon(
-                    Icons.arrow_forward_rounded,
+                  icon: Icon(
+                    PhosphorIcons.arrowRight,
                     color: Colors.white,
                   ),
                 ),
@@ -258,7 +259,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
                   size: 20,
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Text(
                 category.title,
                 style: const TextStyle(
@@ -303,7 +304,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: 16),
       ],
     );
   }

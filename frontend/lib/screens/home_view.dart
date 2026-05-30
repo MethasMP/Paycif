@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
@@ -56,7 +57,7 @@ class _HomeViewState extends State<HomeView> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          const SizedBox(height: 32),
+                          SizedBox(height: 32),
                           // 1. Headline
                           Text(
                             "Ready to Pay",
@@ -67,7 +68,7 @@ class _HomeViewState extends State<HomeView> {
                               color: AppTheme.textPrimaryColor(context),
                             ),
                           ),
-                          const SizedBox(height: 12),
+                          SizedBox(height: 12),
                           Text(
                             "Scan any PromptPay or Paycif QR code to pay instantly",
                             textAlign: TextAlign.center,
@@ -77,7 +78,7 @@ class _HomeViewState extends State<HomeView> {
                               color: AppTheme.textSecondaryColor(context),
                             ),
                           ),
-                          const SizedBox(height: 48),
+                          SizedBox(height: 48),
                           // 2. Gold CTA Center
                           GestureDetector(
                             onTap: () {
@@ -102,28 +103,28 @@ class _HomeViewState extends State<HomeView> {
                                   ),
                                 ],
                               ),
-                              child: const Center(
+                              child: Center(
                                 child: Icon(
-                                  Icons.qr_code_scanner_rounded,
+                                  PhosphorIcons.qrCode,
                                   color: Color(0xFF412402), // accent-900
                                   size: 56,
                                 ),
                               ),
                             ),
                           ),
-                          const SizedBox(height: 54),
+                          SizedBox(height: 54),
                           // 3. Recent Transactions
                           Align(
                             alignment: Alignment.centerLeft,
                             child: _buildRecentTransactionsHeader(context, l10n),
                           ),
-                          const SizedBox(height: 12),
+                          SizedBox(height: 12),
                           _buildTransactionList(state.transactions),
                         ],
                       ),
                     ),
                   )
-                : const Center(child: CircularProgressIndicator()),
+                : Center(child: CircularProgressIndicator()),
           ),
         );
       },
@@ -137,7 +138,7 @@ class _HomeViewState extends State<HomeView> {
       elevation: 0,
       centerTitle: true,
       leading: IconButton(
-        icon: const Icon(Icons.notifications_none_rounded),
+        icon: Icon(PhosphorIcons.bell),
         onPressed: () {},
       ),
       title: Text(
@@ -154,7 +155,7 @@ class _HomeViewState extends State<HomeView> {
       ),
       actions: [
         IconButton(
-          icon: const Icon(Icons.settings_outlined),
+          icon: Icon(PhosphorIcons.gear),
           onPressed: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const ProfilePage()),
@@ -211,7 +212,7 @@ class _HomeViewState extends State<HomeView> {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: transactions.length > 5 ? 5 : transactions.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
+      separatorBuilder: (context, index) => SizedBox(height: 12),
       itemBuilder: (context, index) => TransactionItem(transaction: transactions[index]),
     );
   }

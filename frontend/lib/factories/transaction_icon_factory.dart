@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 
 /// 🏭 [TransactionIconFactory]
@@ -13,8 +14,8 @@ class TransactionIconFactory {
 
     // 1. Income / Inflow Logic
     if (!isDebit) {
-      if (lowerDesc.contains('refund')) return Icons.refresh_rounded;
-      return Icons.account_balance_wallet_rounded; // Default for Top Up
+      if (lowerDesc.contains('refund')) return PhosphorIcons.arrowCounterClockwise;
+      return PhosphorIcons.wallet; // Default for Top Up
     }
 
     // 2. Spending Categories (Outflow)
@@ -26,7 +27,7 @@ class TransactionIconFactory {
         lowerDesc.contains('eats') ||
         lowerDesc.contains('kfc') ||
         lowerDesc.contains('mcdonald')) {
-      return Icons.restaurant_rounded;
+      return PhosphorIcons.forkKnife;
     }
 
     // Shopping & Groceries
@@ -37,7 +38,7 @@ class TransactionIconFactory {
         lowerDesc.contains('market') ||
         lowerDesc.contains('big c') ||
         lowerDesc.contains('lotus')) {
-      return Icons.shopping_bag_rounded;
+      return PhosphorIcons.shoppingBag;
     }
 
     // Transport & Travel
@@ -47,7 +48,7 @@ class TransactionIconFactory {
         lowerDesc.contains('bolt') ||
         lowerDesc.contains('bts') ||
         lowerDesc.contains('mrt')) {
-      return Icons.local_taxi_rounded;
+      return PhosphorIcons.taxi;
     }
 
     // Cafe & Coffee
@@ -55,7 +56,7 @@ class TransactionIconFactory {
         lowerDesc.contains('cafe') ||
         lowerDesc.contains('starbucks') ||
         lowerDesc.contains('amazon')) {
-      return Icons.local_cafe_rounded;
+      return PhosphorIcons.coffee;
     }
 
     // Entertainment
@@ -64,7 +65,7 @@ class TransactionIconFactory {
         lowerDesc.contains('netflix') ||
         lowerDesc.contains('spotify') ||
         lowerDesc.contains('apple')) {
-      return Icons.movie_rounded;
+      return PhosphorIcons.filmStrip;
     }
 
     // Utilities & Bills
@@ -76,15 +77,15 @@ class TransactionIconFactory {
         lowerDesc.contains('pea') ||
         lowerDesc.contains('ais') ||
         lowerDesc.contains('true')) {
-      return Icons.receipt_long_rounded;
+      return PhosphorIcons.receipt;
     }
 
     // Transfers
     if (lowerDesc.contains('transfer') || lowerDesc.contains('sent')) {
-      return Icons.swap_horiz_rounded;
+      return PhosphorIcons.arrowsLeftRight;
     }
 
     // Default Spending Icon
-    return Icons.shopping_bag_outlined;
+    return PhosphorIcons.shoppingBag;
   }
 }

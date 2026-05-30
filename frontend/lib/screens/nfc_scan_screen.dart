@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:mrz_parser/mrz_parser.dart';
@@ -198,7 +199,7 @@ class NfcScanScreenState extends State<NfcScanScreen>
                 'Step 1 of 2',
                 style: TextStyle(color: Colors.black54, fontSize: 13),
               ),
-              const SizedBox(height: 4),
+              SizedBox(height: 4),
               const Text(
                 'Scan passport MRZ',
                 style: TextStyle(
@@ -207,7 +208,7 @@ class NfcScanScreenState extends State<NfcScanScreen>
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: 8),
               const Text(
                 'Open your passport to the photo page and point the camera at the two lines of text at the bottom.',
                 style: TextStyle(color: Colors.black54, height: 1.5),
@@ -235,13 +236,13 @@ class NfcScanScreenState extends State<NfcScanScreen>
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.qr_code_scanner, size: 48, color: Color(0xFF0F6E56)),
-                      const SizedBox(height: 12),
+                      Icon(PhosphorIcons.qrCode, size: 48, color: Color(0xFF0F6E56)),
+                      SizedBox(height: 12),
                       const Text(
                         'Align Passport MRZ in the frame',
                         style: TextStyle(color: Colors.black54),
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: 16),
                       ElevatedButton(
                         onPressed: () => _onMrzRecognized(
                           MRZResult(
@@ -308,7 +309,7 @@ class NfcScanScreenState extends State<NfcScanScreen>
               'Step 2 of 2',
               style: TextStyle(color: Colors.black54, fontSize: 13),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             const Text(
               'Tap Your Passport',
               style: TextStyle(
@@ -317,7 +318,7 @@ class NfcScanScreenState extends State<NfcScanScreen>
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 40),
+            SizedBox(height: 40),
             // Pulsing NFC icon animation
             AnimatedBuilder(
               animation: _pulseAnimation,
@@ -331,15 +332,15 @@ class NfcScanScreenState extends State<NfcScanScreen>
                     color: const Color(0xFF0F6E56).withValues(alpha: 0.15),
                     border: Border.all(color: const Color(0xFF0F6E56), width: 2),
                   ),
-                  child: const Icon(
-                    Icons.nfc,
+                  child: Icon(
+                    PhosphorIcons.rss,
                     size: 80,
                     color: Color(0xFF0F6E56),
                   ),
                 ),
               ),
             ),
-            const SizedBox(height: 40),
+            SizedBox(height: 40),
             const Text(
               'Hold the top of your phone against the cover of your opened passport.',
               textAlign: TextAlign.center,
@@ -349,7 +350,7 @@ class NfcScanScreenState extends State<NfcScanScreen>
                 fontSize: 16,
               ),
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: 20),
             const CircularProgressIndicator(
               color: Color(0xFF0F6E56),
               strokeWidth: 2,
@@ -368,12 +369,12 @@ class NfcScanScreenState extends State<NfcScanScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.verified_rounded,
+            Icon(
+              PhosphorIcons.sealCheck,
               size: 100,
               color: Colors.greenAccent,
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: 24),
             Text(
               'Welcome, ${_passportData!.firstName}!',
               style: const TextStyle(
@@ -383,13 +384,13 @@ class NfcScanScreenState extends State<NfcScanScreen>
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             const Text(
               'Your identity has been cryptographically verified.\nYour wallet is now active.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.black54, height: 1.6),
             ),
-            const SizedBox(height: 40),
+            SizedBox(height: 40),
             // Show the biometric photo from passport chip if available
             if (_passportData?.facialImage != null)
               ClipRRect(
@@ -401,7 +402,7 @@ class NfcScanScreenState extends State<NfcScanScreen>
                   fit: BoxFit.cover,
                 ),
               ),
-            const SizedBox(height: 40),
+            SizedBox(height: 40),
             ElevatedButton(
               onPressed: () => Navigator.pop(context),
               style: ElevatedButton.styleFrom(
@@ -429,12 +430,12 @@ class NfcScanScreenState extends State<NfcScanScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.error_outline_rounded,
+            Icon(
+              PhosphorIcons.warningCircle,
               size: 80,
               color: Colors.redAccent,
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: 24),
             const Text(
               'Verification Failed',
               style: TextStyle(
@@ -443,13 +444,13 @@ class NfcScanScreenState extends State<NfcScanScreen>
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             Text(
               _errorMessage ?? 'An unknown error occurred.',
               textAlign: TextAlign.center,
               style: const TextStyle(color: Colors.black54, height: 1.5),
             ),
-            const SizedBox(height: 40),
+            SizedBox(height: 40),
             ElevatedButton(
               onPressed: () => setState(() {
                 _step = _KycStep.scanMrz;
@@ -524,22 +525,22 @@ class NfcScanScreenState extends State<NfcScanScreen>
                   child: ClipOval(
                     child: _selfieImage != null
                         ? Image.memory(_selfieImage!, fit: BoxFit.cover)
-                        : const Icon(
-                            Icons.face_retouching_natural_rounded,
+                        : Icon(
+                            PhosphorIcons.smiley,
                             size: 80,
                             color: Colors.black26,
                           ),
                   ),
                 ),
                 if (_selfieImage != null)
-                  const CircleAvatar(
+                  CircleAvatar(
                     backgroundColor: Colors.greenAccent,
                     radius: 18,
-                    child: Icon(Icons.check, color: Colors.white),
+                    child: Icon(PhosphorIcons.check, color: Colors.white),
                   ),
               ],
             ),
-            const SizedBox(height: 32),
+            SizedBox(height: 32),
             const Text(
               'Biometric Verification',
               style: TextStyle(
@@ -548,15 +549,15 @@ class NfcScanScreenState extends State<NfcScanScreen>
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             const Text(
               'We need to match your selfie with your passport photo to ensure you are the actual owner.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.black54, height: 1.5),
             ),
-            const SizedBox(height: 40),
+            SizedBox(height: 40),
             if (_isProcessing)
-              const Column(
+              Column(
                 children: [
                   CircularProgressIndicator(color: Color(0xFF0F6E56)),
                   SizedBox(height: 16),
@@ -570,7 +571,7 @@ class NfcScanScreenState extends State<NfcScanScreen>
               ElevatedButton.icon(
                 onPressed: _livenessStep == 'blink' ? null : _captureSelfie,
                 icon: Icon(
-                  _selfieImage == null ? Icons.camera_alt : Icons.refresh,
+                  _selfieImage == null ? PhosphorIcons.camera : PhosphorIcons.arrowCounterClockwise,
                 ),
                 label: Text(
                   _livenessStep == 'blink'
@@ -605,7 +606,7 @@ class NfcScanScreenState extends State<NfcScanScreen>
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const SizedBox(
+                      SizedBox(
                         width: 16,
                         height: 16,
                         child: CircularProgressIndicator(
@@ -613,7 +614,7 @@ class NfcScanScreenState extends State<NfcScanScreen>
                           color: Colors.orangeAccent,
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      SizedBox(width: 12),
                       Text(
                         _challengeText,
                         style: const TextStyle(

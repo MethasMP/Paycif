@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -111,7 +112,7 @@ class _ChangePinSheetState extends State<ChangePinSheet> {
       ),
       child: Column(
         children: [
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           // Drag Handle
           Container(
             width: 40,
@@ -121,7 +122,7 @@ class _ChangePinSheetState extends State<ChangePinSheet> {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: 24),
 
           // Dynamic Header
           AnimatedSwitcher(
@@ -136,7 +137,7 @@ class _ChangePinSheetState extends State<ChangePinSheet> {
             ),
           ),
 
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
 
           // Step Indicators
           Row(
@@ -158,7 +159,7 @@ class _ChangePinSheetState extends State<ChangePinSheet> {
             }),
           ),
 
-          const SizedBox(height: 32),
+          SizedBox(height: 32),
 
           // Content
           Expanded(
@@ -205,11 +206,11 @@ class _ChangePinSheetState extends State<ChangePinSheet> {
                       child: Row(
                         children: [
                           Icon(
-                            Icons.error_outline,
+                            PhosphorIcons.warningCircle,
                             color: Colors.red.shade700,
                             size: 20,
                           ),
-                          const SizedBox(width: 8),
+                          SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               _errorMessage!,
@@ -232,15 +233,15 @@ class _ChangePinSheetState extends State<ChangePinSheet> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(
-                            Icons.check_circle_rounded,
+                          Icon(
+                            PhosphorIcons.checkCircle,
                             color: Color(0xFF10B981),
                             size: 80,
                           ).animate().scale(
                             duration: 400.ms,
                             curve: Curves.elasticOut,
                           ),
-                          const SizedBox(height: 16),
+                          SizedBox(height: 16),
                           Text(
                             'PIN Updated Successfully',
                             style: Theme.of(context).textTheme.titleMedium

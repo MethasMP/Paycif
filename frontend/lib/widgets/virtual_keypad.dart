@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -37,7 +38,7 @@ class VirtualKeypad extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: keys.map((key) {
-          if (key.isEmpty) return const SizedBox(width: 72, height: 72);
+          if (key.isEmpty) return SizedBox(width: 72, height: 72);
           return _buildKey(context, key);
         }).toList(),
       ),
@@ -77,7 +78,7 @@ class VirtualKeypad extends StatelessWidget {
             button: true,
             child: label == '⌫'
                 ? Icon(
-                    Icons.backspace_rounded,
+                    PhosphorIcons.backspace,
                     color: isDark ? Colors.white70 : Colors.black54,
                     size: 22,
                   )

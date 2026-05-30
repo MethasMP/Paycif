@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
 import '../widgets/paycif_text.dart';
@@ -39,13 +40,13 @@ class TermsOfServiceScreen extends StatelessWidget {
                       color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(
-                      Icons.description_rounded,
+                    child: Icon(
+                      PhosphorIcons.fileText,
                       color: Colors.white,
                       size: 28,
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -56,7 +57,7 @@ class TermsOfServiceScreen extends StatelessWidget {
                           color: Colors.white,
                           fontWeight: FontWeight.w600,
                         ),
-                        const SizedBox(height: 4),
+                        SizedBox(height: 4),
                         PaycifText(
                           l10n.termsLastUpdated,
                           style: PaycifTextStyle.caption,
@@ -69,7 +70,7 @@ class TermsOfServiceScreen extends StatelessWidget {
               ),
             ),
 
-            const SizedBox(height: 24),
+            SizedBox(height: 24),
 
             // Terms Sections
             _buildSection(
@@ -109,7 +110,7 @@ class TermsOfServiceScreen extends StatelessWidget {
               isDark,
             ),
 
-            const SizedBox(height: 24),
+            SizedBox(height: 24),
 
             // Contact Section
             Container(
@@ -123,10 +124,10 @@ class TermsOfServiceScreen extends StatelessWidget {
               child: Row(
                 children: [
                   Icon(
-                    Icons.info_outline_rounded,
+                    PhosphorIcons.info,
                     color: isDark ? Colors.white54 : Colors.black45,
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   Expanded(
                     child: PaycifText(
                       l10n.termsContact,
@@ -138,7 +139,7 @@ class TermsOfServiceScreen extends StatelessWidget {
               ),
             ),
 
-            const SizedBox(height: 32),
+            SizedBox(height: 32),
           ],
         ),
       ),
@@ -172,7 +173,7 @@ class TermsOfServiceScreen extends StatelessWidget {
             color: AppTheme.textPrimaryColor(context),
             fontWeight: FontWeight.w600,
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           PaycifText(
             content,
             style: PaycifTextStyle.body,

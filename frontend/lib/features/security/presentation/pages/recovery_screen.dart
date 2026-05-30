@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -62,23 +63,23 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.check_circle_outline_rounded,
+            Icon(
+              PhosphorIcons.checkCircle,
               color: Colors.green,
               size: 64,
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             const Text(
               'Identity Verified',
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             const Text(
               'Your PIN has been reset. Please set up a new one.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey),
             ),
-            const SizedBox(height: 32),
+            SizedBox(height: 32),
             ElevatedButton(
               onPressed: () {
                 Navigator.of(context).pop(); // Close sheet
@@ -115,7 +116,7 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
         elevation: 0,
         leading: IconButton(
           icon: Icon(
-            Icons.arrow_back_ios_new_rounded,
+            PhosphorIcons.caretLeft,
             color: isDark ? Colors.white : Colors.black87,
           ),
           onPressed: () => Navigator.pop(context),
@@ -147,7 +148,7 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: 40),
+                      SizedBox(height: 40),
                       // 🎖️ Identity Badge
                       Container(
                         padding: const EdgeInsets.all(16),
@@ -155,14 +156,14 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
                           shape: BoxShape.circle,
                           color: const Color(0xFF667EEA).withValues(alpha: 0.1),
                         ),
-                        child: const Icon(
-                          Icons.badge_rounded,
+                        child: Icon(
+                          PhosphorIcons.identificationCard,
                           color: Color(0xFF667EEA),
                           size: 40,
                         ),
                       ),
 
-                      const SizedBox(height: 24),
+                      SizedBox(height: 24),
                       const Text(
                         'Identity Challenge',
                         style: TextStyle(
@@ -172,7 +173,7 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
                         ),
                       ),
 
-                      const SizedBox(height: 12),
+                      SizedBox(height: 12),
                       Text(
                         'To reset your PIN, please provide the identity anchor linked to your account.',
                         style: TextStyle(
@@ -182,7 +183,7 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
                         ),
                       ),
 
-                      const SizedBox(height: 48),
+                      SizedBox(height: 48),
 
                       // 🔬 Futuristic Input Card
                       _buildInputCard(isDark, isLoading),
@@ -202,7 +203,7 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
                           ),
                         ),
 
-                      const SizedBox(height: 48),
+                      SizedBox(height: 48),
 
                       // ⚡ Action Button
                       _buildSubmitButton(isLoading),
@@ -250,7 +251,7 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
               color: const Color(0xFF667EEA),
             ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           TextFormField(
             controller: _answerController,
             autofocus: true,
@@ -309,7 +310,7 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
           ),
         ),
         child: isLoading
-            ? const SizedBox(
+            ? SizedBox(
                 width: 24,
                 height: 24,
                 child: CircularProgressIndicator(
@@ -336,17 +337,17 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.lock_person_rounded,
+            Icon(
+              PhosphorIcons.lockKey,
               size: 80,
               color: Colors.orangeAccent,
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: 24),
             const Text(
               'Security Lockout',
               style: TextStyle(fontSize: 28, fontWeight: FontWeight.w600),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             Text(
               errorMsg ??
                   'Identity challenge attempts exhausted. Security protocol active.',

@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -207,13 +208,13 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
       children: [
         if (widget.onForgotPin != null) ...[
           _buildForgotAction(isDark),
-          const SizedBox(height: 32),
+          SizedBox(height: 32),
         ],
 
         // 🔘 Deep Navy Dots (Static, Instant)
         _buildPinDots(isDark),
 
-        const SizedBox(height: 48),
+        SizedBox(height: 48),
 
         // 🔢 Precision Keypad
         _buildKeypadGrid(isDark),
@@ -225,11 +226,11 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
     return Column(
       children: [
         _buildKeypadRow(['1', '2', '3'], isDark),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         _buildKeypadRow(['4', '5', '6'], isDark),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         _buildKeypadRow(['7', '8', '9'], isDark),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         _buildKeypadRow(['EMPTY', '0', 'DEL'], isDark),
       ],
     );
@@ -263,12 +264,12 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
-                Icons.error_outline_rounded,
+                PhosphorIcons.warningCircle,
                 size: 20,
                 color: Colors.red.shade300,
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             Expanded(
               child: Text(
                 _formatErrorMessage(errorMsg, l10n),
@@ -315,7 +316,7 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: keys.map((key) {
         if (key == 'EMPTY') {
-          return const SizedBox(width: 80, height: 80);
+          return SizedBox(width: 80, height: 80);
         }
         if (key == 'DEL') {
           return _buildDeleteButton(isDark);
@@ -364,7 +365,7 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
               : Colors.grey.shade100,
         ),
         child: Icon(
-          Icons.backspace_outlined,
+          PhosphorIcons.backspace,
           size: 26,
           color: isDark ? Colors.white54 : Colors.grey.shade600,
         ),
@@ -410,13 +411,13 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
                 ),
               ],
             ),
-            child: const Icon(
-              Icons.lock_clock_rounded,
+            child: Icon(
+              PhosphorIcons.lockSimple,
               size: 48,
               color: Colors.white,
             ),
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: 24),
           Text(
             'Security Lockout',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -424,7 +425,7 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
               letterSpacing: -0.5,
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 48),
             child: Text(

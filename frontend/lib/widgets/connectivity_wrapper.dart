@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -43,8 +44,8 @@ class ConnectivityWrapper extends StatelessWidget {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(
-                                    Icons.wifi_off_rounded,
+                              Icon(
+                                    PhosphorIcons.wifiSlash,
                                     size: 100,
                                     color: Color(0xFFF59E0B),
                                   )
@@ -55,7 +56,7 @@ class ConnectivityWrapper extends StatelessWidget {
                                     duration: 1.seconds,
                                     curve: Curves.easeInOut,
                                   ),
-                              const SizedBox(height: 32),
+                              SizedBox(height: 32),
                               Text(
                                 AppLocalizations.of(context)?.noInternetTitle ??
                                     'No Connection',
@@ -65,7 +66,7 @@ class ConnectivityWrapper extends StatelessWidget {
                                 ),
                                 textAlign: TextAlign.center,
                               ),
-                              const SizedBox(height: 16),
+                              SizedBox(height: 16),
                               Text(
                                 AppLocalizations.of(
                                       context,
@@ -77,7 +78,7 @@ class ConnectivityWrapper extends StatelessWidget {
                                 ),
                                 textAlign: TextAlign.center,
                               ),
-                              const SizedBox(height: 40),
+                              SizedBox(height: 40),
                               SizedBox(
                                 width: 200,
                                 height: 56,

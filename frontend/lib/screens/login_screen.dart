@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'dart:io' show Platform;
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -185,7 +186,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
                     ),
                     child: Icon(
-                      Icons.shield_outlined, // Emphasize Security ("Paycif")
+                      PhosphorIcons.shield, // Emphasize Security ("Paycif")
                       size: 50,
                       color: Theme.of(context).colorScheme.onPrimary,
                     ),
@@ -198,7 +199,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     curve: Curves.elasticOut,
                   ),
 
-              const SizedBox(height: 32),
+              SizedBox(height: 32),
 
               // Brand Title
               Row(
@@ -214,7 +215,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               letterSpacing: -1.0,
                             ),
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: 8),
                       Container(
                         width: 10,
                         height: 10,
@@ -234,7 +235,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     curve: Curves.easeOut,
                   ),
 
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
 
               // Tagline
               Text(
@@ -281,7 +282,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             height: 20, // Standard size
                             width: 20,
                           ),
-                          const SizedBox(width: 12),
+                          SizedBox(width: 12),
                           Text(
                             "${l10n.commonLogIn} with Google",
                             textAlign: TextAlign.center,
@@ -300,7 +301,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       curve: Curves.easeOutQuad,
                     ),
 
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
 
                 // Apple Button
                 SizedBox(
@@ -314,11 +315,11 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(
-                            Icons.apple,
+                          Icon(
+                            PhosphorIcons.appleLogo,
                             size: 24, // Standard size
                           ),
-                          const SizedBox(width: 12),
+                          SizedBox(width: 12),
                           Text(
                             "${l10n.commonLogIn} with Apple",
                             textAlign: TextAlign.center,
@@ -338,7 +339,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
               ],
 
-              const SizedBox(height: 48),
+              SizedBox(height: 48),
             ],
           ),
         ),

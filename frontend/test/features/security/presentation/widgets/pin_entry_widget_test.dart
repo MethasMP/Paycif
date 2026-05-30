@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:provider/provider.dart';
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 
 import 'package:frontend/features/security/presentation/widgets/pin_entry_widget.dart';
 import 'package:frontend/features/security/presentation/logic/security_controller.dart';
@@ -38,7 +39,7 @@ void main() {
       expect(find.text('1'), findsOneWidget);
       expect(find.text('9'), findsOneWidget);
       expect(find.text('0'), findsOneWidget);
-      expect(find.byIcon(Icons.backspace_outlined), findsOneWidget);
+      expect(find.byIcon(PhosphorIcons.backspace), findsOneWidget);
 
       // Digits dots (6 of them)
       // They are Containers, simpler to find by type? Or maybe by logic.
@@ -117,7 +118,7 @@ void main() {
 
       expect(find.text('Security Lockout'), findsOneWidget);
       expect(find.text('Try again in 5m'), findsOneWidget);
-      expect(find.byIcon(Icons.lock_clock_rounded), findsOneWidget);
+      expect(find.byIcon(PhosphorIcons.lockSimple), findsOneWidget);
     });
   });
 }

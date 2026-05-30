@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
@@ -33,13 +34,13 @@ class _LinkedDevicesView extends StatelessWidget {
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(title: Text(l10n.linkedDevices), centerTitle: true),
       body: controller.isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator())
           : controller.devices.isEmpty
           ? _buildEmptyState(context, isDark)
           : ListView.separated(
               padding: const EdgeInsets.all(24),
               itemCount: controller.devices.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 16),
+              separatorBuilder: (context, index) => SizedBox(height: 16),
               itemBuilder: (context, index) {
                 final device = controller.devices[index];
                 return _buildDeviceTile(
@@ -60,11 +61,11 @@ class _LinkedDevicesView extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            Icons.devices_other_rounded,
+            PhosphorIcons.devices,
             size: 64,
             color: Colors.grey.withValues(alpha: 0.5),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           Text(
             'No active devices found',
             style: TextStyle(
@@ -92,11 +93,11 @@ class _LinkedDevicesView extends StatelessWidget {
 
     IconData platformIcon;
     if (osType.contains('ios') || osType.contains('iphone')) {
-      platformIcon = Icons.apple;
+      platformIcon = PhosphorIcons.appleLogo;
     } else if (osType.contains('android')) {
-      platformIcon = Icons.android;
+      platformIcon = PhosphorIcons.androidLogo;
     } else {
-      platformIcon = Icons.phone_android;
+      platformIcon = PhosphorIcons.deviceMobile;
     }
 
     return Dismissible(
@@ -109,7 +110,7 @@ class _LinkedDevicesView extends StatelessWidget {
           color: Colors.red.withValues(alpha: 0.9),
           borderRadius: BorderRadius.circular(16),
         ),
-        child: const Icon(Icons.delete_outline, color: Colors.white, size: 28),
+        child: Icon(PhosphorIcons.trash, color: Colors.white, size: 28),
       ),
       confirmDismiss: (direction) async {
         return await showDialog<bool>(
@@ -203,7 +204,7 @@ class _LinkedDevicesView extends StatelessWidget {
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 4),
+                SizedBox(height: 4),
                 isCurrent
                     ? Row(
                         children: [
@@ -215,7 +216,7 @@ class _LinkedDevicesView extends StatelessWidget {
                               shape: BoxShape.circle,
                             ),
                           ),
-                          const SizedBox(width: 6),
+                          SizedBox(width: 6),
                           const Text(
                             'Current Device',
                             style: TextStyle(

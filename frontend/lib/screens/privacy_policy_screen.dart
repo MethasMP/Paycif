@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
 import '../widgets/paycif_text.dart';
@@ -39,13 +40,13 @@ class PrivacyPolicyScreen extends StatelessWidget {
                       color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(
-                      Icons.privacy_tip_rounded,
+                    child: Icon(
+                      PhosphorIcons.shield,
                       color: Colors.white,
                       size: 28,
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -56,7 +57,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
                           color: Colors.white,
                           fontWeight: FontWeight.w600,
                         ),
-                        const SizedBox(height: 4),
+                        SizedBox(height: 4),
                         PaycifText(
                           l10n.privacyLastUpdated,
                           style: PaycifTextStyle.caption,
@@ -69,7 +70,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
               ),
             ),
 
-            const SizedBox(height: 24),
+            SizedBox(height: 24),
 
             // Privacy highlights
             Container(
@@ -86,12 +87,12 @@ class PrivacyPolicyScreen extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      const Icon(
-                        Icons.shield_rounded,
+                      Icon(
+                        PhosphorIcons.shield,
                         color: Color(0xFFF59E0B),
                         size: 20,
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: 8),
                       PaycifText(
                         l10n.privacyHighlightsTitle,
                         style: PaycifTextStyle.body,
@@ -100,7 +101,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: 12),
                   _buildHighlightItem(context, l10n.privacyHighlight1, isDark),
                   _buildHighlightItem(context, l10n.privacyHighlight2, isDark),
                   _buildHighlightItem(context, l10n.privacyHighlight3, isDark),
@@ -109,46 +110,46 @@ class PrivacyPolicyScreen extends StatelessWidget {
               ),
             ),
 
-            const SizedBox(height: 24),
+            SizedBox(height: 24),
 
             // Privacy Sections
             _buildSection(
               context,
               l10n.privacySection1Title,
               l10n.privacySection1Content,
-              Icons.data_usage_rounded,
+              PhosphorIcons.database,
               isDark,
             ),
             _buildSection(
               context,
               l10n.privacySection2Title,
               l10n.privacySection2Content,
-              Icons.storage_rounded,
+              PhosphorIcons.hardDrive,
               isDark,
             ),
             _buildSection(
               context,
               l10n.privacySection3Title,
               l10n.privacySection3Content,
-              Icons.share_rounded,
+              PhosphorIcons.share,
               isDark,
             ),
             _buildSection(
               context,
               l10n.privacySection4Title,
               l10n.privacySection4Content,
-              Icons.security_rounded,
+              PhosphorIcons.shield,
               isDark,
             ),
             _buildSection(
               context,
               l10n.privacySection5Title,
               l10n.privacySection5Content,
-              Icons.person_rounded,
+              PhosphorIcons.person,
               isDark,
             ),
 
-            const SizedBox(height: 24),
+            SizedBox(height: 24),
 
             // Contact Section
             Container(
@@ -168,13 +169,13 @@ class PrivacyPolicyScreen extends StatelessWidget {
                     color: AppTheme.textPrimaryColor(context),
                     fontWeight: FontWeight.w600,
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: 8),
                   PaycifText(
                     l10n.privacyContactContent,
                     style: PaycifTextStyle.caption,
                     color: AppTheme.textSecondaryColor(context),
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
@@ -187,12 +188,12 @@ class PrivacyPolicyScreen extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(
-                          Icons.email_outlined,
+                        Icon(
+                          PhosphorIcons.envelope,
                           size: 16,
                           color: Color(0xFF10B981),
                         ),
-                        const SizedBox(width: 6),
+                        SizedBox(width: 6),
                         PaycifText(
                           'privacy@paycif.com',
                           style: PaycifTextStyle.caption,
@@ -206,7 +207,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
               ),
             ),
 
-            const SizedBox(height: 32),
+            SizedBox(height: 32),
           ],
         ),
       ),
@@ -219,12 +220,12 @@ class PrivacyPolicyScreen extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
-            Icons.check_circle_rounded,
+          Icon(
+            PhosphorIcons.checkCircle,
             color: Color(0xFF10B981),
             size: 18,
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: 8),
           Expanded(
             child: PaycifText(
               text,
@@ -269,7 +270,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
                 ),
                 child: Icon(icon, size: 18, color: const Color(0xFF10B981)),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Expanded(
                 child: PaycifText(
                   title,
@@ -280,7 +281,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           PaycifText(
             content,
             style: PaycifTextStyle.body,

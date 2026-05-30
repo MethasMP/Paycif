@@ -1,4 +1,5 @@
 import 'dart:io' show Platform;
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 
 import 'package:local_auth/local_auth.dart';
@@ -15,14 +16,14 @@ class BiometricProfile {
   final String bioName;
   final IconData bioIcon;
 
-  const BiometricProfile({
+  BiometricProfile({
     required this.availableTypes,
     this.primaryType,
     this.identityConfidence = 0.0,
     this.contextualGuidance = "Detecting Identity...",
     this.bioName = "Biometrics",
-    this.bioIcon = Icons.fingerprint_rounded,
-  });
+    IconData? bioIcon,
+  }) : bioIcon = bioIcon ?? PhosphorIcons.fingerprint;
 
   factory BiometricProfile.analyze(
     List<BiometricType> types, {
@@ -31,35 +32,35 @@ class BiometricProfile {
     BiometricType? primary;
     String guidance = "Locked"; // Default guidance if no primary type found
     String name = "Biometrics";
-    IconData icon = Icons.fingerprint_rounded;
+    IconData icon = PhosphorIcons.fingerprint;
 
     // Priority Logic (The "Standard")
     if (types.contains(BiometricType.face)) {
       primary = BiometricType.face;
       guidance = "Looking for you...";
       name = Platform.isIOS ? "Face ID" : "Face Unlock";
-      icon = Icons.face_unlock_rounded;
+      icon = PhosphorIcons.smiley;
     } else if (types.contains(BiometricType.iris)) {
       primary = BiometricType.iris;
       guidance = "Scan your iris";
       name = "Iris Scan";
-      icon = Icons.remove_red_eye_rounded;
+      icon = PhosphorIcons.eye;
     } else if (types.contains(BiometricType.fingerprint)) {
       primary = BiometricType.fingerprint;
       guidance = "Touch to Verify";
       name = Platform.isIOS ? "Touch ID" : "Fingerprint";
-      icon = Icons.fingerprint_rounded;
+      icon = PhosphorIcons.fingerprint;
     } else if (types.contains(BiometricType.strong) || types.contains(BiometricType.weak)) {
       primary = types.contains(BiometricType.strong) ? BiometricType.strong : BiometricType.weak;
       guidance = "Verify your identity";
       name = "Biometrics";
-      icon = Icons.fingerprint_rounded;
+      icon = PhosphorIcons.fingerprint;
     } else if (types.isNotEmpty) {
       // Fallback for future types
       primary = types.first;
       guidance = "Verify your identity";
       name = "Biometrics";
-      icon = Icons.fingerprint_rounded;
+      icon = PhosphorIcons.fingerprint;
     }
 
     return BiometricProfile(
@@ -319,7 +320,7 @@ class SecurityController extends ChangeNotifier {
     try {
       final canCheck = await auth.canCheckBiometrics;
       if (!canCheck) {
-        return const BiometricProfile(
+        return BiometricProfile(
           availableTypes: [],
           contextualGuidance: "No biometrics available",
         );
@@ -341,7 +342,7 @@ class SecurityController extends ChangeNotifier {
       return BiometricProfile.analyze(available, confidence: confidence);
     } catch (e) {
       debugPrint('Sentinel Analysis Failed: $e');
-      return const BiometricProfile(
+      return BiometricProfile(
         availableTypes: [],
         contextualGuidance: "Biometric analysis failed",
       );

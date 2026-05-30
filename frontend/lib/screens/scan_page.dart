@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -191,9 +192,9 @@ class _ScanPageState extends State<ScanPage> {
                 _buildPremiumTopBar(),
                 const Spacer(),
                 _buildInstructionText(),
-                const SizedBox(height: 32),
+                SizedBox(height: 32),
                 _buildGlassActionButtons(),
-                const SizedBox(height: 48),
+                SizedBox(height: 48),
               ],
             ),
           ),
@@ -207,12 +208,12 @@ class _ScanPageState extends State<ScanPage> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
-            Icons.videocam_off_rounded,
+          Icon(
+            PhosphorIcons.videoCameraSlash,
             color: Colors.white38,
             size: 64,
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           Text(
             AppLocalizations.of(context)!.scanErrorCamera,
             style: const TextStyle(color: Colors.white70),
@@ -253,7 +254,7 @@ class _ScanPageState extends State<ScanPage> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           _buildGlassIconButton(
-            icon: Icons.close_rounded,
+            icon: PhosphorIcons.x,
             onTap: () {
               if (widget.onBack != null) {
                 widget.onBack!();
@@ -263,7 +264,7 @@ class _ScanPageState extends State<ScanPage> {
             },
           ),
           _buildGlassIconButton(
-            icon: _isFlashOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
+            icon: _isFlashOn ? PhosphorIcons.lightning : PhosphorIcons.lightningSlash,
             isSelected: _isFlashOn,
             onTap: () async {
               await _cameraController.toggleTorch();
@@ -281,13 +282,13 @@ class _ScanPageState extends State<ScanPage> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         _buildLongGlassButton(
-          Icons.photo_library_rounded,
+          PhosphorIcons.image,
           l10n.commonUpload,
           _pickFromGallery,
         ),
-        const SizedBox(width: 20),
+        SizedBox(width: 20),
         _buildLongGlassButton(
-          Icons.help_outline_rounded,
+          PhosphorIcons.question,
           l10n.commonHelp,
           () => _showHelpModal(),
         ),
@@ -342,7 +343,7 @@ class _ScanPageState extends State<ScanPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(icon, color: Colors.white, size: 20),
-                const SizedBox(width: 10),
+                SizedBox(width: 10),
                 Text(
                   label,
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -384,7 +385,7 @@ class _ScanPageState extends State<ScanPage> {
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              const SizedBox(height: 32),
+              SizedBox(height: 32),
               Text(
                 l10n.scanGuideTitle,
                 style: Theme.of(context).textTheme.headlineLarge?.copyWith(
@@ -392,7 +393,7 @@ class _ScanPageState extends State<ScanPage> {
                   color: Colors.white,
                 ),
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: 24),
               _buildHelpItem(
                 '📱',
                 l10n.scanGuidePromptPayTitle,
@@ -408,7 +409,7 @@ class _ScanPageState extends State<ScanPage> {
                 l10n.scanGuideCurrencyTitle,
                 l10n.scanGuideCurrencyDesc,
               ),
-              const SizedBox(height: 32),
+              SizedBox(height: 32),
               SizedBox(
                 width: double.infinity,
                 height: 56,
@@ -451,7 +452,7 @@ class _ScanPageState extends State<ScanPage> {
             ),
             child: Text(emoji, style: const TextStyle(fontSize: 24)),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

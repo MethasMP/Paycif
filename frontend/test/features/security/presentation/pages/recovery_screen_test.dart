@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:provider/provider.dart';
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 
 import 'package:frontend/features/security/presentation/pages/recovery_screen.dart';
 import 'package:frontend/features/security/presentation/logic/security_controller.dart';
@@ -75,7 +76,7 @@ void main() {
 
       expect(find.text('Security Lockout'), findsOneWidget);
       expect(find.text('Locked for 1 hour'), findsOneWidget);
-      expect(find.byIcon(Icons.lock_person_rounded), findsOneWidget);
+      expect(find.byIcon(PhosphorIcons.lockKey), findsOneWidget);
       // Ensure form is NOT visible or replaced?
       // Our code replaces the whole body content.
       expect(find.byType(TextFormField), findsNothing);

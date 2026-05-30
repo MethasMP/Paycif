@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../cubit/sumsub_kyc_cubit.dart';
@@ -46,22 +47,22 @@ class _KycScreenState extends State<KycScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.shield_outlined, color: Colors.blue, size: 80)
+                  Icon(PhosphorIcons.shield, color: Colors.blue, size: 80)
                     .animate(onPlay: (controller) => controller.repeat())
                     .shimmer(duration: 2.seconds),
-                  const SizedBox(height: 32),
+                  SizedBox(height: 32),
                   Text(
                     state is SumsubLoading ? 'Preparing Secure Link...' : 'Identity Verification',
                     style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w600),
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16),
                   if (state is SumsubFailed) ...[
                     Text(
                       state.reason,
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.redAccent, fontSize: 14),
                     ),
-                    const SizedBox(height: 24),
+                    SizedBox(height: 24),
                     ElevatedButton(
                       onPressed: () => context.read<SumsubKycCubit>().initKyc(),
                       child: const Text('Retry Verification'),
@@ -72,7 +73,7 @@ class _KycScreenState extends State<KycScreen> {
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Colors.white70, fontSize: 16),
                     ),
-                    const SizedBox(height: 48),
+                    SizedBox(height: 48),
                     const CircularProgressIndicator(color: Colors.blue),
                   ],
                 ],

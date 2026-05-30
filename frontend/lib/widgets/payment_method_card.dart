@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -83,7 +84,7 @@ class PaymentMethodCard extends StatelessWidget {
               ),
               child: Center(child: icon),
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: 16),
 
             // Title & Subtitle
             Expanded(
@@ -105,7 +106,7 @@ class PaymentMethodCard extends StatelessWidget {
                         ),
                       ),
                       if (isDefault) ...[
-                        const SizedBox(width: 8),
+                        SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
@@ -130,7 +131,7 @@ class PaymentMethodCard extends StatelessWidget {
                     ],
                   ),
                   if (subtitle != null) ...[
-                    const SizedBox(height: 4),
+                    SizedBox(height: 4),
                     Text(
                       subtitle!,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -153,8 +154,8 @@ class PaymentMethodCard extends StatelessWidget {
                   color: Color(0xFF3949AB),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
-                  Icons.check_rounded,
+                child: Icon(
+                  PhosphorIcons.check,
                   color: Colors.white,
                   size: 16,
                 ),

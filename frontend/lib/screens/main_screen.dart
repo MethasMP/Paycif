@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -235,11 +236,11 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                     height: _barHeight,
                     child: Row(
                       children: [
-                        _buildTabItem(0, Icons.home_outlined, Icons.home_rounded, colWidth),
-                        _buildTabItem(1, Icons.receipt_long_outlined, Icons.receipt_long_rounded, colWidth),
+                        _buildTabItem(0, PhosphorIcons.house, PhosphorIcons.house, colWidth),
+                        _buildTabItem(1, PhosphorIcons.receipt, PhosphorIcons.receipt, colWidth),
                         SizedBox(width: colWidth), // Center spacer for FAB
-                        _buildTabItem(2, Icons.credit_card_outlined, Icons.credit_card_rounded, colWidth),
-                        _buildTabItem(3, Icons.person_outline_rounded, Icons.person_rounded, colWidth),
+                        _buildTabItem(2, PhosphorIcons.creditCard, PhosphorIcons.creditCard, colWidth),
+                        _buildTabItem(3, PhosphorIcons.user, PhosphorIcons.person, colWidth),
                       ],
                     ),
                   ),
@@ -293,9 +294,9 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                                   ),
                                 ],
                               ),
-                              child: const Center(
+                              child: Center(
                                 child: Icon(
-                                  Icons.qr_code_scanner_rounded,
+                                  PhosphorIcons.qrCode,
                                   color: Color(0xFF412402), // accent-900
                                   size: 28.0, // 28px QR icon
                                 ),

@@ -1,4 +1,5 @@
 import 'dart:io' show Platform;
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
@@ -239,7 +240,7 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
       items.add(
         _buildMethodTile(
           id: 'apple_pay',
-          icon: Icons.apple,
+          icon: PhosphorIcons.appleLogo,
           title: 'Apple Pay',
           subtitle: l10n.paymentReliable,
           isDark: isDark,
@@ -268,11 +269,11 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
     }
 
     // 3. Add New Card (at the very bottom)
-    items.add(const SizedBox(height: 24));
+    items.add(SizedBox(height: 24));
     items.add(_buildAddNewCardTile(isDark));
 
     // 4. Trust Footer
-    items.add(const SizedBox(height: 32));
+    items.add(SizedBox(height: 32));
     items.add(_buildTrustFooter(isDark));
 
     return items;
@@ -311,7 +312,7 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
         color: Colors.redAccent,
-        child: const Icon(Icons.delete_outline, color: Colors.white, size: 24),
+        child: Icon(PhosphorIcons.trash, color: Colors.white, size: 24),
       ),
       child: GestureDetector(
         onTap: () => _selectMethod(id),
@@ -328,7 +329,7 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
                   borderRadius: BorderRadius.circular(_iconRadius),
                 ),
                 child: Icon(
-                  Icons.credit_card,
+                  PhosphorIcons.creditCard,
                   color: isDark ? Colors.white70 : Colors.grey[700],
                   size: 22,
                 ),
@@ -348,7 +349,7 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
                           ),
                         ),
                         if (isRecommended) ...[
-                          const SizedBox(width: 8),
+                          SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 6,
@@ -371,7 +372,7 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
                         ],
                       ],
                     ),
-                    const SizedBox(height: 2),
+                    SizedBox(height: 2),
                     Text(
                       'Expires ${card.formattedExpiry}',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -383,8 +384,8 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
               ),
               if (_isEditMode)
                 IconButton(
-                  icon: const Icon(
-                    Icons.remove_circle,
+                  icon: Icon(
+                    PhosphorIcons.minusCircle,
                     color: Colors.redAccent,
                     size: 22,
                   ),
@@ -448,7 +449,7 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
                         ),
                       ),
                       if (isRecommended) ...[
-                        const SizedBox(width: 8),
+                        SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 6,
@@ -471,7 +472,7 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
                       ],
                     ],
                   ),
-                  const SizedBox(height: 2),
+                  SizedBox(height: 2),
                   Text(
                     subtitle,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -489,7 +490,7 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
   }
 
   Widget _buildSelectionIndicator(bool isSelected, bool isDark) {
-    if (!isSelected) return const SizedBox(width: 26, height: 26);
+    if (!isSelected) return SizedBox(width: 26, height: 26);
     // 💎 World-Class Emerald Checkmark (Brand Signature)
     return Container(
       width: 26,
@@ -498,7 +499,7 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
         color: Color(0xFF10B981),
         shape: BoxShape.circle,
       ),
-      child: const Icon(Icons.check_rounded, color: Colors.white, size: 16),
+      child: Icon(PhosphorIcons.check, color: Colors.white, size: 16),
     );
   }
 
@@ -519,11 +520,11 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.add_rounded,
+              PhosphorIcons.plus,
               color: isDark ? Colors.white70 : Colors.grey[600],
               size: 22,
             ),
-            const SizedBox(width: 10),
+            SizedBox(width: 10),
             Text(
               l10n.sheetAddPayment,
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -542,8 +543,8 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(Icons.lock_outline, size: 14, color: AppTheme.textSecondaryColor(context)),
-        const SizedBox(width: 6),
+        Icon(PhosphorIcons.lock, size: 14, color: AppTheme.textSecondaryColor(context)),
+        SizedBox(width: 6),
         Text(
           l10n.biometricLogin,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -583,7 +584,7 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
                       )
                       .animate(onPlay: (controller) => controller.repeat())
                       .shimmer(duration: 1200.ms, color: shimmerBase),
-                  const SizedBox(width: 14),
+                  SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -604,7 +605,7 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
                               delay: 100.ms,
                               color: shimmerBase,
                             ),
-                        const SizedBox(height: 8),
+                        SizedBox(height: 8),
                         Container(
                               width: 80,
                               height: 10,

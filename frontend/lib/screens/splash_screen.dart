@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -158,8 +159,8 @@ class _SplashScreenState extends State<SplashScreen> {
                       ),
                     ],
                   ),
-                  child: const Icon(
-                    Icons.shield_outlined,
+                  child: Icon(
+                    PhosphorIcons.shield,
                     size: 60,
                     color: Colors.white,
                   ),
@@ -168,7 +169,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 .fadeIn(duration: 800.ms)
                 .scale(duration: 600.ms, curve: Curves.elasticOut),
 
-            const SizedBox(height: 32),
+            SizedBox(height: 32),
 
             // Title
             Text(
@@ -182,7 +183,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 .fadeIn(delay: 400.ms, duration: 600.ms)
                 .slideY(begin: 0.2, end: 0),
 
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
 
             // Tagline
             Text(
@@ -193,7 +194,7 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
             ).animate().fadeIn(delay: 600.ms, duration: 600.ms),
 
-            const SizedBox(height: 64),
+            SizedBox(height: 64),
 
             // Loading Text
             PaycifText(

@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:camera/camera.dart';
@@ -140,7 +141,7 @@ class _KineticGuideState extends State<KineticGuide> {
                 letterSpacing: 6,
               ),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         Container(
           height: 1,
           width: 60,
@@ -160,12 +161,12 @@ class _KineticGuideState extends State<KineticGuide> {
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.face_retouching_natural,
+          Icon(
+            PhosphorIcons.smiley,
             color: Colors.cyanAccent,
             size: 28,
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -116,20 +117,20 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
         child: SingleChildScrollView(
           child: Column(
             children: [
-              const SizedBox(height: 60),
+              SizedBox(height: 60),
 
               // 🛡️ Premium Identity Header
               Center(
                 child: Column(
                   children: [
-                    const PaycifIconContainer(
-                      icon: Icons.lock_person_rounded,
+                    PaycifIconContainer(
+                      icon: PhosphorIcons.lockKey,
                     ).animate().scale(
                       duration: 600.ms,
                       curve: Curves.elasticOut,
                     ),
 
-                    const SizedBox(height: 16),
+                    SizedBox(height: 16),
 
                     Text(
                           'Unlock Paycif',
@@ -143,7 +144,7 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
                         .fadeIn(delay: 200.ms)
                         .slideY(begin: 0.2, end: 0),
 
-                    const SizedBox(height: 8),
+                    SizedBox(height: 8),
 
                     Text(
                       'Verify your identity to continue',
@@ -156,7 +157,7 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
                 ),
               ),
 
-              const SizedBox(height: 40),
+              SizedBox(height: 40),
 
               // 🔢 PIN Keypad with Forgot Action
               PinEntryWidget(
@@ -165,7 +166,7 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
                 onForgotPin: () => _handleForgotPin(context),
               ).animate().fadeIn(delay: 600.ms),
 
-              const SizedBox(height: 24),
+              SizedBox(height: 24),
 
               // 🤳 Biometric Action (Primary Alternative)
               if (_profileFuture != null)
@@ -191,7 +192,7 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
                   },
                 ),
 
-              const SizedBox(height: 40),
+              SizedBox(height: 40),
             ],
           ),
         ),

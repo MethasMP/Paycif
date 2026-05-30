@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../models/saved_card.dart';
@@ -39,7 +40,7 @@ class PaymentMethodPicker extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             Container(
               width: 40,
               height: 4,
@@ -60,7 +61,7 @@ class PaymentMethodPicker extends StatelessWidget {
                   ),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(Icons.close),
+                    icon: Icon(PhosphorIcons.x),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
@@ -69,7 +70,7 @@ class PaymentMethodPicker extends StatelessWidget {
             if (Platform.isIOS)
               _buildPickerTile(
                 context: context,
-                icon: Icons.apple,
+                icon: PhosphorIcons.appleLogo,
                 title: l10n.applePay,
                 isSelected: preferredMethodType == 'apple_pay',
                 onTap: () {
@@ -80,7 +81,7 @@ class PaymentMethodPicker extends StatelessWidget {
             ...savedCards.map(
               (card) => _buildPickerTile(
                 context: context,
-                icon: Icons.credit_card_rounded,
+                icon: PhosphorIcons.creditCard,
                 title: '${card.brand} •••• ${card.lastDigits}',
                 isSelected: preferredMethodType == 'card' &&
                     _normalizeId(preferredMethodId ?? '', 'card') ==
@@ -94,7 +95,7 @@ class PaymentMethodPicker extends StatelessWidget {
             const Divider(),
             _buildPickerTile(
               context: context,
-              icon: Icons.add_rounded,
+              icon: PhosphorIcons.plus,
               title: l10n.paymentAddMethod,
               isSelected: false,
               onTap: () {
@@ -102,7 +103,7 @@ class PaymentMethodPicker extends StatelessWidget {
                 onAddMethod();
               },
             ),
-            const SizedBox(height: 32),
+            SizedBox(height: 32),
           ],
         ),
       ),
@@ -129,7 +130,7 @@ class PaymentMethodPicker extends StatelessWidget {
         ),
       ),
       trailing: isSelected
-          ? const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981))
+          ? Icon(PhosphorIcons.checkCircle, color: Color(0xFF10B981))
           : null,
       onTap: onTap,
     );

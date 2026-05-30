@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -91,7 +92,7 @@ class _NotificationSettingsScreenState
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               child: Column(
@@ -102,7 +103,7 @@ class _NotificationSettingsScreenState
                     context,
                     AppLocalizations.of(context)!.notificationSecurityAlwaysOn,
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16),
                   _buildCard(context, [
                     _buildSwitchTile(
                       context,
@@ -114,21 +115,21 @@ class _NotificationSettingsScreenState
                       )!.notificationAccountSecurityDesc,
                       value: true,
                       onChanged: null, // Disabled: Security is mandatory
-                      icon: Icons.shield_rounded,
+                      icon: PhosphorIcons.shield,
                       activeColor: const Color(
                         0xFF10B981,
                       ), // Green for Security
                     ),
                   ]),
 
-                  const SizedBox(height: 32),
+                  SizedBox(height: 32),
 
                   // 💳 2. Transaction Activity
                   _buildSectionHeader(
                     context,
                     AppLocalizations.of(context)!.notificationWalletActivity,
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16),
                   _buildCard(context, [
                     _buildSwitchTile(
                       context,
@@ -143,19 +144,19 @@ class _NotificationSettingsScreenState
                         setState(() => _transactionAlerts = val);
                         _savePreference(_keyTransaction, val);
                       },
-                      icon: Icons.account_balance_wallet_rounded,
+                      icon: PhosphorIcons.wallet,
                       activeColor: const Color(0xFFF59E0B), // Brand Color
                     ),
                   ]),
 
-                  const SizedBox(height: 32),
+                  SizedBox(height: 32),
 
                   // 📣 3. Marketing & Updates
                   _buildSectionHeader(
                     context,
                     AppLocalizations.of(context)!.notificationUpdates,
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16),
                   _buildCard(context, [
                     _buildSwitchTile(
                       context,
@@ -170,12 +171,12 @@ class _NotificationSettingsScreenState
                         setState(() => _marketingUpdates = val);
                         _savePreference(_keyMarketing, val);
                       },
-                      icon: Icons.campaign_rounded,
+                      icon: PhosphorIcons.megaphone,
                       activeColor: Colors.blueAccent,
                     ),
                   ]),
 
-                  const SizedBox(height: 48),
+                  SizedBox(height: 48),
 
                   // Footer Note
                   Center(

@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -142,15 +143,15 @@ class _PayNotifyWidgetState extends State<_PayNotifyWidget> {
     switch (widget.type) {
       case PayNotifyType.success:
         baseColor = const Color(0xFF10B981); // Emerald
-        icon = Icons.check_circle_rounded;
+        icon = PhosphorIcons.checkCircle;
         break;
       case PayNotifyType.error:
         baseColor = const Color(0xFFEF4444); // Rose
-        icon = Icons.error_rounded;
+        icon = PhosphorIcons.warningCircle;
         break;
       case PayNotifyType.info:
         baseColor = const Color(0xFF3B82F6); // Blue
-        icon = Icons.info_rounded;
+        icon = PhosphorIcons.info;
         break;
     }
 
@@ -202,7 +203,7 @@ class _PayNotifyWidgetState extends State<_PayNotifyWidget> {
                               ),
                               child: Icon(icon, color: baseColor, size: 20),
                             ),
-                            const SizedBox(width: 16),
+                            SizedBox(width: 16),
                             Expanded(
                               child: Text(
                                 widget.message,

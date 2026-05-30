@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -42,7 +43,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   IconButton(
-                    icon: Icon(Icons.close_rounded, color: AppTheme.textPrimaryColor(context)),
+                    icon: Icon(PhosphorIcons.x, color: AppTheme.textPrimaryColor(context)),
                     onPressed: () => _navigateToHome(context),
                   ),
                 ],
@@ -53,9 +54,9 @@ class PaymentSuccessScreen extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Column(
                   children: [
-                    const SizedBox(height: 20),
+                    SizedBox(height: 20),
                     _buildSuccessIcon(theme),
-                    const SizedBox(height: 24),
+                    SizedBox(height: 24),
                     Text(
                       'Payment Successful',
                       style: theme.textTheme.headlineSmall?.copyWith(
@@ -63,7 +64,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                         color: AppTheme.textPrimaryColor(context),
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: 8),
                     Text(
                       'Your payment has been processed successfully',
                       textAlign: TextAlign.center,
@@ -71,12 +72,12 @@ class PaymentSuccessScreen extends StatelessWidget {
                         color: AppTheme.textSecondaryColor(context),
                       ),
                     ),
-                    const SizedBox(height: 40),
+                    SizedBox(height: 40),
                     RepaintBoundary(
                       key: _boundaryKey,
                       child: _buildReceiptCard(context, isDark),
                     ),
-                    const SizedBox(height: 40),
+                    SizedBox(height: 40),
                   ],
                 ),
               ),
@@ -103,7 +104,7 @@ class PaymentSuccessScreen extends StatelessWidget {
         ? const Color(0xFF2BBF9E)
         : const Color(0xFF0F6E56);
     return Icon(
-      Icons.check_circle_rounded,
+      PhosphorIcons.checkCircle,
       color: successColor, // primary-600
       size: 64, // 64px check icon
     );
@@ -134,9 +135,9 @@ class PaymentSuccessScreen extends StatelessWidget {
             amount: amount,
             style: theme.textTheme.displayLarge, // Amount 32px
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: 24),
           const Divider(color: Color(0xFFE5E5E3), height: 1),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           _buildBilingualDetailRow(
             context,
             englishLabel: 'Recipient',
@@ -210,7 +211,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                   color: AppTheme.textPrimaryColor(context),
                 ),
               ),
-              const SizedBox(height: 2),
+              SizedBox(height: 2),
               Text(
                 thaiLabel,
                 style: theme.textTheme.bodySmall?.copyWith(
@@ -250,7 +251,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                     ),
                   ),
                   if (thaiValue.isNotEmpty) ...[
-                    const SizedBox(height: 2),
+                    SizedBox(height: 2),
                     Text(
                       thaiValue,
                       textAlign: TextAlign.right,

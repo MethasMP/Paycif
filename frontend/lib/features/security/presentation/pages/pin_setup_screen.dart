@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../logic/security_controller.dart';
@@ -118,9 +119,9 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const SizedBox(height: 40),
-              const PaycifIconContainer(icon: Icons.lock_outline_rounded),
-              const SizedBox(height: 24),
+              SizedBox(height: 40),
+              PaycifIconContainer(icon: PhosphorIcons.lock),
+              SizedBox(height: 24),
               Text(
                 'Create a Secure PIN',
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
@@ -128,7 +129,7 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
                     ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: 8),
               Text(
                 'This PIN will be used to protect your account and approve transactions.',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -136,10 +137,10 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
                     ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 40),
+              SizedBox(height: 40),
               Expanded(
                 child: _isProcessing
-                    ? const Center(child: CircularProgressIndicator())
+                    ? Center(child: CircularProgressIndicator())
                     : PinEntryWidget(
                         isSetupMode: true,
                         showLabel: true,

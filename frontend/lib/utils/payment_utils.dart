@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 
 class PaymentUtils {
@@ -47,17 +48,17 @@ class PaymentUtils {
       // Note: In a production app, these would be custom SVG icons
       // for Visa/Mastercard. Using standard Material icons as placeholders.
       case 'Visa':
-        return Icons.credit_card;
+        return PhosphorIcons.creditCard;
       case 'Mastercard':
-        return Icons.credit_card;
+        return PhosphorIcons.creditCard;
       case 'Amex':
-        return Icons.credit_card;
+        return PhosphorIcons.creditCard;
       case 'JCB':
-        return Icons.credit_card;
+        return PhosphorIcons.creditCard;
       case 'UnionPay':
-        return Icons.credit_card;
+        return PhosphorIcons.creditCard;
       default:
-        return Icons.credit_card;
+        return PhosphorIcons.creditCard;
     }
   }
 

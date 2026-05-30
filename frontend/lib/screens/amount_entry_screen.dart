@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
 import 'package:frontend/utils/emv_parser.dart';
@@ -125,7 +126,7 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+          icon: Icon(PhosphorIcons.caretLeft, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text('Send Money'),
@@ -147,7 +148,7 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
                       child: Column(
                         children: [
                           _buildRecipientCard(isDark),
-                          const SizedBox(height: 60),
+                          SizedBox(height: 60),
                           _buildAmountDisplay(isDark),
                         ],
                       ),
@@ -187,7 +188,7 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
       child: Row(
         children: [
           _buildCircleAvatar(),
-          const SizedBox(width: 16),
+          SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -204,7 +205,7 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
                           color: Colors.grey[400],
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: 8),
                       Text(
                         'Looking up...',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -234,8 +235,8 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
               ],
             ),
           ),
-          const Icon(
-            Icons.verified_rounded,
+          Icon(
+            PhosphorIcons.sealCheck,
             color: Color(0xFF10B981),
             size: 20,
           ),
@@ -245,8 +246,8 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
   }
 
   Widget _buildCircleAvatar() {
-    return const PaycifIconContainer(
-      icon: Icons.person_outline_rounded,
+    return PaycifIconContainer(
+      icon: PhosphorIcons.user,
       size: 28,
     );
   }
@@ -262,7 +263,7 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
                 fontWeight: FontWeight.w500,
               ),
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: 16),
         PaycifAmountText(
           amount: double.tryParse(_controller.text) ?? 0.0,
           isLarge: true,
@@ -302,7 +303,7 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
       child: ElevatedButton(
         onPressed: (_isProcessing || !hasAmount) ? null : _onNext,
         child: _isProcessing
-            ? const SizedBox(
+            ? SizedBox(
                 width: 24,
                 height: 24,
                 child: CircularProgressIndicator(

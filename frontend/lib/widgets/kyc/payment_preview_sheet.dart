@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import '../../services/qr_aggregator_service.dart';
 import '../../theme/app_theme.dart';
@@ -36,11 +37,11 @@ class PaymentPreviewBottomSheet extends StatelessWidget {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: 24),
 
           // Symbol of the method
           _buildMethodIcon(),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
 
           // Merchant Name
           Text(
@@ -50,7 +51,7 @@ class PaymentPreviewBottomSheet extends StatelessWidget {
                 ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: 4),
           Text(
             this.context.subtitle,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -59,7 +60,7 @@ class PaymentPreviewBottomSheet extends StatelessWidget {
                 ),
           ),
 
-          const SizedBox(height: 32),
+          SizedBox(height: 32),
 
           // Amount Display (if available)
           if (this.context.amount != null) ...[
@@ -89,7 +90,7 @@ class PaymentPreviewBottomSheet extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 32),
+            SizedBox(height: 32),
           ],
 
           // Trust Badge
@@ -103,8 +104,8 @@ class PaymentPreviewBottomSheet extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.verified_user, color: Color(0xFF10B981), size: 14),
-                  const SizedBox(width: 6),
+                  Icon(PhosphorIcons.shieldCheck, color: Color(0xFF10B981), size: 14),
+                  SizedBox(width: 6),
                   Text(
                     'Verified via Paycif Layer',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -116,7 +117,7 @@ class PaymentPreviewBottomSheet extends StatelessWidget {
               ),
             ),
 
-          const SizedBox(height: 32),
+          SizedBox(height: 32),
 
           // Actions
           Row(
@@ -139,7 +140,7 @@ class PaymentPreviewBottomSheet extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: 16),
               Expanded(
                 child: ElevatedButton(
                   onPressed: onConfirm,
@@ -174,23 +175,23 @@ class PaymentPreviewBottomSheet extends StatelessWidget {
 
     switch (context.method) {
       case PaymentMethodType.promptPay:
-        icon = Icons.account_balance_rounded;
+        icon = PhosphorIcons.bank;
         color = const Color(0xFF1A1F71);
         break;
       case PaymentMethodType.billPayment:
-        icon = Icons.receipt_long_rounded;
+        icon = PhosphorIcons.receipt;
         color = const Color(0xFFF59E0B);
         break;
       case PaymentMethodType.shopeePay:
-        icon = Icons.shopping_bag_rounded;
+        icon = PhosphorIcons.shoppingBag;
         color = const Color(0xFFEE4D2D); // Shopee Orange
         break;
       case PaymentMethodType.truemoney:
-        icon = Icons.account_balance_wallet_rounded;
+        icon = PhosphorIcons.wallet;
         color = const Color(0xFFFF8100); // TrueMoney Orange
         break;
       default:
-        icon = Icons.qr_code_2_rounded;
+        icon = PhosphorIcons.qrCode;
         color = Colors.grey;
     }
 

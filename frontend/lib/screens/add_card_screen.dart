@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
@@ -61,7 +62,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
         centerTitle: true,
         leading: IconButton(
           icon: Icon(
-            Icons.arrow_back,
+            PhosphorIcons.arrowLeft,
             color: AppTheme.textPrimaryColor(context),
           ),
           onPressed: () => Navigator.pop(context),
@@ -75,7 +76,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
               // Card Preview
               _buildCardPreview(),
 
-              const SizedBox(height: 40),
+              SizedBox(height: 40),
 
               // Form
               Form(
@@ -109,7 +110,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 20),
+                    SizedBox(height: 20),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -117,7 +118,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
                           child: _buildTextField(
                             label: l10n.cardExpiry,
                             hint: l10n.cardExpiryHint,
-                            icon: Icons.calendar_today,
+                            icon: PhosphorIcons.calendar,
                             keyboardType: TextInputType.number,
                             focusNode: _expiryFocus,
                             inputFormatters: [_ExpiryDateFormatter()],
@@ -156,12 +157,12 @@ class _AddCardScreenState extends State<AddCardScreen> {
                             },
                           ),
                         ),
-                        const SizedBox(width: 20),
+                        SizedBox(width: 20),
                         Expanded(
                           child: _buildTextField(
                             label: l10n.cardCVV,
                             hint: '123',
-                            icon: Icons.lock_outline,
+                            icon: PhosphorIcons.lock,
                             keyboardType: TextInputType.number,
                             focusNode: _cvvFocus,
                             inputFormatters: [
@@ -184,11 +185,11 @@ class _AddCardScreenState extends State<AddCardScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
+                    SizedBox(height: 20),
                     _buildTextField(
                       label: l10n.cardHolder,
                       hint: l10n.cardHolderHint,
-                      icon: Icons.person_outline,
+                      icon: PhosphorIcons.user,
                       focusNode: _nameFocus,
                       inputFormatters: [
                         FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z ]')),
@@ -207,7 +208,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
                 ),
               ),
 
-              const SizedBox(height: 40),
+              SizedBox(height: 40),
 
               // Save Button
               SizedBox(
@@ -259,7 +260,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
                       ? Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const SizedBox(
+                            SizedBox(
                               width: 20,
                               height: 20,
                               child: CircularProgressIndicator(
@@ -267,7 +268,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
                                 strokeWidth: 2,
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            SizedBox(width: 12),
                             Text(
                               _loadingMessage,
                               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -360,7 +361,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
               fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: 24),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -431,7 +432,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
             color: AppTheme.textSecondaryColor(context),
           ),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
             color: Theme.of(context).cardColor,

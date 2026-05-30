@@ -1,3 +1,4 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
@@ -50,10 +51,10 @@ class TransactionDetailScreen extends StatelessWidget {
               child: Column(
                 children: [
                   PaycifIconContainer(
-                    icon: isCredit ? Icons.arrow_downward : Icons.arrow_upward,
+                    icon: isCredit ? PhosphorIcons.arrowDown : PhosphorIcons.arrowUp,
                     size: 32,
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16),
                   Text(
                     isCredit
                         ? l10n.transactionReceivedFrom
@@ -62,7 +63,7 @@ class TransactionDetailScreen extends StatelessWidget {
                           color: AppTheme.textSecondaryColor(context),
                         ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: 8),
                   Text(
                     transaction.description.isEmpty
                         ? (isDebit
@@ -75,7 +76,7 @@ class TransactionDetailScreen extends StatelessWidget {
                           color: AppTheme.textPrimaryColor(context),
                         ),
                   ),
-                  const SizedBox(height: 24),
+                  SizedBox(height: 24),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -94,9 +95,9 @@ class TransactionDetailScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 32),
+                  SizedBox(height: 32),
                   const Divider(),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16),
                   _buildDetailRow(
                     context,
                     l10n.transactionStatus,
@@ -125,7 +126,7 @@ class TransactionDetailScreen extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 40),
+            SizedBox(height: 40),
             // 2. Help Button
             SizedBox(
               width: double.infinity,
@@ -140,7 +141,7 @@ class TransactionDetailScreen extends StatelessWidget {
                       l10n.transactionSupportTicketCreated,
                     );
                   },
-                  icon: const Icon(Icons.help_outline),
+                  icon: Icon(PhosphorIcons.question),
                   label: Text(l10n.transactionHelp),
                   style: OutlinedButton.styleFrom(
                     shape: RoundedRectangleBorder(
