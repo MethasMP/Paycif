@@ -236,11 +236,11 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                     height: _barHeight,
                     child: Row(
                       children: [
-                        _buildTabItem(0, PhosphorIcons.house, PhosphorIcons.house, colWidth),
-                        _buildTabItem(1, PhosphorIcons.receipt, PhosphorIcons.receipt, colWidth),
+                        _buildTabItem(0, PhosphorIconsRegular.house, PhosphorIconsFill.house, colWidth),
+                        _buildTabItem(1, PhosphorIconsRegular.receipt, PhosphorIconsFill.receipt, colWidth), // Note: We can toggle duotone dynamically if there is new activity
                         SizedBox(width: colWidth), // Center spacer for FAB
-                        _buildTabItem(2, PhosphorIcons.creditCard, PhosphorIcons.creditCard, colWidth),
-                        _buildTabItem(3, PhosphorIcons.user, PhosphorIcons.person, colWidth),
+                        _buildTabItem(2, PhosphorIconsRegular.wallet, PhosphorIconsFill.wallet, colWidth),
+                        _buildTabItem(3, PhosphorIconsRegular.userCircle, PhosphorIconsFill.userCircle, colWidth),
                       ],
                     ),
                   ),
@@ -296,7 +296,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                               ),
                               child: Center(
                                 child: Icon(
-                                  PhosphorIcons.qrCode,
+                                  PhosphorIconsBold.qrCode,
                                   color: Color(0xFF412402), // accent-900
                                   size: 28.0, // 28px QR icon
                                 ),
