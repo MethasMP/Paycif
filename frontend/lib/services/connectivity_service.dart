@@ -75,9 +75,15 @@ class ConnectivityService {
 
   void _emitStatus(List<ConnectivityResult> results) {
     try {
-      final hasConnection = results.any(
+      bool hasConnection = results.any(
         (result) => result != ConnectivityResult.none,
       );
+
+      // Workaround for iOS Simulator connectivity bug
+      if (!hasConnection && kDebugMode) {
+        debugPrint('⚠️ [Simulator Workaround] Forcing connection status to online.');
+        hasConnection = true;
+      }
       final newStatus = hasConnection
           ? ConnectivityStatus.online
           : ConnectivityStatus.offline;

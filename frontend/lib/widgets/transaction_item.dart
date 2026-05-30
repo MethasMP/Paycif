@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'dart:ui' as ui;
 import '../models/transaction.dart';
+import '../theme/app_theme.dart';
 
 import '../factories/transaction_icon_factory.dart';
 
@@ -17,8 +19,7 @@ class TransactionItem extends StatelessWidget {
     // 'PAYOUT' and 'DEBIT' are Money Out (Expenses)
     // 'CREDIT' and 'TOPUP' are Money In (Income)
     final isDebit = transaction.type == 'PAYOUT' || transaction.type == 'DEBIT';
-    final isCredit =
-        transaction.type == 'CREDIT' || transaction.type == 'TOPUP';
+    final isCredit = transaction.type == 'CREDIT';
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // 2. Smart Icon Logic (Delegated to Factory)
@@ -27,24 +28,14 @@ class TransactionItem extends StatelessWidget {
       isDebit,
     );
 
-    // 3. Color Palette
-    // Spending: Red for "Money Out"
-    // Income: Emerald/Green for "Money In"
-    final amountColor = isCredit
-        ? const Color(0xFF10B981) // Emerald-500
-        : const Color(0xFFEF4444); // Red-500
+    // 3. Color Palette - "Thai Money is Green" (all THB amounts are teal)
+    final amountColor = AppTheme.primaryColor(context);
 
-    final iconBgColor = isCredit
-        ? const Color(0xFFD1FAE5) // Emerald-100
-        : (isDark
-              ? const Color(0xFF450A0A) // Red-950 (Dark mode BG)
-              : const Color(0xFFFEE2E2)); // Red-100 (Light mode BG)
+    final iconBgColor = isDark
+        ? const Color(0xFF2BBF9E).withValues(alpha: 0.1)
+        : const Color(0xFFE1F5EE); // primary-100
 
-    final iconColor = isCredit
-        ? const Color(0xFF059669) // Emerald-600
-        : (isDark
-              ? const Color(0xFFF87171) // Red-400 (Dark mode Icon)
-              : const Color(0xFFDC2626)); // Red-600 (Light mode Icon)
+    final iconColor = AppTheme.primaryColor(context);
 
     // 4. Formatting
     final prefix = isCredit ? '+' : '-';
@@ -57,7 +48,7 @@ class TransactionItem extends StatelessWidget {
     // 5. Title & Subtitle
     // If description is generic, make it cleaner
     String title = transaction.description;
-    if (title.isEmpty) title = isDebit ? 'Payment' : 'Top Up';
+    if (title.isEmpty) title = isDebit ? 'Payment' : 'Deposit';
     if (title.contains('Unknown Merchant')) {
       title = 'Merchant Payment'; // Clean up generic backend text
     }
@@ -90,19 +81,11 @@ class TransactionItem extends StatelessWidget {
               // --- Icon Container ---
               ExcludeSemantics(
                 child: Container(
-                  width: 44,
-                  height: 44,
+                  width: 40,
+                  height: 40,
                   decoration: BoxDecoration(
                     color: iconBgColor,
-                    borderRadius: BorderRadius.circular(22),
-                    // 🪄 Steve Jobs Soft Glow: Light emanates from the transaction
-                    boxShadow: [
-                      BoxShadow(
-                        color: amountColor.withValues(alpha: 0.15),
-                        blurRadius: 10,
-                        spreadRadius: 2,
-                      ),
-                    ],
+                    shape: BoxShape.circle,
                   ),
                   child: Icon(iconData, color: iconColor, size: 20),
                 ),
@@ -116,22 +99,18 @@ class TransactionItem extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w600, // Semi-bold for title
-                        color: isDark ? Colors.white : const Color(0xFF111827),
-                      ),
+                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        color: AppTheme.textPrimaryColor(context),
+                      ), // H2: 20/28, 500
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      timeStr, // Simplify subtitle to just time/date for now
+                      timeStr,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: isDark
-                            ? Colors.grey[400]
-                            : const Color(0xFF6B7280),
-                        fontSize: 12,
-                      ),
+                        color: AppTheme.textSecondaryColor(context),
+                      ), // Caption: 13/20, 400
                     ),
                   ],
                 ),
@@ -139,14 +118,16 @@ class TransactionItem extends StatelessWidget {
 
               // --- Amount ---
               const SizedBox(width: 8),
-              Text(
-                '$prefix$formattedAmount',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  fontWeight: FontWeight.w600, // Medium weight for numbers
-                  color: amountColor,
-                  fontFamily:
-                      'RobotoMono', // Optional: Monospaced for numbers alignment if available, else default
-                  letterSpacing: -0.5,
+              Flexible(
+                child: Text(
+                  '${isCredit ? '+' : '-'} THB $formattedAmount', // Western digits, THB symbol before
+                  style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                    color: amountColor,
+                    fontFeatures: const [ui.FontFeature.tabularFigures()],
+                  ), // Numeric: 28/36, 500
+                  textAlign: TextAlign.right,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

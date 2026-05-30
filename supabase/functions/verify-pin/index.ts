@@ -284,7 +284,11 @@ async function verifyWithHashWasm(phcString: string, pin: string): Promise<boole
     }
 
     // Decode Salt (Index 4)
-    const saltB64 = parts[4];
+    let saltB64 = parts[4];
+    // PHC string format omits base64 padding. Add padding so Deno's decoder doesn't crash.
+    while (saltB64.length % 4 !== 0) {
+      saltB64 += '=';
+    }
     const salt = base64Decode(saltB64);
 
     // Re-hash

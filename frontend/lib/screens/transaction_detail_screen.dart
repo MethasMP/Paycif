@@ -3,6 +3,9 @@ import 'package:intl/intl.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
 import '../models/transaction.dart';
 import '../utils/pay_notify.dart';
+import '../widgets/paycif_icon_container.dart';
+import '../widgets/paycif_amount_text.dart';
+import '../theme/app_theme.dart';
 
 class TransactionDetailScreen extends StatelessWidget {
   final Transaction transaction;
@@ -13,22 +16,12 @@ class TransactionDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final isDebit = transaction.type == 'PAYOUT' || transaction.type == 'DEBIT';
-    final isCredit =
-        transaction.type == 'CREDIT' || transaction.type == 'TOPUP';
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    final amountColor = isCredit
-        ? const Color(0xFF10B981) // Emerald-500
-        : const Color(0xFFEF4444); // Red-500
+    final isCredit = transaction.type == 'CREDIT';
 
     final prefix = isCredit ? '+' : '-';
-    final currencyFormat = NumberFormat('#,##0.00', 'en_US');
-    final formattedAmount = currencyFormat.format(transaction.amount / 100);
 
     return Scaffold(
-      backgroundColor: isDark
-          ? Colors.black
-          : Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(l10n.transactionDetailsTitle),
         centerTitle: true,
@@ -56,37 +49,31 @@ class TransactionDetailScreen extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      color: amountColor.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      isCredit ? Icons.arrow_downward : Icons.arrow_upward,
-                      color: amountColor,
-                      size: 32,
-                    ),
+                  PaycifIconContainer(
+                    icon: isCredit ? Icons.arrow_downward : Icons.arrow_upward,
+                    size: 32,
                   ),
                   const SizedBox(height: 16),
                   Text(
                     isCredit
                         ? l10n.transactionReceivedFrom
                         : l10n.transactionPaidTo,
-                    style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppTheme.textSecondaryColor(context),
+                        ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     transaction.description.isEmpty
                         ? (isDebit
-                              ? l10n.transactionMerchantPayment
-                              : l10n.transactionTopUpLabel)
+                            ? l10n.transactionMerchantPayment
+                            : 'Deposit')
                         : transaction.description,
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textPrimaryColor(context),
+                        ),
                   ),
                   const SizedBox(height: 24),
                   Row(
@@ -95,20 +82,15 @@ class TransactionDetailScreen extends StatelessWidget {
                     textBaseline: TextBaseline.alphabetic,
                     children: [
                       Text(
-                        '$prefix ฿ ',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: amountColor,
-                        ),
+                        '$prefix ',
+                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.primaryColor(context),
+                            ),
                       ),
-                      Text(
-                        formattedAmount,
-                        style: TextStyle(
-                          fontSize: 36,
-                          fontWeight: FontWeight.bold,
-                          color: amountColor,
-                        ),
+                      PaycifAmountText(
+                        amount: transaction.amount / 100,
+                        isLarge: true,
                       ),
                     ],
                   ),
@@ -116,21 +98,25 @@ class TransactionDetailScreen extends StatelessWidget {
                   const Divider(),
                   const SizedBox(height: 16),
                   _buildDetailRow(
+                    context,
                     l10n.transactionStatus,
                     l10n.transactionStatusCompleted,
-                    color: Colors.green,
+                    color: Theme.of(context).colorScheme.secondary,
                   ),
                   _buildDetailRow(
+                    context,
                     l10n.transactionTime,
                     DateFormat(
                       'MMM d, yyyy • h:mm a',
                     ).format(transaction.createdAt),
                   ),
                   _buildDetailRow(
+                    context,
                     l10n.transactionId,
                     transaction.id.substring(0, 8).toUpperCase(),
                   ),
                   _buildDetailRow(
+                    context,
                     l10n.transactionMethod,
                     isCredit
                         ? l10n.transactionBankTransfer
@@ -170,20 +156,24 @@ class TransactionDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDetailRow(String label, String value, {Color? color}) {
+  Widget _buildDetailRow(BuildContext context, String label, String value, {Color? color}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppTheme.textSecondaryColor(context),
+                ),
+          ),
           Text(
             value,
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
-              color: color,
-            ),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: color ?? AppTheme.textPrimaryColor(context),
+                ),
           ),
         ],
       ),

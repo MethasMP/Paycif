@@ -114,7 +114,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 18,
-                              fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                           const SizedBox(height: 4),

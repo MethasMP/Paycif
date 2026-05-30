@@ -134,12 +134,11 @@ class _KineticGuideState extends State<KineticGuide> {
       children: [
         Text(
           "IDENTITY ASSURANCE V1.0",
-          style: TextStyle(
-            color: Colors.cyanAccent.withValues(alpha: 0.9),
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 6,
-          ),
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: Colors.cyanAccent.withValues(alpha: 0.9),
+                fontWeight: FontWeight.w600,
+                letterSpacing: 6,
+              ),
         ),
         const SizedBox(height: 12),
         Container(
@@ -172,17 +171,18 @@ class _KineticGuideState extends State<KineticGuide> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
+                Text(
                   "KINETIC ALIGNMENT",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
                 ),
                 Text(
                   "Align your face with the cyber-mesh guide.",
-                  style: TextStyle(color: Colors.white70, fontSize: 11),
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: Colors.white70,
+                      ),
                 ),
               ],
             ),

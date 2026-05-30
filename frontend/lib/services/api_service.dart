@@ -470,10 +470,17 @@ class ApiService {
         ),
       );
 
-      if (response.statusCode == 200) {
+      if (response.statusCode >= 200 && response.statusCode < 300) {
         return json.decode(response.body);
       } else {
-        throw Exception(_friendlyError(response.statusCode));
+        String errorMessage = 'Unable to get balance';
+        try {
+          final errorData = json.decode(response.body);
+          errorMessage = errorData['error'] ?? errorMessage;
+        } catch (_) {
+          errorMessage = _friendlyError(response.statusCode);
+        }
+        throw Exception(errorMessage);
       }
     });
   }
@@ -541,12 +548,17 @@ class ApiService {
       ),
     );
 
-    if (response.statusCode == 200) {
+    if (response.statusCode >= 200 && response.statusCode < 300) {
       return jsonDecode(response.body);
-    } else if (response.statusCode == 402) {
-      throw Exception('Insufficient balance.');
     } else {
-      throw Exception('Payout failed: ${_friendlyError(response.statusCode)}');
+      String errorMessage = 'Payout failed';
+      try {
+        final errorData = jsonDecode(response.body);
+        errorMessage = errorData['error'] ?? errorMessage;
+      } catch (_) {
+        errorMessage = 'Payout failed: ${_friendlyError(response.statusCode)}';
+      }
+      throw Exception(errorMessage);
     }
   }
 
@@ -621,12 +633,12 @@ class ApiService {
   }
 
   /// Fallback: Get transactions directly from Supabase
-  Future<List<dynamic>> _getTransactionsFromSupabase(String walletId) async {
+  Future<List<dynamic>> _getTransactionsFromSupabase(String profileId) async {
     try {
       final response = await Supabase.instance.client
           .from('transactions')
           .select()
-          .eq('wallet_id', walletId)
+          .eq('profile_id', profileId)
           .order('created_at', ascending: false)
           .limit(20);
       return response as List<dynamic>;
@@ -655,12 +667,17 @@ class ApiService {
         ),
       );
 
-      if (response.statusCode == 200) {
+      if (response.statusCode >= 200 && response.statusCode < 300) {
         return jsonDecode(response.body);
       } else {
-        throw Exception(
-          'Unable to update rates: ${_friendlyError(response.statusCode)}',
-        );
+        String errorMessage = 'Unable to update rates';
+        try {
+          final errorData = jsonDecode(response.body);
+          errorMessage = errorData['error'] ?? errorMessage;
+        } catch (_) {
+          errorMessage = 'Unable to update rates: ${_friendlyError(response.statusCode)}';
+        }
+        throw Exception(errorMessage);
       }
     }, isCritical: false); // ← NO RETRIES for rates
   }
@@ -686,16 +703,27 @@ class ApiService {
         (headers) => http.get(uri, headers: headers),
       );
 
-      if (response.statusCode == 200) {
+      if (response.statusCode >= 200 && response.statusCode < 300) {
         return jsonDecode(response.body);
       } else {
         debugPrint("Backend Error (Quote): ${response.body}");
-        throw Exception(
-          'Unable to get quote: ${_friendlyError(response.statusCode)}',
-        );
+        String errorMessage = 'Unable to get quote';
+        try {
+          final errorData = jsonDecode(response.body);
+          errorMessage = errorData['error'] ?? errorMessage;
+        } catch (_) {
+          errorMessage = 'Unable to get quote: ${_friendlyError(response.statusCode)}';
+        }
+        throw Exception(errorMessage);
       }
     } catch (e) {
       debugPrint("Connection Error (Quote): $e");
+      if (e is Exception && e.toString().startsWith('Exception: Unable to get quote')) {
+        rethrow;
+      }
+      if (e is Exception && !e.toString().contains('Unable to connect to server')) {
+        rethrow; // It's our own backend error exception, don't mask it
+      }
       throw Exception('Unable to connect to server.');
     }
   }
@@ -750,14 +778,8 @@ class ApiService {
       if (response.status != 200) {
         final errorData = response.data as Map<String, dynamic>?;
         final errorMessage = errorData?['error'] ?? 'Transfer failed';
-        // Check popular errors
-        if (errorMessage.contains('balance')) {
-          throw Exception('Insufficient balance.');
-        }
-        if (errorMessage.contains('limit')) {
-          throw Exception('Daily limit exceeded.');
-        }
-        throw Exception('Transfer failed. Please try again.');
+        
+        throw Exception(errorMessage);
       }
 
       final data = response.data as Map<String, dynamic>;
@@ -766,106 +788,6 @@ class ApiService {
       return data;
     } catch (e) {
       debugPrint('❌ Payout error: $e');
-      rethrow;
-    }
-  }
-
-  // ============================================================================
-  // Execute OPn TopUp (calls inbound-handler Edge Function)
-  // ============================================================================
-  Future<Map<String, dynamic>> executeOpnTopUp({
-    required int amountSatang, // Charge amount (includes fee)
-    int? walletAmountSatang, // Optional: What goes into wallet (net of fee)
-    String? token, // Now optional for Saved Cards
-    String? cardId,
-    bool isApplePay = false,
-    required String referenceId,
-    String? description,
-    Map<String, String>? headers,
-  }) async {
-    final supabase = Supabase.instance.client;
-    final user = supabase.auth.currentUser;
-
-    if (user == null) throw Exception('User not authenticated');
-
-    try {
-      debugPrint(
-        '💸 Executing Opn TopUp: Charge=$amountSatang, Wallet=${walletAmountSatang ?? amountSatang} satang (Token: ${token ?? "SAVED_CARD"}, Card: $cardId, ApplePay: $isApplePay)',
-      );
-
-      final payload = {
-        'amount_satang': amountSatang.toInt(), // Charge amount (for Omise)
-        // Wallet amount: If specified, use it; otherwise backend calculates from Omise net
-        if (walletAmountSatang != null)
-          'wallet_amount_satang': walletAmountSatang.toInt(),
-        'token': token,
-        'card_id': cardId,
-        if (isApplePay) 'is_apple_pay': true,
-        'reference_id': referenceId,
-        'description': description ?? 'Wallet Top Up',
-        'currency': 'thb',
-      };
-
-      debugPrint('🚀 [ApiService] Sending Payload to Edge Function: $payload');
-
-      // 🛡️ Use Robust Invoker
-      final response = await ApiService.invokeEdgeFunction(
-        'inbound-handler', // inbound-handler
-        body: payload,
-        headers: headers,
-      );
-
-      if (response.status != 200) {
-        final errorData = response.data as Map<String, dynamic>?;
-        final errorMessage = errorData?['error'] ?? 'Top-Up failed';
-        if (errorMessage.contains('card')) {
-          throw Exception('Card declined. Please check your card info.');
-        }
-        throw Exception('Top-Up failed. Please try again.');
-      }
-
-      final data = response.data as Map<String, dynamic>;
-      debugPrint('✅ TopUp success: ${data['message']}');
-      return data;
-    } catch (e) {
-      debugPrint('❌ TopUp error: $e');
-      rethrow;
-    }
-  }
-
-  // ============================================================================
-  // Get Daily Top-up Status (calls get-topup-status Edge Function)
-  // ============================================================================
-  Future<Map<String, dynamic>> getDailyTopUpStatus() async {
-    // 🛡️ Ensure Valid Session
-    await ApiService.ensureSessionValid();
-    final user = Supabase.instance.client.auth.currentUser;
-
-    if (user == null) throw Exception('User not authenticated');
-
-    try {
-      debugPrint(
-        '📊 Fetching daily top-up status (via High-Performance Rust Engine)...',
-      );
-
-      // 🚀 WORLD-CLASS: This call hits Go, which offloads to Rust
-      // utilizing DashMap and Jemalloc for microsecond latency.
-      final response = await _safeRequest(
-        (headers) => http.get(Uri.parse('$baseUrl/limits'), headers: headers),
-      );
-
-      if (response.statusCode != 200) {
-        throw Exception('Failed to get top-up status: ${response.statusCode}');
-      }
-
-      final limits = jsonDecode(response.body) as Map<String, dynamic>;
-
-      debugPrint(
-        '📊 Daily top-up status: ${limits['current_total_baht']}/${limits['max_daily_baht']} THB (Source: Rust Engine)',
-      );
-      return limits;
-    } catch (e) {
-      debugPrint('❌ Get top-up status error: $e');
       rethrow;
     }
   }

@@ -235,7 +235,7 @@ class _ScanPageState extends State<ScanPage> {
           ),
           child: Text(
             AppLocalizations.of(context)!.scanGuideTitle,
-            style: const TextStyle(
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
               color: Colors.white,
               fontWeight: FontWeight.w500,
               letterSpacing: 0.5,
@@ -345,7 +345,7 @@ class _ScanPageState extends State<ScanPage> {
                 const SizedBox(width: 10),
                 Text(
                   label,
-                  style: const TextStyle(
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.w600,
                   ),
@@ -387,9 +387,8 @@ class _ScanPageState extends State<ScanPage> {
               const SizedBox(height: 32),
               Text(
                 l10n.scanGuideTitle,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
+                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
                   color: Colors.white,
                 ),
               ),
@@ -423,7 +422,10 @@ class _ScanPageState extends State<ScanPage> {
                   ),
                   child: Text(
                     l10n.commonGotIt,
-                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
@@ -456,14 +458,16 @@ class _ScanPageState extends State<ScanPage> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
                     color: Colors.white,
                   ),
                 ),
                 Text(
                   desc,
-                  style: const TextStyle(color: Colors.white60, fontSize: 13),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.white60,
+                  ),
                 ),
               ],
             ),

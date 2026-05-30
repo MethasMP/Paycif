@@ -152,7 +152,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      backgroundColor: const Color(0xFF1A1F71), // Premium Deep Blue
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -169,25 +169,25 @@ class _LoginScreenState extends State<LoginScreen> {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          const Color(0xFFF59E0B), // Gold
-                          const Color(0xFFD97706), // Darker Gold
+                          Theme.of(context).primaryColor,
+                          Theme.of(context).primaryColorDark,
                         ],
-                        begin: .topLeft,
-                        end: .bottomRight,
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFFF59E0B).withValues(alpha: 0.4),
+                          color: Theme.of(context).primaryColor.withValues(alpha: 0.4),
                           blurRadius: 20,
                           spreadRadius: 5,
                         ),
                       ],
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.shield_outlined, // Emphasize Security ("Paycif")
                       size: 50,
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.onPrimary,
                     ),
                   )
                   .animate()
@@ -209,8 +209,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.displayLarge
                             ?.copyWith(
-                              color: Colors.white,
-                              fontWeight: .w800,
+                              color: Theme.of(context).textTheme.displayLarge?.color,
+                              fontWeight: FontWeight.w600,
                               letterSpacing: -1.0,
                             ),
                       ),
@@ -219,8 +219,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         width: 10,
                         height: 10,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF59E0B), // Gold Dot
-                          shape: .circle,
+                          color: Theme.of(context).primaryColor, // Gold Dot
+                          shape: BoxShape.circle,
                         ),
                       ).animate().scale(delay: 800.ms, duration: 300.ms),
                     ],
@@ -241,7 +241,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     'Secure. Simple. Global.', // Keep for style or localize? I'll keep for brand flavor as per user preference.
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.7),
+                      color: Theme.of(context).textTheme.bodyLarge?.color?.withValues(alpha: 0.54),
                       letterSpacing: 2.0,
                       fontSize: 16,
                     ),
@@ -258,63 +258,39 @@ class _LoginScreenState extends State<LoginScreen> {
               const Spacer(),
 
               if (_isLoading)
-                const Center(
+                Center(
                   child: CircularProgressIndicator(
-                    color: Color(0xFFF59E0B), // Gold
+                    color: Theme.of(context).primaryColor,
                   ),
                 )
               else ...[
                 // Google Button
-                Container(
-                      width: double.infinity,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.1),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: Semantics(
+                    label: 'Log in with Google',
+                    button: true,
+                    child: ElevatedButton(
+                      onPressed: _googleSignIn,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Image.asset(
+                            'assets/images/google_logo.png',
+                            height: 20, // Standard size
+                            width: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            "${l10n.commonLogIn} with Google",
+                            textAlign: TextAlign.center,
                           ),
                         ],
-                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Semantics(
-                        label: 'Log in with Google',
-                        button: true,
-                        child: ElevatedButton(
-                          onPressed: _googleSignIn,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: Colors.black, // Ripple color
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Image.asset(
-                                'assets/images/google_logo.png',
-                                height: 20, // Standard size
-                                width: 20,
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                "${l10n.commonLogIn} with Google",
-                                textAlign: TextAlign.center,
-                                style: Theme.of(context).textTheme.titleMedium
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.normal,
-                                      color: Colors.black, // Forced Black
-                                    ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    )
+                    ),
+                  ),
+                )
                     .animate()
                     .fadeIn(duration: 600.ms, delay: 800.ms)
                     .slideY(
@@ -327,56 +303,31 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 16),
 
                 // Apple Button
-                Container(
-                      width: double.infinity,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.1),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: Semantics(
+                    label: 'Log in with Apple',
+                    button: true,
+                    child: OutlinedButton(
+                      onPressed: _appleSignInMock,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.apple,
+                            size: 24, // Standard size
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            "${l10n.commonLogIn} with Apple",
+                            textAlign: TextAlign.center,
                           ),
                         ],
-                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Semantics(
-                        label: 'Log in with Apple',
-                        button: true,
-                        child: ElevatedButton(
-                          onPressed: _appleSignInMock,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: Colors.black,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.apple,
-                                color: Colors.black,
-                                size: 24, // Standard size
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                "${l10n.commonLogIn} with Apple",
-                                textAlign: TextAlign.center,
-                                style: Theme.of(context).textTheme.titleMedium
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.normal,
-                                      color: Colors.black,
-                                    ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    )
+                    ),
+                  ),
+                )
                     .animate()
                     .fadeIn(duration: 600.ms, delay: 900.ms)
                     .slideY(

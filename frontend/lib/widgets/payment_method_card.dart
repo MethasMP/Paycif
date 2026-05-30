@@ -95,13 +95,12 @@ class PaymentMethodCard extends StatelessWidget {
                       Flexible(
                         child: Text(
                           title,
-                          style: TextStyle(
-                            color: isDark
-                                ? Colors.white
-                                : const Color(0xFF1E293B),
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15,
-                          ),
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: isDark
+                                    ? Colors.white
+                                    : const Color(0xFF1E293B),
+                                fontWeight: FontWeight.w600,
+                              ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -118,13 +117,13 @@ class PaymentMethodCard extends StatelessWidget {
                             ).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(6),
                           ),
-                          child: const Text(
+                          child: Text(
                             'Default',
-                            style: TextStyle(
-                              color: Color(0xFF10B981),
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  color: const Color(0xFF10B981),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                ),
                           ),
                         ),
                       ],
@@ -134,10 +133,9 @@ class PaymentMethodCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       subtitle!,
-                      style: TextStyle(
-                        color: isDark ? Colors.grey[400] : Colors.grey[600],
-                        fontSize: 13,
-                      ),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: isDark ? Colors.grey[400] : Colors.grey[600],
+                          ),
                     ),
                   ],
                 ],

@@ -4,6 +4,7 @@ import 'package:frontend/features/security/data/repositories/security_repository
 import 'package:frontend/features/security/data/datasources/security_remote_data_source.dart';
 import 'package:frontend/features/security/data/datasources/crypto_service.dart';
 import 'package:frontend/features/security/data/datasources/secure_storage_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cryptography/cryptography.dart';
 import 'dart:convert';
 
@@ -16,6 +17,8 @@ class MockCryptoService extends Mock implements CryptoService {}
 class MockSecureStorageService extends Mock implements SecureStorageService {}
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   late SecurityRepositoryImpl repository;
   late MockSecurityRemoteDataSource mockRemoteDataSource;
   late MockCryptoService mockCryptoService;
@@ -23,6 +26,7 @@ void main() {
   late SimpleKeyPair mockKeyPair;
 
   setUp(() async {
+    SharedPreferences.setMockInitialValues({'biometric_enabled': true});
     mockRemoteDataSource = MockSecurityRemoteDataSource();
     mockCryptoService = MockCryptoService();
     mockSecureStorage = MockSecureStorageService();
@@ -127,6 +131,19 @@ void main() {
       when(
         () => mockSecureStorage.read('device_private_key_seed'),
       ).thenAnswer((_) async => null);
+      when(
+        () => mockCryptoService.createHardwareIdentity(),
+      ).thenAnswer((_) async => 'mock_public_key');
+      when(
+        () => mockRemoteDataSource.bindDevice(
+          publicKey: any(named: 'publicKey'),
+          deviceId: any(named: 'deviceId'),
+          deviceName: any(named: 'deviceName'),
+          osType: any(named: 'osType'),
+          metadata: any(named: 'metadata'),
+          trustScore: any(named: 'trustScore'),
+        ),
+      ).thenThrow(Exception('Device not bound'));
 
       try {
         await repository.verifyPin('1234');

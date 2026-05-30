@@ -130,7 +130,7 @@ class _ChangePinSheetState extends State<ChangePinSheet> {
               _getHeaderText(l10n),
               key: ValueKey(_currentStep),
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w600,
                 color: _getHeaderColor(context),
               ),
             ),
@@ -245,7 +245,7 @@ class _ChangePinSheetState extends State<ChangePinSheet> {
                             'PIN Updated Successfully',
                             style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(
-                                  fontWeight: FontWeight.bold,
+                                  fontWeight: FontWeight.w600,
                                   color: const Color(0xFF10B981),
                                 ),
                           ).animate().fadeIn(delay: 200.ms),

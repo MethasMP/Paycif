@@ -18,6 +18,7 @@ import 'controllers/payment_controller.dart';
 import 'repositories/dashboard_repository.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'services/push_notification_service.dart';
 import 'firebase_options.dart';
 
@@ -49,6 +50,16 @@ Future<void> main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    // 📲 Obtain APNS token for iOS devices (required for Supabase realtime)
+    final apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+    if (apnsToken != null) {
+      await Supabase.instance.client.auth.updateUser(
+        UserAttributes(data: {'apns_token': apnsToken}),
+      );
+      debugPrint('✅ APNS token set in Supabase');
+    } else {
+      debugPrint('⚠️ APNS token not available yet');
+    }
     await PushNotificationService.initialize();
   } catch (e) {
     debugPrint('⚠️ Firebase initialization failed: $e');

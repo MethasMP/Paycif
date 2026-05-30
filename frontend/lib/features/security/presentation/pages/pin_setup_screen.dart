@@ -3,7 +3,11 @@ import 'package:provider/provider.dart';
 import '../logic/security_controller.dart';
 import '../widgets/pin_entry_widget.dart';
 import '../../../../screens/main_screen.dart';
+import '../../../../widgets/paycif_icon_container.dart';
 
+
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class PinSetupScreen extends StatefulWidget {
   const PinSetupScreen({super.key});
@@ -48,11 +52,11 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
             title: Text('Enable $bioName?'),
             content: Text('Use $bioName to unlock Paycif faster and more securely.'),
             actions: [
-              TextButton(
+              OutlinedButton(
                 onPressed: () => Navigator.of(context).pop(false),
                 child: const Text('Not Now'),
               ),
-              FilledButton(
+              ElevatedButton(
                 onPressed: () => Navigator.of(context).pop(true),
                 child: Text('Enable $bioName'),
               ),
@@ -63,6 +67,28 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
 
       if (wantsBiometrics == true && mounted) {
         try {
+          // 1. Save biometric state locally
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('biometric_enabled', true);
+
+          // 2. Sync biometric state to server database
+          try {
+            final supabase = Supabase.instance.client;
+            final user = supabase.auth.currentUser;
+            if (user != null) {
+              await supabase
+                  .from('profiles')
+                  .update({
+                    'biometric_enabled': true,
+                    'updated_at': DateTime.now().toIso8601String(),
+                  })
+                  .eq('id', user.id);
+            }
+          } catch (dbErr) {
+            debugPrint('⚠️ Failed to sync biometric policy: $dbErr');
+          }
+
+          // 3. Bind device using hardware key (will use biometric_enabled = true check)
           await securityController.bindDevice();
         } catch (e) {
           if (mounted) {
@@ -85,6 +111,7 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40.0),
@@ -92,16 +119,12 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const SizedBox(height: 40),
-              Icon(
-                Icons.lock_outline_rounded,
-                size: 64,
-                color: Theme.of(context).primaryColor,
-              ),
+              const PaycifIconContainer(icon: Icons.lock_outline_rounded),
               const SizedBox(height: 24),
               Text(
                 'Create a Secure PIN',
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w600,
                     ),
                 textAlign: TextAlign.center,
               ),

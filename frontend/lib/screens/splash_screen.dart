@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
+
 import 'package:flutter_animate/flutter_animate.dart';
 import '../controllers/dashboard_controller.dart';
 import 'login_screen.dart';
 import '../l10n/generated/app_localizations.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
-import 'main_screen.dart';
+
 import 'package:provider/provider.dart';
 import '../features/security/presentation/logic/security_controller.dart';
 import '../features/security/presentation/pages/security_unlock_screen.dart';
 import '../features/security/presentation/pages/pin_setup_screen.dart';
+import '../widgets/paycif_text.dart';
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -136,7 +137,7 @@ class _SplashScreenState extends State<SplashScreen> {
       backgroundColor: const Color(0xFF1A1F71), // Navy
       body: Center(
         child: Column(
-          mainAxisAlignment: .center,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             // Paycif Logo (Shield)
             Container(
@@ -145,10 +146,10 @@ class _SplashScreenState extends State<SplashScreen> {
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
-                      begin: .topLeft,
-                      end: .bottomRight,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                    shape: .circle,
+                    shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
                         color: const Color(0xFFF59E0B).withValues(alpha: 0.4),
@@ -174,7 +175,7 @@ class _SplashScreenState extends State<SplashScreen> {
                   'Paycif',
                   style: Theme.of(context).textTheme.displayMedium?.copyWith(
                     color: Colors.white,
-                    fontWeight: .w800,
+                    fontWeight: FontWeight.w600,
                   ),
                 )
                 .animate()
@@ -195,10 +196,11 @@ class _SplashScreenState extends State<SplashScreen> {
             const SizedBox(height: 64),
 
             // Loading Text
-            Text(
+            PaycifText(
                   AppLocalizations.of(context)?.splashLoading ??
                       'Connecting...',
-                  style: const TextStyle(color: Colors.white54, fontSize: 14),
+                  style: PaycifTextStyle.caption,
+                  color: Colors.white54,
                 )
                 .animate(onPlay: (controller) => controller.repeat())
                 .fadeIn(duration: 1000.ms)

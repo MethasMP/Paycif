@@ -4,6 +4,7 @@ import 'package:frontend/features/security/data/repositories/security_repository
 import 'package:frontend/features/security/data/datasources/security_remote_data_source.dart';
 import 'package:frontend/features/security/data/datasources/crypto_service.dart';
 import 'package:frontend/features/security/data/datasources/secure_storage_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cryptography/cryptography.dart';
 import 'dart:convert';
 
@@ -18,12 +19,15 @@ class MockSecureStorageService extends Mock implements SecureStorageService {}
 // But SecurityRepositoryImpl handles the try-catch for platform channels.
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   late SecurityRepositoryImpl repository;
   late MockSecurityRemoteDataSource mockRemoteDataSource;
   late MockCryptoService mockCryptoService;
   late MockSecureStorageService mockSecureStorage;
 
   setUp(() {
+    SharedPreferences.setMockInitialValues({'biometric_enabled': true});
     mockRemoteDataSource = MockSecurityRemoteDataSource();
     mockCryptoService = MockCryptoService();
     mockSecureStorage = MockSecureStorageService();

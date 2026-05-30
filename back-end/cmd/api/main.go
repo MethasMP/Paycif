@@ -9,7 +9,6 @@ import (
 	fxrpc "paysif/internal/grpc"    // Rename for clarity
 	fx_pb "paysif/internal/grpc/pb" // Import pb for FXServiceClient type
 	"paysif/internal/infrastructure/logger"
-	"paysif/internal/infrastructure/redis"
 	"paysif/internal/routing"
 	"paysif/internal/service"
 	"time"
@@ -34,8 +33,7 @@ func main() {
 	database.DB.SetMaxIdleConns(5)
 	database.DB.SetConnMaxIdleTime(1 * time.Minute)
 
-	// 1.5 Redis Infrastructure
-	redisClient := redis.NewRedisClient()
+
 
 	// 1.8 Rust Microservices Integration (Supports TCP & IPC)
 	fxAddress := os.Getenv("FX_ENGINE_URL")
@@ -75,7 +73,7 @@ func main() {
 	auditService := service.NewAuditService(database.DB)
 	alertService := service.NewAlertService()
 	cryptoService := service.NewCryptoService() // Security Init
-	fxService := service.NewFXService(database.DB, fxClientInterface, redisClient) // Inject Rust Client and Redis
+	fxService := service.NewFXService(database.DB, fxClientInterface) // Inject Rust Client
 	fxService.StartFXScheduler(context.Background())                               // Start FX loop
 	
 	// 2.5 Payment Engine Initialization (Provider Abstraction)
@@ -83,8 +81,8 @@ func main() {
 	paymentEngine.RegisterProvider(&service.OmiseProvider{APIKey: os.Getenv("OMISE_API_KEY")})
 	paymentEngine.RegisterProvider(&service.WiseProvider{Token: os.Getenv("WISE_API_TOKEN")})
 
-	// Pass redisClient and AuditService to WalletService
-	walletService := service.NewWalletService(database.DB, fxService, alertService, redisClient, auditService, paymentEngine)
+	// Pass AuditService to WalletService
+	walletService := service.NewWalletService(database.DB, fxService, alertService, auditService, paymentEngine)
 	kycService := service.NewKYCService(database.DB, cryptoService, auditService)
 	sumsubService := service.NewSumsubService()
 	sigService := service.NewSignatureService(sigServiceClient, database.DB) // Inject Rust gRPC Client and DB 🛡️
@@ -121,9 +119,8 @@ func main() {
 
 	v1 := r.Group("/api/v1")
 	v1.Use(middleware.AuthMiddleware(walletService)) // Apply Auth with Service injection 🛡️
-	v1.Use(middleware.RateLimiterMiddleware(redisClient)) // Pass Redis to RateLimiter
+	v1.Use(middleware.RateLimiterMiddleware()) // Use local in-memory RateLimiter
 	{
-		v1.POST("/transfer", transferHandler.HandleTransfer)
 		v1.GET("/balance", transferHandler.HandleBalance)
 		v1.GET("/limits", transferHandler.HandleGetLimits) // New Route for Rust Limits
 		v1.GET("/transactions", transferHandler.HandleGetTransactions)

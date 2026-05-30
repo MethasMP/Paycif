@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
@@ -7,6 +8,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../logic/security_controller.dart';
 import '../widgets/pin_entry_widget.dart';
 import '../../../../screens/main_screen.dart';
+import '../../../../widgets/paycif_icon_container.dart';
 
 import 'recovery_screen.dart';
 
@@ -27,8 +29,16 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
     _profileFuture = context.read<SecurityController>().getBiometricProfile();
     // 🚀 Auto-Trigger Biometric for a "Magical" Experience
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _tryBiometricUnlock();
+      _tryAutoBiometricUnlock();
     });
+  }
+
+  Future<void> _tryAutoBiometricUnlock() async {
+    final prefs = await SharedPreferences.getInstance();
+    final biometricEnabled = prefs.getBool('biometric_enabled') ?? false;
+    if (biometricEnabled) {
+      _tryBiometricUnlock();
+    }
   }
 
   Future<void> _tryBiometricUnlock() async {
@@ -36,6 +46,12 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
     setState(() => _isAuthenticating = true);
 
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final biometricEnabled = prefs.getBool('biometric_enabled') ?? false;
+      if (!biometricEnabled) {
+        return; // Abort if disabled by preference
+      }
+
       final controller = context.read<SecurityController>();
       BiometricProfile? profile;
       if (_profileFuture != null) {
@@ -106,20 +122,8 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
               Center(
                 child: Column(
                   children: [
-                    Container(
-                      width: 72,
-                      height: 72,
-                      decoration: BoxDecoration(
-                        color: Theme.of(
-                          context,
-                        ).primaryColor.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.lock_person_rounded,
-                        size: 32,
-                        color: Theme.of(context).primaryColor,
-                      ),
+                    const PaycifIconContainer(
+                      icon: Icons.lock_person_rounded,
                     ).animate().scale(
                       duration: 600.ms,
                       curve: Curves.elasticOut,
@@ -131,7 +135,7 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
                           'Unlock Paycif',
                           style: Theme.of(context).textTheme.headlineSmall
                               ?.copyWith(
-                                fontWeight: FontWeight.bold,
+                                fontWeight: FontWeight.w600,
                                 letterSpacing: -0.5,
                               ),
                         )
@@ -144,7 +148,7 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
                     Text(
                       'Verify your identity to continue',
                       style: TextStyle(
-                        color: Colors.grey.shade500,
+                        color: Theme.of(context).textTheme.bodySmall?.color,
                         fontSize: 14,
                       ),
                     ).animate().fadeIn(delay: 400.ms),
@@ -171,14 +175,19 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
                     final profile = snapshot.data;
                     if (profile == null) return const SizedBox.shrink();
 
-                    return TextButton.icon(
-                      onPressed: _tryBiometricUnlock,
-                      icon: Icon(profile.bioIcon),
-                      label: Text('Use ${profile.bioName}'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Theme.of(context).primaryColor,
-                      ),
-                    ).animate().fadeIn(delay: 800.ms);
+                    return FutureBuilder<bool>(
+                      future: SharedPreferences.getInstance().then((prefs) => prefs.getBool('biometric_enabled') ?? false),
+                      builder: (context, enabledSnapshot) {
+                        final enabled = enabledSnapshot.data ?? false;
+                        if (!enabled) return const SizedBox.shrink();
+
+                        return OutlinedButton.icon(
+                          onPressed: _tryBiometricUnlock,
+                          icon: Icon(profile.bioIcon),
+                          label: Text('Use ${profile.bioName}'),
+                        ).animate().fadeIn(delay: 800.ms);
+                      },
+                    );
                   },
                 ),
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/qr_aggregator_service.dart';
+import '../../theme/app_theme.dart';
 
 class PaymentPreviewBottomSheet extends StatelessWidget {
   final PaymentContext context;
@@ -44,21 +45,18 @@ class PaymentPreviewBottomSheet extends StatelessWidget {
           // Merchant Name
           Text(
             this.context.title,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.5,
-            ),
+            style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 4),
           Text(
             this.context.subtitle,
-            style: TextStyle(
-              color: Colors.grey.shade500,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Colors.grey.shade500,
+                  fontWeight: FontWeight.w600,
+                ),
           ),
 
           const SizedBox(height: 32),
@@ -75,17 +73,18 @@ class PaymentPreviewBottomSheet extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     'Amount to Pay',
-                    style: TextStyle(fontWeight: FontWeight.w600),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                   ),
                   Text(
                     '${this.context.amount} ${this.context.currency}',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFFF59E0B),
-                    ),
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.primaryColor(context),
+                        ),
                   ),
                 ],
               ),
@@ -101,18 +100,17 @@ class PaymentPreviewBottomSheet extends StatelessWidget {
                 color: const Color(0xFF10B981).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.verified_user, color: Color(0xFF10B981), size: 14),
-                  SizedBox(width: 6),
+                  const Icon(Icons.verified_user, color: Color(0xFF10B981), size: 14),
+                  const SizedBox(width: 6),
                   Text(
                     'Verified via Paycif Layer',
-                    style: TextStyle(
-                      color: Color(0xFF10B981),
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: const Color(0xFF10B981),
+                          fontWeight: FontWeight.w600,
+                        ),
                   ),
                 ],
               ),
@@ -132,12 +130,12 @@ class PaymentPreviewBottomSheet extends StatelessWidget {
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Cancel',
-                    style: TextStyle(
-                      color: Colors.grey,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: Colors.grey,
+                          fontWeight: FontWeight.w600,
+                        ),
                   ),
                 ),
               ),
@@ -154,9 +152,12 @@ class PaymentPreviewBottomSheet extends StatelessWidget {
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Continue',
-                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
                   ),
                 ),
               ),

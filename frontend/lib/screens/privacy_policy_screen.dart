@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
+import '../widgets/paycif_text.dart';
+import '../theme/app_theme.dart';
 
 class PrivacyPolicyScreen extends StatelessWidget {
   const PrivacyPolicyScreen({super.key});
@@ -48,21 +50,17 @@ class PrivacyPolicyScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        PaycifText(
                           l10n.privacyPolicy,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: PaycifTextStyle.h2,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
                         ),
                         const SizedBox(height: 4),
-                        Text(
+                        PaycifText(
                           l10n.privacyLastUpdated,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.7),
-                            fontSize: 13,
-                          ),
+                          style: PaycifTextStyle.caption,
+                          color: Colors.white.withValues(alpha: 0.7),
                         ),
                       ],
                     ),
@@ -94,20 +92,19 @@ class PrivacyPolicyScreen extends StatelessWidget {
                         size: 20,
                       ),
                       const SizedBox(width: 8),
-                      Text(
+                      PaycifText(
                         l10n.privacyHighlightsTitle,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
+                        style: PaycifTextStyle.body,
+                        color: AppTheme.textPrimaryColor(context),
+                        fontWeight: FontWeight.w600,
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
-                  _buildHighlightItem(l10n.privacyHighlight1, isDark),
-                  _buildHighlightItem(l10n.privacyHighlight2, isDark),
-                  _buildHighlightItem(l10n.privacyHighlight3, isDark),
-                  _buildHighlightItem(l10n.privacyHighlight4, isDark),
+                  _buildHighlightItem(context, l10n.privacyHighlight1, isDark),
+                  _buildHighlightItem(context, l10n.privacyHighlight2, isDark),
+                  _buildHighlightItem(context, l10n.privacyHighlight3, isDark),
+                  _buildHighlightItem(context, l10n.privacyHighlight4, isDark),
                 ],
               ),
             ),
@@ -165,21 +162,17 @@ class PrivacyPolicyScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  PaycifText(
                     l10n.privacyContactTitle,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                    ),
+                    style: PaycifTextStyle.body,
+                    color: AppTheme.textPrimaryColor(context),
+                    fontWeight: FontWeight.w600,
                   ),
                   const SizedBox(height: 8),
-                  Text(
+                  PaycifText(
                     l10n.privacyContactContent,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: isDark ? Colors.white70 : Colors.black54,
-                      height: 1.4,
-                    ),
+                    style: PaycifTextStyle.caption,
+                    color: AppTheme.textSecondaryColor(context),
                   ),
                   const SizedBox(height: 12),
                   Container(
@@ -191,22 +184,20 @@ class PrivacyPolicyScreen extends StatelessWidget {
                       color: const Color(0xFF10B981).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.email_outlined,
                           size: 16,
                           color: Color(0xFF10B981),
                         ),
-                        SizedBox(width: 6),
-                        Text(
+                        const SizedBox(width: 6),
+                        PaycifText(
                           'privacy@paycif.com',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF10B981),
-                            fontWeight: FontWeight.w500,
-                          ),
+                          style: PaycifTextStyle.caption,
+                          color: const Color(0xFF10B981),
+                          fontWeight: FontWeight.w600,
                         ),
                       ],
                     ),
@@ -222,7 +213,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHighlightItem(String text, bool isDark) {
+  Widget _buildHighlightItem(BuildContext context, String text, bool isDark) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
@@ -235,13 +226,10 @@ class PrivacyPolicyScreen extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
+            child: PaycifText(
               text,
-              style: TextStyle(
-                fontSize: 13,
-                color: isDark ? Colors.white70 : Colors.black54,
-                height: 1.4,
-              ),
+              style: PaycifTextStyle.caption,
+              color: AppTheme.textSecondaryColor(context),
             ),
           ),
         ],
@@ -283,24 +271,20 @@ class PrivacyPolicyScreen extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(
+                child: PaycifText(
                   title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: PaycifTextStyle.body,
+                  color: AppTheme.textPrimaryColor(context),
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          Text(
+          PaycifText(
             content,
-            style: TextStyle(
-              fontSize: 14,
-              color: isDark ? Colors.white70 : Colors.black54,
-              height: 1.6,
-            ),
+            style: PaycifTextStyle.body,
+            color: AppTheme.textSecondaryColor(context),
           ),
         ],
       ),

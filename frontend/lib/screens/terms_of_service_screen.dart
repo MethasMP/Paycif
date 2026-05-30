@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
+import '../widgets/paycif_text.dart';
+import '../theme/app_theme.dart';
 
 class TermsOfServiceScreen extends StatelessWidget {
   const TermsOfServiceScreen({super.key});
@@ -48,21 +50,17 @@ class TermsOfServiceScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        PaycifText(
                           l10n.termsOfService,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: PaycifTextStyle.h2,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
                         ),
                         const SizedBox(height: 4),
-                        Text(
+                        PaycifText(
                           l10n.termsLastUpdated,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.7),
-                            fontSize: 13,
-                          ),
+                          style: PaycifTextStyle.caption,
+                          color: Colors.white.withValues(alpha: 0.7),
                         ),
                       ],
                     ),
@@ -130,13 +128,10 @@ class TermsOfServiceScreen extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(
+                    child: PaycifText(
                       l10n.termsContact,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: isDark ? Colors.white70 : Colors.black54,
-                        height: 1.4,
-                      ),
+                      style: PaycifTextStyle.caption,
+                      color: AppTheme.textSecondaryColor(context),
                     ),
                   ),
                 ],
@@ -171,18 +166,17 @@ class TermsOfServiceScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          PaycifText(
             title,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            style: PaycifTextStyle.body,
+            color: AppTheme.textPrimaryColor(context),
+            fontWeight: FontWeight.w600,
           ),
           const SizedBox(height: 12),
-          Text(
+          PaycifText(
             content,
-            style: TextStyle(
-              fontSize: 14,
-              color: isDark ? Colors.white70 : Colors.black54,
-              height: 1.6,
-            ),
+            style: PaycifTextStyle.body,
+            color: AppTheme.textSecondaryColor(context),
           ),
         ],
       ),

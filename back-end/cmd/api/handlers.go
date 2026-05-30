@@ -18,106 +18,7 @@ type TransferHandler struct {
 	SignatureService *service.SignatureService
 }
 
-// TransferRequestDTO matches the expected JSON input.
-// We map this to service.TransferRequest.
-type TransferRequestDTO struct {
-	FromWalletID   string `json:"from_wallet_id" binding:"required,uuid"`
-	ToWalletID     string `json:"to_wallet_id" binding:"required,uuid"`
-	Amount         int64  `json:"amount" binding:"required,gt=0"`
-	Currency       string `json:"currency" binding:"required,len=3,uppercase"`
-	IdempotencyKey string `json:"idempotency_key" binding:"required,uuid"`
-	Description    string `json:"description" binding:"max=200"`
-}
-
-// HandleTransfer processes the transfer request.
-func (h *TransferHandler) HandleTransfer(c *gin.Context) {
-	var dto TransferRequestDTO
-	if err := c.ShouldBindJSON(&dto); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	fromID, _ := uuid.Parse(dto.FromWalletID)
-	toID, _ := uuid.Parse(dto.ToWalletID)
-
-	userIDStr, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User unauthorized"})
-		return
-	}
-	userID, err := uuid.Parse(userIDStr.(string))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID in token"})
-		return
-	}
-
-	// 🛡️ SECURITY: Hardened Device Signature Verification
-	deviceId := c.GetHeader("X-Device-Id")
-	signature := c.GetHeader("X-Device-Signature")
-
-	if deviceId == "" || signature == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Device authorization missing"})
-		return
-	}
-
-	// Fetch Public Key for this device and user
-	publicKey, err := h.SignatureService.GetDevicePublicKey(c.Request.Context(), userID, deviceId)
-	if err != nil {
-		log.Printf("⚠️ Signature Error: %v for user %s\n", err, userID)
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-		return
-	}
-
-	// ⬇️ DEPRECATED: Go-based Signature Verification (Offloaded to Rust FX Engine)
-	// isValid, err := h.SignatureService.VerifySignature(publicKey, signature, dto.IdempotencyKey)
-	// if err != nil || !isValid {
-	// 	log.Printf("❌ Signature Verification Failure for User %s, Device %s\n", userID, deviceId)
-	// 	c.JSON(http.StatusUnauthorized, gin.H{"error": "Request integrity check failed"})
-	// 	return
-	// }
-
-	req := service.TransferRequest{
-		UserID:       userID,
-		FromWalletID: fromID,
-		ToWalletID:   toID,
-		Amount:       dto.Amount,
-		Currency:     dto.Currency,
-		ReferenceID:  dto.IdempotencyKey,
-		Description:  dto.Description,
-		// Security Offload to Rust
-		PublicKey:     publicKey,
-		Signature:     signature,
-		SignedPayload: dto.IdempotencyKey,
-	}
-
-	resp, err := h.Service.Transfer(c.Request.Context(), req)
-	if err != nil {
-		// Differentiate errors if possible, but generic 400 or 500 for now.
-		// If custom error types existed, we could be more specific.
-		// For robustness, assume logical errors are 400 and system errors 500.
-		// Simple approach: non-nil error from service -> 400 (e.g. insufficient funds) or 500.
-		// Given strict instructions: "409 for duplicate idempotency keys" is handled below on success.
-		// We'll treat generic errors as 500 for safety, or 400 if validation.
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	if resp.UsedExisting {
-		c.JSON(http.StatusConflict, gin.H{
-			"error":          "Idempotency key conflict",
-			"transaction_id": resp.TransactionID,
-			"message":        "Transaction already processed with this key",
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"transaction_id": resp.TransactionID,
-		"status":         "success",
-	})
-}
-
-// HandleBalance returns the balance for the authenticated user.
+// HandleBalance returns the balance for the authenticated user (mocked to 0 for pay-per-use).
 func (h *TransferHandler) HandleBalance(c *gin.Context) {
 	currency := strings.ToUpper(strings.TrimSpace(c.Query("currency")))
 	if len(currency) != 3 {
@@ -125,41 +26,15 @@ func (h *TransferHandler) HandleBalance(c *gin.Context) {
 		return
 	}
 
-	userIDStr, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User unauthorized"})
-		return
-	}
-	userID, err := uuid.Parse(userIDStr.(string))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID"})
-		return
-	}
-
-	balance, err := h.Service.GetBalance(c.Request.Context(), userID, currency)
-	if err != nil {
-		// Could differentiate 404 vs 500
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, balance)
+	c.JSON(http.StatusOK, gin.H{
+		"wallet_id": "00000000-0000-0000-0000-000000000000",
+		"currency":  currency,
+		"balance":   0,
+	})
 }
 
-// HandleGetTransactions retrieves the transaction history for a wallet.
+// HandleGetTransactions retrieves the transaction history for the user.
 func (h *TransferHandler) HandleGetTransactions(c *gin.Context) {
-	walletIDStr := strings.TrimSpace(c.Query("wallet_id"))
-	if walletIDStr == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "wallet_id query param required"})
-		return
-	}
-
-	walletID, err := uuid.Parse(walletIDStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid wallet_id"})
-		return
-	}
-
 	userIDStr, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User unauthorized"})
@@ -167,19 +42,14 @@ func (h *TransferHandler) HandleGetTransactions(c *gin.Context) {
 	}
 	userID, err := uuid.Parse(userIDStr.(string))
 	if err != nil {
-		c.Error(err) // Log invalid user ID error
+		c.Error(err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID in token"})
 		return
 	}
 
-	transactions, err := h.Service.GetTransactions(c.Request.Context(), userID, walletID)
+	transactions, err := h.Service.GetTransactions(c.Request.Context(), userID)
 	if err != nil {
-		// Differentiate unauthorized vs internal? Service returns "unauthorized" error text
-		if err.Error() == "unauthorized: wallet does not belong to user" {
-			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
-			return
-		}
-		c.Error(err) // Log the actual database/service error
+		c.Error(err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
 		return
 	}

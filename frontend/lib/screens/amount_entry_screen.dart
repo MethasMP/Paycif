@@ -3,7 +3,10 @@ import 'package:frontend/l10n/generated/app_localizations.dart';
 import 'package:frontend/utils/emv_parser.dart';
 import 'package:frontend/widgets/virtual_keypad.dart';
 import 'package:frontend/services/api_service.dart';
+import 'package:frontend/widgets/paycif_icon_container.dart';
+import 'package:frontend/widgets/paycif_amount_text.dart';
 import 'pay_screen.dart';
+import '../theme/app_theme.dart';
 
 class AmountEntryScreen extends StatefulWidget {
   final EMFData data;
@@ -32,7 +35,7 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
       return;
     }
 
-    try {
+  try {
       final api = ApiService();
       final name = await api.lookupPromptPayName(widget.data.promptPayId!);
       if (mounted) {
@@ -119,22 +122,13 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark
-          ? const Color(0xFF0F172A)
-          : const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
-          'Send Money',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color: isDark ? Colors.white : Colors.black87,
-          ),
-        ),
+        title: const Text('Send Money'),
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -173,7 +167,7 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: isDark
@@ -213,23 +207,29 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
                       const SizedBox(width: 8),
                       Text(
                         'Looking up...',
-                        style: TextStyle(fontSize: 14, color: Colors.grey[400]),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: AppTheme.textSecondaryColor(context),
+                            ),
                       ),
                     ],
                   )
                 else
                   Text(
                     _displayName,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          color: AppTheme.textPrimaryColor(context),
+                          fontWeight: FontWeight.w600,
+                        ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 if (widget.data.promptPayId != null)
                   Text(
                     widget.data.promptPayId!,
-                    style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppTheme.textSecondaryColor(context),
+                        ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
               ],
             ),
@@ -245,22 +245,9 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
   }
 
   Widget _buildCircleAvatar() {
-    return Container(
-      width: 52,
-      height: 52,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF6366F1), Color(0xFF4F46E5)],
-        ),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: const Icon(
-        Icons.person_outline_rounded,
-        color: Colors.white,
-        size: 28,
-      ),
+    return const PaycifIconContainer(
+      icon: Icons.person_outline_rounded,
+      size: 28,
     );
   }
 
@@ -269,40 +256,16 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
       children: [
         Text(
           'Input Amount',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Colors.grey[500],
-            letterSpacing: 1.2,
-          ),
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: AppTheme.textSecondaryColor(context),
+                letterSpacing: 1.2,
+                fontWeight: FontWeight.w500,
+              ),
         ),
         const SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Text(
-              '฿',
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.w300,
-                color: isDark ? Colors.white38 : Colors.black26,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              _controller.text.isEmpty ? '0.00' : _controller.text,
-              style: TextStyle(
-                fontSize: 64,
-                fontWeight: FontWeight.bold,
-                color: _controller.text.isEmpty
-                    ? (isDark ? Colors.white12 : Colors.black12)
-                    : (isDark ? Colors.white : Colors.black87),
-                letterSpacing: -2,
-              ),
-            ),
-          ],
+        PaycifAmountText(
+          amount: double.tryParse(_controller.text) ?? 0.0,
+          isLarge: true,
         ),
       ],
     );
@@ -315,7 +278,7 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
   ) {
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+        color: Theme.of(context).scaffoldBackgroundColor,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -333,32 +296,11 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
   Widget _buildActionBtn(AppLocalizations l10n) {
     final bool hasAmount = (double.tryParse(_controller.text) ?? 0.0) > 0;
 
-    return Container(
+    return SizedBox(
       width: double.infinity,
       height: 64,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: hasAmount
-            ? [
-                BoxShadow(
-                  color: const Color(0xFF6366F1).withValues(alpha: 0.3),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10),
-                ),
-              ]
-            : null,
-      ),
       child: ElevatedButton(
         onPressed: (_isProcessing || !hasAmount) ? null : _onNext,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF6366F1),
-          foregroundColor: Colors.white,
-          disabledBackgroundColor: Colors.grey.withValues(alpha: 0.1),
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-        ),
         child: _isProcessing
             ? const SizedBox(
                 width: 24,
@@ -368,10 +310,7 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
                   strokeWidth: 2,
                 ),
               )
-            : const Text(
-                'Review Payment',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
+            : const Text('Review Payment'),
       ),
     );
   }

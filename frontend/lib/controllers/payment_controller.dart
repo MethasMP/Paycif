@@ -116,8 +116,7 @@ class PaymentController extends ChangeNotifier {
       debugPrint('✅ PaymentController: Preference Persisted=$methodId');
     } catch (e) {
       debugPrint('❌ PaymentController Preference Error: $e');
-      // In a strict world-class app, we might want to revert if it fails.
-      // But for now, user can just try again.
+      rethrow;
     }
   }
 
@@ -148,6 +147,7 @@ class PaymentController extends ChangeNotifier {
     } catch (e) {
       debugPrint('❌ PaymentController Delete Error: $e');
       fetchData(silent: true); // Re-sync on error
+      rethrow;
     }
   }
 }

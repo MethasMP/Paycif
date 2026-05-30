@@ -8,8 +8,9 @@ import '../widgets/transaction_item.dart';
 import 'history_screen.dart';
 import '../utils/error_translator.dart';
 import 'profile_page.dart';
-import 'payment_methods_screen.dart';
+import 'scan_page.dart';
 import 'package:flutter/services.dart';
+import '../theme/app_theme.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({super.key});
@@ -31,6 +32,9 @@ class _HomeViewState extends State<HomeView> {
           return Center(
             child: Text(
               "${l10n.commonError}: ${ErrorTranslator.translate(l10n, state.errorMessage ?? '')}",
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.error,
+              ),
             ),
           );
         }
@@ -38,7 +42,7 @@ class _HomeViewState extends State<HomeView> {
         final isReady = state.status == 'success';
 
         return Scaffold(
-          backgroundColor: theme.scaffoldBackgroundColor,
+          backgroundColor: isDark ? theme.scaffoldBackgroundColor : Colors.white, // White background for Light Mode
           appBar: _buildAppBar(context),
           body: AnimatedSwitcher(
             duration: const Duration(milliseconds: 600),
@@ -50,13 +54,69 @@ class _HomeViewState extends State<HomeView> {
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                       physics: const AlwaysScrollableScrollPhysics(),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          _buildPayPerUseCard(context, state, isDark),
-                          const SizedBox(height: 28),
-                          _buildActionRow(context, l10n),
                           const SizedBox(height: 32),
-                          _buildRecentTransactionsHeader(context, l10n),
+                          // 1. Headline
+                          Text(
+                            "Ready to Pay",
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.displayLarge?.copyWith(
+                              color: AppTheme.textPrimaryColor(context),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            "Scan any PromptPay or Paycif QR code to pay instantly",
+                            textAlign: TextAlign.center,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              color: AppTheme.textSecondaryColor(context),
+                            ),
+                          ),
+                          const SizedBox(height: 48),
+                          // 2. Gold CTA Center
+                          GestureDetector(
+                            onTap: () {
+                              HapticFeedback.mediumImpact();
+                              Navigator.of(context).push(
+                                MaterialPageRoute(builder: (context) => const ScanPage()),
+                              ).then((_) {
+                                if (mounted) context.read<DashboardController>().refresh();
+                              });
+                            },
+                            child: Container(
+                              width: 140,
+                              height: 140,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFFEF9F27), // accent-500
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF0F6E56).withValues(alpha: 0.08),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 8),
+                                  ),
+                                ],
+                              ),
+                              child: const Center(
+                                child: Icon(
+                                  Icons.qr_code_scanner_rounded,
+                                  color: Color(0xFF412402), // accent-900
+                                  size: 56,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 54),
+                          // 3. Recent Transactions
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: _buildRecentTransactionsHeader(context, l10n),
+                          ),
                           const SizedBox(height: 12),
                           _buildTransactionList(state.transactions),
                         ],
@@ -82,8 +142,13 @@ class _HomeViewState extends State<HomeView> {
       ),
       title: Text(
         AppLocalizations.of(context)!.appTitle,
-        style: theme.textTheme.headlineSmall?.copyWith(
-          fontWeight: FontWeight.bold,
+        style: theme.appBarTheme.titleTextStyle?.copyWith(
+          fontWeight: FontWeight.w600,
+          color: AppTheme.textPrimaryColor(context),
+          letterSpacing: -0.5,
+        ) ?? theme.textTheme.headlineSmall?.copyWith(
+          fontWeight: FontWeight.w600,
+          color: AppTheme.textPrimaryColor(context),
           letterSpacing: -0.5,
         ),
       ),
@@ -99,148 +164,6 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
-  Widget _buildPayPerUseCard(BuildContext context, DashboardState state, bool isDark) {
-    final theme = Theme.of(context);
-    return Container(
-      width: double.infinity,
-      height: 200,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isDark 
-            ? [const Color(0xFF085041), const Color(0xFF04342C)]
-            : [const Color(0xFF0F6E56), const Color(0xFF085041)],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: theme.primaryColor.withValues(alpha: 0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -20,
-            top: -20,
-            child: Icon(
-              Icons.payments_outlined,
-              size: 150,
-              color: Colors.white.withValues(alpha: 0.05),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      "PAY PER USE",
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: const Color(0xFFEF9F27),
-                        letterSpacing: 2.0,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    if (state.isOffline)
-                      const Icon(Icons.cloud_off_rounded, color: Colors.amber, size: 16),
-                  ],
-                ),
-                const Spacer(),
-                Text(
-                  "Ready to Pay",
-                  style: theme.textTheme.headlineMedium?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  "Scan QR to pay instantly from your linked card",
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.7),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionRow(BuildContext context, AppLocalizations l10n) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        _buildActionButton(
-          context,
-          Icons.credit_card_rounded,
-          "Methods",
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const PaymentMethodsScreen()),
-          ),
-        ),
-        _buildActionButton(
-          context,
-          Icons.qr_code_scanner_rounded,
-          "Scan",
-          onTap: () {
-            // Trigger global scan action
-          },
-        ),
-        _buildActionButton(
-          context,
-          Icons.history_rounded,
-          "History",
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const HistoryScreen()),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildActionButton(BuildContext context, IconData icon, String label, {VoidCallback? onTap}) {
-    final theme = Theme.of(context);
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        onTap?.call();
-      },
-      child: Column(
-        children: [
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: theme.cardColor,
-              shape: BoxShape.circle,
-              border: Border.all(color: theme.primaryColor.withValues(alpha: 0.1)),
-            ),
-            child: Icon(icon, color: theme.primaryColor),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: theme.textTheme.labelMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: theme.textTheme.bodyLarge?.color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildRecentTransactionsHeader(BuildContext context, AppLocalizations l10n) {
     final theme = Theme.of(context);
     return Row(
@@ -248,7 +171,10 @@ class _HomeViewState extends State<HomeView> {
       children: [
         Text(
           l10n.homeRecentTransactions,
-          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+          style: theme.textTheme.headlineMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textPrimaryColor(context),
+          ),
         ),
         TextButton(
           onPressed: () => Navigator.push(
@@ -259,7 +185,7 @@ class _HomeViewState extends State<HomeView> {
             l10n.homeViewAll,
             style: theme.textTheme.labelLarge?.copyWith(
               color: const Color(0xFFEF9F27),
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
@@ -269,10 +195,15 @@ class _HomeViewState extends State<HomeView> {
 
   Widget _buildTransactionList(List<Transaction> transactions) {
     if (transactions.isEmpty) {
-      return const Center(
+      return Center(
         child: Padding(
-          padding: EdgeInsets.only(top: 40),
-          child: Text("No recent transactions"),
+          padding: const EdgeInsets.only(top: 40),
+          child: Text(
+            "No recent transactions",
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: AppTheme.textSecondaryColor(context),
+            ),
+          ),
         ),
       );
     }

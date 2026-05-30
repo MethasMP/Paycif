@@ -15,49 +15,31 @@ class PaymentCubit extends Cubit<PaymentState> {
        _securityRepository = securityRepository,
        super(PaymentInitial());
 
-  /// Initializes the payment screen with wallet balance check.
+  /// Initializes the payment screen for instant pay-per-use checkout.
   Future<void> initialize(double amount, {String? recipientName}) async {
     emit(PaymentLoading());
     try {
-      // 1. Fetch Wallet Balance (THB) (built-in backoff retries in ApiService)
-      final balanceData = await _apiService.getBalance('THB');
+      const double balanceMajor = 0.0;
 
-      final int balanceMinor = balanceData['balance'] ?? 0;
-      final double balanceMajor = balanceMinor / 100.0;
-
-      // 2. Check if sufficient funds
-      final bool hasSufficientFunds = balanceMajor >= amount;
-
-      // 3. Create Wallet Payment Method
-      final walletMethod = PaymentMethod(
-        id: 'wallet_thb',
-        type: PaymentMethodType.wallet,
-        title: 'Paysif Wallet',
-        subtitle: '฿${balanceMajor.toStringAsFixed(2)} Available',
+      final payPerUseMethod = PaymentMethod(
+        id: 'pay_per_use',
+        type: PaymentMethodType.wallet, // Retain wallet type for UI widget compatibility
+        title: 'Pay per use',
+        subtitle: 'Direct charge & instant settlement',
       );
 
-      if (hasSufficientFunds) {
-        emit(
-          PaymentReady(
-            method: walletMethod,
-            amount: amount,
-            availableMethods: [walletMethod],
-            balance: balanceMajor,
-          ),
-        );
-      } else {
-        // Insufficient Balance: Emit special state
-        emit(
-          PaymentInsufficientFunds(
-            availableBalance: balanceMajor,
-            requiredAmount: amount,
-          ),
-        );
-      }
+      emit(
+        PaymentReady(
+          method: payPerUseMethod,
+          amount: amount,
+          availableMethods: [payPerUseMethod],
+          balance: balanceMajor,
+        ),
+      );
     } catch (e) {
       emit(
         PaymentFailure(
-          errorMessage: 'Failed to load wallet: $e',
+          errorMessage: 'Failed to initialize payment: $e',
           failedMethod: const PaymentMethod(
             id: 'error',
             type: PaymentMethodType.wallet,

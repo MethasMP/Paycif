@@ -5,6 +5,7 @@ import 'package:frontend/l10n/generated/app_localizations.dart';
 import '../utils/pay_notify.dart';
 import '../utils/payment_utils.dart';
 import '../utils/error_translator.dart';
+import '../theme/app_theme.dart';
 
 class AddCardScreen extends StatefulWidget {
   const AddCardScreen({super.key});
@@ -49,16 +50,19 @@ class _AddCardScreenState extends State<AddCardScreen> {
         elevation: 0,
         title: Text(
           l10n.cardTitle,
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).textTheme.bodyLarge?.color,
+          style: Theme.of(context).appBarTheme.titleTextStyle?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textPrimaryColor(context),
+          ) ?? Theme.of(context).textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textPrimaryColor(context),
           ),
         ),
         centerTitle: true,
         leading: IconButton(
           icon: Icon(
             Icons.arrow_back,
-            color: Theme.of(context).iconTheme.color,
+            color: AppTheme.textPrimaryColor(context),
           ),
           onPressed: () => Navigator.pop(context),
         ),
@@ -266,9 +270,8 @@ class _AddCardScreenState extends State<AddCardScreen> {
                             const SizedBox(width: 12),
                             Text(
                               _loadingMessage,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
+                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                fontWeight: FontWeight.w600,
                                 color: Colors.white,
                               ),
                             ),
@@ -276,9 +279,8 @@ class _AddCardScreenState extends State<AddCardScreen> {
                         )
                       : Text(
                           l10n.cardAddBtn,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
                             color: Colors.white,
                           ),
                         ),
@@ -329,9 +331,9 @@ class _AddCardScreenState extends State<AddCardScreen> {
                 PaymentUtils.getCardType(cardNumber) == 'Unknown'
                     ? l10n.cardPreviewTitle
                     : PaymentUtils.getCardType(cardNumber),
-                style: const TextStyle(
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: Colors.white,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w600,
                   letterSpacing: 1,
                 ),
               ),
@@ -367,18 +369,16 @@ class _AddCardScreenState extends State<AddCardScreen> {
                 children: [
                   Text(
                     l10n.cardPreviewHolder,
-                    style: TextStyle(
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       color: Colors.white.withValues(alpha: 0.6),
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   Text(
                     cardHolderName.isEmpty ? 'YOUR NAME' : cardHolderName,
-                    style: const TextStyle(
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
@@ -388,18 +388,16 @@ class _AddCardScreenState extends State<AddCardScreen> {
                 children: [
                   Text(
                     l10n.cardPreviewExpires,
-                    style: TextStyle(
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       color: Colors.white.withValues(alpha: 0.6),
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   Text(
                     expiryDate.isEmpty ? 'MM/YY' : expiryDate,
-                    style: const TextStyle(
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
@@ -428,9 +426,9 @@ class _AddCardScreenState extends State<AddCardScreen> {
       children: [
         Text(
           label,
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
             fontWeight: FontWeight.w600,
-            color: Colors.grey,
+            color: AppTheme.textSecondaryColor(context),
           ),
         ),
         const SizedBox(height: 8),
@@ -452,9 +450,9 @@ class _AddCardScreenState extends State<AddCardScreen> {
             inputFormatters: inputFormatters,
             onChanged: onChanged,
             validator: validator,
-            style: TextStyle(
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
               fontWeight: FontWeight.w600,
-              color: Theme.of(context).textTheme.bodyLarge?.color,
+              color: AppTheme.textPrimaryColor(context),
             ),
             decoration: InputDecoration(
               hintText: hint,

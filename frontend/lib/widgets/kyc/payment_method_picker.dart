@@ -34,75 +34,77 @@ class PaymentMethodPicker extends StatelessWidget {
         color: Theme.of(context).scaffoldBackgroundColor,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(height: 12),
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(2),
+      child: Material(
+        color: Colors.transparent,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: Row(
-              children: [
-                Text(
-                  l10n.walletPaymentMethod,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Row(
+                children: [
+                  Text(
+                    l10n.walletPaymentMethod,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                   ),
-                ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
             ),
-          ),
-          if (Platform.isIOS)
+            if (Platform.isIOS)
+              _buildPickerTile(
+                context: context,
+                icon: Icons.apple,
+                title: l10n.applePay,
+                isSelected: preferredMethodType == 'apple_pay',
+                onTap: () {
+                  onMethodSelected('apple_pay', 'apple_pay');
+                  Navigator.pop(context);
+                },
+              ),
+            ...savedCards.map(
+              (card) => _buildPickerTile(
+                context: context,
+                icon: Icons.credit_card_rounded,
+                title: '${card.brand} •••• ${card.lastDigits}',
+                isSelected: preferredMethodType == 'card' &&
+                    _normalizeId(preferredMethodId ?? '', 'card') ==
+                        _normalizeId(card.id, 'card'),
+                onTap: () {
+                  onMethodSelected(card.id, 'card');
+                  Navigator.pop(context);
+                },
+              ),
+            ),
+            const Divider(),
             _buildPickerTile(
               context: context,
-              icon: Icons.apple,
-              title: l10n.applePay,
-              isSelected: preferredMethodType == 'apple_pay',
+              icon: Icons.add_rounded,
+              title: l10n.paymentAddMethod,
+              isSelected: false,
               onTap: () {
-                onMethodSelected('apple_pay', 'apple_pay');
                 Navigator.pop(context);
+                onAddMethod();
               },
             ),
-          ...savedCards.map(
-            (card) => _buildPickerTile(
-              context: context,
-              icon: Icons.credit_card_rounded,
-              title: '${card.brand} •••• ${card.lastDigits}',
-              isSelected: preferredMethodType == 'card' &&
-                  _normalizeId(preferredMethodId ?? '', 'card') ==
-                      _normalizeId(card.id, 'card'),
-              onTap: () {
-                onMethodSelected(card.id, 'card');
-                Navigator.pop(context);
-              },
-            ),
-          ),
-          const Divider(),
-          _buildPickerTile(
-            context: context,
-            icon: Icons.add_rounded,
-            title: l10n.paymentAddMethod,
-            isSelected: false,
-            onTap: () {
-              Navigator.pop(context);
-              onAddMethod();
-            },
-          ),
-          const SizedBox(height: 32),
-        ],
+            const SizedBox(height: 32),
+          ],
+        ),
       ),
     );
   }
@@ -122,7 +124,7 @@ class PaymentMethodPicker extends StatelessWidget {
       title: Text(
         title,
         style: TextStyle(
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
           color: isSelected ? const Color(0xFF10B981) : null,
         ),
       ),

@@ -22,6 +22,8 @@ import '../features/security/presentation/pages/linked_devices_screen.dart';
 import 'package:provider/provider.dart';
 import 'notification_settings_screen.dart';
 import 'nfc_scan_screen.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../theme/app_theme.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -234,31 +236,34 @@ class _ProfilePageState extends State<ProfilePage> {
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              l10n.language,
-              style: Theme.of(
-                context,
-              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            ...LanguageNotifier.supportedLocales.map((locale) {
-              final isSelected = languageNotifier.value == locale;
-              return ListTile(
-                title: Text(LanguageNotifier.getLanguageName(locale)),
-                trailing: isSelected
-                    ? const Icon(Icons.check_circle, color: Color(0xFF10B981))
-                    : null,
-                onTap: () {
-                  languageNotifier.value = locale;
-                  Navigator.pop(context);
-                },
-              );
-            }),
-          ],
+        child: Material(
+          color: Colors.transparent,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l10n.language,
+                style: Theme.of(
+                  context,
+                ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 16),
+              ...LanguageNotifier.supportedLocales.map((locale) {
+                final isSelected = languageNotifier.value == locale;
+                return ListTile(
+                  title: Text(LanguageNotifier.getLanguageName(locale)),
+                  trailing: isSelected
+                      ? const Icon(Icons.check_circle, color: Color(0xFF10B981))
+                      : null,
+                  onTap: () {
+                    languageNotifier.value = locale;
+                    Navigator.pop(context);
+                  },
+                );
+              }),
+            ],
+          ),
         ),
       ),
     );
@@ -330,12 +335,11 @@ class _ProfilePageState extends State<ProfilePage> {
                       color: Colors.white.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Text(
+                    child: Text(
                       'START',
-                      style: TextStyle(
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
                         color: Colors.white70,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
@@ -603,10 +607,9 @@ class _ProfilePageState extends State<ProfilePage> {
                                 const SizedBox(width: 4),
                                 Text(
                                   l10n.passportLabel,
-                                  style: const TextStyle(
+                                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
                                     color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
+                                    fontWeight: FontWeight.w600,
                                     letterSpacing: 1.0,
                                   ),
                                 ),
@@ -657,11 +660,10 @@ class _ProfilePageState extends State<ProfilePage> {
                                     isVerified
                                         ? l10n.kycStatusVerified
                                         : l10n.kycStatusPending,
-                                    style: TextStyle(
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                       color: isVerified
                                           ? const Color(0xFF10B981)
                                           : Colors.orange,
-                                      fontSize: 11,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -705,19 +707,18 @@ class _ProfilePageState extends State<ProfilePage> {
                               children: [
                                 Text(
                                   name,
-                                  style: const TextStyle(
+                                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                                     color: Colors.white,
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
                                   'ID: $id',
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.7),
-                                    fontSize: 14,
-                                    fontFamily: 'monospace',
+                                  style: GoogleFonts.robotoMono(
+                                    textStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      color: Colors.white.withValues(alpha: 0.7),
+                                    ),
                                   ),
                                 ),
                               ],
@@ -780,8 +781,8 @@ class _ProfilePageState extends State<ProfilePage> {
     return Text(
       title.toUpperCase(),
       style: Theme.of(context).textTheme.labelLarge?.copyWith(
-        color: Theme.of(context).textTheme.bodySmall?.color,
-        fontWeight: FontWeight.bold,
+        color: AppTheme.textSecondaryColor(context),
+        fontWeight: FontWeight.w600,
         letterSpacing: 1.2,
       ),
     );
@@ -852,17 +853,17 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
       title: Text(
         title,
-        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textPrimaryColor(context),
+            ),
       ),
       subtitle: subtitle != null
           ? Text(
               subtitle,
-              style: TextStyle(
-                fontSize: 13,
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? Colors.white54
-                    : Colors.black54,
-              ),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTheme.textSecondaryColor(context),
+                  ),
             )
           : null,
       trailing:
@@ -889,7 +890,10 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
       title: Text(
         l10n.biometricLabel,
-        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textPrimaryColor(context),
+            ),
       ),
       subtitle: _isBiometricLoading
           ? const SizedBox(
@@ -903,12 +907,9 @@ class _ProfilePageState extends State<ProfilePage> {
             )
           : Text(
               _isBiometricEnabled ? l10n.commonEnabled : l10n.commonDisabled,
-              style: TextStyle(
-                fontSize: 13,
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? Colors.white54
-                    : Colors.black54,
-              ),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTheme.textSecondaryColor(context),
+                  ),
             ),
       trailing: _isBiometricLoading
           ? const SizedBox(
@@ -956,6 +957,9 @@ class _ProfilePageState extends State<ProfilePage> {
           _isBiometricEnabled = newState;
         });
 
+        // 🚀 CRITICAL: Re-bind device immediately to rotate keys based on new preference!
+        await context.read<SecurityController>().bindDevice();
+
         PayNotify.success(context, l10n.biometricSettingsUpdated);
       } catch (e) {
         if (!mounted) return;
@@ -996,15 +1000,18 @@ class _ProfilePageState extends State<ProfilePage> {
             const SizedBox(height: 32),
             Text(
               l10n.biometricConfirmManage,
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textPrimaryColor(context),
+                  ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Please verify your PIN to continue.',
-              style: TextStyle(color: Colors.grey),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppTheme.textSecondaryColor(context),
+                  ),
             ),
             const SizedBox(height: 16),
             Expanded(

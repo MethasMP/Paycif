@@ -7,6 +7,8 @@ import '../cubit/payment_state.dart';
 import '../services/api_service.dart';
 import 'payment_success_screen.dart';
 import '../features/security/domain/repositories/security_repository.dart';
+import '../widgets/paycif_icon_container.dart';
+import '../widgets/paycif_amount_text.dart';
 
 class PayScreen extends StatefulWidget {
   final double amount;
@@ -106,10 +108,11 @@ class _PayScreenState extends State<PayScreen> {
         securityRepository: context.read<SecurityRepository>(),
       )..initialize(widget.amount),
       child: Scaffold(
-        backgroundColor: theme.scaffoldBackgroundColor,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
+          backgroundColor: const Color(0xFF0F6E56),
           leading: IconButton(
-            icon: const Icon(Icons.close_rounded),
+            icon: const Icon(Icons.close_rounded, color: Colors.white),
             onPressed: () => Navigator.pop(context),
           ),
         ),
@@ -139,9 +142,9 @@ class _PayScreenState extends State<PayScreen> {
               child: Column(
                 children: [
                   const Spacer(),
-                  Text(
-                    '฿${widget.amount.toStringAsFixed(2)}',
-                    style: theme.textTheme.displayLarge?.copyWith(fontWeight: FontWeight.bold),
+                  PaycifAmountText(
+                    amount: widget.amount,
+                    style: theme.textTheme.displayLarge,
                   ),
                   const SizedBox(height: 8),
                   Text(widget.merchantName, style: theme.textTheme.titleLarge),
@@ -176,21 +179,24 @@ class _PayScreenState extends State<PayScreen> {
       ),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEF9F27).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.credit_card, color: Color(0xFFEF9F27)),
-          ),
+          const PaycifIconContainer(icon: Icons.credit_card),
           const SizedBox(width: 16),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("Pay per use", style: TextStyle(fontWeight: FontWeight.bold)),
-                Text("Visa **** 8899", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                Text(
+                  "Pay per use",
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                Text(
+                  "Visa **** 8899",
+                  style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.grey,
+                      ),
+                ),
               ],
             ),
           ),

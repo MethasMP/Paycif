@@ -197,7 +197,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -263,7 +263,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
                 category.title,
                 style: const TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
@@ -271,7 +271,6 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
         ),
         Container(
           decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: isDark
@@ -279,24 +278,29 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
                   : Colors.grey.withValues(alpha: 0.1),
             ),
           ),
-          child: Column(
-            children: category.questions.asMap().entries.map((entry) {
-              final isLast = entry.key == category.questions.length - 1;
-              return Column(
-                children: [
-                  _buildFAQTile(entry.value, isDark),
-                  if (!isLast)
-                    Divider(
-                      height: 1,
-                      indent: 16,
-                      endIndent: 16,
-                      color: Theme.of(
-                        context,
-                      ).dividerColor.withValues(alpha: 0.3),
-                    ),
-                ],
-              );
-            }).toList(),
+          child: Material(
+            color: Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(16),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: category.questions.asMap().entries.map((entry) {
+                final isLast = entry.key == category.questions.length - 1;
+                return Column(
+                  children: [
+                    _buildFAQTile(entry.value, isDark),
+                    if (!isLast)
+                      Divider(
+                        height: 1,
+                        indent: 16,
+                        endIndent: 16,
+                        color: Theme.of(
+                          context,
+                        ).dividerColor.withValues(alpha: 0.3),
+                      ),
+                  ],
+                );
+              }).toList(),
+            ),
           ),
         ),
         const SizedBox(height: 16),

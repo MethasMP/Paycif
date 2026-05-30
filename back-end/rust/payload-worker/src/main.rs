@@ -222,7 +222,7 @@ impl PayloadWorker {
                     "Notification queued"
                 );
             }
-            "TOPUP_COMPLETED" | "WITHDRAWAL_COMPLETED" => {
+            "WITHDRAWAL_COMPLETED" => {
                 // Publish for real-time balance updates
                 let _: () = self
                     .redis

@@ -1,6 +1,6 @@
 class Transaction {
   final String id;
-  final String walletId;
+  final String profileId;
   final String type;
   final int amount;
   final String description;
@@ -8,7 +8,7 @@ class Transaction {
 
   Transaction({
     required this.id,
-    required this.walletId,
+    required this.profileId,
     required this.type,
     required this.amount,
     required this.description,
@@ -18,19 +18,18 @@ class Transaction {
   factory Transaction.fromJson(Map<String, dynamic> json) {
     return Transaction(
       id: json['id'],
-      walletId: json['wallet_id'],
-      type: json['type'],
-      amount: json['amount'],
-      // Handle potential null description from backend (though SQL usually returns empty string if not null)
+      profileId: json['profile_id'] ?? json['wallet_id'] ?? '',
+      type: json['type'] ?? 'UNKNOWN',
+      amount: json['amount'] ?? 0,
       description: json['description'] ?? '',
-      createdAt: DateTime.parse(json['created_at']).toLocal(),
+      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']).toLocal() : DateTime.now(),
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'wallet_id': walletId,
+      'profile_id': profileId,
       'type': type,
       'amount': amount,
       'description': description,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
+import '../theme/app_theme.dart';
 
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({super.key});
@@ -80,9 +81,13 @@ class _NotificationSettingsScreenState
         ),
         elevation: 0,
         backgroundColor: theme.scaffoldBackgroundColor,
-        iconTheme: IconThemeData(color: theme.textTheme.bodyLarge?.color),
-        titleTextStyle: theme.textTheme.titleLarge?.copyWith(
-          fontWeight: FontWeight.bold,
+        iconTheme: IconThemeData(color: AppTheme.textPrimaryColor(context)),
+        titleTextStyle: theme.appBarTheme.titleTextStyle?.copyWith(
+          fontWeight: FontWeight.w600,
+          color: AppTheme.textPrimaryColor(context),
+        ) ?? theme.textTheme.headlineSmall?.copyWith(
+          fontWeight: FontWeight.w600,
+          color: AppTheme.textPrimaryColor(context),
         ),
       ),
       body: _isLoading
@@ -94,6 +99,7 @@ class _NotificationSettingsScreenState
                 children: [
                   // 🛡️ 1. Security Alerts (Non-negotiable)
                   _buildSectionHeader(
+                    context,
                     AppLocalizations.of(context)!.notificationSecurityAlwaysOn,
                   ),
                   const SizedBox(height: 16),
@@ -119,6 +125,7 @@ class _NotificationSettingsScreenState
 
                   // 💳 2. Transaction Activity
                   _buildSectionHeader(
+                    context,
                     AppLocalizations.of(context)!.notificationWalletActivity,
                   ),
                   const SizedBox(height: 16),
@@ -145,6 +152,7 @@ class _NotificationSettingsScreenState
 
                   // 📣 3. Marketing & Updates
                   _buildSectionHeader(
+                    context,
                     AppLocalizations.of(context)!.notificationUpdates,
                   ),
                   const SizedBox(height: 16),
@@ -174,9 +182,8 @@ class _NotificationSettingsScreenState
                     child: Text(
                       'Push notifications help you stay secure and informed.\nYou can manage system-level permission in your device settings.',
                       textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: Colors.grey,
-                        fontSize: 12,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppTheme.textSecondaryColor(context),
                       ),
                     ),
                   ),
@@ -186,15 +193,14 @@ class _NotificationSettingsScreenState
     );
   }
 
-  Widget _buildSectionHeader(String title) {
+  Widget _buildSectionHeader(BuildContext context, String title) {
     return Text(
       title.toUpperCase(),
-      style: const TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.bold,
-        letterSpacing: 1.2,
-        color: Colors.grey,
-      ),
+      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1.2,
+            color: AppTheme.textSecondaryColor(context),
+          ),
     );
   }
 
@@ -217,7 +223,10 @@ class _NotificationSettingsScreenState
           ),
         ],
       ),
-      child: Column(children: children),
+      child: Material(
+        color: Colors.transparent,
+        child: Column(children: children),
+      ),
     );
   }
 
@@ -244,16 +253,18 @@ class _NotificationSettingsScreenState
       ),
       title: Text(
         title,
-        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textPrimaryColor(context),
+            ),
       ),
       subtitle: Padding(
         padding: const EdgeInsets.only(top: 4.0),
         child: Text(
           subtitle,
-          style: TextStyle(
-            fontSize: 13,
-            color: theme.textTheme.bodySmall?.color,
-          ),
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppTheme.textSecondaryColor(context),
+              ),
         ),
       ),
       trailing: Switch.adaptive(

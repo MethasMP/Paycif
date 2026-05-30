@@ -52,7 +52,7 @@ class _KycScreenState extends State<KycScreen> {
                   const SizedBox(height: 32),
                   Text(
                     state is SumsubLoading ? 'Preparing Secure Link...' : 'Identity Verification',
-                    style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                    style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 16),
                   if (state is SumsubFailed) ...[

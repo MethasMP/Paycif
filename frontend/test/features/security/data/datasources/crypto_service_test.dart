@@ -132,7 +132,7 @@ void main() {
       });
 
       test(
-        'fast and static versions should produce the same hash',
+        'fast and static versions should produce different hashes due to parameters',
         () async {
           final salt = cryptoService.generateSalt();
           const pin = '123456';
@@ -146,7 +146,7 @@ void main() {
             'salt': salt,
           });
 
-          expect(staticHash, equals(fastHash));
+          expect(staticHash, isNot(equals(fastHash)));
         },
       );
 

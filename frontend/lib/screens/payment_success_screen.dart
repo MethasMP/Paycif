@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../controllers/dashboard_controller.dart';
+import '../widgets/paycif_amount_text.dart';
+import '../theme/app_theme.dart';
 
 class PaymentSuccessScreen extends StatelessWidget {
   final String transactionId;
@@ -19,15 +21,18 @@ class PaymentSuccessScreen extends StatelessWidget {
 
   final GlobalKey _boundaryKey = GlobalKey();
 
+  static const _thShortMonths = [
+    'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+    'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
+  ];
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final now = DateTime.now();
-    final dateFormat = DateFormat('dd MMM yyyy, HH:mm');
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: isDark ? theme.scaffoldBackgroundColor : Colors.white,
       body: SafeArea(
         child: Column(
           children: [
@@ -37,7 +42,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.close_rounded),
+                    icon: Icon(Icons.close_rounded, color: AppTheme.textPrimaryColor(context)),
                     onPressed: () => _navigateToHome(context),
                   ),
                 ],
@@ -53,18 +58,23 @@ class PaymentSuccessScreen extends StatelessWidget {
                     const SizedBox(height: 24),
                     Text(
                       'Payment Successful',
-                      style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textPrimaryColor(context),
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'Your payment has been processed successfully',
                       textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: AppTheme.textSecondaryColor(context),
+                      ),
                     ),
                     const SizedBox(height: 40),
                     RepaintBoundary(
                       key: _boundaryKey,
-                      child: _buildReceiptCard(context, isDark, dateFormat.format(now)),
+                      child: _buildReceiptCard(context, isDark),
                     ),
                     const SizedBox(height: 40),
                   ],
@@ -89,78 +99,168 @@ class PaymentSuccessScreen extends StatelessWidget {
   }
 
   Widget _buildSuccessIcon(ThemeData theme) {
-    return Container(
-      width: 100,
-      height: 100,
-      decoration: BoxDecoration(
-        color: const Color(0xFF10B981),
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF10B981).withValues(alpha: 0.3),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: const Icon(Icons.check_rounded, color: Colors.white, size: 56),
+    final successColor = theme.brightness == Brightness.dark
+        ? const Color(0xFF2BBF9E)
+        : const Color(0xFF0F6E56);
+    return Icon(
+      Icons.check_circle_rounded,
+      color: successColor, // primary-600
+      size: 64, // 64px check icon
     );
   }
 
-  Widget _buildReceiptCard(BuildContext context, bool isDark, String dateTime) {
+  Widget _buildReceiptCard(BuildContext context, bool isDark) {
     final theme = Theme.of(context);
+    final now = DateTime.now();
+    final enDate = DateFormat('dd MMM yyyy').format(now);
+    final enTime = DateFormat('HH:mm').format(now);
+    final enDateVal = "$enDate, $enTime";
+
+    final thMonth = _thShortMonths[now.month - 1];
+    final thBuddhistYear = (now.year + 543) % 100;
+    final thDateVal = "${now.day} $thMonth $thBuddhistYear, $enTime";
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: theme.primaryColor.withValues(alpha: 0.1)),
+        color: isDark ? theme.cardColor : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE5E5E3)), // border token
       ),
       child: Column(
         children: [
-          Text(
-            '฿${amount.toStringAsFixed(2)}',
-            style: theme.textTheme.displaySmall?.copyWith(fontWeight: FontWeight.bold),
+          PaycifAmountText(
+            amount: amount,
+            style: theme.textTheme.displayLarge, // Amount 32px
           ),
           const SizedBox(height: 24),
-          const Divider(),
+          const Divider(color: Color(0xFFE5E5E3), height: 1),
           const SizedBox(height: 16),
-          _buildDetailRow('Recipient', recipientName, theme),
-          if (promptPayId != null) _buildDetailRow('PromptPay', promptPayId!, theme),
-          _buildDetailRow('Date/Time', dateTime, theme),
-          _buildDetailRow('Reference ID', transactionId, theme),
-          _buildDetailRow('Status', 'Success', theme, isStatus: true),
+          _buildBilingualDetailRow(
+            context,
+            englishLabel: 'Recipient',
+            thaiLabel: 'ผู้รับเงิน',
+            englishValue: recipientName,
+            thaiValue: '',
+            theme: theme,
+          ),
+          if (promptPayId != null)
+            _buildBilingualDetailRow(
+              context,
+              englishLabel: 'PromptPay',
+              thaiLabel: 'พร้อมเพย์',
+              englishValue: promptPayId!,
+              thaiValue: '',
+              theme: theme,
+            ),
+          _buildBilingualDetailRow(
+            context,
+            englishLabel: 'Date/Time',
+            thaiLabel: 'วันที่/เวลา',
+            englishValue: enDateVal,
+            thaiValue: thDateVal,
+            theme: theme,
+          ),
+          _buildBilingualDetailRow(
+            context,
+            englishLabel: 'Reference ID',
+            thaiLabel: 'รหัสอ้างอิง',
+            englishValue: transactionId,
+            thaiValue: '',
+            theme: theme,
+          ),
+          _buildBilingualDetailRow(
+            context,
+            englishLabel: 'Status',
+            thaiLabel: 'สถานะ',
+            englishValue: 'Success',
+            thaiValue: 'สำเร็จ',
+            theme: theme,
+            isStatus: true,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildDetailRow(String label, String value, ThemeData theme, {bool isStatus = false}) {
+  Widget _buildBilingualDetailRow(
+    BuildContext context, {
+    required String englishLabel,
+    required String thaiLabel,
+    required String englishValue,
+    required String thaiValue,
+    required ThemeData theme,
+    bool isStatus = false,
+  }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey)),
+          // Labels (EN/TH stacked)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                englishLabel,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w500, // EN 14px medium
+                  color: AppTheme.textPrimaryColor(context),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                thaiLabel,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w400, // TH 12px regular below
+                  color: AppTheme.textSecondaryColor(context),
+                ),
+              ),
+            ],
+          ),
+          // Values (EN/TH stacked or aligned right)
           if (isStatus)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
-                color: const Color(0xFF10B981).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(20),
+                color: const Color(0xFFE1F5EE), // primary-100
+                borderRadius: BorderRadius.circular(999), // pill
               ),
-              child: const Text(
+              child: Text(
                 'Success',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF10B981)),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF0F6E56),
+                ),
               ),
             )
           else
             Flexible(
-              child: Text(
-                value,
-                textAlign: TextAlign.right,
-                style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    englishValue,
+                    textAlign: TextAlign.right,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                      color: AppTheme.textPrimaryColor(context),
+                    ),
+                  ),
+                  if (thaiValue.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      thaiValue,
+                      textAlign: TextAlign.right,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w400,
+                        color: AppTheme.textSecondaryColor(context),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
         ],

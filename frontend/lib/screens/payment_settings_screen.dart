@@ -7,6 +7,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../models/saved_card.dart';
 import '../controllers/payment_controller.dart';
 import 'package:provider/provider.dart';
+import '../theme/app_theme.dart';
 
 /// ─────────────────────────────────────────────────────────────────────────────
 /// PAYMENT SETTINGS SCREEN
@@ -174,9 +175,9 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
               onPressed: _toggleEditMode,
               child: Text(
                 _isEditMode ? l10n.commonDone : l10n.commonEdit,
-                style: TextStyle(
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
                   color: isDark ? Colors.white70 : const Color(0xFF3B82F6),
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -341,10 +342,9 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
                       children: [
                         Text(
                           '${card.brand} •••• ${card.lastDigits}',
-                          style: TextStyle(
-                            color: isDark ? Colors.white : Colors.black87,
-                            fontWeight: FontWeight.w500,
-                            fontSize: 16,
+                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color: AppTheme.textPrimaryColor(context),
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                         if (isRecommended) ...[
@@ -362,9 +362,8 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
                             ),
                             child: Text(
                               AppLocalizations.of(context)!.commonDefault,
-                              style: const TextStyle(
-                                color: Color(0xFF10B981),
-                                fontSize: 10,
+                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                color: const Color(0xFF10B981),
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -375,9 +374,8 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
                     const SizedBox(height: 2),
                     Text(
                       'Expires ${card.formattedExpiry}',
-                      style: TextStyle(
-                        color: isDark ? Colors.white54 : Colors.grey[600],
-                        fontSize: 12,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.textSecondaryColor(context),
                       ),
                     ),
                   ],
@@ -444,10 +442,9 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
                     children: [
                       Text(
                         title,
-                        style: TextStyle(
-                          color: isDark ? Colors.white : Colors.black87,
-                          fontWeight: FontWeight.w500,
-                          fontSize: 16,
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: AppTheme.textPrimaryColor(context),
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                       if (isRecommended) ...[
@@ -465,9 +462,8 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
                           ),
                           child: Text(
                             AppLocalizations.of(context)!.commonDefault,
-                            style: const TextStyle(
-                              color: Color(0xFF10B981),
-                              fontSize: 10,
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: const Color(0xFF10B981),
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -478,9 +474,8 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: TextStyle(
-                      color: isDark ? Colors.white54 : Colors.grey[600],
-                      fontSize: 12,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppTheme.textSecondaryColor(context),
                     ),
                   ),
                 ],
@@ -531,10 +526,9 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
             const SizedBox(width: 10),
             Text(
               l10n.sheetAddPayment,
-              style: TextStyle(
-                color: isDark ? Colors.white70 : Colors.grey[800],
-                fontWeight: FontWeight.w500,
-                fontSize: 15,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: AppTheme.textPrimaryColor(context),
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
@@ -548,11 +542,13 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(Icons.lock_outline, size: 14, color: Colors.grey[500]),
+        Icon(Icons.lock_outline, size: 14, color: AppTheme.textSecondaryColor(context)),
         const SizedBox(width: 6),
         Text(
           l10n.biometricLogin,
-          style: TextStyle(color: Colors.grey[500], fontSize: 12),
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: AppTheme.textSecondaryColor(context),
+          ),
         ),
       ],
     );

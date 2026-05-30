@@ -83,12 +83,9 @@ class VirtualKeypad extends StatelessWidget {
                   )
                 : Text(
                     label,
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w400,
-                      color: isDark ? Colors.white : Colors.black87,
-                      letterSpacing: -0.5,
-                    ),
+                    style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
                   ),
           ),
         ),

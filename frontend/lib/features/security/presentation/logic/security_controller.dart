@@ -174,7 +174,20 @@ class SecurityController extends ChangeNotifier {
       return true;
     } catch (e) {
       final errorStr = e.toString();
-      final isDeviceError = errorStr.contains('Device not recognized');
+      final isDeviceError = errorStr.contains('Device not recognized') ||
+                            errorStr.contains('Device not bound') ||
+                            errorStr.contains('credentials missing');
+
+      if (errorStr.contains('PIN not setup')) {
+        await _repository.clearAllPinData();
+        _setState(
+          _state.copyWith(
+            status: SecurityStatus.error,
+            errorMessage: 'PIN not setup on server. Redirecting...',
+          ),
+        );
+        return false;
+      }
 
       if (isDeviceError) {
         _setState(

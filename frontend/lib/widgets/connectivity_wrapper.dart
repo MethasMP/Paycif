@@ -59,11 +59,8 @@ class ConnectivityWrapper extends StatelessWidget {
                               Text(
                                 AppLocalizations.of(context)?.noInternetTitle ??
                                     'No Connection',
-                                style: const TextStyle(
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
+                                style: Theme.of(context).textTheme.displayLarge?.copyWith(
                                   color: Colors.white,
-                                  letterSpacing: -0.5,
                                   decoration: TextDecoration.none,
                                 ),
                                 textAlign: TextAlign.center,
@@ -74,10 +71,8 @@ class ConnectivityWrapper extends StatelessWidget {
                                       context,
                                     )?.noInternetMessage ??
                                     'Please check your internet settings.',
-                                style: const TextStyle(
-                                  fontSize: 16,
+                                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                                   color: Colors.white70,
-                                  height: 1.5,
                                   decoration: TextDecoration.none,
                                 ),
                                 textAlign: TextAlign.center,
@@ -111,9 +106,9 @@ class ConnectivityWrapper extends StatelessWidget {
                                           context,
                                         )?.noInternetRetry ??
                                         'Retry',
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
+                                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: const Color(0xFF1A1F71),
                                     ),
                                   ),
                                 ),

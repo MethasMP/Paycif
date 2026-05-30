@@ -40,4 +40,7 @@ abstract class SecurityRepository {
 
   /// 🔒 Hard-Clear: Wipes all sensitive in-memory and disk caches (Logout).
   Future<void> clearSecurityData();
+
+  /// Clear local PIN hash, salt and cache (used for PIN reset flow).
+  Future<void> clearAllPinData();
 }

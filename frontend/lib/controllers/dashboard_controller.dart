@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../repositories/dashboard_repository.dart';
@@ -13,7 +14,6 @@ class DashboardState {
   final bool isTransactionsLoaded;
   final bool isOffline;
   final String kycTier;
-  final String? walletId;
 
   DashboardState({
     this.status = 'initial',
@@ -22,7 +22,6 @@ class DashboardState {
     this.isTransactionsLoaded = false,
     this.isOffline = false,
     this.kycTier = 'tier0',
-    this.walletId,
   });
 
   bool get isDataWarmed => status == 'success';
@@ -34,7 +33,6 @@ class DashboardState {
     bool? isTransactionsLoaded,
     bool? isOffline,
     String? kycTier,
-    String? walletId,
   }) {
     return DashboardState(
       status: status ?? this.status,
@@ -43,7 +41,6 @@ class DashboardState {
       isTransactionsLoaded: isTransactionsLoaded ?? this.isTransactionsLoaded,
       isOffline: isOffline ?? this.isOffline,
       kycTier: kycTier ?? this.kycTier,
-      walletId: walletId ?? this.walletId,
     );
   }
 }
@@ -103,30 +100,39 @@ class DashboardController extends Cubit<DashboardState> {
 
     try {
       final tier = await ApiService.getUserTier();
-      final wallet = await _repository.fetchUserWallet().first;
       
       emit(state.copyWith(
         kycTier: tier,
-        walletId: wallet?.id,
         status: 'success',
       ));
 
-      if (wallet != null) {
-        _subscribeToTransactions(wallet.id);
-      }
+      _subscribeToTransactions(currentUser.id);
+      
     } catch (e) {
       emit(state.copyWith(status: 'error', errorMessage: e.toString()));
     }
   }
 
-  void _subscribeToTransactions(String walletId) {
+  void _subscribeToTransactions(String profileId) {
     _txSub?.cancel();
-    _txSub = _repository.fetchTransactions(walletId).listen((transactions) {
-      emit(state.copyWith(
-        transactions: transactions,
-        isTransactionsLoaded: true,
-      ));
-    });
+    _txSub = _repository.fetchTransactions(profileId).listen(
+      (transactions) {
+        emit(state.copyWith(
+          transactions: transactions,
+          isTransactionsLoaded: true,
+        ));
+      },
+      onError: (e) {
+        debugPrint('⚠️ [Dashboard] Real-time Sync Error: $e');
+        // Fallback: One-time query if Real-time fails
+        _repository.getTransactionsOnce(profileId).then((transactions) {
+          emit(state.copyWith(
+            transactions: transactions,
+            isTransactionsLoaded: true,
+          ));
+        });
+      },
+    );
   }
 
   Future<void> refresh() async {

@@ -143,13 +143,13 @@ class NfcScanScreenState extends State<NfcScanScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text(
           'Verify Your Identity',
           style: TextStyle(color: Colors.white),
         ),
-        backgroundColor: Colors.transparent,
+        backgroundColor: const Color(0xFF0F6E56),
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
@@ -196,21 +196,21 @@ class NfcScanScreenState extends State<NfcScanScreen>
             children: [
               const Text(
                 'Step 1 of 2',
-                style: TextStyle(color: Colors.white54, fontSize: 13),
+                style: TextStyle(color: Colors.black54, fontSize: 13),
               ),
               const SizedBox(height: 4),
               const Text(
                 'Scan passport MRZ',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: Colors.black87,
                   fontSize: 24,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(height: 8),
               const Text(
                 'Open your passport to the photo page and point the camera at the two lines of text at the bottom.',
-                style: TextStyle(color: Colors.white60, height: 1.5),
+                style: TextStyle(color: Colors.black54, height: 1.5),
               ),
             ],
           ),
@@ -220,26 +220,26 @@ class NfcScanScreenState extends State<NfcScanScreen>
           child: Container(
             margin: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Colors.grey.shade900,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: Colors.blueAccent.withValues(alpha: 0.5),
+                color: const Color(0xFF0F6E56).withValues(alpha: 0.5),
                 width: 2,
               ),
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(18),
               child: Container(
-                color: Colors.black54,
+                color: Colors.grey.shade100,
                 child: Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.qr_code_scanner, size: 48, color: Colors.blueAccent),
+                      const Icon(Icons.qr_code_scanner, size: 48, color: Color(0xFF0F6E56)),
                       const SizedBox(height: 12),
                       const Text(
                         'Align Passport MRZ in the frame',
-                        style: TextStyle(color: Colors.white70),
+                        style: TextStyle(color: Colors.black54),
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton(
@@ -288,7 +288,7 @@ class NfcScanScreenState extends State<NfcScanScreen>
               ),
               child: const Text(
                 'Simulate MRZ Detected (Debug Mode)',
-                style: TextStyle(color: Colors.white24),
+                style: TextStyle(color: Colors.black26),
               ),
             ),
           ),
@@ -306,15 +306,15 @@ class NfcScanScreenState extends State<NfcScanScreen>
           children: [
             const Text(
               'Step 2 of 2',
-              style: TextStyle(color: Colors.white54, fontSize: 13),
+              style: TextStyle(color: Colors.black54, fontSize: 13),
             ),
             const SizedBox(height: 8),
             const Text(
               'Tap Your Passport',
               style: TextStyle(
-                color: Colors.white,
+                color: Colors.black87,
                 fontSize: 26,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: 40),
@@ -328,13 +328,13 @@ class NfcScanScreenState extends State<NfcScanScreen>
                   height: 160,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.blueAccent.withValues(alpha: 0.15),
-                    border: Border.all(color: Colors.blueAccent, width: 2),
+                    color: const Color(0xFF0F6E56).withValues(alpha: 0.15),
+                    border: Border.all(color: const Color(0xFF0F6E56), width: 2),
                   ),
                   child: const Icon(
                     Icons.nfc,
                     size: 80,
-                    color: Colors.blueAccent,
+                    color: Color(0xFF0F6E56),
                   ),
                 ),
               ),
@@ -344,14 +344,14 @@ class NfcScanScreenState extends State<NfcScanScreen>
               'Hold the top of your phone against the cover of your opened passport.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white70,
+                color: Colors.black54,
                 height: 1.6,
                 fontSize: 16,
               ),
             ),
             const SizedBox(height: 20),
             const CircularProgressIndicator(
-              color: Colors.blueAccent,
+              color: Color(0xFF0F6E56),
               strokeWidth: 2,
             ),
           ],
@@ -377,9 +377,9 @@ class NfcScanScreenState extends State<NfcScanScreen>
             Text(
               'Welcome, ${_passportData!.firstName}!',
               style: const TextStyle(
-                color: Colors.white,
+                color: Colors.black87,
                 fontSize: 28,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w600,
               ),
               textAlign: TextAlign.center,
             ),
@@ -387,7 +387,7 @@ class NfcScanScreenState extends State<NfcScanScreen>
             const Text(
               'Your identity has been cryptographically verified.\nYour wallet is now active.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white60, height: 1.6),
+              style: TextStyle(color: Colors.black54, height: 1.6),
             ),
             const SizedBox(height: 40),
             // Show the biometric photo from passport chip if available
@@ -405,8 +405,6 @@ class NfcScanScreenState extends State<NfcScanScreen>
             ElevatedButton(
               onPressed: () => Navigator.pop(context),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.greenAccent,
-                foregroundColor: Colors.black,
                 minimumSize: const Size(double.infinity, 52),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
@@ -414,7 +412,7 @@ class NfcScanScreenState extends State<NfcScanScreen>
               ),
               child: const Text(
                 'Continue to Wallet',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
               ),
             ),
           ],
@@ -440,16 +438,16 @@ class NfcScanScreenState extends State<NfcScanScreen>
             const Text(
               'Verification Failed',
               style: TextStyle(
-                color: Colors.white,
+                color: Colors.black87,
                 fontSize: 22,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: 12),
             Text(
               _errorMessage ?? 'An unknown error occurred.',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white60, height: 1.5),
+              style: const TextStyle(color: Colors.black54, height: 1.5),
             ),
             const SizedBox(height: 40),
             ElevatedButton(
@@ -458,7 +456,6 @@ class NfcScanScreenState extends State<NfcScanScreen>
                 _errorMessage = null;
               }),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blueAccent,
                 minimumSize: const Size(double.infinity, 52),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
@@ -490,8 +487,8 @@ class NfcScanScreenState extends State<NfcScanScreen>
                 color: done
                     ? Colors.greenAccent
                     : active
-                    ? Colors.blueAccent
-                    : Colors.white12,
+                    ? const Color(0xFF0F6E56)
+                    : Colors.black12,
               ),
             ),
           );
@@ -516,11 +513,11 @@ class NfcScanScreenState extends State<NfcScanScreen>
                   height: 180,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.grey.shade900,
+                    color: Colors.grey.shade200,
                     border: Border.all(
                       color: _selfieImage != null
                           ? Colors.greenAccent
-                          : Colors.blueAccent,
+                          : const Color(0xFF0F6E56),
                       width: 3,
                     ),
                   ),
@@ -530,7 +527,7 @@ class NfcScanScreenState extends State<NfcScanScreen>
                         : const Icon(
                             Icons.face_retouching_natural_rounded,
                             size: 80,
-                            color: Colors.white30,
+                            color: Colors.black26,
                           ),
                   ),
                 ),
@@ -538,7 +535,7 @@ class NfcScanScreenState extends State<NfcScanScreen>
                   const CircleAvatar(
                     backgroundColor: Colors.greenAccent,
                     radius: 18,
-                    child: Icon(Icons.check, color: Colors.black),
+                    child: Icon(Icons.check, color: Colors.white),
                   ),
               ],
             ),
@@ -546,26 +543,26 @@ class NfcScanScreenState extends State<NfcScanScreen>
             const Text(
               'Biometric Verification',
               style: TextStyle(
-                color: Colors.white,
+                color: Colors.black87,
                 fontSize: 24,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: 12),
             const Text(
               'We need to match your selfie with your passport photo to ensure you are the actual owner.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white60, height: 1.5),
+              style: TextStyle(color: Colors.black54, height: 1.5),
             ),
             const SizedBox(height: 40),
             if (_isProcessing)
               const Column(
                 children: [
-                  CircularProgressIndicator(color: Colors.blueAccent),
+                  CircularProgressIndicator(color: Color(0xFF0F6E56)),
                   SizedBox(height: 16),
                   Text(
                     'Matching Face...',
-                    style: TextStyle(color: Colors.blueAccent),
+                    style: TextStyle(color: Color(0xFF0F6E56)),
                   ),
                 ],
               )
@@ -584,8 +581,8 @@ class NfcScanScreenState extends State<NfcScanScreen>
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _livenessStep == 'blink'
-                      ? Colors.orangeAccent
-                      : Colors.blueAccent,
+                      ? Theme.of(context).primaryColor
+                      : null,
                   minimumSize: const Size(double.infinity, 52),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
@@ -621,7 +618,7 @@ class NfcScanScreenState extends State<NfcScanScreen>
                         _challengeText,
                         style: const TextStyle(
                           color: Colors.orangeAccent,
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],

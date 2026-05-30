@@ -8,6 +8,8 @@ import '../datasources/crypto_service.dart';
 import '../datasources/secure_storage_service.dart';
 import '../datasources/security_remote_data_source.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 class SecurityRepositoryImpl implements SecurityRepository {
   final SecurityRemoteDataSource _remoteDataSource;
   final CryptoService _cryptoService;
@@ -82,25 +84,43 @@ class SecurityRepositoryImpl implements SecurityRepository {
       await _secureStorage.write(_kDeviceIdKey, deviceId);
     }
 
-    // 2. Generate Banking-Grade Cryptographic Identity (Secure Enclave / TEE)
-    final publicKeyBase64 = await _cryptoService.createHardwareIdentity();
+    // Check if biometric is enabled
+    final prefs = await SharedPreferences.getInstance();
+    final biometricEnabled = prefs.getBool('biometric_enabled') ?? false;
 
-    if (publicKeyBase64 == null) {
-      throw Exception('Hardware security module failure. Secure Enclave unavailable.');
+    String? publicKeyBase64;
+    bool isHardware = false;
+
+    if (biometricEnabled) {
+      // 2. Generate Banking-Grade Cryptographic Identity (Secure Enclave / TEE)
+      publicKeyBase64 = await _cryptoService.createHardwareIdentity();
+      if (publicKeyBase64 != null) {
+        isHardware = true;
+      }
+    }
+
+    if (!isHardware) {
+      // Software fallback
+      final keyPair = await _cryptoService.generateKeyPair();
+      final privateKeyBytes = await _cryptoService.getPrivateKeyBytes(keyPair);
+      publicKeyBase64 = await _cryptoService.getPublicKeyBase64(keyPair);
+
+      await _secureStorage.write(_kPrivateKeySeedKey, base64Encode(privateKeyBytes));
+      await _secureStorage.write(_kIsHardwareKey, 'false');
+    } else {
+      // 3. Mark as Hardware Backed (No Private Key extraction!)
+      await _secureStorage.write(_kIsHardwareKey, 'true');
+      await _secureStorage.delete(_kPrivateKeySeedKey); // Wipe any old software seeds
     }
 
     // 🔬 DEBUG: Print public key prefix for tracing
     debugPrint('🔑 [Bind] DeviceID: $deviceId');
-    debugPrint('🔑 [Bind] Hardware PubKey Prefix: ${publicKeyBase64.substring(0, 10)}...');
-
-    // 3. Mark as Hardware Backed (No Private Key extraction!)
-    await _secureStorage.write(_kIsHardwareKey, 'true');
-    await _secureStorage.delete(_kPrivateKeySeedKey); // Wipe any old software seeds
+    debugPrint('🔑 [Bind] PubKey Prefix: ${publicKeyBase64!.substring(0, 10)}...');
 
     // 4. Get Device Metadata
     String deviceName = 'Unknown Device';
     String osType = 'web';
-    Map<String, dynamic> metadata = {'security_level': 'hardware_enclave'};
+    Map<String, dynamic> metadata = {'security_level': isHardware ? 'hardware_enclave' : 'software_storage'};
 
     try {
       if (Platform.isAndroid) {
@@ -123,7 +143,7 @@ class SecurityRepositoryImpl implements SecurityRepository {
       deviceName: deviceName,
       osType: osType,
       metadata: metadata,
-      trustScore: 100, // Hardware-backed keys get full trust score
+      trustScore: isHardware ? 100 : 70, // Hardware-backed keys get full trust score
     );
 
     // ⚡ Post-Bind (No memory caching for hardware/secure keys)
@@ -179,7 +199,9 @@ class SecurityRepositoryImpl implements SecurityRepository {
       // 2. "Device signature verification failed" (Key Mismatch / Rotated Key)
       final shouldSelfHeal =
           (errorStr.contains('Device not recognized') ||
-              errorStr.contains('Device signature verification failed')) &&
+              errorStr.contains('Device signature verification failed') ||
+              errorStr.contains('Device not bound') ||
+              errorStr.contains('credentials missing')) &&
           retryCount < 1;
 
       if (shouldSelfHeal) {
@@ -411,6 +433,20 @@ class SecurityRepositoryImpl implements SecurityRepository {
   }
 
   @override
+  Future<void> clearAllPinData() async {
+    // Clear cached in-memory
+    _cachedLocalHash = null;
+    _cachedLocalSalt = null;
+
+    // Remove persisted PIN data (hash, salt, cache flag)
+    await _secureStorage.delete(_kLocalPinHashKey);
+    await _secureStorage.delete(_kLocalPinSaltKey);
+    await _secureStorage.delete(_kHasPinCacheKey);
+
+    debugPrint('🔒 [SecurityRepo] clearAllPinData: Local PIN data wiped.');
+  }
+
+  @override
   Future<void> clearSecurityData() async {
     // 1. Wipe Memory Cache
     _devicesCache = null;
@@ -427,4 +463,5 @@ class SecurityRepositoryImpl implements SecurityRepository {
 
     debugPrint('🔒 [SecurityRepo] Hard-Clear: Sensitive data wiped.');
   }
+
 }

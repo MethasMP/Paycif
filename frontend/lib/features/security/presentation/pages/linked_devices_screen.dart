@@ -176,62 +176,65 @@ class _LinkedDevicesView extends StatelessWidget {
             ),
           ],
         ),
-        child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 8,
-          ),
-          leading: Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: isCurrent
-                  ? const Color(0xFF10B981).withValues(alpha: 0.1)
-                  : Theme.of(context).scaffoldBackgroundColor,
-              borderRadius: BorderRadius.circular(12),
+        child: Material(
+          color: Colors.transparent,
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 8,
             ),
-            child: Icon(
-              platformIcon,
-              color: isCurrent ? const Color(0xFF10B981) : Colors.grey,
+            leading: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: isCurrent
+                    ? const Color(0xFF10B981).withValues(alpha: 0.1)
+                    : Theme.of(context).scaffoldBackgroundColor,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                platformIcon,
+                color: isCurrent ? const Color(0xFF10B981) : Colors.grey,
+              ),
             ),
-          ),
-          title: Text(
-            deviceName,
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 4),
-              isCurrent
-                  ? Row(
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF10B981),
-                            shape: BoxShape.circle,
+            title: Text(
+              deviceName,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 4),
+                isCurrent
+                    ? Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF10B981),
+                              shape: BoxShape.circle,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 6),
-                        const Text(
-                          'Current Device',
-                          style: TextStyle(
-                            color: Color(0xFF10B981),
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
+                          const SizedBox(width: 6),
+                          const Text(
+                            'Current Device',
+                            style: TextStyle(
+                              color: Color(0xFF10B981),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
+                        ],
+                      )
+                    : Text(
+                        'Active ${controller.formatLastActive(lastActive)}',
+                        style: TextStyle(
+                          color: Colors.grey.withValues(alpha: 0.8),
+                          fontSize: 13,
                         ),
-                      ],
-                    )
-                  : Text(
-                      'Active ${controller.formatLastActive(lastActive)}',
-                      style: TextStyle(
-                        color: Colors.grey.withValues(alpha: 0.8),
-                        fontSize: 13,
                       ),
-                    ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../pages/pin_setup_screen.dart';
 import '../../presentation/logic/security_controller.dart';
 import '../../../../utils/error_translator.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
@@ -125,6 +126,14 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
         HapticFeedback.lightImpact();
         widget.onSuccess?.call(_pin);
       } else {
+        if (controller.state.errorMessage?.contains('PIN not setup') == true) {
+          if (mounted) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => const PinSetupScreen()),
+            );
+            return;
+          }
+        }
         _triggerErrorAnimation();
         _onClear();
       }
@@ -411,7 +420,7 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
           Text(
             'Security Lockout',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w600,
               letterSpacing: -0.5,
             ),
           ),

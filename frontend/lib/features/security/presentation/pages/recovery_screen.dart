@@ -70,7 +70,7 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
             const SizedBox(height: 16),
             const Text(
               'Identity Verified',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
             const Text(
@@ -167,7 +167,7 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
                         'Identity Challenge',
                         style: TextStyle(
                           fontSize: 32,
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w600,
                           letterSpacing: -1,
                         ),
                       ),
@@ -245,7 +245,7 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
             'Security Anchor'.toUpperCase(),
             style: TextStyle(
               fontSize: 12,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w600,
               letterSpacing: 1.2,
               color: const Color(0xFF667EEA),
             ),
@@ -258,7 +258,7 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
             maxLength: 4,
             style: const TextStyle(
               fontSize: 24,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w600,
               letterSpacing: 8,
             ),
             decoration: InputDecoration(
@@ -322,7 +322,7 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 18,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
       ),
@@ -344,7 +344,7 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
             const SizedBox(height: 24),
             const Text(
               'Security Lockout',
-              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 28, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 12),
             Text(

@@ -68,12 +68,11 @@ class DigitalWalletButton extends StatelessWidget {
               const SizedBox(width: 10),
               Text(
                 _getButtonText(),
-                style: TextStyle(
-                  color: _getTextColor(),
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.3,
-                ),
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: _getTextColor(),
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.3,
+                    ),
               ),
               if (isLinked) ...[
                 const SizedBox(width: 12),
@@ -86,22 +85,21 @@ class DigitalWalletButton extends StatelessWidget {
                     color: const Color(0xFF10B981).withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.check_circle_rounded,
                         size: 12,
                         color: Color(0xFF10B981),
                       ),
-                      SizedBox(width: 4),
+                      const SizedBox(width: 4),
                       Text(
                         'Linked',
-                        style: TextStyle(
-                          color: Color(0xFF10B981),
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: const Color(0xFF10B981),
+                              fontWeight: FontWeight.w600,
+                            ),
                       ),
                     ],
                   ),

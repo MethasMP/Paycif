@@ -1,14 +1,12 @@
 package middleware
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/redis/go-redis/v9"
 )
 
 var (
@@ -25,7 +23,6 @@ const (
 )
 
 // initMemory initializes the background cleanup for in-memory counting.
-// Uses sync.Once to ensure it starts only once if multiple middlewares are created (rare but safe).
 func initMemory() {
 	once.Do(func() {
 		cleanupTicker = time.NewTicker(CleanupTick)
@@ -48,14 +45,9 @@ func initMemory() {
 	})
 }
 
-// RateLimiterMiddleware enforces rate limits.
-// Accepts an injected Redis client. If nil, strict in-memory fallback is used.
-func RateLimiterMiddleware(rdb *redis.Client) gin.HandlerFunc {
-	useRedis := (rdb != nil)
-
-	if !useRedis {
-		initMemory()
-	}
+// RateLimiterMiddleware enforces rate limits in memory (Pure Supabase architecture fallback).
+func RateLimiterMiddleware() gin.HandlerFunc {
+	initMemory()
 
 	return func(c *gin.Context) {
 		userID := c.GetString("user_id")
@@ -71,37 +63,16 @@ func RateLimiterMiddleware(rdb *redis.Client) gin.HandlerFunc {
 		currentMinute := time.Now().Unix() / 60
 		key := fmt.Sprintf("rate:%s:%d", identifier, currentMinute)
 
-		if useRedis {
-			ctx := context.Background()
-			// INCR and EXPIRE
-			count, err := rdb.Incr(ctx, key).Result()
-			if err != nil {
-				// Redis fail open -> allow request
-				c.Next()
-				return
-			}
-			if count == 1 {
-				rdb.Expire(ctx, key, Window)
-			}
-
-			if count > RateLimit {
-				c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
-					"error": "Rate limit exceeded. Try again later.",
-				})
-				return
-			}
-		} else {
-			// In-Memory Fallback
-			val, _ := memoryStore.LoadOrStore(key, &SafeCounter{})
-			counter := val.(*SafeCounter)
-			
-			newVal := counter.Inc()
-			if newVal > RateLimit {
-				c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
-					"error": "Rate limit exceeded (Local).",
-				})
-				return
-			}
+		// In-Memory Rate Limiter
+		val, _ := memoryStore.LoadOrStore(key, &SafeCounter{})
+		counter := val.(*SafeCounter)
+		
+		newVal := counter.Inc()
+		if newVal > RateLimit {
+			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
+				"error": "Rate limit exceeded (Local).",
+			})
+			return
 		}
 
 		c.Next()
@@ -120,3 +91,4 @@ func (c *SafeCounter) Inc() int {
 	c.v++
 	return c.v
 }
+

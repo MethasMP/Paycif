@@ -1,6 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
-import '../models/wallet_model.dart';
 import '../models/transaction.dart';
 import 'dart:async';
 
@@ -11,23 +10,11 @@ class DashboardRepository {
 
   Stream<AuthState> get authStream => _client.auth.onAuthStateChange;
 
-  Stream<Wallet?> fetchUserWallet() {
-    final userId = _client.auth.currentUser?.id;
-    if (userId == null) return Stream.value(null);
-
-    return _client
-        .from('wallets')
-        .stream(primaryKey: ['id'])
-        .eq('profile_id', userId)
-        .limit(1)
-        .map((data) => data.isEmpty ? null : Wallet.fromJson(data.first));
-  }
-
-  Stream<List<Transaction>> fetchTransactions(String walletId) {
+  Stream<List<Transaction>> fetchTransactions(String profileId) {
     return _client
         .from('transactions')
         .stream(primaryKey: ['id'])
-        .eq('wallet_id', walletId)
+        .eq('profile_id', profileId)
         .order('created_at')
         .map((data) {
           final txs = data.map((json) => Transaction.fromJson(json)).toList();
@@ -36,19 +23,20 @@ class DashboardRepository {
         });
   }
 
-  Future<void> createWalletManually() async {
-    final user = _client.auth.currentUser;
-    if (user == null) return;
+  Future<List<Transaction>> getTransactionsOnce(String profileId) async {
     try {
-      await _client.from('wallets').insert({
-        'profile_id': user.id,
-        'balance': 0,
-        'currency': 'THB',
-        'account_type': 'standard',
-        'status': 'active',
-      });
+      final response = await _client
+          .from('transactions')
+          .select()
+          .eq('profile_id', profileId)
+          .order('created_at', ascending: false);
+      return (response as List<dynamic>)
+          .map((json) => Transaction.fromJson(json))
+          .toList();
     } catch (e) {
-      debugPrint("Manual wallet creation info: $e");
+      debugPrint('❌ Failed to fetch transactions once: $e');
+      return [];
     }
   }
 }
+

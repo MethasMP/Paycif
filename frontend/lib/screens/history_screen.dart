@@ -6,6 +6,7 @@ import '../controllers/dashboard_controller.dart';
 import '../widgets/transaction_item.dart';
 import 'transaction_detail_screen.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
+import '../theme/app_theme.dart';
 
 class HistoryScreen extends StatelessWidget {
   const HistoryScreen({super.key});
@@ -50,10 +51,8 @@ class HistoryScreen extends StatelessWidget {
                       child: Text(
                         dateKey.toUpperCase(),
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: Theme.of(
-                            context,
-                          ).textTheme.bodySmall?.color?.withValues(alpha: 0.5),
-                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textSecondaryColor(context),
+                          fontWeight: FontWeight.w600,
                           letterSpacing: 1.2,
                         ),
                       ),
@@ -129,12 +128,9 @@ class HistoryScreen extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               l10n.historyNoActivity,
-              style: TextStyle(
-                color: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.color?.withValues(alpha: 0.5),
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                color: AppTheme.textSecondaryColor(context),
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
