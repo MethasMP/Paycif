@@ -104,6 +104,8 @@ type ExchangeRateResponse struct {
 
 // GetExchangeRate retrieves the latest rate for a currency pair.
 func (s *WalletService) GetExchangeRate(ctx context.Context, fromCurr, toCurr string) (*ExchangeRateResponse, error) {
+	fromCurr = strings.ToUpper(fromCurr)
+	toCurr = strings.ToUpper(toCurr)
 	cacheKey := fmt.Sprintf("rate:%s:%s", fromCurr, toCurr)
 
 	if val, ok := s.localRateCache.Load(cacheKey); ok {
@@ -117,7 +119,7 @@ func (s *WalletService) GetExchangeRate(ctx context.Context, fromCurr, toCurr st
 	var rate float64
 	var updatedAt time.Time
 	err := s.DB.QueryRowContext(ctx, "SELECT provider_rate, updated_at FROM exchange_rates WHERE from_currency = $1 AND to_currency = $2",
-		strings.ToUpper(fromCurr), strings.ToUpper(toCurr)).Scan(&rate, &updatedAt)
+		fromCurr, toCurr).Scan(&rate, &updatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("rate not found for %s/%s", fromCurr, toCurr)
@@ -145,27 +147,23 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 	}
 	defer tx.Rollback()
 
-	// 1. Idempotency check
-	var exists bool
-	err = tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM transactions WHERE reference_id = $1)", referenceID).Scan(&exists)
-	if err != nil {
-		return err
-	}
-	if exists {
-		log.Printf("ℹ[] Payment already processed for reference: %s", referenceID)
-		return nil
-	}
-
-	// 2. Record Transaction
+	// 1. Record Transaction (Atomic Idempotency)
 	newTxID := uuid.New()
 	description := "Pay per use: " + merchant
-	_, err = tx.ExecContext(ctx, `
+	res, err := tx.ExecContext(ctx, `
 		INSERT INTO transactions (id, profile_id, reference_id, amount, description, settlement_status, gateway_fee, provider_metadata, created_at)
 		VALUES ($1, $2, $3, $4, $5, 'SETTLED', 0, $6, NOW())
+		ON CONFLICT (reference_id) DO NOTHING
 	`, newTxID, userID, referenceID, int64(amount*100), description,
 		fmt.Sprintf(`{"provider": "stripe", "merchant": "%s", "amount": %f}`, merchant, amount))
 	if err != nil {
 		return fmt.Errorf("failed to insert transaction: %w", err)
+	}
+
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		log.Printf("ℹ[] Payment already processed for reference: %s", referenceID)
+		return nil
 	}
 
 	// 3. Create Ledger Entry
@@ -238,11 +236,10 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 	// Check Daily Limit (querying ledger_entries by profile_id)
 	var dailyDebitTotal sql.NullInt64
 	err = tx.QueryRowContext(ctx, `
-		SELECT COALESCE(SUM(ABS(le.amount)), 0) FROM ledger_entries le
-		JOIN transactions t ON le.transaction_id = t.id
-		WHERE le.profile_id = $1 
-		AND le.amount < 0 
-		AND t.created_at > NOW() - INTERVAL '24 hours'
+		SELECT COALESCE(SUM(ABS(amount)), 0) FROM ledger_entries
+		WHERE profile_id = $1
+		AND amount < 0
+		AND created_at > NOW() - INTERVAL '24 hours'
 	`, req.UserID).Scan(&dailyDebitTotal)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("failed to check daily limit: %w", err)

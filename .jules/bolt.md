@@ -1,0 +1,3 @@
+## 2025-05-30 - [Database & Transaction Optimization]
+**Learning:** In systems using `SERIALIZABLE` isolation levels, transaction duration and the read/write set size are critical. Redundant `SELECT EXISTS` checks for idempotency and unnecessary `JOIN` operations in limit-checking queries increase the transaction window and conflict surface.
+**Action:** Replace `SELECT EXISTS` with `INSERT ... ON CONFLICT DO NOTHING`. Avoid joining `transactions` when querying `ledger_entries` if the required metadata (like `created_at` or `profile_id`) is already present on the ledger. This reduces DB roundtrips and serialization failures.
