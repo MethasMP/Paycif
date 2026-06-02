@@ -3,3 +3,6 @@ mcp_config.json
 .idea/
 .vscode/
 *.log
+.agent/
+*.jpg
+*.png
