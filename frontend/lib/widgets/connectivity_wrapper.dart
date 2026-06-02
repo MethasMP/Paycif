@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../services/connectivity_service.dart';
 import '../services/api_service.dart';
 import '../l10n/generated/app_localizations.dart';
+import '../theme/app_theme.dart';
 
 class ConnectivityWrapper extends StatelessWidget {
   final Widget child;
@@ -93,7 +94,7 @@ class ConnectivityWrapper extends StatelessWidget {
                                   },
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: const Color(0xFFF59E0B),
-                                    foregroundColor: const Color(0xFF1A1F71),
+                                    foregroundColor: AppTheme.accentGoldDark,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(28),
                                     ),
@@ -109,7 +110,7 @@ class ConnectivityWrapper extends StatelessWidget {
                                         'Retry',
                                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                                       fontWeight: FontWeight.w600,
-                                      color: const Color(0xFF1A1F71),
+                                      color: AppTheme.accentGoldDark,
                                     ),
                                   ),
                                 ),

@@ -104,7 +104,7 @@ class AppTheme {
     final base = ThemeData.light();
     return base.copyWith(
       primaryColor: primaryTeal,
-      scaffoldBackgroundColor: backgroundWhite,
+      scaffoldBackgroundColor: const Color(0xFFF0FAF6),
       cardColor: backgroundWhite,
       colorScheme: ColorScheme.fromSeed(
         seedColor: primaryTeal,

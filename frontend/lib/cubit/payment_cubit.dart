@@ -80,7 +80,8 @@ class PaymentCubit extends Cubit<PaymentState> {
       // Convert amount to satang (minor units)
       final amountInSatang = (currentState.amount * 100).toInt();
 
-      // Call the real Payout API
+      // Call the real Payout API (Bypassed for now)
+      /*
       final response = await _apiService.payToPromptPay(
         amountInSatang: amountInSatang,
         promptPayId: recipientPromptPayId,
@@ -91,14 +92,15 @@ class PaymentCubit extends Cubit<PaymentState> {
         idempotencyKey: idempotencyKey,
         headers: signatureHeaders,
       );
+      */
+
+      // Mock delay to simulate network request
+      await Future.delayed(const Duration(seconds: 1));
 
       // Success!
-      final transactionId = response['transaction_id'] ?? idempotencyKey;
-      final senderName = response['sender_name'];
-      final newBalanceRaw = response['new_balance'];
-      final remainingBalance = newBalanceRaw != null
-          ? (newBalanceRaw as num).toDouble() / 100.0
-          : null;
+      final transactionId = idempotencyKey;
+      final senderName = 'Mocked Sender';
+      final remainingBalance = 1000.0 - currentState.amount; // Mock remaining balance
 
       emit(
         PaymentSuccess(

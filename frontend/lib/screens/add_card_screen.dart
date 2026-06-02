@@ -249,12 +249,12 @@ class _AddCardScreenState extends State<AddCardScreen> {
                           }
                         },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1A1F71),
+                    backgroundColor: AppTheme.primaryColor(context),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
                     elevation: 8,
-                    shadowColor: const Color(0xFF1A1F71).withValues(alpha: 0.5),
+                    shadowColor: AppTheme.primaryColor(context).withValues(alpha: 0.5),
                   ),
                   child: _isLoading
                       ? Row(
@@ -463,7 +463,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
               ),
               prefixIcon: Icon(
                 icon,
-                color: isDark ? Colors.white70 : const Color(0xFF1A1F71),
+                color: isDark ? Colors.white70 : AppTheme.primaryColor(context),
               ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),

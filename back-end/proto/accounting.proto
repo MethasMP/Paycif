@@ -36,6 +36,7 @@ message TransferRequest {
   string currency = 4;
   string reference_id = 5;    // Idempotency key
   string request_id = 6;      // For tracing across services
+  string user_id = 7;
 }
 
 message TransferResponse {

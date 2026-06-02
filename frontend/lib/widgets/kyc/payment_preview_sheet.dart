@@ -176,7 +176,7 @@ class PaymentPreviewBottomSheet extends StatelessWidget {
     switch (context.method) {
       case PaymentMethodType.promptPay:
         icon = PhosphorIcons.bank;
-        color = const Color(0xFF1A1F71);
+        color = const Color(0xFF003087);
         break;
       case PaymentMethodType.billPayment:
         icon = PhosphorIcons.receipt;

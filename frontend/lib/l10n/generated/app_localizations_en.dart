@@ -18,7 +18,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get navHistory => 'History';
 
   @override
-  String get navPayment => 'Payment';
+  String get navPayment => 'Methods';
 
   @override
   String get navProfile => 'Profile';
@@ -27,7 +27,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get navScan => 'Scan';
 
   @override
-  String get profileTitle => 'My Profile';
+  String get profileTitle => 'Profile';
 
   @override
   String get passportLabel => 'PASSPORT';
@@ -51,7 +51,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get darkMode => 'Dark Mode';
 
   @override
-  String get lightMode => 'Light Mode';
+  String get lightMode => 'Appearance';
 
   @override
   String get language => 'Language';

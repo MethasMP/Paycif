@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -49,26 +50,64 @@ class ApiService {
     }
   }
 
-  // 1. Return to localhost for simulator access via 127.0.0.1 (Android uses 10.0.2.2 usually, iOS 127.0.0.1)
+  static String? _customHostOverride;
+
+  /// Helper to dynamically replace 'localhost' / '127.0.0.1' with '10.0.2.2' for Android Emulator.
+  static String _resolveLocalHost(String url) {
+    if (url.contains('localhost') || url.contains('127.0.0.1')) {
+      if (Platform.isAndroid) {
+        return url.replaceAll('localhost', '10.0.2.2').replaceAll('127.0.0.1', '10.0.2.2');
+      }
+    }
+    return url;
+  }
+
+  /// Initialize custom host override from local storage
+  static Future<void> initHostOverride() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _customHostOverride = prefs.getString('custom_backend_url');
+    } catch (_) {}
+  }
+
+  /// Save and update custom host override
+  static Future<void> saveHostOverride(String url) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (url.trim().isEmpty) {
+        await prefs.remove('custom_backend_url');
+        _customHostOverride = null;
+      } else {
+        await prefs.setString('custom_backend_url', url.trim());
+        _customHostOverride = url.trim();
+      }
+    } catch (_) {}
+  }
+
   // 🚀 World-Class URL Management
   // Use: flutter run --dart-define=BACKEND_URL=http://192.168.1.XX:8080/api/v1
   static String get baseUrl {
+    // 0. Try Custom Host Override (Run Anywhere developer feature)
+    if (_customHostOverride != null && _customHostOverride!.isNotEmpty) {
+      return _resolveLocalHost(_customHostOverride!);
+    }
+
     // 1. Try Dart Define (The most flexible way)
     const defineUrl = String.fromEnvironment('BACKEND_URL');
-    if (defineUrl.isNotEmpty) return defineUrl;
+    if (defineUrl.isNotEmpty) return _resolveLocalHost(defineUrl);
 
     // 2. Try .env file
     final prodUrl = dotenv.env['BACKEND_URL'];
     if (prodUrl != null && prodUrl.isNotEmpty) {
-      return prodUrl;
+      return _resolveLocalHost(prodUrl);
     }
 
     // 3. Fallback logic for Local Development
     if (Platform.isAndroid) {
       return 'http://10.0.2.2:8080/api/v1';
     } else {
-      // 🍎 On iOS, we distinguish between Simulator and Physical Device
-      return 'http://192.168.0.109:8080/api/v1';
+      // 🍎 On iOS Simulator/Device fallback
+      return 'http://localhost:8080/api/v1';
     }
   }
 

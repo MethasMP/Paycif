@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v4.25.1
-// source: accounting.proto
+// source: proto/accounting.proto
 
 package pb
 
@@ -29,13 +29,14 @@ type TransferRequest struct {
 	Currency      string                 `protobuf:"bytes,4,opt,name=currency,proto3" json:"currency,omitempty"`
 	ReferenceId   string                 `protobuf:"bytes,5,opt,name=reference_id,json=referenceId,proto3" json:"reference_id,omitempty"` // Idempotency key
 	RequestId     string                 `protobuf:"bytes,6,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`       // For tracing across services
+	UserId        string                 `protobuf:"bytes,7,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *TransferRequest) Reset() {
 	*x = TransferRequest{}
-	mi := &file_accounting_proto_msgTypes[0]
+	mi := &file_proto_accounting_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -47,7 +48,7 @@ func (x *TransferRequest) String() string {
 func (*TransferRequest) ProtoMessage() {}
 
 func (x *TransferRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_accounting_proto_msgTypes[0]
+	mi := &file_proto_accounting_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -60,7 +61,7 @@ func (x *TransferRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TransferRequest.ProtoReflect.Descriptor instead.
 func (*TransferRequest) Descriptor() ([]byte, []int) {
-	return file_accounting_proto_rawDescGZIP(), []int{0}
+	return file_proto_accounting_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *TransferRequest) GetFromWalletId() string {
@@ -105,6 +106,13 @@ func (x *TransferRequest) GetRequestId() string {
 	return ""
 }
 
+func (x *TransferRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
 type TransferResponse struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
 	Success              bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
@@ -119,7 +127,7 @@ type TransferResponse struct {
 
 func (x *TransferResponse) Reset() {
 	*x = TransferResponse{}
-	mi := &file_accounting_proto_msgTypes[1]
+	mi := &file_proto_accounting_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -131,7 +139,7 @@ func (x *TransferResponse) String() string {
 func (*TransferResponse) ProtoMessage() {}
 
 func (x *TransferResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_accounting_proto_msgTypes[1]
+	mi := &file_proto_accounting_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -144,7 +152,7 @@ func (x *TransferResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TransferResponse.ProtoReflect.Descriptor instead.
 func (*TransferResponse) Descriptor() ([]byte, []int) {
-	return file_accounting_proto_rawDescGZIP(), []int{1}
+	return file_proto_accounting_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *TransferResponse) GetSuccess() bool {
@@ -199,7 +207,7 @@ type BalanceRequest struct {
 
 func (x *BalanceRequest) Reset() {
 	*x = BalanceRequest{}
-	mi := &file_accounting_proto_msgTypes[2]
+	mi := &file_proto_accounting_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -211,7 +219,7 @@ func (x *BalanceRequest) String() string {
 func (*BalanceRequest) ProtoMessage() {}
 
 func (x *BalanceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_accounting_proto_msgTypes[2]
+	mi := &file_proto_accounting_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -224,7 +232,7 @@ func (x *BalanceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BalanceRequest.ProtoReflect.Descriptor instead.
 func (*BalanceRequest) Descriptor() ([]byte, []int) {
-	return file_accounting_proto_rawDescGZIP(), []int{2}
+	return file_proto_accounting_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *BalanceRequest) GetWalletId() string {
@@ -253,7 +261,7 @@ type BalanceResponse struct {
 
 func (x *BalanceResponse) Reset() {
 	*x = BalanceResponse{}
-	mi := &file_accounting_proto_msgTypes[3]
+	mi := &file_proto_accounting_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -265,7 +273,7 @@ func (x *BalanceResponse) String() string {
 func (*BalanceResponse) ProtoMessage() {}
 
 func (x *BalanceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_accounting_proto_msgTypes[3]
+	mi := &file_proto_accounting_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -278,7 +286,7 @@ func (x *BalanceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BalanceResponse.ProtoReflect.Descriptor instead.
 func (*BalanceResponse) Descriptor() ([]byte, []int) {
-	return file_accounting_proto_rawDescGZIP(), []int{3}
+	return file_proto_accounting_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *BalanceResponse) GetSuccess() bool {
@@ -320,7 +328,7 @@ type ValidationResponse struct {
 
 func (x *ValidationResponse) Reset() {
 	*x = ValidationResponse{}
-	mi := &file_accounting_proto_msgTypes[4]
+	mi := &file_proto_accounting_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -332,7 +340,7 @@ func (x *ValidationResponse) String() string {
 func (*ValidationResponse) ProtoMessage() {}
 
 func (x *ValidationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_accounting_proto_msgTypes[4]
+	mi := &file_proto_accounting_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -345,7 +353,7 @@ func (x *ValidationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidationResponse.ProtoReflect.Descriptor instead.
 func (*ValidationResponse) Descriptor() ([]byte, []int) {
-	return file_accounting_proto_rawDescGZIP(), []int{4}
+	return file_proto_accounting_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ValidationResponse) GetIsValid() bool {
@@ -369,6 +377,392 @@ func (x *ValidationResponse) GetErrorMessage() string {
 	return ""
 }
 
+// Limit checking messages
+type LimitCheckRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Amount        int64                  `protobuf:"varint,2,opt,name=amount,proto3" json:"amount,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LimitCheckRequest) Reset() {
+	*x = LimitCheckRequest{}
+	mi := &file_proto_accounting_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LimitCheckRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LimitCheckRequest) ProtoMessage() {}
+
+func (x *LimitCheckRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_accounting_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LimitCheckRequest.ProtoReflect.Descriptor instead.
+func (*LimitCheckRequest) Descriptor() ([]byte, []int) {
+	return file_proto_accounting_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *LimitCheckRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *LimitCheckRequest) GetAmount() int64 {
+	if x != nil {
+		return x.Amount
+	}
+	return 0
+}
+
+type LimitCheckResponse struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Allowed        bool                   `protobuf:"varint,1,opt,name=allowed,proto3" json:"allowed,omitempty"`
+	RemainingDaily int64                  `protobuf:"varint,2,opt,name=remaining_daily,json=remainingDaily,proto3" json:"remaining_daily,omitempty"`
+	Message        string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *LimitCheckResponse) Reset() {
+	*x = LimitCheckResponse{}
+	mi := &file_proto_accounting_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LimitCheckResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LimitCheckResponse) ProtoMessage() {}
+
+func (x *LimitCheckResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_accounting_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LimitCheckResponse.ProtoReflect.Descriptor instead.
+func (*LimitCheckResponse) Descriptor() ([]byte, []int) {
+	return file_proto_accounting_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *LimitCheckResponse) GetAllowed() bool {
+	if x != nil {
+		return x.Allowed
+	}
+	return false
+}
+
+func (x *LimitCheckResponse) GetRemainingDaily() int64 {
+	if x != nil {
+		return x.RemainingDaily
+	}
+	return 0
+}
+
+func (x *LimitCheckResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type LimitsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LimitsRequest) Reset() {
+	*x = LimitsRequest{}
+	mi := &file_proto_accounting_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LimitsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LimitsRequest) ProtoMessage() {}
+
+func (x *LimitsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_accounting_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LimitsRequest.ProtoReflect.Descriptor instead.
+func (*LimitsRequest) Descriptor() ([]byte, []int) {
+	return file_proto_accounting_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *LimitsRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+type LimitsResponse struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	CurrentDaily   int64                  `protobuf:"varint,1,opt,name=current_daily,json=currentDaily,proto3" json:"current_daily,omitempty"`
+	MaxDaily       int64                  `protobuf:"varint,2,opt,name=max_daily,json=maxDaily,proto3" json:"max_daily,omitempty"`
+	MaxTransaction int64                  `protobuf:"varint,3,opt,name=max_transaction,json=maxTransaction,proto3" json:"max_transaction,omitempty"`
+	Remaining      int64                  `protobuf:"varint,4,opt,name=remaining,proto3" json:"remaining,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *LimitsResponse) Reset() {
+	*x = LimitsResponse{}
+	mi := &file_proto_accounting_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LimitsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LimitsResponse) ProtoMessage() {}
+
+func (x *LimitsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_accounting_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LimitsResponse.ProtoReflect.Descriptor instead.
+func (*LimitsResponse) Descriptor() ([]byte, []int) {
+	return file_proto_accounting_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *LimitsResponse) GetCurrentDaily() int64 {
+	if x != nil {
+		return x.CurrentDaily
+	}
+	return 0
+}
+
+func (x *LimitsResponse) GetMaxDaily() int64 {
+	if x != nil {
+		return x.MaxDaily
+	}
+	return 0
+}
+
+func (x *LimitsResponse) GetMaxTransaction() int64 {
+	if x != nil {
+		return x.MaxTransaction
+	}
+	return 0
+}
+
+func (x *LimitsResponse) GetRemaining() int64 {
+	if x != nil {
+		return x.Remaining
+	}
+	return 0
+}
+
+// Payout messages
+type PayoutRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	UserId         string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	WalletId       string                 `protobuf:"bytes,2,opt,name=wallet_id,json=walletId,proto3" json:"wallet_id,omitempty"`
+	Amount         int64                  `protobuf:"varint,3,opt,name=amount,proto3" json:"amount,omitempty"`
+	PromptpayId    string                 `protobuf:"bytes,4,opt,name=promptpay_id,json=promptpayId,proto3" json:"promptpay_id,omitempty"`
+	RecipientName  string                 `protobuf:"bytes,5,opt,name=recipient_name,json=recipientName,proto3" json:"recipient_name,omitempty"`
+	IdempotencyKey string                 `protobuf:"bytes,6,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *PayoutRequest) Reset() {
+	*x = PayoutRequest{}
+	mi := &file_proto_accounting_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PayoutRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PayoutRequest) ProtoMessage() {}
+
+func (x *PayoutRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_accounting_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PayoutRequest.ProtoReflect.Descriptor instead.
+func (*PayoutRequest) Descriptor() ([]byte, []int) {
+	return file_proto_accounting_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *PayoutRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *PayoutRequest) GetWalletId() string {
+	if x != nil {
+		return x.WalletId
+	}
+	return ""
+}
+
+func (x *PayoutRequest) GetAmount() int64 {
+	if x != nil {
+		return x.Amount
+	}
+	return 0
+}
+
+func (x *PayoutRequest) GetPromptpayId() string {
+	if x != nil {
+		return x.PromptpayId
+	}
+	return ""
+}
+
+func (x *PayoutRequest) GetRecipientName() string {
+	if x != nil {
+		return x.RecipientName
+	}
+	return ""
+}
+
+func (x *PayoutRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+type PayoutResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	TransactionId string                 `protobuf:"bytes,2,opt,name=transaction_id,json=transactionId,proto3" json:"transaction_id,omitempty"`
+	Status        string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	NewBalance    int64                  `protobuf:"varint,5,opt,name=new_balance,json=newBalance,proto3" json:"new_balance,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PayoutResponse) Reset() {
+	*x = PayoutResponse{}
+	mi := &file_proto_accounting_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PayoutResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PayoutResponse) ProtoMessage() {}
+
+func (x *PayoutResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_accounting_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PayoutResponse.ProtoReflect.Descriptor instead.
+func (*PayoutResponse) Descriptor() ([]byte, []int) {
+	return file_proto_accounting_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *PayoutResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *PayoutResponse) GetTransactionId() string {
+	if x != nil {
+		return x.TransactionId
+	}
+	return ""
+}
+
+func (x *PayoutResponse) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *PayoutResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *PayoutResponse) GetNewBalance() int64 {
+	if x != nil {
+		return x.NewBalance
+	}
+	return 0
+}
+
 type HealthRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -377,7 +771,7 @@ type HealthRequest struct {
 
 func (x *HealthRequest) Reset() {
 	*x = HealthRequest{}
-	mi := &file_accounting_proto_msgTypes[5]
+	mi := &file_proto_accounting_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -389,7 +783,7 @@ func (x *HealthRequest) String() string {
 func (*HealthRequest) ProtoMessage() {}
 
 func (x *HealthRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_accounting_proto_msgTypes[5]
+	mi := &file_proto_accounting_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -402,7 +796,7 @@ func (x *HealthRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthRequest.ProtoReflect.Descriptor instead.
 func (*HealthRequest) Descriptor() ([]byte, []int) {
-	return file_accounting_proto_rawDescGZIP(), []int{5}
+	return file_proto_accounting_proto_rawDescGZIP(), []int{11}
 }
 
 type HealthResponse struct {
@@ -416,7 +810,7 @@ type HealthResponse struct {
 
 func (x *HealthResponse) Reset() {
 	*x = HealthResponse{}
-	mi := &file_accounting_proto_msgTypes[6]
+	mi := &file_proto_accounting_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -428,7 +822,7 @@ func (x *HealthResponse) String() string {
 func (*HealthResponse) ProtoMessage() {}
 
 func (x *HealthResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_accounting_proto_msgTypes[6]
+	mi := &file_proto_accounting_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -441,7 +835,7 @@ func (x *HealthResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthResponse.ProtoReflect.Descriptor instead.
 func (*HealthResponse) Descriptor() ([]byte, []int) {
-	return file_accounting_proto_rawDescGZIP(), []int{6}
+	return file_proto_accounting_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *HealthResponse) GetHealthy() bool {
@@ -465,12 +859,12 @@ func (x *HealthResponse) GetUptimeSeconds() int64 {
 	return 0
 }
 
-var File_accounting_proto protoreflect.FileDescriptor
+var File_proto_accounting_proto protoreflect.FileDescriptor
 
-const file_accounting_proto_rawDesc = "" +
+const file_proto_accounting_proto_rawDesc = "" +
 	"\n" +
-	"\x10accounting.proto\x12\n" +
-	"accounting\"\xcf\x01\n" +
+	"\x16proto/accounting.proto\x12\n" +
+	"accounting\"\xe8\x01\n" +
 	"\x0fTransferRequest\x12$\n" +
 	"\x0efrom_wallet_id\x18\x01 \x01(\tR\ffromWalletId\x12 \n" +
 	"\fto_wallet_id\x18\x02 \x01(\tR\n" +
@@ -479,7 +873,8 @@ const file_accounting_proto_rawDesc = "" +
 	"\bcurrency\x18\x04 \x01(\tR\bcurrency\x12!\n" +
 	"\freference_id\x18\x05 \x01(\tR\vreferenceId\x12\x1d\n" +
 	"\n" +
-	"request_id\x18\x06 \x01(\tR\trequestId\"\xff\x01\n" +
+	"request_id\x18\x06 \x01(\tR\trequestId\x12\x17\n" +
+	"\auser_id\x18\a \x01(\tR\x06userId\"\xff\x01\n" +
 	"\x10TransferResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12%\n" +
 	"\x0etransaction_id\x18\x02 \x01(\tR\rtransactionId\x12\x1d\n" +
@@ -501,77 +896,120 @@ const file_accounting_proto_rawDesc = "" +
 	"\bis_valid\x18\x01 \x01(\bR\aisValid\x12\x1d\n" +
 	"\n" +
 	"error_code\x18\x02 \x01(\tR\terrorCode\x12#\n" +
-	"\rerror_message\x18\x03 \x01(\tR\ferrorMessage\"\x0f\n" +
+	"\rerror_message\x18\x03 \x01(\tR\ferrorMessage\"D\n" +
+	"\x11LimitCheckRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x16\n" +
+	"\x06amount\x18\x02 \x01(\x03R\x06amount\"q\n" +
+	"\x12LimitCheckResponse\x12\x18\n" +
+	"\aallowed\x18\x01 \x01(\bR\aallowed\x12'\n" +
+	"\x0fremaining_daily\x18\x02 \x01(\x03R\x0eremainingDaily\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\"(\n" +
+	"\rLimitsRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"\x99\x01\n" +
+	"\x0eLimitsResponse\x12#\n" +
+	"\rcurrent_daily\x18\x01 \x01(\x03R\fcurrentDaily\x12\x1b\n" +
+	"\tmax_daily\x18\x02 \x01(\x03R\bmaxDaily\x12'\n" +
+	"\x0fmax_transaction\x18\x03 \x01(\x03R\x0emaxTransaction\x12\x1c\n" +
+	"\tremaining\x18\x04 \x01(\x03R\tremaining\"\xd0\x01\n" +
+	"\rPayoutRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1b\n" +
+	"\twallet_id\x18\x02 \x01(\tR\bwalletId\x12\x16\n" +
+	"\x06amount\x18\x03 \x01(\x03R\x06amount\x12!\n" +
+	"\fpromptpay_id\x18\x04 \x01(\tR\vpromptpayId\x12%\n" +
+	"\x0erecipient_name\x18\x05 \x01(\tR\rrecipientName\x12'\n" +
+	"\x0fidempotency_key\x18\x06 \x01(\tR\x0eidempotencyKey\"\xa4\x01\n" +
+	"\x0ePayoutResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12%\n" +
+	"\x0etransaction_id\x18\x02 \x01(\tR\rtransactionId\x12\x16\n" +
+	"\x06status\x18\x03 \x01(\tR\x06status\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\x12\x1f\n" +
+	"\vnew_balance\x18\x05 \x01(\x03R\n" +
+	"newBalance\"\x0f\n" +
 	"\rHealthRequest\"k\n" +
 	"\x0eHealthResponse\x12\x18\n" +
 	"\ahealthy\x18\x01 \x01(\bR\ahealthy\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12%\n" +
-	"\x0euptime_seconds\x18\x03 \x01(\x03R\ruptimeSeconds2\xbb\x02\n" +
+	"\x0euptime_seconds\x18\x03 \x01(\x03R\ruptimeSeconds2\x95\x04\n" +
 	"\x11AccountingService\x12E\n" +
 	"\bTransfer\x12\x1b.accounting.TransferRequest\x1a\x1c.accounting.TransferResponse\x12E\n" +
 	"\n" +
 	"GetBalance\x12\x1a.accounting.BalanceRequest\x1a\x1b.accounting.BalanceResponse\x12R\n" +
 	"\x13ValidateTransaction\x12\x1b.accounting.TransferRequest\x1a\x1e.accounting.ValidationResponse\x12D\n" +
-	"\vHealthCheck\x12\x19.accounting.HealthRequest\x1a\x1a.accounting.HealthResponseB\x19Z\x17paysif/internal/grpc/pbb\x06proto3"
+	"\vHealthCheck\x12\x19.accounting.HealthRequest\x1a\x1a.accounting.HealthResponse\x12L\n" +
+	"\vCheckLimits\x12\x1d.accounting.LimitCheckRequest\x1a\x1e.accounting.LimitCheckResponse\x12B\n" +
+	"\tGetLimits\x12\x19.accounting.LimitsRequest\x1a\x1a.accounting.LimitsResponse\x12F\n" +
+	"\rProcessPayout\x12\x19.accounting.PayoutRequest\x1a\x1a.accounting.PayoutResponseB\x19Z\x17paysif/internal/grpc/pbb\x06proto3"
 
 var (
-	file_accounting_proto_rawDescOnce sync.Once
-	file_accounting_proto_rawDescData []byte
+	file_proto_accounting_proto_rawDescOnce sync.Once
+	file_proto_accounting_proto_rawDescData []byte
 )
 
-func file_accounting_proto_rawDescGZIP() []byte {
-	file_accounting_proto_rawDescOnce.Do(func() {
-		file_accounting_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_accounting_proto_rawDesc), len(file_accounting_proto_rawDesc)))
+func file_proto_accounting_proto_rawDescGZIP() []byte {
+	file_proto_accounting_proto_rawDescOnce.Do(func() {
+		file_proto_accounting_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_accounting_proto_rawDesc), len(file_proto_accounting_proto_rawDesc)))
 	})
-	return file_accounting_proto_rawDescData
+	return file_proto_accounting_proto_rawDescData
 }
 
-var file_accounting_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
-var file_accounting_proto_goTypes = []any{
+var file_proto_accounting_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_proto_accounting_proto_goTypes = []any{
 	(*TransferRequest)(nil),    // 0: accounting.TransferRequest
 	(*TransferResponse)(nil),   // 1: accounting.TransferResponse
 	(*BalanceRequest)(nil),     // 2: accounting.BalanceRequest
 	(*BalanceResponse)(nil),    // 3: accounting.BalanceResponse
 	(*ValidationResponse)(nil), // 4: accounting.ValidationResponse
-	(*HealthRequest)(nil),      // 5: accounting.HealthRequest
-	(*HealthResponse)(nil),     // 6: accounting.HealthResponse
+	(*LimitCheckRequest)(nil),  // 5: accounting.LimitCheckRequest
+	(*LimitCheckResponse)(nil), // 6: accounting.LimitCheckResponse
+	(*LimitsRequest)(nil),      // 7: accounting.LimitsRequest
+	(*LimitsResponse)(nil),     // 8: accounting.LimitsResponse
+	(*PayoutRequest)(nil),      // 9: accounting.PayoutRequest
+	(*PayoutResponse)(nil),     // 10: accounting.PayoutResponse
+	(*HealthRequest)(nil),      // 11: accounting.HealthRequest
+	(*HealthResponse)(nil),     // 12: accounting.HealthResponse
 }
-var file_accounting_proto_depIdxs = []int32{
-	0, // 0: accounting.AccountingService.Transfer:input_type -> accounting.TransferRequest
-	2, // 1: accounting.AccountingService.GetBalance:input_type -> accounting.BalanceRequest
-	0, // 2: accounting.AccountingService.ValidateTransaction:input_type -> accounting.TransferRequest
-	5, // 3: accounting.AccountingService.HealthCheck:input_type -> accounting.HealthRequest
-	1, // 4: accounting.AccountingService.Transfer:output_type -> accounting.TransferResponse
-	3, // 5: accounting.AccountingService.GetBalance:output_type -> accounting.BalanceResponse
-	4, // 6: accounting.AccountingService.ValidateTransaction:output_type -> accounting.ValidationResponse
-	6, // 7: accounting.AccountingService.HealthCheck:output_type -> accounting.HealthResponse
-	4, // [4:8] is the sub-list for method output_type
-	0, // [0:4] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+var file_proto_accounting_proto_depIdxs = []int32{
+	0,  // 0: accounting.AccountingService.Transfer:input_type -> accounting.TransferRequest
+	2,  // 1: accounting.AccountingService.GetBalance:input_type -> accounting.BalanceRequest
+	0,  // 2: accounting.AccountingService.ValidateTransaction:input_type -> accounting.TransferRequest
+	11, // 3: accounting.AccountingService.HealthCheck:input_type -> accounting.HealthRequest
+	5,  // 4: accounting.AccountingService.CheckLimits:input_type -> accounting.LimitCheckRequest
+	7,  // 5: accounting.AccountingService.GetLimits:input_type -> accounting.LimitsRequest
+	9,  // 6: accounting.AccountingService.ProcessPayout:input_type -> accounting.PayoutRequest
+	1,  // 7: accounting.AccountingService.Transfer:output_type -> accounting.TransferResponse
+	3,  // 8: accounting.AccountingService.GetBalance:output_type -> accounting.BalanceResponse
+	4,  // 9: accounting.AccountingService.ValidateTransaction:output_type -> accounting.ValidationResponse
+	12, // 10: accounting.AccountingService.HealthCheck:output_type -> accounting.HealthResponse
+	6,  // 11: accounting.AccountingService.CheckLimits:output_type -> accounting.LimitCheckResponse
+	8,  // 12: accounting.AccountingService.GetLimits:output_type -> accounting.LimitsResponse
+	10, // 13: accounting.AccountingService.ProcessPayout:output_type -> accounting.PayoutResponse
+	7,  // [7:14] is the sub-list for method output_type
+	0,  // [0:7] is the sub-list for method input_type
+	0,  // [0:0] is the sub-list for extension type_name
+	0,  // [0:0] is the sub-list for extension extendee
+	0,  // [0:0] is the sub-list for field type_name
 }
 
-func init() { file_accounting_proto_init() }
-func file_accounting_proto_init() {
-	if File_accounting_proto != nil {
+func init() { file_proto_accounting_proto_init() }
+func file_proto_accounting_proto_init() {
+	if File_proto_accounting_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_accounting_proto_rawDesc), len(file_accounting_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_accounting_proto_rawDesc), len(file_proto_accounting_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_accounting_proto_goTypes,
-		DependencyIndexes: file_accounting_proto_depIdxs,
-		MessageInfos:      file_accounting_proto_msgTypes,
+		GoTypes:           file_proto_accounting_proto_goTypes,
+		DependencyIndexes: file_proto_accounting_proto_depIdxs,
+		MessageInfos:      file_proto_accounting_proto_msgTypes,
 	}.Build()
-	File_accounting_proto = out.File
-	file_accounting_proto_goTypes = nil
-	file_accounting_proto_depIdxs = nil
+	File_proto_accounting_proto = out.File
+	file_proto_accounting_proto_goTypes = nil
+	file_proto_accounting_proto_depIdxs = nil
 }

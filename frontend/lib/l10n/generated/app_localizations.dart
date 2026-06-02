@@ -123,7 +123,7 @@ abstract class AppLocalizations {
   /// No description provided for @navPayment.
   ///
   /// In en, this message translates to:
-  /// **'Payment'**
+  /// **'Methods'**
   String get navPayment;
 
   /// No description provided for @navProfile.
@@ -141,7 +141,7 @@ abstract class AppLocalizations {
   /// No description provided for @profileTitle.
   ///
   /// In en, this message translates to:
-  /// **'My Profile'**
+  /// **'Profile'**
   String get profileTitle;
 
   /// No description provided for @passportLabel.
@@ -189,7 +189,7 @@ abstract class AppLocalizations {
   /// No description provided for @lightMode.
   ///
   /// In en, this message translates to:
-  /// **'Light Mode'**
+  /// **'Appearance'**
   String get lightMode;
 
   /// No description provided for @language.

@@ -31,7 +31,11 @@ func GenerateMockPassport(nationality string, firstName string, lastName string)
 	dg2 := []byte{0x75, 0x0A, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A}
 
 	// 3. Create a Mock Document Signer (DS) Certificate
-	privKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, err
+	}
+
 	template := &x509.Certificate{
 		SerialNumber: big.NewInt(time.Now().Unix()),
 		Subject:      pkix.Name{CommonName: "Mock Passport Authority"},
@@ -39,7 +43,10 @@ func GenerateMockPassport(nationality string, firstName string, lastName string)
 		NotAfter:     time.Now().Add(time.Hour * 24 * 365),
 		KeyUsage:     x509.KeyUsageDigitalSignature,
 	}
-	dsCertRaw, _ := x509.CreateCertificate(rand.Reader, template, template, &privKey.PublicKey, privKey)
+	dsCertRaw, err := x509.CreateCertificate(rand.Reader, template, template, &privKey.PublicKey, privKey)
+	if err != nil {
+		return nil, err
+	}
 
 	// 4. Create SOD (Simplistic Mock CMS)
 	// In reality, SOD contains SHA256 hashes of all DGs.
@@ -48,7 +55,11 @@ func GenerateMockPassport(nationality string, firstName string, lastName string)
 	
 	// Composite data to be signed
 	content := append(dg1Hash[:], dg2Hash[:]...)
-	signature, _ := rsa.SignPKCS1v15(rand.Reader, privKey, crypto.SHA256, content)
+	hashedContent := sha256.Sum256(content)
+	signature, err := rsa.SignPKCS1v15(rand.Reader, privKey, crypto.SHA256, hashedContent[:])
+	if err != nil {
+		return nil, err
+	}
 	
 	// Fake SOD structure for the demo (normally ASN.1 CMS)
 	sod := append([]byte("MOCK_SOD_CMS:"), signature...)

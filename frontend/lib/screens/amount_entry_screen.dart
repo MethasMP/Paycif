@@ -253,6 +253,11 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
   }
 
   Widget _buildAmountDisplay(bool isDark) {
+    final amountTHB = double.tryParse(_controller.text) ?? 0.0;
+    // Calculate USD equivalent (Rate: 1 USD = 36.45 THB, convenience fee 3.5%)
+    final amountUSD = amountTHB / 36.45;
+    final totalUSD = amountUSD * 1.035;
+
     return Column(
       children: [
         Text(
@@ -263,11 +268,47 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
                 fontWeight: FontWeight.w500,
               ),
         ),
-        SizedBox(height: 16),
+        const SizedBox(height: 16),
         PaycifAmountText(
-          amount: double.tryParse(_controller.text) ?? 0.0,
+          amount: amountTHB,
           isLarge: true,
         ),
+        if (amountTHB > 0) ...[
+          const SizedBox(height: 8),
+          Text(
+            '≈ \$${totalUSD.toStringAsFixed(2)} USD',
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textSecondaryColor(context),
+                ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE1F5EE),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  PhosphorIconsRegular.info,
+                  size: 14,
+                  color: Color(0xFF0F6E56),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Rate locked. Includes 3.5% convenience fee.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: const Color(0xFF0F6E56),
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }

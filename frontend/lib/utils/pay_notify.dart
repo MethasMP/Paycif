@@ -41,11 +41,18 @@ class PayNotify {
         break;
     }
 
+    bool isDismissed = false;
+
     overlayEntry = OverlayEntry(
       builder: (context) => _PayNotifyWidget(
         message: message,
         type: type,
-        onDismiss: () => overlayEntry.remove(),
+        onDismiss: () {
+          if (!isDismissed) {
+            isDismissed = true;
+            overlayEntry.remove();
+          }
+        },
         duration: duration,
       ),
     );

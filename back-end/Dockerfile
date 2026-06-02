@@ -1,29 +1,29 @@
 # Build Stage
-FROM golang:1.24-bookworm as builder
+FROM golang:1.24-bookworm AS builder
 
 WORKDIR /app
 
-# Copy all files
-COPY . .
-
-# Download dependencies (No need for local go_home hacks here)
+# Cache modules
+COPY go.mod go.sum ./
 RUN go mod download
 
-# Build
-RUN go build -o main ./cmd/api
+# Copy source code
+COPY . .
+
+# Build argument for the service
+ARG SERVICE_NAME
+RUN if [ -z "$SERVICE_NAME" ]; then echo "SERVICE_NAME build arg is required" && exit 1; fi
+
+# Build the specific service
+RUN CGO_ENABLED=0 GOOS=linux go build -o /app/main ./cmd/${SERVICE_NAME}
 
 # Runtime Stage
-FROM debian:bookworm-slim
+FROM gcr.io/distroless/static-debian12
 
 WORKDIR /app
 
-# Install CA certificates for HTTPS (Supabase/Stripe)
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
-
+# Copy binary from builder
 COPY --from=builder /app/main .
-COPY --from=builder /app/.env . 
-# Note: copying .env is convenient for demo, but usually passed via Orchestrator
 
-EXPOSE 8080
-
-CMD ["./main"]
+# Command to run the executable
+ENTRYPOINT ["/app/main"]

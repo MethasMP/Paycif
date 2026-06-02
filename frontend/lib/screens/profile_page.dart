@@ -144,8 +144,8 @@ class _ProfilePageState extends State<ProfilePage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF1A1F71)),
+                CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor(context)),
                 ),
                 SizedBox(height: 24),
                 Text(
@@ -275,55 +275,215 @@ class _ProfilePageState extends State<ProfilePage> {
     // Fallback if l10n is null (e.g. key missing), though it shouldn't be
     if (l10n == null) return const SizedBox.shrink();
 
-    final String kycStatus = _profile?['kyc_status'] ?? 'pending';
-    final bool isVerified = kycStatus == 'verified';
+    final String kycStatus = _profile?['kyc_status'] ?? 'PENDING';
+    final bool isVerified = kycStatus.toUpperCase() == 'VERIFIED';
+    
+    // Fetch OAuth Profile Image from user metadata
+    final user = _supabase.auth.currentUser;
+    final String? avatarUrl = user?.userMetadata?['avatar_url'] ?? user?.userMetadata?['picture'];
+    final String email = _profile?['email'] ?? user?.email ?? '';
+    final String fullName = _profile?['full_name'] ?? _profile?['username'] ?? user?.userMetadata?['full_name'] ?? 'User';
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(l10n.profileTitle),
-        // Style inherited from AppTheme.titleLarge via AppBarTheme.titleTextStyle
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 24.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox(height: 10),
+            const SizedBox(height: 16),
 
-            // Digital Passport card removed as requested
-
-            // ─── Account Settings ──────────────────────────────────
-            _buildSectionHeader(context, l10n.accountSecurity),
-            SizedBox(height: 16),
-            _buildMenuContainer(context, [
-              if (!isVerified)
-                _buildMenuItem(
-                  PhosphorIcons.identificationCard,
-                  l10n.verifyIdentity,
-                  subtitle: 'Required to unlock higher limits',
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const NfcScanScreen()),
+            // ─── USER PROFILE CARD HEADER ────────────────────────
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: theme.brightness == Brightness.dark
+                    ? theme.cardColor
+                    : Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: theme.brightness == Brightness.dark
+                      ? Colors.white.withValues(alpha: 0.05)
+                      : Colors.grey.withValues(alpha: 0.1),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
                   ),
-                  trailing: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  // Beautiful Profile Image (or Fallback Icon)
+                  Container(
+                    width: 64,
+                    height: 64,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      'START',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: Colors.white70,
-                        fontWeight: FontWeight.w600,
+                      shape: BoxShape.circle,
+                      color: theme.brightness == Brightness.dark
+                          ? Colors.white.withValues(alpha: 0.05)
+                          : Colors.black.withValues(alpha: 0.05),
+                      border: Border.all(
+                        color: theme.brightness == Brightness.dark
+                            ? Colors.white.withValues(alpha: 0.1)
+                            : Colors.black.withValues(alpha: 0.1),
+                        width: 1.5,
                       ),
                     ),
+                    child: ClipOval(
+                      child: avatarUrl != null
+                          ? Image.network(
+                              avatarUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => Icon(
+                                PhosphorIcons.user,
+                                size: 28,
+                                color: Theme.of(context).iconTheme.color,
+                              ),
+                            )
+                          : Icon(
+                              PhosphorIcons.user,
+                              size: 28,
+                              color: Theme.of(context).iconTheme.color,
+                            ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  // User Details Column
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          fullName,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.textPrimaryColor(context),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          email,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: AppTheme.textSecondaryColor(context),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (isVerified) ...[
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.2)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(PhosphorIcons.shieldCheck, size: 14, color: Color(0xFF10B981)),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Verified Account',
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: const Color(0xFF10B981),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ─── KYC ACTION CARD (Show only if not verified) ───────
+            if (!isVerified) ...[
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: theme.brightness == Brightness.dark
+                      ? const Color(0xFF241800)
+                      : Colors.amber.shade50.withValues(alpha: 0.8),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: theme.brightness == Brightness.dark
+                        ? Colors.amber.shade800.withValues(alpha: 0.25)
+                        : Colors.amber.shade200,
                   ),
                 ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(PhosphorIcons.warningCircle, color: Colors.amber.shade700, size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Identity Verification Required',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: theme.brightness == Brightness.dark
+                                ? Colors.amber.shade200
+                                : Colors.amber.shade900,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Verify your identity to unlock higher limits and secure your account.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.brightness == Brightness.dark
+                            ? Colors.amber.shade200.withValues(alpha: 0.8)
+                            : Colors.amber.shade800,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 40,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const NfcScanScreen()),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFEF9F27),
+                          foregroundColor: const Color(0xFF412402),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Verify Now', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 24),
+
+            // ─── Group 1: Security & Safety ─────────────────────────
+            _buildSectionHeader(context, l10n.accountSecurity),
+            const SizedBox(height: 8),
+            _buildMenuContainer(context, [
               _buildBiometricTile(context, l10n),
               _buildMenuItem(
                 PhosphorIcons.lock,
@@ -349,11 +509,11 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ]),
 
-            SizedBox(height: 32),
+            const SizedBox(height: 20),
 
-            // ─── App Preferences ───────────────────────────────────
+            // ─── Group 2: Preferences ─────────────────────────────
             _buildSectionHeader(context, l10n.preferences),
-            SizedBox(height: 16),
+            const SizedBox(height: 8),
             _buildMenuContainer(context, [
               // Dark Mode Toggle
               ValueListenableBuilder<ThemeMode>(
@@ -368,14 +528,17 @@ class _ProfilePageState extends State<ProfilePage> {
                           ? ThemeMode.light
                           : ThemeMode.dark;
                     },
-                    trailing: Switch.adaptive(
-                      value: isDarkMode,
-                      activeTrackColor: const Color(0xFFF59E0B),
-                      onChanged: (val) {
-                        themeNotifier.value = val
-                            ? ThemeMode.dark
-                            : ThemeMode.light;
-                      },
+                    trailing: Transform.scale(
+                      scale: 0.85,
+                      child: Switch.adaptive(
+                        value: isDarkMode,
+                        activeTrackColor: const Color(0xFFF59E0B),
+                        onChanged: (val) {
+                          themeNotifier.value = val
+                              ? ThemeMode.dark
+                              : ThemeMode.light;
+                        },
+                      ),
                     ),
                   );
                 },
@@ -400,11 +563,11 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ]),
 
-            SizedBox(height: 32),
+            const SizedBox(height: 20),
 
-            // ─── Support ───────────────────────────────────────────
+            // ─── Group 3: Help & Support ───────────────────────────
             _buildSectionHeader(context, l10n.support),
-            SizedBox(height: 16),
+            const SizedBox(height: 8),
             _buildMenuContainer(context, [
               _buildMenuItem(
                 PhosphorIcons.question,
@@ -426,47 +589,60 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ]),
 
-            SizedBox(height: 32),
+            const SizedBox(height: 32),
 
-            // ─── About ─────────────────────────────────────────────
-            _buildSectionHeader(context, l10n.aboutApp),
-            SizedBox(height: 16),
-            _buildMenuContainer(context, [
-              _buildMenuItem(
-                PhosphorIcons.fileText,
-                l10n.termsOfService,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const TermsOfServiceScreen(),
+            // ─── Footer Section: Inline Legal Links & Version ──────
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const TermsOfServiceScreen()),
+                  ),
+                  child: Text(
+                    l10n.termsOfService,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppTheme.textSecondaryColor(context),
+                      decoration: TextDecoration.underline,
+                    ),
                   ),
                 ),
-              ),
-              _buildMenuItem(
-                PhosphorIcons.shield,
-                l10n.privacyPolicy,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const PrivacyPolicyScreen(),
+                Text(
+                  '  •  ',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: AppTheme.textSecondaryColor(context),
                   ),
                 ),
-              ),
-            ]),
+                GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
+                  ),
+                  child: Text(
+                    l10n.privacyPolicy,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppTheme.textSecondaryColor(context),
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 24),
 
-            SizedBox(height: 48),
-
-            // ─── Sign Out ──────────────────────────────────────────
+            // ─── Sign Out Button ───────────────────────────────────
             Center(
               child: Semantics(
                 label: 'Sign out from Paycif',
                 button: true,
                 child: ElevatedButton.icon(
                   onPressed: () => _showSignOutConfirmation(context),
-                  icon: Icon(PhosphorIcons.signOut, size: 20),
+                  icon: const Icon(PhosphorIcons.signOut, size: 20),
                   label: Text(l10n.signOut),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red.shade50,
+                    backgroundColor: Colors.red.shade50.withValues(alpha: theme.brightness == Brightness.dark ? 0.08 : 0.8),
                     foregroundColor: Colors.redAccent,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(
@@ -475,13 +651,16 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
+                      side: theme.brightness == Brightness.dark
+                          ? BorderSide(color: Colors.redAccent.withValues(alpha: 0.2))
+                          : BorderSide.none,
                     ),
                   ),
                 ),
               ),
             ),
 
-            SizedBox(height: 24),
+            const SizedBox(height: 16),
 
             Center(
               child: Text(
@@ -489,7 +668,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
               ),
             ),
-            SizedBox(height: 48),
+            const SizedBox(height: 120),
           ],
         ),
       ),
@@ -503,7 +682,7 @@ class _ProfilePageState extends State<ProfilePage> {
       style: Theme.of(context).textTheme.labelLarge?.copyWith(
         color: AppTheme.textSecondaryColor(context),
         fontWeight: FontWeight.w600,
-        letterSpacing: 1.2,
+        letterSpacing: 0.6,
       ),
     );
   }
@@ -562,14 +741,15 @@ class _ProfilePageState extends State<ProfilePage> {
   }) {
     return ListTile(
       onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      horizontalTitleGap: 12,
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           color: Theme.of(context).scaffoldBackgroundColor,
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(icon, size: 20, color: Theme.of(context).iconTheme.color),
+        child: Icon(icon, size: 24, color: Theme.of(context).iconTheme.color),
       ),
       title: Text(
         title,
@@ -595,7 +775,8 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget _buildBiometricTile(BuildContext context, AppLocalizations l10n) {
     return ListTile(
       onTap: () => _handleBiometricToggle(l10n),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      horizontalTitleGap: 12,
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
@@ -604,7 +785,7 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
         child: Icon(
           PhosphorIcons.fingerprint,
-          size: 20,
+          size: 24,
           color: Theme.of(context).iconTheme.color,
         ),
       ),
@@ -645,12 +826,15 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
             )
-          : Switch.adaptive(
-              value: _isBiometricEnabled,
-              activeTrackColor: const Color(0xFF10B981),
-              onChanged: _isBiometricAvailable && !_isProcessingToggle
-                  ? (v) => _handleBiometricToggle(l10n)
-                  : null,
+          : Transform.scale(
+              scale: 0.85,
+              child: Switch.adaptive(
+                value: _isBiometricEnabled,
+                activeTrackColor: const Color(0xFF10B981),
+                onChanged: _isBiometricAvailable && !_isProcessingToggle
+                    ? (v) => _handleBiometricToggle(l10n)
+                    : null,
+              ),
             ),
     );
   }
@@ -666,6 +850,9 @@ class _ProfilePageState extends State<ProfilePage> {
     // 🔒 World-Class Security: Gating Biometric Settings with PIN
     _showPinVerificationSheet(l10n, () async {
       try {
+        // Read controller before any async operations
+        final securityController = context.read<SecurityController>();
+        
         setState(() => _isProcessingToggle = true);
 
         final newState = !_isBiometricEnabled;
@@ -678,7 +865,9 @@ class _ProfilePageState extends State<ProfilePage> {
         });
 
         // 🚀 CRITICAL: Re-bind device immediately to rotate keys based on new preference!
-        await context.read<SecurityController>().bindDevice();
+        await securityController.bindDevice();
+
+        if (!mounted) return;
 
         PayNotify.success(context, l10n.biometricSettingsUpdated);
       } catch (e) {

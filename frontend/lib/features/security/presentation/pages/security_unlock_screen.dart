@@ -23,11 +23,13 @@ class SecurityUnlockScreen extends StatefulWidget {
 class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
   bool _isAuthenticating = false;
   Future<BiometricProfile>? _profileFuture;
+  late Future<Map<String, dynamic>> _biometricStatusFuture;
 
   @override
   void initState() {
     super.initState();
     _profileFuture = context.read<SecurityController>().getBiometricProfile();
+    _biometricStatusFuture = _getBiometricStatus();
     // 🚀 Auto-Trigger Biometric for a "Magical" Experience
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _tryAutoBiometricUnlock();
@@ -44,6 +46,7 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
 
   Future<void> _tryBiometricUnlock() async {
     if (_isAuthenticating) return;
+    final controller = context.read<SecurityController>();
     setState(() => _isAuthenticating = true);
 
     try {
@@ -53,7 +56,6 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
         return; // Abort if disabled by preference
       }
 
-      final controller = context.read<SecurityController>();
       BiometricProfile? profile;
       if (_profileFuture != null) {
         profile = await _profileFuture;
@@ -108,91 +110,92 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
     );
   }
 
+  Future<Map<String, dynamic>> _getBiometricStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final biometricEnabled = prefs.getBool('biometric_enabled') ?? false;
+    BiometricProfile? profile;
+    if (_profileFuture != null) {
+      profile = await _profileFuture;
+    }
+    return {
+      'enabled': biometricEnabled,
+      'profile': profile,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
-    // isDark is used implicitly in theme checks if needed, but not explicitly used here.
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: isDark ? const Color(0xFF0B0F0E) : Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
             children: [
-              SizedBox(height: 60),
+              const SizedBox(height: 60),
 
               // 🛡️ Premium Identity Header
               Center(
                 child: Column(
                   children: [
                     PaycifIconContainer(
-                      icon: PhosphorIcons.lockKey,
+                      icon: PhosphorIcons.shieldCheck,
                     ).animate().scale(
                       duration: 600.ms,
                       curve: Curves.elasticOut,
                     ),
 
-                    SizedBox(height: 16),
+                    const SizedBox(height: 20),
 
                     Text(
-                          'Unlock Paycif',
-                          style: Theme.of(context).textTheme.headlineSmall
-                              ?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: -0.5,
-                              ),
-                        )
-                        .animate()
-                        .fadeIn(delay: 200.ms)
-                        .slideY(begin: 0.2, end: 0),
+                      'Unlock Paycif',
+                      style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: -0.5,
+                            color: isDark ? const Color(0xFFF5F5F5) : const Color(0xFF111111),
+                          ),
+                    )
+                    .animate()
+                    .fadeIn(delay: 200.ms)
+                    .slideY(begin: 0.2, end: 0),
 
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
 
                     Text(
                       'Verify your identity to continue',
                       style: TextStyle(
-                        color: Theme.of(context).textTheme.bodySmall?.color,
+                        color: isDark ? Colors.white38 : Colors.grey.shade500,
                         fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                        letterSpacing: 0.1,
                       ),
                     ).animate().fadeIn(delay: 400.ms),
                   ],
                 ),
               ),
 
-              SizedBox(height: 40),
+              const SizedBox(height: 48),
 
-              // 🔢 PIN Keypad with Forgot Action
-              PinEntryWidget(
-                showLabel: false,
-                onSuccess: (_) => _onUnlockSuccess(),
-                onForgotPin: () => _handleForgotPin(context),
-              ).animate().fadeIn(delay: 600.ms),
+              // 🔢 PIN Keypad with integrated biometrics key
+              FutureBuilder<Map<String, dynamic>>(
+                future: _biometricStatusFuture,
+                builder: (context, snapshot) {
+                  final data = snapshot.data;
+                  final enabled = data?['enabled'] ?? false;
+                  final profile = data?['profile'] as BiometricProfile?;
 
-              SizedBox(height: 24),
+                  return PinEntryWidget(
+                    showLabel: false,
+                    onSuccess: (_) => _onUnlockSuccess(),
+                    onForgotPin: () => _handleForgotPin(context),
+                    biometricIcon: enabled ? profile?.bioIcon : null,
+                    onBiometricPressed: enabled ? _tryBiometricUnlock : null,
+                  );
+                },
+              ).animate().fadeIn(delay: 500.ms),
 
-              // 🤳 Biometric Action (Primary Alternative)
-              if (_profileFuture != null)
-                FutureBuilder<BiometricProfile>(
-                  future: _profileFuture,
-                  builder: (context, snapshot) {
-                    final profile = snapshot.data;
-                    if (profile == null) return const SizedBox.shrink();
-
-                    return FutureBuilder<bool>(
-                      future: SharedPreferences.getInstance().then((prefs) => prefs.getBool('biometric_enabled') ?? false),
-                      builder: (context, enabledSnapshot) {
-                        final enabled = enabledSnapshot.data ?? false;
-                        if (!enabled) return const SizedBox.shrink();
-
-                        return OutlinedButton.icon(
-                          onPressed: _tryBiometricUnlock,
-                          icon: Icon(profile.bioIcon),
-                          label: Text('Use ${profile.bioName}'),
-                        ).animate().fadeIn(delay: 800.ms);
-                      },
-                    );
-                  },
-                ),
-
-              SizedBox(height: 40),
+              const SizedBox(height: 40),
             ],
           ),
         ),

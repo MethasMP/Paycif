@@ -17,6 +17,8 @@ class PinEntryWidget extends StatefulWidget {
   final Future<bool> Function(String)? onVerify;
   final bool showLabel;
   final VoidCallback? onForgotPin;
+  final VoidCallback? onBiometricPressed;
+  final IconData? biometricIcon;
 
   const PinEntryWidget({
     super.key,
@@ -26,6 +28,8 @@ class PinEntryWidget extends StatefulWidget {
     this.onVerify,
     this.showLabel = true,
     this.onForgotPin,
+    this.onBiometricPressed,
+    this.biometricIcon,
   });
 
   @override
@@ -86,7 +90,14 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
 
   void _triggerErrorAnimation() {
     setState(() => _hasError = true);
-    _shakeController.forward(from: 0);
+    _shakeController.forward(from: 0).then((_) {
+      if (mounted) {
+        setState(() {
+          _hasError = false;
+          _pin = '';
+        });
+      }
+    });
     HapticFeedback.heavyImpact();
   }
 
@@ -136,14 +147,12 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
           }
         }
         _triggerErrorAnimation();
-        _onClear();
       }
     }
   }
 
   void _resetSetup() {
     setState(() {
-      _pin = '';
       _firstPin = null;
       _isConfirming = false;
     });
@@ -206,32 +215,36 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
   Widget _buildUnifiedConsole(bool isDark) {
     return Column(
       children: [
+        // 🔘 Deep Gold/Accent Dots with pulse/error feedback (isolated repaint layer)
+        RepaintBoundary(
+          child: _buildPinDots(isDark),
+        ),
+
+        const SizedBox(height: 48),
+
+        // 🔢 Precision Keypad (isolated repaint layer)
+        RepaintBoundary(
+          child: _buildKeypadGrid(isDark),
+        ),
+
         if (widget.onForgotPin != null) ...[
+          const SizedBox(height: 32),
           _buildForgotAction(isDark),
-          SizedBox(height: 32),
         ],
-
-        // 🔘 Deep Navy Dots (Static, Instant)
-        _buildPinDots(isDark),
-
-        SizedBox(height: 48),
-
-        // 🔢 Precision Keypad
-        _buildKeypadGrid(isDark),
       ],
-    ); // No animation - instant render
+    );
   }
 
   Widget _buildKeypadGrid(bool isDark) {
     return Column(
       children: [
         _buildKeypadRow(['1', '2', '3'], isDark),
-        SizedBox(height: 12),
+        const SizedBox(height: 16),
         _buildKeypadRow(['4', '5', '6'], isDark),
-        SizedBox(height: 12),
+        const SizedBox(height: 16),
         _buildKeypadRow(['7', '8', '9'], isDark),
-        SizedBox(height: 12),
-        _buildKeypadRow(['EMPTY', '0', 'DEL'], isDark),
+        const SizedBox(height: 16),
+        _buildKeypadRow(['BIO', '0', 'DEL'], isDark),
       ],
     );
   }
@@ -269,7 +282,7 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
                 color: Colors.red.shade300,
               ),
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Expanded(
               child: Text(
                 _formatErrorMessage(errorMsg, l10n),
@@ -287,14 +300,17 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
   }
 
   Widget _buildPinDots(bool isDark) {
-    const navyColor = Color(0xFF0F172A); // Premium Navy
+    // Brand design system mapping
+    final Color filledColor = isDark ? const Color(0xFFFAC775) : const Color(0xFFEF9F27); // Gold Accent
+    final Color emptyColor = isDark ? Colors.white24 : Colors.grey.shade300;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(6, (index) {
         final isFilled = index < _pin.length;
 
         return AnimatedContainer(
-          duration: 100.ms,
+          duration: 150.ms,
           margin: const EdgeInsets.symmetric(horizontal: 12),
           width: 14,
           height: 14,
@@ -302,21 +318,27 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
             shape: BoxShape.circle,
             color: _hasError
                 ? Colors.red.shade600
-                : (isFilled
-                      ? (isDark ? Colors.white : navyColor)
-                      : (isDark ? Colors.white24 : Colors.grey.shade300)),
+                : (isFilled ? filledColor : emptyColor),
+            boxShadow: [
+              if (isFilled && !_hasError)
+                BoxShadow(
+                  color: filledColor.withValues(alpha: 0.3),
+                  blurRadius: 6,
+                  spreadRadius: 1,
+                ),
+            ],
           ),
         );
       }),
-    );
+    ).animate(target: _hasError ? 1 : 0).shake(duration: 400.ms);
   }
 
   Widget _buildKeypadRow(List<String> keys, bool isDark) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: keys.map((key) {
-        if (key == 'EMPTY') {
-          return SizedBox(width: 80, height: 80);
+        if (key == 'BIO') {
+          return _buildBiometricButton(isDark);
         }
         if (key == 'DEL') {
           return _buildDeleteButton(isDark);
@@ -327,48 +349,44 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
   }
 
   Widget _buildDigitButton(String digit, bool isDark) {
-    return GestureDetector(
-      onTapDown: (_) => HapticFeedback.lightImpact(),
+    return KeypadButton(
+      isDark: isDark,
       onTap: () => _onKeyPress(digit),
-      child: Container(
-        width: 80,
-        height: 80,
-        alignment: Alignment.center,
-        decoration: const BoxDecoration(
-          shape: BoxShape.circle,
-          color: Colors.transparent,
-        ),
-        child: Text(
-          digit,
-          style: TextStyle(
-            fontSize: 34,
-            fontWeight: FontWeight.w400,
-            color: isDark ? Colors.white : const Color(0xFF0F172A),
-            fontFamily: 'Outfit',
-          ),
+      child: Text(
+        digit,
+        style: TextStyle(
+          fontSize: 30,
+          fontWeight: FontWeight.w500,
+          color: isDark ? const Color(0xFFF5F5F5) : const Color(0xFF111111),
+          fontFamily: 'Outfit',
         ),
       ),
     );
   }
 
+  Widget _buildBiometricButton(bool isDark) {
+    if (widget.biometricIcon == null || widget.onBiometricPressed == null) {
+      return const SizedBox(width: 80, height: 80);
+    }
+    return KeypadButton(
+      isDark: isDark,
+      onTap: widget.onBiometricPressed!,
+      child: Icon(
+        widget.biometricIcon,
+        size: 28,
+        color: isDark ? const Color(0xFFFAC775) : const Color(0xFF0F6E56), // Gold for dark, Teal for light
+      ),
+    );
+  }
+
   Widget _buildDeleteButton(bool isDark) {
-    return GestureDetector(
+    return KeypadButton(
+      isDark: isDark,
       onTap: _onDelete,
-      child: Container(
-        width: 72,
-        height: 72,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.05)
-              : Colors.grey.shade100,
-        ),
-        child: Icon(
-          PhosphorIcons.backspace,
-          size: 26,
-          color: isDark ? Colors.white54 : Colors.grey.shade600,
-        ),
+      child: Icon(
+        PhosphorIcons.backspace,
+        size: 26,
+        color: isDark ? Colors.white70 : Colors.grey.shade700,
       ),
     );
   }
@@ -383,7 +401,7 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: isDark ? Colors.white60 : Colors.grey.shade500,
+            color: isDark ? const Color(0xFFFAC775).withValues(alpha: 0.8) : const Color(0xFF0F6E56), // Use brand colors!
             letterSpacing: 0.2,
           ),
         ),
@@ -417,7 +435,7 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
               color: Colors.white,
             ),
           ),
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
           Text(
             'Security Lockout',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -425,7 +443,7 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
               letterSpacing: -0.5,
             ),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 48),
             child: Text(
@@ -441,5 +459,73 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
         ],
       ),
     ).animate().fadeIn().scale();
+  }
+}
+
+/// 🔘 Tactile circular keycap with hover/press scale animation
+class KeypadButton extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+  final bool isDark;
+
+  const KeypadButton({
+    super.key,
+    required this.child,
+    required this.onTap,
+    required this.isDark,
+  });
+
+  @override
+  State<KeypadButton> createState() => _KeypadButtonState();
+}
+
+class _KeypadButtonState extends State<KeypadButton> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color buttonColor = widget.isDark 
+        ? const Color(0xFF141A18) 
+        : const Color(0xFFF7F7F5);
+    final Color borderColor = widget.isDark 
+        ? Colors.white.withValues(alpha: 0.08) 
+        : const Color(0xFFE5E5E3);
+
+    return GestureDetector(
+      onTapDown: (_) {
+        HapticFeedback.lightImpact();
+        setState(() => _isPressed = true);
+      },
+      onTapUp: (_) => setState(() => _isPressed = false),
+      onTapCancel: () => setState(() => _isPressed = false),
+      onTap: widget.onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 100),
+        width: 80,
+        height: 80,
+        curve: Curves.easeOut,
+        transform: Matrix4.diagonal3Values(_isPressed ? 0.92 : 1.0, _isPressed ? 0.92 : 1.0, 1.0),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: _isPressed
+              ? (widget.isDark ? Colors.white.withValues(alpha: 0.15) : Colors.grey.shade300)
+              : buttonColor,
+          border: Border.all(
+            color: borderColor,
+            width: 1.2,
+          ),
+          boxShadow: [
+            if (!_isPressed)
+              BoxShadow(
+                color: widget.isDark ? Colors.black.withValues(alpha: 0.25) : Colors.black.withValues(alpha: 0.03),
+                blurRadius: 6,
+                offset: const Offset(0, 3),
+              ),
+          ],
+        ),
+        child: widget.child,
+      ),
+    );
   }
 }

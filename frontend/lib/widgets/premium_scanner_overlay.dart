@@ -1,5 +1,12 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PREMIUM SCANNER OVERLAY — Minimalist Ring
+//
+// First-principle approach: the frame IS the UI.
+// No corner brackets. No scan line. No hard cutout.
+// Just a clean, glowing, breathing rounded rectangle.
+// ─────────────────────────────────────────────────────────────────────────────
 
 class PremiumScannerOverlay extends StatefulWidget {
   final double frameSize;
@@ -10,204 +17,154 @@ class PremiumScannerOverlay extends StatefulWidget {
 }
 
 class _PremiumScannerOverlayState extends State<PremiumScannerOverlay>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scanAnimation;
+    with TickerProviderStateMixin {
+
+  // Breathing pulse — the whole frame gently scales
+  late AnimationController _breatheController;
+  late Animation<double> _breatheAnim;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      duration: const Duration(seconds: 2),
+
+    _breatheController = AnimationController(
+      duration: const Duration(milliseconds: 4000),
       vsync: this,
     )..repeat(reverse: true);
 
-    _scanAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+    _breatheAnim = Tween<double>(begin: 0.98, end: 1.0).animate(
+      CurvedAnimation(parent: _breatheController, curve: Curves.easeInOut),
+    );
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _breatheController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final topPadding = (size.height / 2 - 60) - (widget.frameSize / 2);
+    final screenSize = MediaQuery.of(context).size;
+    final frameSize = widget.frameSize;
+    final centerY = screenSize.height * 0.40;
 
     return Stack(
       children: [
-        // 1. Semi-transparent blurred background
-        ClipPath(
-          clipper: _ScannerCutoutClipper(frameSize: widget.frameSize),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),
-            child: Container(color: Colors.black.withValues(alpha: 0.4)),
+        // ── 1. Soft gradient vignette (NOT a hard cutout) ───────────────
+        CustomPaint(
+          painter: _SoftVignettePainter(
+            frameSize: frameSize,
+            centerY: centerY,
           ),
+          child: const SizedBox.expand(),
         ),
 
-        // 2. Animated Laser Line
+        // ── 2. The frame — glowing continuous border ──────────────
         AnimatedBuilder(
-          animation: _scanAnimation,
-          builder: (context, child) {
-            final dynamicPos =
-                topPadding + (widget.frameSize * _scanAnimation.value);
-
-            return Positioned(
-              top: dynamicPos,
-              left: (size.width / 2) - (widget.frameSize / 2),
-              child: Container(
-                width: widget.frameSize,
-                height: 2,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      const Color(0xFFF59E0B).withValues(alpha: 0.0),
-                      const Color(0xFFF59E0B),
-                      const Color(0xFFF59E0B).withValues(alpha: 0.0),
-                    ],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFF59E0B).withValues(alpha: 0.5),
-                      blurRadius: 8,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
+          animation: _breatheAnim,
+          builder: (ctx, _) {
+            return CustomPaint(
+              painter: _LuminousFramePainter(
+                frameSize: frameSize * _breatheAnim.value,
+                centerY: centerY,
               ),
+              child: const SizedBox.expand(),
             );
           },
-        ),
-
-        // 3. Static Designer Corners
-        CustomPaint(
-          painter: _ScannerFramePainter(frameSize: widget.frameSize),
-          child: const SizedBox.expand(),
         ),
       ],
     );
   }
 }
 
-class _ScannerCutoutClipper extends CustomClipper<Path> {
+// ─────────────────────────────────────────────────────────────────────────────
+// SOFT VIGNETTE — gentle gradient fade instead of hard black cutout
+// ─────────────────────────────────────────────────────────────────────────────
+class _SoftVignettePainter extends CustomPainter {
   final double frameSize;
-  _ScannerCutoutClipper({required this.frameSize});
+  final double centerY;
+
+  _SoftVignettePainter({required this.frameSize, required this.centerY});
 
   @override
-  Path getClip(Size size) {
-    final scanRect = Rect.fromCenter(
-      center: Offset(size.width / 2, size.height / 2 - 60),
-      width: frameSize,
-      height: frameSize,
-    );
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, centerY);
 
-    return Path.combine(
-      PathOperation.difference,
-      Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height)),
-      Path()..addRRect(
-        RRect.fromRectAndRadius(scanRect, const Radius.circular(24)),
-      ),
-    );
+    // Radial gradient: clear in center, dark at edges
+    final paint = Paint()
+      ..shader = RadialGradient(
+        center: Alignment(
+          (center.dx / size.width) * 2 - 1,
+          (center.dy / size.height) * 2 - 1,
+        ),
+        radius: 0.55,
+        colors: const [
+          Color(0x00000000), // fully transparent in center
+          Color(0x15000000), // barely visible
+          Color(0x60000000), // medium at edges
+          Color(0x99000000), // strong at corners
+        ],
+        stops: const [0.0, 0.45, 0.72, 1.0],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), paint);
   }
 
   @override
-  bool shouldReclip(covariant _ScannerCutoutClipper oldClipper) =>
-      oldClipper.frameSize != frameSize;
+  bool shouldRepaint(covariant _SoftVignettePainter old) =>
+      old.frameSize != frameSize || old.centerY != centerY;
 }
 
-class _ScannerFramePainter extends CustomPainter {
+// ─────────────────────────────────────────────────────────────────────────────
+// LUMINOUS FRAME — continuous clean glowing border
+// ─────────────────────────────────────────────────────────────────────────────
+class _LuminousFramePainter extends CustomPainter {
   final double frameSize;
-  _ScannerFramePainter({required this.frameSize});
+  final double centerY;
+
+  static const _gold = Color(0xFFEF9F27);
+  static const _radius = 28.0;
+
+  _LuminousFramePainter({
+    required this.frameSize,
+    required this.centerY,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
     final rect = Rect.fromCenter(
-      center: Offset(size.width / 2, size.height / 2 - 60),
+      center: Offset(size.width / 2, centerY),
       width: frameSize,
       height: frameSize,
     );
+    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(_radius));
 
-    final paint = Paint()
-      ..color = const Color(0xFFF59E0B)
+    // ── Static base border (very subtle) ─────────────────────────────────
+    final basePaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.15)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 4.0
-      ..strokeCap = StrokeCap.round;
+      ..strokeWidth = 2.0;
+    canvas.drawRRect(rrect, basePaint);
 
-    const cornerLength = 40.0;
-    const radius = 24.0;
-
-    // Drawing premium corners with subtle rounding
-    // Top Left
-    canvas.drawPath(
-      Path()
-        ..moveTo(rect.left, rect.top + cornerLength)
-        ..lineTo(rect.left, rect.top + radius)
-        ..arcToPoint(
-          Offset(rect.left + radius, rect.top),
-          radius: const Radius.circular(radius),
-        )
-        ..lineTo(rect.left + cornerLength, rect.top),
-      paint,
-    );
-
-    // Top Right
-    canvas.drawPath(
-      Path()
-        ..moveTo(rect.right - cornerLength, rect.top)
-        ..lineTo(rect.right - radius, rect.top)
-        ..arcToPoint(
-          Offset(rect.right, rect.top + radius),
-          radius: const Radius.circular(radius),
-        )
-        ..lineTo(rect.right, rect.top + cornerLength),
-      paint,
-    );
-
-    // Bottom Left
-    canvas.drawPath(
-      Path()
-        ..moveTo(rect.left, rect.bottom - cornerLength)
-        ..lineTo(rect.left, rect.bottom - radius)
-        ..arcToPoint(
-          Offset(rect.left + radius, rect.bottom),
-          radius: const Radius.circular(radius),
-        )
-        ..lineTo(rect.left + cornerLength, rect.bottom),
-      paint,
-    );
-
-    // Bottom Right
-    canvas.drawPath(
-      Path()
-        ..moveTo(rect.right - cornerLength, rect.bottom)
-        ..lineTo(rect.right - radius, rect.bottom)
-        ..arcToPoint(
-          Offset(rect.right, rect.bottom - radius),
-          radius: const Radius.circular(radius),
-        )
-        ..lineTo(rect.right, rect.bottom - cornerLength),
-      paint,
-    );
-
-    // Subtle Glow around the inner edge of cutout
+    // ── Ambient glow behind frame border ─────────────────────────────────
     final glowPaint = Paint()
-      ..color = const Color(0xFFF59E0B).withValues(alpha: 0.15)
+      ..color = _gold.withValues(alpha: 0.08)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 20.0
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 15);
-
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rect, const Radius.circular(radius)),
-      glowPaint,
-    );
+      ..strokeWidth = 40.0
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 20);
+    canvas.drawRRect(rrect, glowPaint);
+    
+    // ── Inner core glow to make it stand out a bit more ──────────────────
+    final coreGlowPaint = Paint()
+      ..color = _gold.withValues(alpha: 0.2)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 6.0
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+    canvas.drawRRect(rrect, coreGlowPaint);
   }
 
   @override
-  bool shouldRepaint(covariant _ScannerFramePainter oldDelegate) =>
-      oldDelegate.frameSize != frameSize;
+  bool shouldRepaint(covariant _LuminousFramePainter old) =>
+      old.frameSize != frameSize || old.centerY != centerY;
 }

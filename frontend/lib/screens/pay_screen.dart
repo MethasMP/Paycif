@@ -10,6 +10,7 @@ import 'payment_success_screen.dart';
 import '../features/security/domain/repositories/security_repository.dart';
 import '../widgets/paycif_icon_container.dart';
 import '../widgets/paycif_amount_text.dart';
+import '../theme/app_theme.dart';
 
 class PayScreen extends StatefulWidget {
   final double amount;
@@ -53,8 +54,9 @@ class _PayScreenState extends State<PayScreen> {
     bool authenticated = false;
     if (_biometricReady) {
       try {
+        final double totalUSD = (widget.amount / 36.45) * 1.035;
         authenticated = await _auth.authenticate(
-          localizedReason: 'Confirm payment of ฿${widget.amount.toStringAsFixed(2)}',
+          localizedReason: 'Confirm payment of \$${totalUSD.toStringAsFixed(2)} USD (฿${widget.amount.toStringAsFixed(2)})',
           biometricOnly: true,
         );
       } catch (_) {}
@@ -138,6 +140,7 @@ class _PayScreenState extends State<PayScreen> {
             }
           },
           builder: (context, state) {
+            final double totalUSD = (widget.amount / 36.45) * 1.035;
             return Padding(
               padding: const EdgeInsets.all(24.0),
               child: Column(
@@ -147,11 +150,34 @@ class _PayScreenState extends State<PayScreen> {
                     amount: widget.amount,
                     style: theme.textTheme.displayLarge,
                   ),
-                  SizedBox(height: 8),
-                  Text(widget.merchantName, style: theme.textTheme.titleLarge),
+                  const SizedBox(height: 4),
+                  Text(
+                    "≈ \$${totalUSD.toStringAsFixed(2)} USD",
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      color: AppTheme.textSecondaryColor(context),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    widget.merchantName,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   const Spacer(),
+                  _buildFXBreakdownCard(theme),
                   _buildPaymentMethodCard(theme, isDark),
-                  SizedBox(height: 32),
+                  const SizedBox(height: 16),
+                  Text(
+                    "* Your card issuer may apply cross-border fees.",
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppTheme.textSecondaryColor(context).withValues(alpha: 0.7),
+                      fontSize: 11,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
                   SizedBox(
                     width: double.infinity,
                     height: 60,
@@ -160,7 +186,7 @@ class _PayScreenState extends State<PayScreen> {
                       child: const Text("Confirm Payment"),
                     ),
                   ),
-                  SizedBox(height: 48),
+                  const SizedBox(height: 24),
                 ],
               ),
             );
@@ -181,7 +207,7 @@ class _PayScreenState extends State<PayScreen> {
       child: Row(
         children: [
           PaycifIconContainer(icon: PhosphorIcons.creditCard),
-          SizedBox(width: 16),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -201,9 +227,77 @@ class _PayScreenState extends State<PayScreen> {
               ],
             ),
           ),
-          Icon(PhosphorIcons.checkCircle, color: Color(0xFF10B981)),
+          const Icon(PhosphorIcons.checkCircle, color: Color(0xFF10B981)),
         ],
       ),
+    );
+  }
+
+  Widget _buildFXBreakdownCard(ThemeData theme) {
+    final double amountUSD = widget.amount / 36.45;
+    final double feeUSD = amountUSD * 0.035;
+    final double totalUSD = amountUSD * 1.035;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.primaryColor.withValues(alpha: 0.1)),
+      ),
+      child: Column(
+        children: [
+          _buildBreakdownRow("Exchange Rate", "1 USD ≈ 36.45 THB", theme),
+          const SizedBox(height: 8),
+          _buildBreakdownRow("Base Amount", "฿${widget.amount.toStringAsFixed(2)}", theme),
+          const SizedBox(height: 8),
+          _buildBreakdownRow("Convenience Fee (3.5%)", "\$${feeUSD.toStringAsFixed(2)} USD", theme),
+          const SizedBox(height: 12),
+          const Divider(height: 1, color: Color(0xFFE5E5E3)),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                "Guaranteed Charge",
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textPrimaryColor(context),
+                ),
+              ),
+              Text(
+                "\$${totalUSD.toStringAsFixed(2)} USD",
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFFEF9F27),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBreakdownRow(String label, String value, ThemeData theme) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: AppTheme.textSecondaryColor(context),
+          ),
+        ),
+        Text(
+          value,
+          style: theme.textTheme.bodySmall?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textPrimaryColor(context),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -1,6 +1,8 @@
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
+
 class PaymentUtils {
   /// Validates a credit card number using the Luhn Algorithm.
   static bool isValidLuhn(String cardNumber) {
@@ -74,7 +76,7 @@ class PaymentUtils {
       case 'UnionPay':
         return const Color(0xFFC00C1A);
       default:
-        return const Color(0xFF1A1F71);
+        return AppTheme.primaryTeal;
     }
   }
 }

@@ -17,7 +17,7 @@ class HardwareSecurityBridge {
         keyFormat: KeyFormat.base64,
         config: CreateKeysConfig(
           signatureType: SignatureType.ecdsa, // 🛡️ Secure Enclave / TEE Standard
-          enforceBiometric: true,
+          enforceBiometric: false,
           setInvalidatedByBiometricEnrollment: true,
         ),
       );

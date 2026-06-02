@@ -1,6 +1,8 @@
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:frontend/l10n/generated/app_localizations.dart';
 
 import '../controllers/dashboard_controller.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -34,7 +36,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
   late final Animation<double> _pulseOpacityAnimation;
 
   // Sizing constants for the premium navigation bar
-  static const double _barHeight = 70.0;
+  static const double _barHeight = 80.0;
   static const double _scanButtonSize = 72.0; // 72px circle as per design.md
   static const double _iconSize = 24.0;
   static const double _dotWidth = 14.0;
@@ -115,9 +117,12 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     return (activeCol + 0.5) * colWidth - _dotWidth / 2;
   }
 
-  Widget _buildTabItem(int index, IconData unselectedIcon, IconData selectedIcon, double width) {
+  Widget _buildTabItem(int index, IconData unselectedIcon, IconData selectedIcon, String label, double width) {
     final isSelected = _selectedIndex == index;
-    final theme = Theme.of(context);
+    final activeColor = const Color(0xFF0E5F59);
+    final inactiveColor = const Color(0xFF8A8F98);
+    final color = isSelected ? activeColor : inactiveColor;
+
     return SizedBox(
       width: width,
       height: _barHeight,
@@ -127,15 +132,39 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
         highlightColor: Colors.transparent,
         hoverColor: Colors.transparent,
         child: Center(
-          child: AnimatedScale(
-            scale: isSelected ? 1.08 : 1.0,
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOutBack,
-            child: Icon(
-              isSelected ? selectedIcon : unselectedIcon,
-              color: isSelected ? theme.primaryColor : Colors.grey[400],
-              size: _iconSize,
-            ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 24,
+                height: 24,
+                child: Center(
+                  child: AnimatedScale(
+                    scale: isSelected ? 1.05 : 1.0,
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOutBack,
+                    child: Icon(
+                      isSelected ? selectedIcon : unselectedIcon,
+                      color: color,
+                      size: _iconSize,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: GoogleFonts.ibmPlexSans(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 0.2,
+                  color: color,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           ),
         ),
       ),
@@ -145,6 +174,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
     final floatMargin = bottomPadding > 0 ? bottomPadding : 20.0;
 
@@ -222,7 +252,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                       width: _dotWidth,
                       height: 4.0,
                       decoration: BoxDecoration(
-                        color: theme.primaryColor,
+                        color: const Color(0xFF0E5F59),
                         borderRadius: BorderRadius.circular(2.0),
                       ),
                     ),
@@ -236,11 +266,11 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                     height: _barHeight,
                     child: Row(
                       children: [
-                        _buildTabItem(0, PhosphorIconsRegular.house, PhosphorIconsFill.house, colWidth),
-                        _buildTabItem(1, PhosphorIconsRegular.receipt, PhosphorIconsFill.receipt, colWidth), // Note: We can toggle duotone dynamically if there is new activity
+                        _buildTabItem(0, PhosphorIconsRegular.house, PhosphorIconsFill.house, l10n.navHome, colWidth),
+                        _buildTabItem(1, PhosphorIconsRegular.receipt, PhosphorIconsFill.receipt, l10n.navHistory, colWidth),
                         SizedBox(width: colWidth), // Center spacer for FAB
-                        _buildTabItem(2, PhosphorIconsRegular.wallet, PhosphorIconsFill.wallet, colWidth),
-                        _buildTabItem(3, PhosphorIconsRegular.userCircle, PhosphorIconsFill.userCircle, colWidth),
+                        _buildTabItem(2, PhosphorIconsRegular.cardsThree, PhosphorIconsFill.cardsThree, l10n.navPayment, colWidth),
+                        _buildTabItem(3, PhosphorIconsRegular.userCircle, PhosphorIconsFill.userCircle, l10n.navProfile, colWidth),
                       ],
                     ),
                   ),
@@ -270,35 +300,38 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                                   child: Container(
                                     width: _scanButtonSize,
                                     height: _scanButtonSize,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
+                                    decoration: ShapeDecoration(
+                                      shape: ContinuousRectangleBorder(
+                                        borderRadius: BorderRadius.circular(28),
+                                      ),
                                       color: const Color(0xFFEF9F27).withValues(alpha: _pulseOpacityAnimation.value),
                                     ),
                                   ),
                                 );
                               },
                             ),
-                            // Main Gold CTA button
+                            // Main Gold CTA button (Squircle shape)
                             Container(
-                              width: _scanButtonSize,
-                              height: _scanButtonSize,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
+                              width: 72,
+                              height: 72,
+                              decoration: ShapeDecoration(
                                 color: const Color(0xFFEF9F27),
-                                boxShadow: [
+                                shape: ContinuousRectangleBorder(
+                                  borderRadius: BorderRadius.circular(28), // Tuned for better Apple squircle look
+                                ),
+                                shadows: [
                                   BoxShadow(
-                                    color: const Color(0xFF0F6E56).withValues(alpha: 0.08),
-                                    blurRadius: 8,
-                                    spreadRadius: 0,
-                                    offset: const Offset(0, 2),
+                                    color: Colors.black.withValues(alpha: 0.15),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
                                   ),
                                 ],
                               ),
                               child: Center(
-                                child: Icon(
-                                  PhosphorIconsBold.qrCode,
-                                  color: Color(0xFF412402), // accent-900
-                                  size: 28.0, // 28px QR icon
+                                child: CustomScanIcon(
+                                  size: 28.0,
+                                  color: const Color(0xFF412402), // accent-900
+                                  strokeWidth: 2.5,
                                 ),
                               ),
                             ),
@@ -314,5 +347,103 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
         ),
       ),
     );
+  }
+}
+
+// ────────────────────────────────────────────────────────────
+// CUSTOM SCANNER ICON (Vector Painting for Perfect UI)
+// ────────────────────────────────────────────────────────────
+
+class CustomScanIcon extends StatelessWidget {
+  final double size;
+  final Color color;
+  final double strokeWidth;
+
+  const CustomScanIcon({
+    super.key,
+    this.size = 28.0,
+    this.color = const Color(0xFF412402),
+    this.strokeWidth = 2.5,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: Size(size, size),
+      painter: _ScanIconPainter(color: color, strokeWidth: strokeWidth),
+    );
+  }
+}
+
+class _ScanIconPainter extends CustomPainter {
+  final Color color;
+  final double strokeWidth;
+
+  _ScanIconPainter({required this.color, this.strokeWidth = 2.5});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final w = size.width;
+    final h = size.height;
+    
+    // Configurable parameters for the vector drawing
+    final cornerLength = w * 0.28; // Length of the corner lines (8px)
+    final radius = 3.5;           // Smooth corner roundness (Apple-like feel)
+
+    // 1. Top-Left Corner
+    final pathTL = Path()
+      ..moveTo(0, cornerLength)
+      ..lineTo(0, radius)
+      ..quadraticBezierTo(0, 0, radius, 0)
+      ..lineTo(cornerLength, 0);
+    canvas.drawPath(pathTL, paint);
+
+    // 2. Top-Right Corner
+    final pathTR = Path()
+      ..moveTo(w - cornerLength, 0)
+      ..lineTo(w - radius, 0)
+      ..quadraticBezierTo(w, 0, w, radius)
+      ..lineTo(w, cornerLength);
+    canvas.drawPath(pathTR, paint);
+
+    // 3. Bottom-Left Corner
+    final pathBL = Path()
+      ..moveTo(0, h - cornerLength)
+      ..lineTo(0, h - radius)
+      ..quadraticBezierTo(0, h, radius, h)
+      ..lineTo(cornerLength, h);
+    canvas.drawPath(pathBL, paint);
+
+    // 4. Bottom-Right Corner
+    final pathBR = Path()
+      ..moveTo(w - cornerLength, h)
+      ..lineTo(w - radius, h)
+      ..quadraticBezierTo(w, h, w, h - radius)
+      ..lineTo(w, h - cornerLength);
+    canvas.drawPath(pathBR, paint);
+
+    // 5. Middle Laser Line (extends slightly outwards for dynamic scanning visual)
+    final linePaint = Paint()
+      ..color = color
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawLine(
+      Offset(-1.5, h / 2),
+      Offset(w + 1.5, h / 2),
+      linePaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _ScanIconPainter oldDelegate) {
+    return oldDelegate.color != color || oldDelegate.strokeWidth != strokeWidth;
   }
 }

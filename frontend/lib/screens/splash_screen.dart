@@ -14,6 +14,8 @@ import '../features/security/presentation/logic/security_controller.dart';
 import '../features/security/presentation/pages/security_unlock_screen.dart';
 import '../features/security/presentation/pages/pin_setup_screen.dart';
 import '../widgets/paycif_text.dart';
+import '../theme/app_theme.dart';
+
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -134,8 +136,9 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xFF1A1F71), // Navy
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -153,13 +156,13 @@ class _SplashScreenState extends State<SplashScreen> {
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFFF59E0B).withValues(alpha: 0.4),
+                        color: AppTheme.accentGold.withValues(alpha: 0.3),
                         blurRadius: 30,
                         spreadRadius: 10,
                       ),
                     ],
                   ),
-                  child: Icon(
+                  child: const Icon(
                     PhosphorIcons.shield,
                     size: 60,
                     color: Colors.white,
@@ -169,13 +172,13 @@ class _SplashScreenState extends State<SplashScreen> {
                 .fadeIn(duration: 800.ms)
                 .scale(duration: 600.ms, curve: Curves.elasticOut),
 
-            SizedBox(height: 32),
+            const SizedBox(height: 32),
 
             // Title
             Text(
                   'Paycif',
-                  style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                    color: Colors.white,
+                  style: theme.textTheme.displayMedium?.copyWith(
+                    color: AppTheme.textPrimaryColor(context),
                     fontWeight: FontWeight.w600,
                   ),
                 )
@@ -183,25 +186,25 @@ class _SplashScreenState extends State<SplashScreen> {
                 .fadeIn(delay: 400.ms, duration: 600.ms)
                 .slideY(begin: 0.2, end: 0),
 
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
 
             // Tagline
             Text(
               'Secure. Simple. Global.',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: Colors.white70,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color: AppTheme.textSecondaryColor(context),
                 letterSpacing: 2.0,
               ),
             ).animate().fadeIn(delay: 600.ms, duration: 600.ms),
 
-            SizedBox(height: 64),
+            const SizedBox(height: 64),
 
             // Loading Text
             PaycifText(
                   AppLocalizations.of(context)?.splashLoading ??
                       'Connecting...',
                   style: PaycifTextStyle.caption,
-                  color: Colors.white54,
+                  color: AppTheme.textSecondaryColor(context).withValues(alpha: 0.7),
                 )
                 .animate(onPlay: (controller) => controller.repeat())
                 .fadeIn(duration: 1000.ms)

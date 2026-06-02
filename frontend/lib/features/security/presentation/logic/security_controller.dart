@@ -39,7 +39,7 @@ class BiometricProfile {
       primary = BiometricType.face;
       guidance = "Looking for you...";
       name = Platform.isIOS ? "Face ID" : "Face Unlock";
-      icon = PhosphorIcons.smiley;
+      icon = PhosphorIcons.userFocus;
     } else if (types.contains(BiometricType.iris)) {
       primary = BiometricType.iris;
       guidance = "Scan your iris";
