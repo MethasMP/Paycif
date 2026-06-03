@@ -67,21 +67,26 @@ serve(async (req: Request) => {
       return jsonError('Device authorization missing', 401);
     }
 
-    // Fetch binding
-    const { data: binding, error: bindError } = await supabase
-      .from('user_device_bindings')
-      .select('public_key')
-      .eq('user_id', user.id)
-      .eq('device_id', deviceId)
-      .single();
+    // Consolidated database read RPC
+    const { data: authContext, error: contextError } = await supabase
+      .rpc('get_user_auth_context', { p_user_id: user.id, p_device_id: deviceId });
 
-    if (bindError || !binding) {
-      console.warn(`[VerifyPin] Unbound device attempt: ${deviceId}`);
+    if (contextError) {
+      console.error('Auth context fetch error:', contextError);
+      return jsonError(`System Error: ${contextError.message}`, 500);
+    }
+
+    if (!authContext) {
+      return jsonError('PIN not setup', 400);
+    }
+
+    if (!authContext.public_key || !authContext.is_device_active) {
+      console.warn(`[VerifyPin] Unbound or inactive device attempt: ${deviceId}`);
       return jsonError('Device not recognized', 401);
     }
 
     // 🔬 DEBUG: Trace what we're verifying
-    const pubKeyPrefix = binding.public_key.substring(0, 10);
+    const pubKeyPrefix = authContext.public_key.substring(0, 10);
     const sigPrefix = signature.substring(0, 10);
     console.log(`[VerifyPin] DEBUG - DeviceID: ${deviceId}`);
     console.log(`[VerifyPin] DEBUG - PubKey Prefix (from DB): ${pubKeyPrefix}...`);
@@ -89,7 +94,7 @@ serve(async (req: Request) => {
     console.log(`[VerifyPin] DEBUG - PIN (message): ${pin}`);
 
     // Verify Signature: The device signs the PIN attempt itself.
-    const isValidSig = await verifySignature(signature, pin, binding.public_key);
+    const isValidSig = await verifySignature(signature, pin, authContext.public_key);
     if (!isValidSig) {
       console.warn(
         `[VerifyPin] Invalid Signature for ${user.id}. PubKey: ${pubKeyPrefix}... Sig: ${sigPrefix}...`,
@@ -100,22 +105,8 @@ serve(async (req: Request) => {
     // ------------------------------------------------------------------------
     // 3. SERVER-SIDE LOCKOUT CHECK (The "Authority")
     // ------------------------------------------------------------------------
-    // Use RPC to get secret securely without exposing private schema
-    const { data: secret, error: secretError } = await supabase
-      .rpc('get_user_auth_secret', { p_user_id: user.id });
-
-    if (secretError) {
-      console.error('Secret fetch error:', secretError);
-      return jsonError(`System Error: ${secretError.message}`, 500);
-    }
-
-    if (!secret) {
-      return jsonError('PIN not setup', 400);
-    }
-
-    // Check Lockout
-    if (secret.locked_until) {
-      const lockedUntil = new Date(secret.locked_until);
+    if (authContext.locked_until) {
+      const lockedUntil = new Date(authContext.locked_until);
       const now = new Date();
       if (lockedUntil > now) {
         const diffMs = lockedUntil.getTime() - now.getTime();
@@ -124,7 +115,7 @@ serve(async (req: Request) => {
           JSON.stringify({
             success: false,
             error: `Account locked. Try again in ${diffSec} seconds.`,
-            locked_until: secret.locked_until,
+            locked_until: authContext.locked_until,
           }),
           {
             status: 423,
@@ -141,32 +132,27 @@ serve(async (req: Request) => {
     // ------------------------------------------------------------------------
     // 4. Verify PIN Hash
     // ------------------------------------------------------------------------
-    const isValid = await verifyWithHashWasm(secret.pin_hash, pin);
+    const isValid = await verifyWithHashWasm(authContext.pin_hash, pin);
 
     if (isValid) {
-      // SUCCESS: Reset counters via RPC
+      // SUCCESS: Reset counters via consolidated RPC write
       console.log(`[VerifyPin] User ${user.id} Success`);
 
-      await supabase.rpc('update_user_auth_status', {
+      await supabase.rpc('update_user_auth_result', {
         p_user_id: user.id,
+        p_device_id: deviceId,
         p_failed_attempts: 0,
         p_locked_until: null,
         p_reset_counters: true
       });
-
-      // Also update device last_used (Public table)
-      await supabase
-        .from('user_device_bindings')
-        .update({ last_used_at: new Date().toISOString() })
-        .eq('device_id', deviceId);
 
       return new Response(
         JSON.stringify({ success: true, message: 'Verified' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     } else {
-      // FAILURE: Increment & Check Lockout via RPC
-      const newFailed = (secret.failed_attempts || 0) + 1;
+      // FAILURE: Increment & Check Lockout via consolidated RPC write
+      const newFailed = (authContext.failed_attempts || 0) + 1;
       let newLockedUntil = null;
       let errorMsg = 'Invalid PIN';
 
@@ -181,8 +167,9 @@ serve(async (req: Request) => {
         errorMsg = `Invalid PIN. ${remaining} attempts remaining.`;
       }
 
-      await supabase.rpc('update_user_auth_status', {
+      await supabase.rpc('update_user_auth_result', {
         p_user_id: user.id,
+        p_device_id: deviceId,
         p_failed_attempts: newFailed,
         p_locked_until: newLockedUntil,
         p_reset_counters: false
