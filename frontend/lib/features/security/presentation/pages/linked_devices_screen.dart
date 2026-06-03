@@ -32,7 +32,7 @@ class _LinkedDevicesView extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(title: Text(l10n.linkedDevices), centerTitle: true),
+      appBar: AppBar(title: Text(l10n.linkedDevices)),
       body: controller.isLoading
           ? Center(child: CircularProgressIndicator())
           : controller.devices.isEmpty

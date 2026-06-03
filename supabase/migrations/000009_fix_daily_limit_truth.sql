@@ -2,7 +2,7 @@
 -- URGENT FIX: Daily Limit Truth - Transaction-First Approach
 -- ============================================================================
 -- PROBLEM: 
---   - get_daily_topup_status shows 600 THB but Activity Stream shows 520.33 THB
+--   - get_daily_topup_status shows 600 THB but Transaction history shows 520.33 THB
 --   - The daily limit is calculated from tracking table which can be out of sync
 --   - Need to ALWAYS use transactions as source of truth
 -- 

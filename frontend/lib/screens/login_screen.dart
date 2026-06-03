@@ -100,7 +100,9 @@ class _LoginScreenState extends State<LoginScreen> {
       if (idToken != null) {
         await _exchangeTokenWithSupabase(OAuthProvider.google, idToken);
       } else {
-        setState(() => _isLoading = false);
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
       }
     } catch (error) {
       _handleSignInError(error);
@@ -132,7 +134,9 @@ class _LoginScreenState extends State<LoginScreen> {
       if (idToken != null) {
         await _exchangeTokenWithSupabase(OAuthProvider.apple, idToken);
       } else {
-        setState(() => _isLoading = false);
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
       }
     } catch (error) {
       _handleSignInError(error);

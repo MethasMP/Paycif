@@ -23,6 +23,7 @@ class SumsubKycCubit extends Cubit<SumsubKycState> {
     emit(SumsubLoading());
     try {
       final res = await ApiService.getSumsubToken();
+      if (isClosed) return;
       final token = res['token'];
       if (token != null) {
         emit(SumsubReady(token));
@@ -30,6 +31,7 @@ class SumsubKycCubit extends Cubit<SumsubKycState> {
         emit(SumsubFailed('Invalid token response'));
       }
     } catch (e) {
+      if (isClosed) return;
       emit(SumsubFailed(e.toString()));
     }
   }
@@ -40,7 +42,9 @@ class SumsubKycCubit extends Cubit<SumsubKycState> {
     // Poll for status update in DB (Backend updates tier via webhook)
     int attempts = 0;
     while (attempts < 30) {
+      if (isClosed) return;
       final tier = await ApiService.getUserTier();
+      if (isClosed) return;
       if (tier == 'tier2') {
         emit(SumsubCompleted());
         return;
@@ -49,6 +53,7 @@ class SumsubKycCubit extends Cubit<SumsubKycState> {
       attempts++;
     }
     
+    if (isClosed) return;
     emit(SumsubFailed('Verification processing timed out. Please check again later.'));
   }
 }

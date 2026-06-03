@@ -233,7 +233,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Your financial activity will appear here once you start using your card.';
 
   @override
-  String get historyTitle => 'Activity Stream';
+  String get historyTitle => 'Transaction history';
 
   @override
   String get historyNoActivity => 'No Activity Yet';

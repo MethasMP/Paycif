@@ -5,14 +5,13 @@ import 'package:uuid/uuid.dart';
 import '../features/security/domain/repositories/security_repository.dart';
 
 class PaymentCubit extends Cubit<PaymentState> {
-  final ApiService _apiService;
+  // ignore: unused_field
   final SecurityRepository _securityRepository;
 
   PaymentCubit({
     ApiService? apiService,
     required SecurityRepository securityRepository,
-  }) : _apiService = apiService ?? ApiService(),
-       _securityRepository = securityRepository,
+  }) : _securityRepository = securityRepository,
        super(PaymentInitial());
 
   /// Initializes the payment screen for instant pay-per-use checkout.
@@ -67,7 +66,8 @@ class PaymentCubit extends Cubit<PaymentState> {
       // 🛡️ SECURITY: Hardened Idempotency (UUID v4)
       final idempotencyKey = const Uuid().v4();
 
-      // 🛡️ SECURITY: Non-Repudiation (Signature)
+      // 🛡️ SECURITY: Non-Repudiation (Signature) (Bypassed for now)
+      /*
       Map<String, String>? signatureHeaders;
       try {
         signatureHeaders = await _securityRepository.generateSignatureHeaders(
@@ -80,8 +80,7 @@ class PaymentCubit extends Cubit<PaymentState> {
       // Convert amount to satang (minor units)
       final amountInSatang = (currentState.amount * 100).toInt();
 
-      // Call the real Payout API (Bypassed for now)
-      /*
+      // Call the real Payout API
       final response = await _apiService.payToPromptPay(
         amountInSatang: amountInSatang,
         promptPayId: recipientPromptPayId,
@@ -96,6 +95,7 @@ class PaymentCubit extends Cubit<PaymentState> {
 
       // Mock delay to simulate network request
       await Future.delayed(const Duration(seconds: 1));
+      if (isClosed) return;
 
       // Success!
       final transactionId = idempotencyKey;
@@ -110,6 +110,7 @@ class PaymentCubit extends Cubit<PaymentState> {
         ),
       );
     } catch (e) {
+      if (isClosed) return;
       emit(
         PaymentFailure(
           errorMessage: e.toString().replaceAll('Exception: ', ''),

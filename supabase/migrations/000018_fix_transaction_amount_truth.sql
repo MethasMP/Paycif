@@ -67,7 +67,7 @@ BEGIN
     UPDATE wallets SET balance = v_new_balance, updated_at = NOW() WHERE id = v_wallet_id;
 
     -- 💎 FIX: Record the NET amount in the amount column.
-    -- This ensures History, Activity Stream, and Daily Limits (which query this table)
+    -- This ensures History, Transaction history, and Daily Limits (which query this table)
     -- always show the intended top-up amount without gateway fees.
     INSERT INTO transactions (
         id, reference_id, description, status, settlement_status, 
@@ -95,7 +95,7 @@ END;
 $$;
 
 -- 💎 REPAIR: Retroactively fix any existing transactions that stored Gross instead of Net
--- This will fix the Daily Limit display and Activity Stream for previous top-ups.
+-- This will fix the Daily Limit display and Transaction history for previous top-ups.
 UPDATE transactions 
 SET amount = (provider_metadata->>'wallet_amount_satang')::bigint
 WHERE type = 'TOPUP' 

@@ -118,6 +118,7 @@ class AppTheme {
         elevation: 0,
         iconTheme: IconThemeData(color: textPrimary),
         titleTextStyle: TextStyle(color: textPrimary, fontSize: 22, fontWeight: FontWeight.w600),
+        centerTitle: false,
       ),
       textTheme: _buildTextTheme(base).apply(bodyColor: textPrimary, displayColor: textPrimary),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -185,6 +186,7 @@ class AppTheme {
         elevation: 0,
         iconTheme: IconThemeData(color: darkTextPrimary),
         titleTextStyle: TextStyle(color: darkTextPrimary, fontSize: 22, fontWeight: FontWeight.w600),
+        centerTitle: false,
       ),
       textTheme: _buildTextTheme(base).apply(bodyColor: darkTextPrimary, displayColor: darkTextPrimary),
       elevatedButtonTheme: ElevatedButtonThemeData(

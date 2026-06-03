@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../controllers/dashboard_controller.dart';
 import '../theme/app_theme.dart';
+import '../widgets/paycif_text.dart';
 
 class PaymentSuccessScreen extends StatelessWidget {
   final String transactionId;
@@ -92,7 +93,6 @@ class PaymentSuccessScreen extends StatelessWidget {
                   const SizedBox(height: 8),
                   TextButton.icon(
                     onPressed: () {
-                      // TODO: Implement save to gallery
                     },
                     icon: const Icon(PhosphorIcons.downloadSimple, color: Colors.white, size: 20),
                     label: const Text(
@@ -140,22 +140,32 @@ class PaymentSuccessScreen extends StatelessWidget {
           // Security Header
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 10),
+            padding: const EdgeInsets.symmetric(vertical: 12),
             decoration: BoxDecoration(
-              color: isDark ? Colors.black.withValues(alpha: 0.2) : const Color(0xFFF7F7F5),
+              color: isDark ? Colors.black.withValues(alpha: 0.25) : const Color(0xFFE1F5EE),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              border: Border(
+                bottom: BorderSide(
+                  color: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFCBECE0),
+                  width: 1,
+                ),
+              ),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(PhosphorIcons.shieldCheckFill, color: Color(0xFF0F6E56), size: 16),
+                const Icon(
+                  PhosphorIcons.shieldCheckFill,
+                  color: Color(0xFF0F6E56),
+                  size: 18,
+                ),
                 const SizedBox(width: 8),
                 Text(
-                  'Secured by Paycif',
+                  'Verified by Paycif Network',
                   style: TextStyle(
-                    color: textMuted,
+                    color: isDark ? const Color(0xFF2BBF9E) : const Color(0xFF0F6E56),
                     fontSize: 12,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.bold,
                     letterSpacing: 0.5,
                   ),
                 ),
@@ -174,21 +184,19 @@ class PaymentSuccessScreen extends StatelessWidget {
                   Column(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(10),
+                        padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: const Color(0xFF0F6E56).withValues(alpha: 0.1),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(PhosphorIcons.check, color: Color(0xFF0F6E56), size: 32),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
+                      const SizedBox(height: 10),
+                      PaycifText(
                         'โอนเงินสำเร็จ',
-                        style: TextStyle(
-                          color: textColor,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: PaycifTextStyle.h1,
+                        color: textColor,
+                        fontWeight: FontWeight.bold,
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -243,13 +251,33 @@ class PaymentSuccessScreen extends StatelessWidget {
                         style: TextStyle(color: textMuted, fontSize: 13, fontWeight: FontWeight.w500),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        '${NumberFormat('#,##0.00').format(amount)} THB',
-                        style: TextStyle(
-                          color: textColor,
-                          fontSize: 32,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -1,
+                      RichText(
+                        text: TextSpan(
+                          style: TextStyle(
+                            color: isDark ? const Color(0xFF2BBF9E) : AppTheme.primaryTeal,
+                            fontFamily: Theme.of(context).textTheme.displayMedium?.fontFamily,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                          children: [
+                            TextSpan(
+                              text: NumberFormat('#,##0.00').format(amount),
+                              style: const TextStyle(
+                                fontSize: 34,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -1,
+                              ),
+                            ),
+                            const TextSpan(text: ' '),
+                            TextSpan(
+                              text: 'THB',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: textMuted,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -352,23 +380,24 @@ class PaymentSuccessScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
+              PaycifText(
                 label,
-                style: TextStyle(color: textMuted, fontSize: 12, fontWeight: FontWeight.w500),
+                style: PaycifTextStyle.caption,
+                color: textMuted,
+                fontWeight: FontWeight.w500,
               ),
               const SizedBox(height: 2),
-              Text(
+              PaycifText(
                 name,
-                style: TextStyle(
-                  color: textColor,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: PaycifTextStyle.body,
+                color: textColor,
+                fontWeight: FontWeight.w600,
               ),
               const SizedBox(height: 2),
-              Text(
+              PaycifText(
                 subtext,
-                style: TextStyle(color: textMuted, fontSize: 13),
+                style: PaycifTextStyle.caption,
+                color: textMuted,
               ),
             ],
           ),

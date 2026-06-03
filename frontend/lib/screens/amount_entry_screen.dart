@@ -130,7 +130,6 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text('Send Money'),
-        centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),

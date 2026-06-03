@@ -25,7 +25,6 @@ class TransactionDetailScreen extends StatelessWidget {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(l10n.transactionDetailsTitle),
-        centerTitle: true,
         elevation: 0,
         backgroundColor: Colors.transparent,
       ),

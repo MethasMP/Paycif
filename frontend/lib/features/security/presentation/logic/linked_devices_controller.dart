@@ -57,10 +57,19 @@ class LinkedDevicesController extends ChangeNotifier {
     );
   }
 
+  bool _isDisposed = false;
+
   @override
   void dispose() {
+    _isDisposed = true;
     _devicesSub?.cancel();
     super.dispose();
+  }
+
+  @override
+  void notifyListeners() {
+    if (_isDisposed) return;
+    super.notifyListeners();
   }
 
   Future<bool> revokeDevice(String deviceId, AppLocalizations l10n) async {

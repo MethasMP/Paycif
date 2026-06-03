@@ -278,7 +278,7 @@ class ApiService {
       functionUrl,
       headers: finalHeaders,
       body: body != null ? jsonEncode(body) : null,
-    );
+    ).timeout(const Duration(seconds: 15));
 
     debugPrint(
       '🌐 [RawInvoke] $functionName -> Status: ${response.statusCode}',
@@ -319,7 +319,7 @@ class ApiService {
     Future<http.Response> Function(Map<String, String> headers) request,
   ) async {
     final headers = await _getHeaders();
-    final response = await request(headers);
+    final response = await request(headers).timeout(const Duration(seconds: 15));
 
     if (response.statusCode == 401) {
       debugPrint("🚨 [Universal Interceptor] 401 detected. Recovery mode...");
@@ -329,7 +329,7 @@ class ApiService {
 
         // 2. Retry with pristine headers
         final freshHeaders = await _getHeaders();
-        final retryResponse = await request(freshHeaders);
+        final retryResponse = await request(freshHeaders).timeout(const Duration(seconds: 15));
 
         debugPrint(
           "✅ [Universal Interceptor] Recovery successful. Status: ${retryResponse.statusCode}",
@@ -1014,7 +1014,7 @@ class ApiService {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
       },
-    );
+    ).timeout(const Duration(seconds: 15));
 
     if (response.statusCode == 200) {
       return jsonDecode(response.body);

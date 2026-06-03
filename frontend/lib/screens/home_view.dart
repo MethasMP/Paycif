@@ -10,6 +10,7 @@ import 'history_screen.dart';
 import '../utils/error_translator.dart';
 import 'profile_page.dart';
 import 'scan_page.dart';
+import 'payment_settings_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
@@ -373,7 +374,6 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
-  // --- Quick Actions Dock ---
   Widget _buildQuickActionsDock(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -381,17 +381,6 @@ class _HomeViewState extends State<HomeView> {
         _QuickActionButton(
           label: "Send",
           icon: PhosphorIconsRegular.paperPlaneRight,
-          onTap: () {
-            HapticFeedback.lightImpact();
-            // Action Placeholder / Integration
-          },
-        ),
-        
-        // Scan QR Centerpiece (Elevated Design)
-        _QuickActionButton(
-          label: "Scan QR",
-          icon: PhosphorIconsRegular.qrCode,
-          isPrimary: true,
           onTap: () {
             HapticFeedback.mediumImpact();
             final dashboardController = context.read<DashboardController>();
@@ -402,7 +391,6 @@ class _HomeViewState extends State<HomeView> {
             });
           },
         ),
-
         _QuickActionButton(
           label: "Top Up",
           icon: PhosphorIconsRegular.plusCircle,
@@ -410,7 +398,17 @@ class _HomeViewState extends State<HomeView> {
             HapticFeedback.lightImpact();
           },
         ),
-
+        _QuickActionButton(
+          label: "Cards",
+          icon: PhosphorIconsRegular.creditCard,
+          onTap: () {
+            HapticFeedback.lightImpact();
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const PaymentSettingsScreen()),
+            );
+          },
+        ),
         _QuickActionButton(
           label: "Rates",
           icon: PhosphorIconsRegular.chartLineUp,
@@ -487,7 +485,6 @@ class _HomeViewState extends State<HomeView> {
     return AppBar(
       backgroundColor: Colors.transparent,
       elevation: 0,
-      centerTitle: true,
       leading: Padding(
         padding: const EdgeInsets.only(left: 8.0),
         child: IconButton(
@@ -713,13 +710,11 @@ class _QuickActionButton extends StatefulWidget {
   final String label;
   final IconData icon;
   final VoidCallback onTap;
-  final bool isPrimary;
 
   const _QuickActionButton({
     required this.label,
     required this.icon,
     required this.onTap,
-    this.isPrimary = false,
   });
 
   @override
@@ -765,22 +760,16 @@ class _QuickActionButtonState extends State<_QuickActionButton> with SingleTicke
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
-    final Color buttonBg = widget.isPrimary
-        ? const Color(0xFFEF9F27)
-        : (isDark ? Colors.white.withValues(alpha: 0.04) : Colors.white);
+    final Color buttonBg = isDark ? Colors.white.withValues(alpha: 0.04) : Colors.white;
 
-    final Color iconColor = widget.isPrimary
-        ? const Color(0xFF412402)
-        : (isDark ? Colors.white : const Color(0xFF111111));
+    final Color iconColor = isDark ? Colors.white : const Color(0xFF111111);
 
     final Color labelColor = isDark ? Colors.white.withValues(alpha: 0.87) : const Color(0xFF111111);
 
-    final Border? border = widget.isPrimary
-        ? null
-        : Border.all(
-            color: isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE5E5E3),
-            width: 1,
-          );
+    final Border border = Border.all(
+      color: isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE5E5E3),
+      width: 1,
+    );
 
     return GestureDetector(
       onTapDown: _handleTapDown,
@@ -795,26 +784,24 @@ class _QuickActionButtonState extends State<_QuickActionButton> with SingleTicke
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: widget.isPrimary ? 64 : 56,
-                height: widget.isPrimary ? 64 : 56,
+                width: 56,
+                height: 56,
                 decoration: BoxDecoration(
                   color: buttonBg,
                   shape: BoxShape.circle,
                   border: border,
                   boxShadow: [
                     BoxShadow(
-                      color: widget.isPrimary
-                          ? const Color(0xFFEF9F27).withValues(alpha: 0.3)
-                          : Colors.black.withValues(alpha: isDark ? 0.15 : 0.03),
-                      blurRadius: widget.isPrimary ? 16 : 8,
-                      offset: Offset(0, widget.isPrimary ? 6 : 3),
+                      color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.03),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
                     ),
                   ],
                 ),
                 child: Icon(
                   widget.icon,
                   color: iconColor,
-                  size: widget.isPrimary ? 28 : 22,
+                  size: 22,
                 ),
               ),
               const SizedBox(height: 8),
@@ -822,7 +809,7 @@ class _QuickActionButtonState extends State<_QuickActionButton> with SingleTicke
                 widget.label,
                 style: GoogleFonts.ibmPlexSans(
                   fontSize: 12,
-                  fontWeight: widget.isPrimary ? FontWeight.bold : FontWeight.w500,
+                  fontWeight: FontWeight.w500,
                   color: labelColor,
                 ),
               ),

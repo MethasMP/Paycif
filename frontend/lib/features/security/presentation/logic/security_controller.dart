@@ -365,4 +365,18 @@ class SecurityController extends ChangeNotifier {
     _hasPinCached = null;
     _setState(const SecurityState());
   }
+
+  bool _isDisposed = false;
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    super.dispose();
+  }
+
+  @override
+  void notifyListeners() {
+    if (_isDisposed) return;
+    super.notifyListeners();
+  }
 }

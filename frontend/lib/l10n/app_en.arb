@@ -80,7 +80,7 @@
   "homeNoTransactions": "No transactions yet",
   "homeNoTransactionsDesc": "Your financial activity will appear here once you start using your card.",
 
-  "historyTitle": "Activity Stream",
+  "historyTitle": "Transaction history",
   "historyNoActivity": "No Activity Yet",
 
   "scanTitle": "Scan QR Code",

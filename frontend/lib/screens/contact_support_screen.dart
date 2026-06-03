@@ -72,7 +72,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(title: Text(l10n.contactSupport), centerTitle: true),
+      appBar: AppBar(title: Text(l10n.contactSupport)),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Form(

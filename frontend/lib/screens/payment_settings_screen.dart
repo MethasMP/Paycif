@@ -169,7 +169,6 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(l10n.paymentSettingsTitle),
-        centerTitle: true,
         actions: [
           if (savedCards.isNotEmpty)
             TextButton(

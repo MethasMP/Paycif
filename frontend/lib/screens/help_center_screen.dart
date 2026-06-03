@@ -91,7 +91,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(title: Text(l10n.helpCenter), centerTitle: true),
+      appBar: AppBar(title: Text(l10n.helpCenter)),
       body: Column(
         children: [
           // Search Bar

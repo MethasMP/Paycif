@@ -59,7 +59,6 @@ class _AddCardScreenState extends State<AddCardScreen> {
             color: AppTheme.textPrimaryColor(context),
           ),
         ),
-        centerTitle: true,
         leading: IconButton(
           icon: Icon(
             PhosphorIcons.arrowLeft,

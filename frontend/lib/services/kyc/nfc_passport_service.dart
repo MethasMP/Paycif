@@ -236,7 +236,7 @@ class NfcPassportService {
           'Authorization': 'Bearer $token',
         },
         body: jsonEncode(payload),
-      );
+      ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
@@ -269,7 +269,7 @@ class NfcPassportService {
           'selfie_base64': base64Encode(selfieBytes),
           'session_id': sessionId,
         }),
-      );
+      ).timeout(const Duration(seconds: 15));
       return response.statusCode == 200;
     } catch (e) {
       debugPrint('[Biometrics] Selfie submission error: $e');
