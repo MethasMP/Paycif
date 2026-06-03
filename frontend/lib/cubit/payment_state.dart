@@ -23,7 +23,7 @@ class PaymentMethod extends Equatable {
   List<Object?> get props => [id, type, title, subtitle, cardData];
 }
 
-abstract class PaymentState extends Equatable {
+sealed class PaymentState extends Equatable {
   const PaymentState();
 
   @override

@@ -41,11 +41,7 @@ void main() {
       expect(find.text('0'), findsOneWidget);
       expect(find.byIcon(PhosphorIcons.backspace), findsOneWidget);
 
-      // Digits dots (6 of them)
-      // They are Containers, simpler to find by type? Or maybe by logic.
-      // List.generate(6) creates 6 containers.
-      // Let's check for empty containers or just general structure.
-      // The dots are inside a Row.
+      await tester.pumpAndSettle();
     });
 
     testWidgets('Enters digits and updates UI', (tester) async {
@@ -57,12 +53,7 @@ void main() {
       await tester.tap(find.text('2'));
       await tester.pump();
 
-      // We rely on internal state of widget not controller for the text inputs,
-      // controller is only called on submit.
-      // Since _pin is internal state, we verify visual feedback or internal behavior?
-      // Visual feedback involves animations which are hard to test perfectly without wait.
-      // But we can check if dots changed color if we inspected them carefully,
-      // but simplistic verify is: no error thrown.
+      await tester.pumpAndSettle();
     });
 
     testWidgets('Submit Verify Call on 6th digit', (tester) async {

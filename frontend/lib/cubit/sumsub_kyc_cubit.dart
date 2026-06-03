@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../services/api_service.dart';
 
-abstract class SumsubKycState {}
+sealed class SumsubKycState {}
 
 class SumsubInitial extends SumsubKycState {}
 class SumsubLoading extends SumsubKycState {}
