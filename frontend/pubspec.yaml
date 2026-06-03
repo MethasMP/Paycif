@@ -52,7 +52,7 @@ dependencies:
   sign_in_with_apple: ^8.0.0
   flutter_animate: ^4.5.2
 
-  image_gallery_saver_plus: ^4.0.1
+  image_gallery_saver_plus: ^5.0.0
   qr_flutter: ^4.1.0
   flutter_localizations:
     sdk: flutter
