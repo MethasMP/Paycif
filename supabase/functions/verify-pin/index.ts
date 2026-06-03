@@ -302,9 +302,19 @@ async function verifyWithHashWasm(phcString: string, pin: string): Promise<boole
       outputType: 'encoded',
     });
 
-    return newHash === phcString;
+    return safeCompare(newHash, phcString);
   } catch (err) {
     console.error('Verification error:', err);
     return false;
   }
+}
+
+// Constant-time string comparison to prevent timing attacks
+function safeCompare(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
 }
