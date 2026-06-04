@@ -236,13 +236,14 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 	}
 
 	// Check Daily Limit (querying ledger_entries by profile_id)
+	// Optimization: Filter directly on ledger_entries.created_at to leverage idx_ledger_entries_profile_created
+	// and avoid redundant join with transactions table. Using SUM(-amount) as a micro-optimization for ABS.
 	var dailyDebitTotal sql.NullInt64
 	err = tx.QueryRowContext(ctx, `
-		SELECT COALESCE(SUM(ABS(le.amount)), 0) FROM ledger_entries le
-		JOIN transactions t ON le.transaction_id = t.id
-		WHERE le.profile_id = $1 
-		AND le.amount < 0 
-		AND t.created_at > NOW() - INTERVAL '24 hours'
+		SELECT COALESCE(SUM(-amount), 0) FROM ledger_entries
+		WHERE profile_id = $1
+		AND amount < 0
+		AND created_at > NOW() - INTERVAL '24 hours'
 	`, req.UserID).Scan(&dailyDebitTotal)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("failed to check daily limit: %w", err)
