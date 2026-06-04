@@ -240,7 +240,7 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 	// and avoid redundant join with transactions table.
 	var dailyDebitTotal sql.NullInt64
 	err = tx.QueryRowContext(ctx, `
-		SELECT COALESCE(SUM(ABS(amount)), 0) FROM ledger_entries
+		SELECT COALESCE(SUM(-amount), 0) FROM ledger_entries
 		WHERE profile_id = $1
 		AND amount < 0
 		AND created_at > NOW() - INTERVAL '24 hours'
