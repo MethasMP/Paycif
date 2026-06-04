@@ -6,6 +6,7 @@ import '../../domain/repositories/security_repository.dart';
 import '../logic/linked_devices_controller.dart';
 import 'package:frontend/utils/pay_notify.dart';
 import '../../../../screens/login_screen.dart'; // For logout redirection
+import 'package:frontend/theme/app_theme.dart';
 
 class LinkedDevicesScreen extends StatelessWidget {
   const LinkedDevicesScreen({super.key});
@@ -165,7 +166,7 @@ class _LinkedDevicesView extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           border: isCurrent
               ? Border.all(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.5),
+                  color: AppTheme.successGreen.withValues(alpha: 0.5),
                   width: 1.5,
                 )
               : Border.all(color: Colors.grey.withValues(alpha: 0.1)),
@@ -188,13 +189,13 @@ class _LinkedDevicesView extends StatelessWidget {
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: isCurrent
-                    ? const Color(0xFF10B981).withValues(alpha: 0.1)
+                    ? AppTheme.successGreen.withValues(alpha: 0.1)
                     : Theme.of(context).scaffoldBackgroundColor,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
                 platformIcon,
-                color: isCurrent ? const Color(0xFF10B981) : Colors.grey,
+                color: isCurrent ? AppTheme.successGreen : Colors.grey,
               ),
             ),
             title: Text(
@@ -212,7 +213,7 @@ class _LinkedDevicesView extends StatelessWidget {
                             width: 8,
                             height: 8,
                             decoration: const BoxDecoration(
-                              color: Color(0xFF10B981),
+                              color: AppTheme.successGreen,
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -220,7 +221,7 @@ class _LinkedDevicesView extends StatelessWidget {
                           const Text(
                             'Current Device',
                             style: TextStyle(
-                              color: Color(0xFF10B981),
+                              color: AppTheme.successGreen,
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
                             ),

@@ -252,7 +252,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 return ListTile(
                   title: Text(LanguageNotifier.getLanguageName(locale)),
                   trailing: isSelected
-                      ? Icon(PhosphorIcons.checkCircle, color: Color(0xFF10B981))
+                      ? Icon(PhosphorIcons.checkCircle, color: AppTheme.successGreen)
                       : null,
                   onTap: () {
                     languageNotifier.value = locale;
@@ -382,19 +382,19 @@ class _ProfilePageState extends State<ProfilePage> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                              color: AppTheme.successGreen.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.2)),
+                              border: Border.all(color: AppTheme.successGreen.withValues(alpha: 0.2)),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(PhosphorIcons.shieldCheck, size: 14, color: Color(0xFF10B981)),
+                                const Icon(PhosphorIcons.shieldCheck, size: 14, color: AppTheme.successGreen),
                                 const SizedBox(width: 4),
                                 Text(
                                   'Verified Account',
                                   style: theme.textTheme.labelSmall?.copyWith(
-                                    color: const Color(0xFF10B981),
+                                    color: AppTheme.successGreen,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -463,8 +463,8 @@ class _ProfilePageState extends State<ProfilePage> {
                           MaterialPageRoute(builder: (_) => const NfcScanScreen()),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFEF9F27),
-                          foregroundColor: const Color(0xFF412402),
+                          backgroundColor: AppTheme.accentGold,
+                          foregroundColor: AppTheme.accentGoldDark,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -532,7 +532,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       scale: 0.85,
                       child: Switch.adaptive(
                         value: isDarkMode,
-                        activeTrackColor: const Color(0xFFF59E0B),
+                        activeTrackColor: AppTheme.accentGold,
                         onChanged: (val) {
                           themeNotifier.value = val
                               ? ThemeMode.dark
@@ -830,7 +830,7 @@ class _ProfilePageState extends State<ProfilePage> {
               scale: 0.85,
               child: Switch.adaptive(
                 value: _isBiometricEnabled,
-                activeTrackColor: const Color(0xFF10B981),
+                activeTrackColor: AppTheme.successGreen,
                 onChanged: _isBiometricAvailable && !_isProcessingToggle
                     ? (v) => _handleBiometricToggle(l10n)
                     : null,

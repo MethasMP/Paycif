@@ -1,5 +1,6 @@
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 import 'package:flutter/foundation.dart';
 import 'package:mrz_parser/mrz_parser.dart';
 import 'package:image_picker/image_picker.dart';
@@ -150,7 +151,7 @@ class NfcScanScreenState extends State<NfcScanScreen>
           'Verify Your Identity',
           style: TextStyle(color: Colors.white),
         ),
-        backgroundColor: const Color(0xFF0F6E56),
+        backgroundColor: AppTheme.primaryTeal,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
@@ -224,7 +225,7 @@ class NfcScanScreenState extends State<NfcScanScreen>
               color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: const Color(0xFF0F6E56).withValues(alpha: 0.5),
+                color: AppTheme.primaryTeal.withValues(alpha: 0.5),
                 width: 2,
               ),
             ),
@@ -236,7 +237,7 @@ class NfcScanScreenState extends State<NfcScanScreen>
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(PhosphorIcons.qrCode, size: 48, color: Color(0xFF0F6E56)),
+                      Icon(PhosphorIcons.qrCode, size: 48, color: AppTheme.primaryTeal),
                       SizedBox(height: 12),
                       const Text(
                         'Align Passport MRZ in the frame',
@@ -329,13 +330,13 @@ class NfcScanScreenState extends State<NfcScanScreen>
                   height: 160,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: const Color(0xFF0F6E56).withValues(alpha: 0.15),
-                    border: Border.all(color: const Color(0xFF0F6E56), width: 2),
+                    color: AppTheme.primaryTeal.withValues(alpha: 0.15),
+                    border: Border.all(color: AppTheme.primaryTeal, width: 2),
                   ),
                   child: Icon(
                     PhosphorIcons.rss,
                     size: 80,
-                    color: Color(0xFF0F6E56),
+                    color: AppTheme.primaryTeal,
                   ),
                 ),
               ),
@@ -352,7 +353,7 @@ class NfcScanScreenState extends State<NfcScanScreen>
             ),
             SizedBox(height: 20),
             const CircularProgressIndicator(
-              color: Color(0xFF0F6E56),
+              color: AppTheme.primaryTeal,
               strokeWidth: 2,
             ),
           ],
@@ -488,7 +489,7 @@ class NfcScanScreenState extends State<NfcScanScreen>
                 color: done
                     ? Colors.greenAccent
                     : active
-                    ? const Color(0xFF0F6E56)
+                    ? AppTheme.primaryTeal
                     : Colors.black12,
               ),
             ),
@@ -518,7 +519,7 @@ class NfcScanScreenState extends State<NfcScanScreen>
                     border: Border.all(
                       color: _selfieImage != null
                           ? Colors.greenAccent
-                          : const Color(0xFF0F6E56),
+                          : AppTheme.primaryTeal,
                       width: 3,
                     ),
                   ),
@@ -559,11 +560,11 @@ class NfcScanScreenState extends State<NfcScanScreen>
             if (_isProcessing)
               Column(
                 children: [
-                  CircularProgressIndicator(color: Color(0xFF0F6E56)),
+                  CircularProgressIndicator(color: AppTheme.primaryTeal),
                   SizedBox(height: 16),
                   Text(
                     'Matching Face...',
-                    style: TextStyle(color: Color(0xFF0F6E56)),
+                    style: TextStyle(color: AppTheme.primaryTeal),
                   ),
                 ],
               )

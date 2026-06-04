@@ -32,8 +32,8 @@ class TransactionItem extends StatelessWidget {
     final amountColor = AppTheme.primaryColor(context);
 
     final iconBgColor = isDark
-        ? const Color(0xFF2BBF9E).withValues(alpha: 0.1)
-        : const Color(0xFFE1F5EE); // primary-100
+        ? AppTheme.primaryColor(context).withValues(alpha: 0.1)
+        : AppTheme.primaryTealLight; // primary-100
 
     final iconColor = AppTheme.primaryColor(context);
 

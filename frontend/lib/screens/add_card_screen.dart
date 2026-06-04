@@ -6,7 +6,7 @@ import 'package:frontend/l10n/generated/app_localizations.dart';
 import '../utils/pay_notify.dart';
 import '../utils/payment_utils.dart';
 import '../utils/error_translator.dart';
-import '../theme/app_theme.dart';
+import 'package:frontend/theme/app_theme.dart';
 
 class AddCardScreen extends StatefulWidget {
   const AddCardScreen({super.key});
@@ -342,7 +342,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
                 height: 35,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFFFFD700), Color(0xFFDAA520)],
+                    colors: [AppTheme.accentGoldDisabled, AppTheme.accentGold],
                   ),
                   borderRadius: BorderRadius.circular(6),
                 ),

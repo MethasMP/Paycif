@@ -22,8 +22,7 @@ class PaycifAmountText extends StatelessWidget {
     final formattedAmount = format.format(amount);
     
     // Automatically adjust color based on theme - "Thai Money is Green"
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
-    final Color amountColor = isDark ? const Color(0xFF2BBF9E) : AppTheme.primaryTeal;
+    final Color amountColor = AppTheme.primaryColor(context);
     
     final baseStyle = style ?? (isLarge 
         ? Theme.of(context).textTheme.displayMedium 

@@ -10,7 +10,7 @@ import 'payment_success_screen.dart';
 import '../features/security/domain/repositories/security_repository.dart';
 import '../widgets/paycif_icon_container.dart';
 import '../widgets/paycif_amount_text.dart';
-import '../theme/app_theme.dart';
+import 'package:frontend/theme/app_theme.dart';
 
 class PayScreen extends StatefulWidget {
   final double amount;
@@ -113,7 +113,7 @@ class _PayScreenState extends State<PayScreen> {
       child: Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
-          backgroundColor: const Color(0xFF0F6E56),
+          backgroundColor: AppTheme.primaryTeal,
           leading: IconButton(
             icon: Icon(PhosphorIcons.x, color: Colors.white),
             onPressed: () => Navigator.pop(context),
@@ -227,7 +227,7 @@ class _PayScreenState extends State<PayScreen> {
               ],
             ),
           ),
-          const Icon(PhosphorIcons.checkCircle, color: Color(0xFF10B981)),
+          const Icon(PhosphorIcons.checkCircle, color: AppTheme.successGreen),
         ],
       ),
     );
@@ -254,7 +254,7 @@ class _PayScreenState extends State<PayScreen> {
           const SizedBox(height: 8),
           _buildBreakdownRow("Convenience Fee (3.5%)", "\$${feeUSD.toStringAsFixed(2)} USD", theme),
           const SizedBox(height: 12),
-          const Divider(height: 1, color: Color(0xFFE5E5E3)),
+          const Divider(height: 1, color: AppTheme.borderGrey),
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -270,7 +270,7 @@ class _PayScreenState extends State<PayScreen> {
                 "\$${totalUSD.toStringAsFixed(2)} USD",
                 style: theme.textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: const Color(0xFFEF9F27),
+                  color: AppTheme.accentGold,
                 ),
               ),
             ],

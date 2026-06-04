@@ -1,5 +1,6 @@
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
@@ -119,8 +120,8 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
 
   Widget _buildTabItem(int index, IconData unselectedIcon, IconData selectedIcon, String label, double width) {
     final isSelected = _selectedIndex == index;
-    final activeColor = const Color(0xFF0E5F59);
-    final inactiveColor = const Color(0xFF8A8F98);
+    final activeColor = AppTheme.primaryTeal;
+    final inactiveColor = AppTheme.textSecondary;
     final color = isSelected ? activeColor : inactiveColor;
 
     return SizedBox(
@@ -252,7 +253,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                       width: _dotWidth,
                       height: 4.0,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0E5F59),
+                        color: AppTheme.primaryTeal,
                         borderRadius: BorderRadius.circular(2.0),
                       ),
                     ),
@@ -304,7 +305,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                                       shape: ContinuousRectangleBorder(
                                         borderRadius: BorderRadius.circular(28),
                                       ),
-                                      color: const Color(0xFFEF9F27).withValues(alpha: _pulseOpacityAnimation.value),
+                                      color: AppTheme.accentGold.withValues(alpha: _pulseOpacityAnimation.value),
                                     ),
                                   ),
                                 );
@@ -315,7 +316,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                               width: 72,
                               height: 72,
                               decoration: ShapeDecoration(
-                                color: const Color(0xFFEF9F27),
+                                color: AppTheme.accentGold,
                                 shape: ContinuousRectangleBorder(
                                   borderRadius: BorderRadius.circular(28), // Tuned for better Apple squircle look
                                 ),
@@ -330,7 +331,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                               child: Center(
                                 child: CustomScanIcon(
                                   size: 28.0,
-                                  color: const Color(0xFF412402), // accent-900
+                                  color: AppTheme.accentGoldDark, // accent-900
                                   strokeWidth: 2.5,
                                 ),
                               ),
@@ -362,7 +363,7 @@ class CustomScanIcon extends StatelessWidget {
   const CustomScanIcon({
     super.key,
     this.size = 28.0,
-    this.color = const Color(0xFF412402),
+    this.color = AppTheme.accentGoldDark,
     this.strokeWidth = 2.5,
   });
 

@@ -17,15 +17,15 @@ class PaycifIconContainer extends StatelessWidget {
 
     // Premium adaptive styling
     final Color backgroundColor = isDark
-        ? const Color(0xFF141A18) // Deep surface background
+        ? Theme.of(context).colorScheme.surface // Deep surface background
         : AppTheme.primaryTealLight; // Soft teal tint #E1F5EE
         
     final Color borderColor = isDark
-        ? const Color(0xFFFAC775).withValues(alpha: 0.15) // Subtle gold border in dark mode
+        ? AppTheme.accentGoldDisabled.withValues(alpha: 0.15) // Subtle gold border in dark mode
         : AppTheme.primaryTeal.withValues(alpha: 0.2); // Teal stroke in light mode
         
     final Color iconColor = isDark
-        ? const Color(0xFFFAC775) // Gold accent icon in dark mode
+        ? AppTheme.accentGoldDisabled // Gold accent icon in dark mode
         : AppTheme.primaryTeal; // Teal icon in light mode
 
     return Container(
@@ -40,7 +40,7 @@ class PaycifIconContainer extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             color: isDark 
-                ? const Color(0xFFFAC775).withValues(alpha: 0.05) 
+                ? AppTheme.accentGoldDisabled.withValues(alpha: 0.05) 
                 : AppTheme.primaryTeal.withValues(alpha: 0.03),
             blurRadius: 10,
             spreadRadius: 2,

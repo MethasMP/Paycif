@@ -27,7 +27,7 @@ class TermsOfServiceScreen extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: isDark
-                      ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
+                      ? [theme.colorScheme.surface, theme.scaffoldBackgroundColor]
                       : [AppTheme.primaryTeal, AppTheme.primaryTealDark],
                 ),
                 borderRadius: BorderRadius.circular(20),

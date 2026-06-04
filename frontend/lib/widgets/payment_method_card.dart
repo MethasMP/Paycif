@@ -1,6 +1,7 @@
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../theme/app_theme.dart';
 
 /// ─────────────────────────────────────────────────────────────────────────────
 /// PAYMENT METHOD CARD
@@ -44,11 +45,11 @@ class PaymentMethodCard extends StatelessWidget {
         margin: const EdgeInsets.symmetric(vertical: 6),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          color: isDark ? Theme.of(context).cardColor : Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected
-                ? const Color(0xFF3949AB)
+                ? AppTheme.primaryColor(context)
                 : (isDark
                       ? Colors.white10
                       : Colors.grey.withValues(alpha: 0.15)),
@@ -57,7 +58,7 @@ class PaymentMethodCard extends StatelessWidget {
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: const Color(0xFF3949AB).withValues(alpha: 0.15),
+                    color: AppTheme.primaryColor(context).withValues(alpha: 0.15),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
@@ -79,7 +80,7 @@ class PaymentMethodCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: isDark
                     ? Colors.white.withValues(alpha: 0.05)
-                    : const Color(0xFFF1F5F9),
+                    : AppTheme.backgroundGrey,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Center(child: icon),
@@ -99,7 +100,7 @@ class PaymentMethodCard extends StatelessWidget {
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                 color: isDark
                                     ? Colors.white
-                                    : const Color(0xFF1E293B),
+                                    : AppTheme.textPrimary,
                                 fontWeight: FontWeight.w600,
                               ),
                           overflow: TextOverflow.ellipsis,
@@ -113,15 +114,13 @@ class PaymentMethodCard extends StatelessWidget {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(
-                              0xFF10B981,
-                            ).withValues(alpha: 0.1),
+                            color: AppTheme.successGreen.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             'Default',
                             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                  color: const Color(0xFF10B981),
+                                  color: AppTheme.successGreen,
                                   fontSize: 10,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -150,8 +149,8 @@ class PaymentMethodCard extends StatelessWidget {
               Container(
                 width: 24,
                 height: 24,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF3949AB),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor(context),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(

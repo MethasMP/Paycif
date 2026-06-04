@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
+import 'package:frontend/theme/app_theme.dart';
 import '../logic/security_controller.dart';
 import 'pin_entry_widget.dart';
 
@@ -235,7 +236,7 @@ class _ChangePinSheetState extends State<ChangePinSheet> {
                         children: [
                           Icon(
                             PhosphorIcons.checkCircle,
-                            color: Color(0xFF10B981),
+                            color: AppTheme.successGreen,
                             size: 80,
                           ).animate().scale(
                             duration: 400.ms,
@@ -247,7 +248,7 @@ class _ChangePinSheetState extends State<ChangePinSheet> {
                             style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(
                                   fontWeight: FontWeight.w600,
-                                  color: const Color(0xFF10B981),
+                                  color: AppTheme.successGreen,
                                 ),
                           ).animate().fadeIn(delay: 200.ms),
                         ],

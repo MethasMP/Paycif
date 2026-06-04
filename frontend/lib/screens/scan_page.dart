@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:image_picker/image_picker.dart';
@@ -15,10 +16,6 @@ import '../utils/pay_notify.dart';
 // First Principles: Minimalist, immersive, almost invisible UI.
 // Let the camera and the luminous ring be the hero.
 // ─────────────────────────────────────────────────────────────────────────────
-const _kGold = Color(0xFFEF9F27);
-const _kSurface = Color(0xFF0B0F0E);
-const _kGlass = Color(0x14FFFFFF);      // ultra-light glass (8%)
-const _kGlassBorder = Color(0x1EFFFFFF); // subtle border (12%)
 
 class ScanPage extends StatefulWidget {
   final VoidCallback? onBack;
@@ -290,18 +287,18 @@ class _FloatingIconButton extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: isActive
-                  ? _kGold.withValues(alpha: 0.15)
-                  : _kGlass,
+                  ? AppTheme.accentGold.withValues(alpha: 0.15)
+                  : Colors.white.withValues(alpha: 0.08),
               border: Border.all(
                 color: isActive
-                    ? _kGold.withValues(alpha: 0.4)
-                    : _kGlassBorder,
+                    ? AppTheme.accentGold.withValues(alpha: 0.4)
+                    : Colors.white.withValues(alpha: 0.12),
                 width: 1.0,
               ),
             ),
             child: Icon(
               icon,
-              color: isActive ? _kGold : Colors.white,
+              color: isActive ? AppTheme.accentGold : Colors.white,
               size: 22,
             ),
           ),
@@ -337,7 +334,7 @@ class _MinimalBottomPill extends StatelessWidget {
           height: 56,
           padding: const EdgeInsets.symmetric(horizontal: 8),
           decoration: BoxDecoration(
-            color: const Color(0xFF000000).withValues(alpha: 0.3),
+            color: Colors.black.withValues(alpha: 0.3),
             borderRadius: BorderRadius.circular(100),
             border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1.0),
           ),
@@ -425,7 +422,7 @@ class _CameraErrorPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: _kSurface,
+      color: Theme.of(context).scaffoldBackgroundColor,
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -450,7 +447,7 @@ class _CameraErrorPlaceholder extends StatelessWidget {
               icon: Icon(PhosphorIcons.qrCode, color: Colors.black, size: 20),
               label: const Text("Simulate / Bypass Scan"),
               style: ElevatedButton.styleFrom(
-                backgroundColor: _kGold,
+                backgroundColor: AppTheme.accentGold,
                 foregroundColor: Colors.black,
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 shape: RoundedRectangleBorder(
@@ -479,7 +476,7 @@ class _MinimalHelpSheet extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.fromLTRB(28, 0, 28, 0),
         decoration: BoxDecoration(
-          color: const Color(0xFF0A0C0B).withValues(alpha: 0.85),
+          color: Colors.black.withValues(alpha: 0.85),
           borderRadius: const BorderRadius.vertical(top: Radius.circular(40)),
           border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
         ),
@@ -581,7 +578,7 @@ class _HelpRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: _kGold, size: 28),
+          Icon(icon, color: AppTheme.accentGold, size: 28),
           const SizedBox(width: 20),
           Expanded(
             child: Column(

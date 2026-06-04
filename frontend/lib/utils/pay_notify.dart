@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:frontend/theme/app_theme.dart';
 
 enum PayNotifyType { success, error, info }
 
@@ -149,15 +150,15 @@ class _PayNotifyWidgetState extends State<_PayNotifyWidget> {
     IconData icon;
     switch (widget.type) {
       case PayNotifyType.success:
-        baseColor = const Color(0xFF10B981); // Emerald
+        baseColor = AppTheme.successGreen; // Emerald
         icon = PhosphorIcons.checkCircle;
         break;
       case PayNotifyType.error:
-        baseColor = const Color(0xFFEF4444); // Rose
+        baseColor = AppTheme.errorRed; // Rose
         icon = PhosphorIcons.warningCircle;
         break;
       case PayNotifyType.info:
-        baseColor = const Color(0xFF3B82F6); // Blue
+        baseColor = AppTheme.infoBlue; // Blue
         icon = PhosphorIcons.info;
         break;
     }

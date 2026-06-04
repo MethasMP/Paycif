@@ -7,6 +7,7 @@ import '../pages/pin_setup_screen.dart';
 import '../../presentation/logic/security_controller.dart';
 import '../../../../utils/error_translator.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
+import 'package:frontend/theme/app_theme.dart';
 
 /// 🚀 World-Class PIN Entry Widget
 /// Designed 20 years ahead with premium UX/UI patterns
@@ -301,7 +302,7 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
 
   Widget _buildPinDots(bool isDark) {
     // Brand design system mapping
-    final Color filledColor = isDark ? const Color(0xFFFAC775) : const Color(0xFFEF9F27); // Gold Accent
+    final Color filledColor = isDark ? AppTheme.accentGoldDisabled : AppTheme.accentGold; // Gold Accent
     final Color emptyColor = isDark ? Colors.white24 : Colors.grey.shade300;
 
     return Row(
@@ -357,7 +358,7 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
         style: TextStyle(
           fontSize: 30,
           fontWeight: FontWeight.w500,
-          color: isDark ? const Color(0xFFF5F5F5) : const Color(0xFF111111),
+          color: AppTheme.textPrimaryColor(context),
           fontFamily: 'Outfit',
         ),
       ),
@@ -374,7 +375,7 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
       child: Icon(
         widget.biometricIcon,
         size: 28,
-        color: isDark ? const Color(0xFFFAC775) : const Color(0xFF0F6E56), // Gold for dark, Teal for light
+        color: isDark ? AppTheme.accentGoldDisabled : AppTheme.primaryTeal, // Gold for dark, Teal for light
       ),
     );
   }
@@ -401,7 +402,7 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: isDark ? const Color(0xFFFAC775).withValues(alpha: 0.8) : const Color(0xFF0F6E56), // Use brand colors!
+            color: (isDark ? AppTheme.accentGoldDisabled : AppTheme.primaryTeal).withValues(alpha: 0.8), // Use brand colors!
             letterSpacing: 0.2,
           ),
         ),
@@ -485,11 +486,11 @@ class _KeypadButtonState extends State<KeypadButton> {
   @override
   Widget build(BuildContext context) {
     final Color buttonColor = widget.isDark 
-        ? const Color(0xFF141A18) 
-        : const Color(0xFFF7F7F5);
+        ? AppTheme.darkTheme.cardColor 
+        : AppTheme.backgroundGrey;
     final Color borderColor = widget.isDark 
         ? Colors.white.withValues(alpha: 0.08) 
-        : const Color(0xFFE5E5E3);
+        : AppTheme.borderGrey;
 
     return GestureDetector(
       onTapDown: (_) {

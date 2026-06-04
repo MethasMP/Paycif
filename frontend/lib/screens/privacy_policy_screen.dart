@@ -27,8 +27,8 @@ class PrivacyPolicyScreen extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: isDark
-                      ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
-                      : [const Color(0xFF10B981), const Color(0xFF059669)],
+                      ? [theme.colorScheme.surface, theme.scaffoldBackgroundColor]
+                      : [AppTheme.primaryTeal, AppTheme.primaryTealDark],
                 ),
                 borderRadius: BorderRadius.circular(20),
               ),
@@ -76,10 +76,10 @@ class PrivacyPolicyScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
+                color: AppTheme.warningAmber.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: const Color(0xFFF59E0B).withValues(alpha: 0.3),
+                  color: AppTheme.warningAmber.withValues(alpha: 0.3),
                 ),
               ),
               child: Column(
@@ -89,7 +89,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
                     children: [
                       Icon(
                         PhosphorIcons.shield,
-                        color: Color(0xFFF59E0B),
+                        color: AppTheme.warningAmber,
                         size: 20,
                       ),
                       SizedBox(width: 8),
@@ -182,7 +182,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                      color: AppTheme.successGreen.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
@@ -191,13 +191,13 @@ class PrivacyPolicyScreen extends StatelessWidget {
                         Icon(
                           PhosphorIcons.envelope,
                           size: 16,
-                          color: Color(0xFF10B981),
+                          color: AppTheme.successGreen,
                         ),
                         SizedBox(width: 6),
                         PaycifText(
                           'privacy@paycif.com',
                           style: PaycifTextStyle.caption,
-                          color: const Color(0xFF10B981),
+                          color: AppTheme.successGreen,
                           fontWeight: FontWeight.w600,
                         ),
                       ],
@@ -222,7 +222,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
         children: [
           Icon(
             PhosphorIcons.checkCircle,
-            color: Color(0xFF10B981),
+            color: AppTheme.successGreen,
             size: 18,
           ),
           SizedBox(width: 8),
@@ -265,10 +265,10 @@ class PrivacyPolicyScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                  color: AppTheme.successGreen.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(icon, size: 18, color: const Color(0xFF10B981)),
+                child: Icon(icon, size: 18, color: AppTheme.successGreen),
               ),
               SizedBox(width: 12),
               Expanded(

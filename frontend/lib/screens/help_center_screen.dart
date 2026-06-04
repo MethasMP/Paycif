@@ -2,6 +2,7 @@ import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
 import 'package:frontend/screens/contact_support_screen.dart';
+import 'package:frontend/theme/app_theme.dart';
 
 class HelpCenterScreen extends StatefulWidget {
   const HelpCenterScreen({super.key});
@@ -169,8 +170,8 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: isDark
-                    ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
-                    : [const Color(0xFF667EEA), const Color(0xFF764BA2)],
+                    ? [theme.colorScheme.surface, theme.scaffoldBackgroundColor]
+                    : [AppTheme.primaryTeal, AppTheme.primaryTealDark],
               ),
               borderRadius: BorderRadius.circular(20),
             ),
@@ -250,12 +251,12 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
+                  color: AppTheme.warningAmber.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
                   category.icon,
-                  color: const Color(0xFFF59E0B),
+                  color: AppTheme.warningAmber,
                   size: 20,
                 ),
               ),

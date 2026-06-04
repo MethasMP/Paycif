@@ -9,7 +9,6 @@ import '../widgets/transaction_item.dart';
 import 'history_screen.dart';
 import '../utils/error_translator.dart';
 import 'profile_page.dart';
-import 'scan_page.dart';
 import 'payment_settings_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -45,7 +44,7 @@ class _HomeViewState extends State<HomeView> {
         final isReady = state.status == 'success';
 
         return Scaffold(
-          backgroundColor: isDark ? theme.scaffoldBackgroundColor : const Color(0xFFF7F7F5),
+          backgroundColor: isDark ? theme.scaffoldBackgroundColor : AppTheme.backgroundGrey,
           appBar: _buildAppBar(context),
           body: AnimatedSwitcher(
             duration: const Duration(milliseconds: 600),
@@ -60,9 +59,7 @@ class _HomeViewState extends State<HomeView> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Center(child: _buildLiveFXBanner(context)),
-                          const SizedBox(height: 16),
-                          _buildHeroCard(context),
-                          const SizedBox(height: 28),
+                          const SizedBox(height: 24),
                           
                           // Quick Actions Label
                           Padding(
@@ -72,7 +69,7 @@ class _HomeViewState extends State<HomeView> {
                               style: theme.textTheme.labelSmall?.copyWith(
                                 letterSpacing: 1.5,
                                 fontWeight: FontWeight.bold,
-                                color: isDark ? Colors.white54 : const Color(0xFF666664),
+                                color: isDark ? Colors.white54 : AppTheme.textSecondary,
                               ),
                             ),
                           ),
@@ -105,7 +102,7 @@ class _HomeViewState extends State<HomeView> {
         color: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.white,
         borderRadius: BorderRadius.circular(30),
         border: Border.all(
-          color: isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE5E5E3),
+          color: isDark ? Colors.white.withValues(alpha: 0.08) : AppTheme.borderGrey,
           width: 1,
         ),
         boxShadow: [
@@ -140,7 +137,7 @@ class _HomeViewState extends State<HomeView> {
           Icon(
             PhosphorIconsRegular.lockSimple,
             size: 13,
-            color: const Color(0xFF0F6E56),
+            color: AppTheme.primaryTeal,
           ),
           const SizedBox(width: 4),
           Text(
@@ -148,225 +145,7 @@ class _HomeViewState extends State<HomeView> {
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               fontSize: 10,
               fontWeight: FontWeight.bold,
-              color: const Color(0xFF0F6E56),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // --- Hyper-Realistic Virtual Card ---
-  Widget _buildHeroCard(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      height: 220,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: LinearGradient(
-          colors: isDark
-              ? [
-                  const Color(0xFF0C1D18),
-                  const Color(0xFF060B09),
-                ]
-              : [
-                  const Color(0xFF0F6E56),
-                  const Color(0xFF063A2D),
-                ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        border: Border.all(
-          color: isDark ? const Color(0xFF2BBF9E).withValues(alpha: 0.15) : const Color(0xFF0F6E56).withValues(alpha: 0.1),
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0F6E56).withValues(alpha: isDark ? 0.3 : 0.15),
-            blurRadius: 24,
-            spreadRadius: -4,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          // Glass gloss effect overlay
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.white.withValues(alpha: 0.08),
-                    Colors.transparent,
-                    Colors.white.withValues(alpha: 0.02),
-                  ],
-                  begin: Alignment.topRight,
-                  end: Alignment.bottomLeft,
-                  stops: const [0.0, 0.5, 1.0],
-                ),
-              ),
-            ),
-          ),
-          // Subtle brand design circle in background
-          Positioned(
-            right: -60,
-            bottom: -60,
-            child: Container(
-              width: 220,
-              height: 220,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    const Color(0xFFEF9F27).withValues(alpha: 0.15),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Card Top: Brand & Network Type
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            PhosphorIconsFill.wallet,
-                            color: Color(0xFFEF9F27),
-                            size: 16,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          "PAYCIF VIRTUAL",
-                          style: GoogleFonts.ibmPlexSans(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.5,
-                            color: Colors.white.withValues(alpha: 0.9),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Icon(
-                      PhosphorIconsFill.wifiHigh,
-                      color: Colors.white70,
-                      size: 20,
-                    ),
-                  ],
-                ),
-
-                // Card Middle: Chip & Spending Amount
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    const _CardChip(),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "TRIP SPENDING",
-                            style: GoogleFonts.ibmPlexSans(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1.2,
-                              color: isDark ? Colors.white60 : Colors.white70,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.baseline,
-                            textBaseline: TextBaseline.alphabetic,
-                            children: [
-                              Text(
-                                "12,450",
-                                style: GoogleFonts.ibmPlexSans(
-                                  fontSize: 30,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                  letterSpacing: -0.5,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                "THB",
-                                style: GoogleFonts.ibmPlexSans(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: const Color(0xFFEF9F27),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            "≈ \$341.50 USD",
-                            style: GoogleFonts.ibmPlexSans(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.white70,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-
-                // Card Bottom: Card Number & Type Tag
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      "•••• •••• •••• 4321",
-                      style: GoogleFonts.ibmPlexSans(
-                        fontSize: 14,
-                        letterSpacing: 2.0,
-                        color: Colors.white70,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEF9F27).withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: const Color(0xFFEF9F27).withValues(alpha: 0.4),
-                          width: 1,
-                        ),
-                      ),
-                      child: Text(
-                        "ACTIVE",
-                        style: GoogleFonts.ibmPlexSans(
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
-                          color: const Color(0xFFEF9F27),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+              color: AppTheme.primaryTeal,
             ),
           ),
         ],
@@ -378,26 +157,6 @@ class _HomeViewState extends State<HomeView> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        _QuickActionButton(
-          label: "Send",
-          icon: PhosphorIconsRegular.paperPlaneRight,
-          onTap: () {
-            HapticFeedback.mediumImpact();
-            final dashboardController = context.read<DashboardController>();
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (context) => const ScanPage()),
-            ).then((_) {
-              if (mounted) dashboardController.refresh();
-            });
-          },
-        ),
-        _QuickActionButton(
-          label: "Top Up",
-          icon: PhosphorIconsRegular.plusCircle,
-          onTap: () {
-            HapticFeedback.lightImpact();
-          },
-        ),
         _QuickActionButton(
           label: "Cards",
           icon: PhosphorIconsRegular.creditCard,
@@ -428,20 +187,28 @@ class _HomeViewState extends State<HomeView> {
   Widget _buildTransactionContainer(List<Transaction> transactions) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     if (transactions.isEmpty) {
-      return Container(
-        height: 120,
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF141A18) : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFE5E5E3),
-          ),
-        ),
-        child: const Center(
-          child: Text(
-            "No recent transactions",
-            style: TextStyle(color: Colors.grey),
-          ),
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 4),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Icon(
+              PhosphorIconsRegular.clock,
+              size: 18,
+              color: isDark ? Colors.white38 : Colors.black38,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              "No recent transactions",
+              style: TextStyle(
+                color: isDark ? Colors.white38 : Colors.black38,
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -453,7 +220,7 @@ class _HomeViewState extends State<HomeView> {
         color: isDark ? const Color(0xFF141A18) : Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFE5E5E3),
+          color: isDark ? Colors.white.withValues(alpha: 0.05) : AppTheme.borderGrey,
         ),
         boxShadow: [
           BoxShadow(
@@ -560,7 +327,7 @@ class _HomeViewState extends State<HomeView> {
                 Text(
                   l10n.homeViewAll,
                   style: theme.textTheme.labelLarge?.copyWith(
-                    color: const Color(0xFFEF9F27),
+                    color: AppTheme.accentGold,
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                   ),
@@ -568,7 +335,7 @@ class _HomeViewState extends State<HomeView> {
                 const SizedBox(width: 2),
                 const Icon(
                   PhosphorIconsBold.caretRight,
-                  color: Color(0xFFEF9F27),
+                  color: AppTheme.accentGold,
                   size: 14,
                 ),
               ],
@@ -579,75 +346,6 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 }
-
-// --- Metallic Chip Widget ---
-class _CardChip extends StatelessWidget {
-  const _CardChip();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 42,
-      height: 32,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFFE5B560),
-            Color(0xFFFBE4AD),
-            Color(0xFFD49E43),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: Colors.white24,
-          width: 0.5,
-        ),
-      ),
-      child: Stack(
-        children: [
-          // Chip internal patterns
-          Positioned(
-            left: 8,
-            top: 0,
-            bottom: 0,
-            child: Container(width: 0.5, color: Colors.black12),
-          ),
-          Positioned(
-            right: 8,
-            top: 0,
-            bottom: 0,
-            child: Container(width: 0.5, color: Colors.black12),
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            top: 10,
-            child: Container(height: 0.5, color: Colors.black12),
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 10,
-            child: Container(height: 0.5, color: Colors.black12),
-          ),
-          Center(
-            child: Container(
-              width: 14,
-              height: 14,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.black12, width: 0.5),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          )
-        ],
-      ),
-    );
-  }
-}
-
 // --- Breathing Pulse Dot Widget ---
 class _PulseDot extends StatefulWidget {
   const _PulseDot();
@@ -687,7 +385,7 @@ class _PulseDotState extends State<_PulseDot> with SingleTickerProviderStateMixi
               height: 14,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFF0F6E56).withValues(alpha: 0.4 * (1.0 - _pulseController.value)),
+                color: AppTheme.primaryTeal.withValues(alpha: 0.4 * (1.0 - _pulseController.value)),
               ),
             ),
             Container(
@@ -695,7 +393,7 @@ class _PulseDotState extends State<_PulseDot> with SingleTickerProviderStateMixi
               height: 7,
               decoration: const BoxDecoration(
                 shape: BoxShape.circle,
-                color: Color(0xFF0F6E56),
+                color: AppTheme.primaryTeal,
               ),
             ),
           ],
@@ -762,12 +460,12 @@ class _QuickActionButtonState extends State<_QuickActionButton> with SingleTicke
     
     final Color buttonBg = isDark ? Colors.white.withValues(alpha: 0.04) : Colors.white;
 
-    final Color iconColor = isDark ? Colors.white : const Color(0xFF111111);
+    final Color iconColor = isDark ? Colors.white : AppTheme.textPrimaryColor(context);
 
-    final Color labelColor = isDark ? Colors.white.withValues(alpha: 0.87) : const Color(0xFF111111);
+    final Color labelColor = isDark ? Colors.white.withValues(alpha: 0.87) : AppTheme.textPrimaryColor(context);
 
     final Border border = Border.all(
-      color: isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE5E5E3),
+      color: isDark ? Colors.white.withValues(alpha: 0.08) : AppTheme.borderGrey,
       width: 1,
     );
 

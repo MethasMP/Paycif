@@ -3,6 +3,7 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -210,7 +211,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
-                    color: isDark ? Colors.white : const Color(0xFF111111),
+                    color: isDark ? Colors.white : AppTheme.textPrimaryColor(context),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -232,11 +233,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? (isDark ? const Color(0xFF0F6E56).withValues(alpha: 0.2) : const Color(0xFFE1F5EE))
+                              ? (isDark ? AppTheme.primaryTeal.withValues(alpha: 0.2) : AppTheme.primaryTealLight)
                               : Colors.transparent,
                           border: Border.all(
                             color: isSelected
-                                ? const Color(0xFF0F6E56)
+                                ? AppTheme.primaryTeal
                                 : (isDark ? Colors.white12 : Colors.black12),
                             width: 1.5,
                           ),
@@ -255,15 +256,15 @@ class _LoginScreenState extends State<LoginScreen> {
                                 fontSize: 16,
                                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                                 color: isSelected
-                                    ? (isDark ? const Color(0xFF2BBF9E) : const Color(0xFF0F6E56))
-                                    : (isDark ? Colors.white70 : const Color(0xFF111111)),
+                                    ? (isDark ? const Color(0xFF2BBF9E) : AppTheme.primaryTeal)
+                                    : (isDark ? Colors.white70 : AppTheme.textPrimaryColor(context)),
                               ),
                             ),
                             const Spacer(),
                             if (isSelected)
                               Icon(
                                 Icons.check_circle,
-                                color: isDark ? const Color(0xFF2BBF9E) : const Color(0xFF0F6E56),
+                                color: isDark ? const Color(0xFF2BBF9E) : AppTheme.primaryTeal,
                               ),
                           ],
                         ),
@@ -307,7 +308,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         boxShadow: [
           BoxShadow(
-            color: (isDark ? Colors.black : const Color(0xFF0F6E56)).withValues(alpha: 0.04),
+            color: (isDark ? Colors.black : AppTheme.primaryTeal).withValues(alpha: 0.04),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -328,7 +329,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 child: Icon(
                   PhosphorIcons.creditCard,
-                  color: isDark ? const Color(0xFF2BBF9E) : const Color(0xFF0F6E56),
+                  color: isDark ? const Color(0xFF2BBF9E) : AppTheme.primaryTeal,
                   size: 24,
                 ),
               ),
@@ -338,7 +339,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white70 : const Color(0xFF111111),
+                  color: isDark ? Colors.white70 : AppTheme.textPrimaryColor(context),
                 ),
               ),
             ],
@@ -352,7 +353,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     const Icon(
                       PhosphorIcons.shieldCheck,
-                      color: Color(0xFFEF9F27),
+                      color: AppTheme.accentGold,
                       size: 14,
                     ),
                     const SizedBox(width: 4),
@@ -361,7 +362,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
-                        color: isDark ? const Color(0xFFFAC775) : const Color(0xFFEF9F27),
+                        color: isDark ? AppTheme.accentGoldDisabled : AppTheme.accentGold,
                       ),
                     ),
                   ],
@@ -378,7 +379,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       width: 20,
                       height: 20,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0F6E56),
+                        color: AppTheme.primaryTeal,
                         shape: BoxShape.circle,
                         border: Border.all(color: isDark ? const Color(0xFF0B0F0E) : Colors.white, width: 2),
                       ),
@@ -406,7 +407,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 child: Icon(
                   PhosphorIcons.qrCode,
-                  color: isDark ? const Color(0xFF2BBF9E) : const Color(0xFF0F6E56),
+                  color: isDark ? const Color(0xFF2BBF9E) : AppTheme.primaryTeal,
                   size: 24,
                 ),
               ),
@@ -416,7 +417,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white70 : const Color(0xFF111111),
+                  color: isDark ? Colors.white70 : AppTheme.textPrimaryColor(context),
                 ),
               ),
             ],
@@ -437,8 +438,8 @@ class _LoginScreenState extends State<LoginScreen> {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: isDark
-                ? const Color(0xFF0F6E56).withValues(alpha: 0.12)
-                : const Color(0xFFE1F5EE).withValues(alpha: 0.7),
+                ? AppTheme.primaryTeal.withValues(alpha: 0.12)
+                : AppTheme.primaryTealLight.withValues(alpha: 0.7),
           ),
         ),
       ).animate().fadeIn(duration: 1000.ms),
@@ -451,8 +452,8 @@ class _LoginScreenState extends State<LoginScreen> {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: isDark
-                ? const Color(0xFFEF9F27).withValues(alpha: 0.08)
-                : const Color(0xFFFAC775).withValues(alpha: 0.25),
+                ? AppTheme.accentGold.withValues(alpha: 0.08)
+                : AppTheme.accentGoldDisabled.withValues(alpha: 0.25),
           ),
         ),
       ).animate().fadeIn(duration: 1000.ms),
@@ -492,7 +493,7 @@ class _LoginScreenState extends State<LoginScreen> {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: isDark ? Colors.white70 : const Color(0xFF111111),
+                color: isDark ? Colors.white70 : AppTheme.textPrimaryColor(context),
               ),
             ),
             const SizedBox(width: 4),
@@ -517,7 +518,7 @@ class _LoginScreenState extends State<LoginScreen> {
         return IconButton(
           icon: Icon(
             currentIsDark ? PhosphorIcons.sun : PhosphorIcons.moon,
-            color: currentIsDark ? const Color(0xFFFAC775) : const Color(0xFF0F6E56),
+            color: currentIsDark ? AppTheme.accentGoldDisabled : AppTheme.primaryTeal,
             size: 24,
           ),
           onPressed: () {
@@ -540,7 +541,7 @@ class _LoginScreenState extends State<LoginScreen> {
               'Paycif',
               style: Theme.of(context).textTheme.displayLarge?.copyWith(
                 fontWeight: FontWeight.w600,
-                color: isDark ? Colors.white : const Color(0xFF111111),
+                color: isDark ? Colors.white : AppTheme.textPrimaryColor(context),
                 letterSpacing: -0.8,
               ),
             ),
@@ -549,7 +550,7 @@ class _LoginScreenState extends State<LoginScreen> {
               width: 8,
               height: 8,
               decoration: const BoxDecoration(
-                color: Color(0xFFEF9F27),
+                color: AppTheme.accentGold,
                 shape: BoxShape.circle,
               ),
             ).animate().scale(delay: 500.ms, duration: 300.ms),
@@ -582,7 +583,7 @@ class _LoginScreenState extends State<LoginScreen> {
             border: Border.all(
               color: isDark
                   ? const Color(0xFF2BBF9E).withValues(alpha: 0.15)
-                  : const Color(0xFF0F6E56).withValues(alpha: 0.08),
+                  : AppTheme.primaryTeal.withValues(alpha: 0.08),
               width: 4,
             ),
           ),
@@ -593,15 +594,15 @@ class _LoginScreenState extends State<LoginScreen> {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: isDark
-                  ? [const Color(0xFF2BBF9E), const Color(0xFF0F6E56)]
-                  : [const Color(0xFF0F6E56), const Color(0xFF085041)],
+                  ? [const Color(0xFF2BBF9E), AppTheme.primaryTeal]
+                  : [AppTheme.primaryTeal, AppTheme.primaryTealDark],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF0F6E56).withValues(alpha: isDark ? 0.3 : 0.15),
+                color: AppTheme.primaryTeal.withValues(alpha: isDark ? 0.3 : 0.15),
                 blurRadius: 16,
                 spreadRadius: 2,
               ),
@@ -646,7 +647,7 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 20),
               child: CircularProgressIndicator(
-                color: isDark ? const Color(0xFF2BBF9E) : const Color(0xFFEF9F27),
+                color: isDark ? const Color(0xFF2BBF9E) : AppTheme.accentGold,
               ),
             ),
           )
@@ -729,11 +730,11 @@ class _LoginScreenState extends State<LoginScreen> {
     return _buildSocialButton(
       onPressed: _googleSignIn,
       backgroundColor: isDark ? const Color(0xFF141A18) : Colors.white,
-      foregroundColor: isDark ? Colors.white70 : const Color(0xFF111111),
+      foregroundColor: isDark ? Colors.white70 : AppTheme.textPrimaryColor(context),
       label: "${l10n.commonLogIn} with Google",
       svgAsset: 'assets/images/google_logo.svg',
       border: BorderSide(
-        color: isDark ? Colors.white12 : const Color(0xFFE5E5E3),
+        color: isDark ? Colors.white12 : AppTheme.borderGrey,
         width: 1.5,
       ),
     ).animate().fadeIn(delay: 700.ms).slideY(begin: 0.2, end: 0, curve: Curves.easeOutQuad);
@@ -759,14 +760,14 @@ class _LoginScreenState extends State<LoginScreen> {
             Icon(
               PhosphorIcons.lockSimple,
               size: 14,
-              color: isDark ? Colors.white38 : const Color(0xFFAAAAAA),
+              color: isDark ? Colors.white38 : AppTheme.textPlaceholder,
             ),
             const SizedBox(width: 6),
             Text(
               'Safe & Secure 256-bit SSL Connection',
               style: TextStyle(
                 fontSize: 11,
-                color: isDark ? Colors.white38 : const Color(0xFFAAAAAA),
+                color: isDark ? Colors.white38 : AppTheme.textPlaceholder,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -778,7 +779,7 @@ class _LoginScreenState extends State<LoginScreen> {
           text: TextSpan(
             style: TextStyle(
               fontSize: 11,
-              color: isDark ? Colors.white30 : const Color(0xFFAAAAAA),
+              color: isDark ? Colors.white30 : AppTheme.textPlaceholder,
               height: 1.4,
             ),
             children: [
@@ -786,7 +787,7 @@ class _LoginScreenState extends State<LoginScreen> {
               TextSpan(
                 text: l10n.termsOfService,
                 style: TextStyle(
-                  color: isDark ? const Color(0xFF2BBF9E) : const Color(0xFF0F6E56),
+                  color: isDark ? const Color(0xFF2BBF9E) : AppTheme.primaryTeal,
                   fontWeight: FontWeight.w600,
                   decoration: TextDecoration.underline,
                 ),
@@ -804,7 +805,7 @@ class _LoginScreenState extends State<LoginScreen> {
               TextSpan(
                 text: l10n.privacyPolicy,
                 style: TextStyle(
-                  color: isDark ? const Color(0xFF2BBF9E) : const Color(0xFF0F6E56),
+                  color: isDark ? const Color(0xFF2BBF9E) : AppTheme.primaryTeal,
                   fontWeight: FontWeight.w600,
                   decoration: TextDecoration.underline,
                 ),
@@ -833,7 +834,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final flag = _getLanguageFlag(languageNotifier.value.languageCode);
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0B0F0E) : const Color(0xFFF0FAF6),
+      backgroundColor: isDark ? const Color(0xFF0B0F0E) : const Color(0xFFFBFBFA),
       body: Stack(
         children: [
           ..._buildBackgroundGlow(isDark),

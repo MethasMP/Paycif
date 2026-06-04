@@ -22,7 +22,7 @@ class PaymentPreviewBottomSheet extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0F172A) : Colors.white,
+        color: isDark ? Theme.of(context).cardColor : Colors.white,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
       ),
       child: Column(
@@ -98,18 +98,18 @@ class PaymentPreviewBottomSheet extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                color: AppTheme.successGreen.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(PhosphorIcons.shieldCheck, color: Color(0xFF10B981), size: 14),
+                  Icon(PhosphorIcons.shieldCheck, color: AppTheme.successGreen, size: 14),
                   SizedBox(width: 6),
                   Text(
                     'Verified via Paycif Layer',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: const Color(0xFF10B981),
+                          color: AppTheme.successGreen,
                           fontWeight: FontWeight.w600,
                         ),
                   ),
@@ -145,7 +145,7 @@ class PaymentPreviewBottomSheet extends StatelessWidget {
                 child: ElevatedButton(
                   onPressed: onConfirm,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFF59E0B),
+                    backgroundColor: AppTheme.accentGold,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     elevation: 0,
@@ -176,19 +176,19 @@ class PaymentPreviewBottomSheet extends StatelessWidget {
     switch (context.method) {
       case PaymentMethodType.promptPay:
         icon = PhosphorIcons.bank;
-        color = const Color(0xFF003087);
+        color = AppTheme.infoBlue;
         break;
       case PaymentMethodType.billPayment:
         icon = PhosphorIcons.receipt;
-        color = const Color(0xFFF59E0B);
+        color = AppTheme.accentGold;
         break;
       case PaymentMethodType.shopeePay:
         icon = PhosphorIcons.shoppingBag;
-        color = const Color(0xFFEE4D2D); // Shopee Orange
+        color = AppTheme.errorRed; // Shopee Orange fallback
         break;
       case PaymentMethodType.truemoney:
         icon = PhosphorIcons.wallet;
-        color = const Color(0xFFFF8100); // TrueMoney Orange
+        color = AppTheme.warningAmber; // TrueMoney Orange fallback
         break;
       default:
         icon = PhosphorIcons.qrCode;

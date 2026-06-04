@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
+import '../../theme/app_theme.dart';
 
 class SwipeToPaySlider extends StatefulWidget {
   final VoidCallback onSwipeComplete;
@@ -11,7 +12,7 @@ class SwipeToPaySlider extends StatefulWidget {
     super.key,
     required this.onSwipeComplete,
     this.text = 'Swipe to pay',
-    this.activeColor = const Color(0xFFEF9F27),
+    this.activeColor = AppTheme.accentGold,
   });
 
   @override

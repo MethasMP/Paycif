@@ -5,7 +5,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:provider/provider.dart';
 
 import '../controllers/dashboard_controller.dart';
-import '../theme/app_theme.dart';
+import 'package:frontend/theme/app_theme.dart';
 import '../widgets/paycif_text.dart';
 
 class PaymentSuccessScreen extends StatelessWidget {
@@ -114,7 +114,7 @@ class PaymentSuccessScreen extends StatelessWidget {
     // Bilingual Date Format
     final enDate = DateFormat('dd MMM yyyy - HH:mm').format(now);
 
-    final slipBgColor = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final slipBgColor = isDark ? Theme.of(context).colorScheme.surfaceContainerHighest : Colors.white;
     final textColor = AppTheme.textPrimaryColor(context);
     final textMuted = AppTheme.textSecondaryColor(context);
 
@@ -142,11 +142,11 @@ class PaymentSuccessScreen extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 12),
             decoration: BoxDecoration(
-              color: isDark ? Colors.black.withValues(alpha: 0.25) : const Color(0xFFE1F5EE),
+              color: isDark ? Colors.black.withValues(alpha: 0.25) : AppTheme.primaryTealLight,
               borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
               border: Border(
                 bottom: BorderSide(
-                  color: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFCBECE0),
+                  color: isDark ? Colors.white.withValues(alpha: 0.05) : AppTheme.primaryTealLight,
                   width: 1,
                 ),
               ),
@@ -156,14 +156,14 @@ class PaymentSuccessScreen extends StatelessWidget {
               children: [
                 const Icon(
                   PhosphorIcons.shieldCheckFill,
-                  color: Color(0xFF0F6E56),
+                  color: AppTheme.primaryTeal,
                   size: 18,
                 ),
                 const SizedBox(width: 8),
                 Text(
                   'Verified by Paycif Network',
                   style: TextStyle(
-                    color: isDark ? const Color(0xFF2BBF9E) : const Color(0xFF0F6E56),
+                    color: isDark ? AppTheme.primaryColor(context) : AppTheme.primaryTeal,
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 0.5,
@@ -186,10 +186,10 @@ class PaymentSuccessScreen extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF0F6E56).withValues(alpha: 0.1),
+                          color: AppTheme.primaryTeal.withValues(alpha: 0.1),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(PhosphorIcons.check, color: Color(0xFF0F6E56), size: 32),
+                        child: const Icon(PhosphorIcons.check, color: AppTheme.primaryTeal, size: 32),
                       ),
                       const SizedBox(height: 10),
                       PaycifText(
@@ -254,7 +254,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                       RichText(
                         text: TextSpan(
                           style: TextStyle(
-                            color: isDark ? const Color(0xFF2BBF9E) : AppTheme.primaryTeal,
+                            color: isDark ? AppTheme.primaryColor(context) : AppTheme.primaryTeal,
                             fontFamily: Theme.of(context).textTheme.displayMedium?.fontFamily,
                             fontFeatures: const [FontFeature.tabularFigures()],
                           ),
@@ -312,12 +312,12 @@ class PaymentSuccessScreen extends StatelessWidget {
                             const SizedBox(height: 8),
                             Row(
                               children: [
-                                const Icon(PhosphorIcons.checkCircleFill, color: Color(0xFF0F6E56), size: 16),
+                                const Icon(PhosphorIcons.checkCircleFill, color: AppTheme.primaryTeal, size: 16),
                                 const SizedBox(width: 4),
                                 Text(
                                   'Verified',
                                   style: TextStyle(
-                                    color: const Color(0xFF0F6E56),
+                                    color: AppTheme.primaryTeal,
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -370,7 +370,7 @@ class PaymentSuccessScreen extends StatelessWidget {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFF7F7F5),
+            color: isDark ? Colors.white.withValues(alpha: 0.05) : AppTheme.backgroundGrey,
             shape: BoxShape.circle,
           ),
           child: Icon(icon, color: textColor, size: 20),

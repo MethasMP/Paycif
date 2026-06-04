@@ -1,6 +1,7 @@
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../theme/app_theme.dart';
 
 /// ─────────────────────────────────────────────────────────────────────────────
 /// DIGITAL WALLET BUTTON
@@ -27,7 +28,6 @@ class DigitalWalletButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return GestureDetector(
       onTap: isLoading
@@ -41,9 +41,9 @@ class DigitalWalletButton extends StatelessWidget {
         margin: const EdgeInsets.symmetric(vertical: 6),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         decoration: BoxDecoration(
-          color: _getBackgroundColor(isDark),
+          color: _getBackgroundColor(context),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _getBorderColor(isDark), width: 1),
+          border: Border.all(color: _getBorderColor(context), width: 1),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.08),
@@ -61,7 +61,7 @@ class DigitalWalletButton extends StatelessWidget {
                 height: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: _getTextColor(),
+                  color: _getTextColor(context),
                 ),
               )
             else ...[
@@ -70,7 +70,7 @@ class DigitalWalletButton extends StatelessWidget {
               Text(
                 _getButtonText(),
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: _getTextColor(),
+                      color: _getTextColor(context),
                       fontWeight: FontWeight.w600,
                       letterSpacing: 0.3,
                     ),
@@ -83,7 +83,7 @@ class DigitalWalletButton extends StatelessWidget {
                     vertical: 3,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                    color: AppTheme.successGreen.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Row(
@@ -92,13 +92,13 @@ class DigitalWalletButton extends StatelessWidget {
                       Icon(
                         PhosphorIcons.checkCircle,
                         size: 12,
-                        color: Color(0xFF10B981),
+                        color: AppTheme.successGreen,
                       ),
                       SizedBox(width: 4),
                       Text(
                         'Linked',
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: const Color(0xFF10B981),
+                              color: AppTheme.successGreen,
                               fontWeight: FontWeight.w600,
                             ),
                       ),
@@ -113,30 +113,30 @@ class DigitalWalletButton extends StatelessWidget {
     );
   }
 
-  Color _getBackgroundColor(bool isDark) {
+  Color _getBackgroundColor(BuildContext context) {
     switch (type) {
       case DigitalWalletType.applePay:
         return Colors.black;
       case DigitalWalletType.googlePay:
-        return isDark ? const Color(0xFF1E293B) : Colors.white;
+        return Theme.of(context).brightness == Brightness.dark ? Theme.of(context).cardColor : Colors.white;
     }
   }
 
-  Color _getBorderColor(bool isDark) {
+  Color _getBorderColor(BuildContext context) {
     switch (type) {
       case DigitalWalletType.applePay:
         return Colors.black;
       case DigitalWalletType.googlePay:
-        return isDark ? Colors.white24 : Colors.grey[300]!;
+        return Theme.of(context).brightness == Brightness.dark ? Colors.white24 : Colors.grey[300]!;
     }
   }
 
-  Color _getTextColor() {
+  Color _getTextColor(BuildContext context) {
     switch (type) {
       case DigitalWalletType.applePay:
         return Colors.white;
       case DigitalWalletType.googlePay:
-        return const Color(0xFF3C4043);
+        return AppTheme.textSecondaryColor(context);
     }
   }
 
@@ -179,7 +179,7 @@ class DigitalWalletButton extends StatelessWidget {
                       width: 10,
                       height: 10,
                       decoration: const BoxDecoration(
-                        color: Color(0xFF4285F4),
+                        color: AppTheme.infoBlue,
                         borderRadius: BorderRadius.only(
                           topLeft: Radius.circular(10),
                         ),
@@ -194,7 +194,7 @@ class DigitalWalletButton extends StatelessWidget {
                       width: 10,
                       height: 10,
                       decoration: const BoxDecoration(
-                        color: Color(0xFFEA4335),
+                        color: AppTheme.errorRed,
                         borderRadius: BorderRadius.only(
                           topRight: Radius.circular(10),
                         ),
@@ -209,7 +209,7 @@ class DigitalWalletButton extends StatelessWidget {
                       width: 10,
                       height: 10,
                       decoration: const BoxDecoration(
-                        color: Color(0xFFFBBC05),
+                        color: AppTheme.warningAmber,
                         borderRadius: BorderRadius.only(
                           bottomLeft: Radius.circular(10),
                         ),
@@ -224,7 +224,7 @@ class DigitalWalletButton extends StatelessWidget {
                       width: 10,
                       height: 10,
                       decoration: const BoxDecoration(
-                        color: Color(0xFF34A853),
+                        color: AppTheme.successGreen,
                         borderRadius: BorderRadius.only(
                           bottomRight: Radius.circular(10),
                         ),

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../models/saved_card.dart';
 import '../../l10n/generated/app_localizations.dart';
+import '../../theme/app_theme.dart';
 
 class PaymentMethodPicker extends StatelessWidget {
   final String? preferredMethodId;
@@ -120,17 +121,17 @@ class PaymentMethodPicker extends StatelessWidget {
     return ListTile(
       leading: Icon(
         icon,
-        color: isSelected ? const Color(0xFF10B981) : Colors.grey,
+        color: isSelected ? AppTheme.successGreen : Colors.grey,
       ),
       title: Text(
         title,
         style: TextStyle(
           fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-          color: isSelected ? const Color(0xFF10B981) : null,
+          color: isSelected ? AppTheme.successGreen : null,
         ),
       ),
       trailing: isSelected
-          ? Icon(PhosphorIcons.checkCircle, color: Color(0xFF10B981))
+          ? Icon(PhosphorIcons.checkCircle, color: AppTheme.successGreen)
           : null,
       onTap: onTap,
     );

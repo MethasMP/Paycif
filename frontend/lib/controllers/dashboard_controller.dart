@@ -51,6 +51,9 @@ class DashboardController extends Cubit<DashboardState> {
   StreamSubscription? _txSub;
   StreamSubscription? _connSub;
   StreamSubscription? _authSub;
+  Timer? _retryTimer;
+  int _retryCount = 0;
+  static const int _maxRetries = 5;
 
   DashboardController(this._repository, this._connectivity) : super(DashboardState()) {
     _listenToAuthChanges();
@@ -81,6 +84,7 @@ class DashboardController extends Cubit<DashboardState> {
 
   @override
   Future<void> close() {
+    _retryTimer?.cancel();
     _txSub?.cancel();
     _authSub?.cancel();
     _connSub?.cancel();
@@ -88,6 +92,8 @@ class DashboardController extends Cubit<DashboardState> {
   }
 
   void reset() {
+    _retryTimer?.cancel();
+    _retryCount = 0;
     _txSub?.cancel();
     emit(DashboardState());
   }
@@ -100,6 +106,7 @@ class DashboardController extends Cubit<DashboardState> {
 
     try {
       final tier = await ApiService.getUserTier();
+      if (isClosed) return;
       
       emit(state.copyWith(
         kycTier: tier,
@@ -109,28 +116,56 @@ class DashboardController extends Cubit<DashboardState> {
       _subscribeToTransactions(currentUser.id);
       
     } catch (e) {
+      if (isClosed) return;
       emit(state.copyWith(status: 'error', errorMessage: e.toString()));
     }
   }
 
   void _subscribeToTransactions(String profileId) {
+    _retryTimer?.cancel();
     _txSub?.cancel();
+    _retryCount = 0;
+    _startListening(profileId);
+  }
+
+  void _startListening(String profileId) {
+    if (isClosed) return;
+
     _txSub = _repository.fetchTransactions(profileId).listen(
       (transactions) {
-        emit(state.copyWith(
-          transactions: transactions,
-          isTransactionsLoaded: true,
-        ));
-      },
-      onError: (e) {
-        debugPrint('⚠️ [Dashboard] Real-time Sync Error: $e');
-        // Fallback: One-time query if Real-time fails
-        _repository.getTransactionsOnce(profileId).then((transactions) {
+        // Reset retry counter on any successful data
+        _retryCount = 0;
+        if (!isClosed) {
           emit(state.copyWith(
             transactions: transactions,
             isTransactionsLoaded: true,
           ));
+        }
+      },
+      onError: (e) {
+        debugPrint('⚠️ [Dashboard] Real-time Sync Error: $e');
+        if (isClosed) return;
+
+        // Fallback: one-time query so UI always has data
+        _repository.getTransactionsOnce(profileId).then((transactions) {
+          if (!isClosed) {
+            emit(state.copyWith(
+              transactions: transactions,
+              isTransactionsLoaded: true,
+            ));
+          }
         });
+
+        // Exponential backoff retry (max _maxRetries times)
+        if (_retryCount < _maxRetries) {
+          final delay = Duration(seconds: (2 << _retryCount).clamp(2, 60)); // 2,4,8,16,32,60s
+          _retryCount++;
+          debugPrint('🔁 [Dashboard] Retrying real-time in ${delay.inSeconds}s (attempt $_retryCount/$_maxRetries)');
+          _retryTimer?.cancel();
+          _retryTimer = Timer(delay, () => _startListening(profileId));
+        } else {
+          debugPrint('⚠️ [Dashboard] Max retries reached. Staying in fallback (one-time query) mode.');
+        }
       },
     );
   }

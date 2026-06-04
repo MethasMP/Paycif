@@ -63,7 +63,17 @@ class PushNotificationService {
 
   static Future<void> syncToken({String? token}) async {
     try {
-      final fcmToken = token ?? await _messaging.getToken();
+      String? fcmToken = token;
+      if (fcmToken == null) {
+        if (defaultTargetPlatform == TargetPlatform.iOS) {
+          final apnsToken = await _messaging.getAPNSToken();
+          if (apnsToken == null) {
+            debugPrint('📡 APNS token not available yet. Skipping FCM token retrieval.');
+            return;
+          }
+        }
+        fcmToken = await _messaging.getToken();
+      }
       final user = Supabase.instance.client.auth.currentUser;
       final storage = SecureStorageService();
 

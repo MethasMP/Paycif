@@ -2,6 +2,7 @@ import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
 import 'package:frontend/utils/pay_notify.dart';
+import 'package:frontend/theme/app_theme.dart';
 
 class ContactSupportScreen extends StatefulWidget {
   const ContactSupportScreen({super.key});
@@ -86,8 +87,8 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: isDark
-                        ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
-                        : [const Color(0xFF667EEA), const Color(0xFF764BA2)],
+                        ? [theme.colorScheme.surface, theme.scaffoldBackgroundColor]
+                        : [AppTheme.primaryTeal, AppTheme.primaryTealDark],
                   ),
                   borderRadius: BorderRadius.circular(20),
                 ),
@@ -159,14 +160,14 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                       ),
                       decoration: BoxDecoration(
                         color: isSelected
-                            ? const Color(0xFFF59E0B)
+                            ? AppTheme.warningAmber
                             : (isDark
                                   ? Colors.white.withValues(alpha: 0.05)
                                   : Colors.grey.shade100),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: isSelected
-                              ? const Color(0xFFF59E0B)
+                              ? AppTheme.warningAmber
                               : Colors.transparent,
                         ),
                       ),
@@ -279,7 +280,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                 child: ElevatedButton(
                   onPressed: _isSubmitting ? null : _submitTicket,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFF59E0B),
+                    backgroundColor: AppTheme.warningAmber,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
@@ -350,7 +351,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 18, color: const Color(0xFFF59E0B)),
+          Icon(icon, size: 18, color: AppTheme.warningAmber),
           SizedBox(width: 8),
           Text(
             label,

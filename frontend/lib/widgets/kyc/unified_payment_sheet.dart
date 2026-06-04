@@ -5,6 +5,8 @@ import 'package:local_auth/local_auth.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:intl/intl.dart';
 
+import '../../theme/app_theme.dart';
+
 import '../../cubit/payment_cubit.dart';
 import '../../cubit/payment_state.dart';
 import '../../services/api_service.dart';
@@ -251,7 +253,7 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
                 right: 24,
               ),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF0B0F0E).withValues(alpha: 0.95) : Colors.white.withValues(alpha: 0.95),
+                color: isDark ? Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.95) : Colors.white.withValues(alpha: 0.95),
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(40)),
                 border: Border.all(
                   color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05),
@@ -341,7 +343,7 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
                       const SizedBox(
                         width: 12,
                         height: 12,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFEF9F27)),
+                        child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.accentGold),
                       ),
                       const SizedBox(width: 8),
                       Text('Looking up...', style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
@@ -362,7 +364,7 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
               ],
             ),
           ),
-          const Icon(PhosphorIcons.sealCheck, color: Color(0xFF10B981), size: 20),
+          const Icon(PhosphorIcons.sealCheck, color: AppTheme.successGreen, size: 20),
         ],
       ),
     );
@@ -400,7 +402,7 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
           const SizedBox(height: 8),
           Text(
             '≈ \$${_totalUSD.toStringAsFixed(2)} USD',
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFFEF9F27)),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppTheme.accentGold),
           ),
         ],
         const SizedBox(height: 16),
@@ -412,7 +414,7 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
           child: ElevatedButton(
             onPressed: amountTHB > 0 ? () => _goToPreview(cubit) : null,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEF9F27),
+              backgroundColor: AppTheme.accentGold,
               foregroundColor: Colors.black,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
             ),
@@ -439,7 +441,7 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
         Center(
           child: Text(
             "≈ \$${_totalUSD.toStringAsFixed(2)} USD",
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: Color(0xFFEF9F27)),
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppTheme.accentGold),
           ),
         ),
         const SizedBox(height: 24),
@@ -469,10 +471,10 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEF9F27).withValues(alpha: 0.1),
+                  color: AppTheme.accentGold.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(PhosphorIcons.wallet, color: Color(0xFFEF9F27), size: 20),
+                child: const Icon(PhosphorIcons.wallet, color: AppTheme.accentGold, size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -640,7 +642,7 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
             height: 48,
             child: CircularProgressIndicator(
               strokeWidth: 3,
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFEF9F27)),
+              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.accentGold),
             ),
           ),
           SizedBox(height: 24),
@@ -662,7 +664,7 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
 
     return Column(
       children: [
-        const Icon(PhosphorIcons.checkCircle, color: Color(0xFF0F6E56), size: 64),
+        const Icon(PhosphorIcons.checkCircle, color: AppTheme.successGreen, size: 64),
         const SizedBox(height: 16),
         const Text(
           'Payment Successful',
@@ -717,7 +719,7 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
           child: ElevatedButton(
             onPressed: () => _handleSuccess(context),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0F6E56),
+              backgroundColor: AppTheme.successGreen,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
             ),
@@ -783,7 +785,7 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
                     });
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFEF9F27),
+                    backgroundColor: AppTheme.accentGold,
                     foregroundColor: Colors.black,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
                   ),

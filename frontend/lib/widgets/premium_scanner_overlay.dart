@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PREMIUM SCANNER OVERLAY — Minimalist Ring
@@ -99,11 +100,11 @@ class _SoftVignettePainter extends CustomPainter {
           (center.dy / size.height) * 2 - 1,
         ),
         radius: 0.55,
-        colors: const [
-          Color(0x00000000), // fully transparent in center
-          Color(0x15000000), // barely visible
-          Color(0x60000000), // medium at edges
-          Color(0x99000000), // strong at corners
+        colors: [
+          Colors.transparent, // fully transparent in center
+          Colors.black.withValues(alpha: 0.08), // barely visible
+          Colors.black.withValues(alpha: 0.38), // medium at edges
+          Colors.black.withValues(alpha: 0.6), // strong at corners
         ],
         stops: const [0.0, 0.45, 0.72, 1.0],
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
@@ -123,7 +124,6 @@ class _LuminousFramePainter extends CustomPainter {
   final double frameSize;
   final double centerY;
 
-  static const _gold = Color(0xFFEF9F27);
   static const _radius = 28.0;
 
   _LuminousFramePainter({
@@ -149,7 +149,7 @@ class _LuminousFramePainter extends CustomPainter {
 
     // ── Ambient glow behind frame border ─────────────────────────────────
     final glowPaint = Paint()
-      ..color = _gold.withValues(alpha: 0.08)
+      ..color = AppTheme.accentGold.withValues(alpha: 0.08)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 40.0
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 20);
@@ -157,7 +157,7 @@ class _LuminousFramePainter extends CustomPainter {
     
     // ── Inner core glow to make it stand out a bit more ──────────────────
     final coreGlowPaint = Paint()
-      ..color = _gold.withValues(alpha: 0.2)
+      ..color = AppTheme.accentGold.withValues(alpha: 0.2)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 6.0
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);

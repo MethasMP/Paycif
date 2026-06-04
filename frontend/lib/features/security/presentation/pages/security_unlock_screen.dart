@@ -10,6 +10,7 @@ import '../logic/security_controller.dart';
 import '../widgets/pin_entry_widget.dart';
 import '../../../../screens/main_screen.dart';
 import '../../../../widgets/paycif_icon_container.dart';
+import 'package:frontend/theme/app_theme.dart';
 
 import 'recovery_screen.dart';
 
@@ -128,7 +129,7 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0B0F0E) : Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: isDark ? AppTheme.darkTheme.scaffoldBackgroundColor : Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
@@ -153,7 +154,7 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
                       style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                             fontWeight: FontWeight.w600,
                             letterSpacing: -0.5,
-                            color: isDark ? const Color(0xFFF5F5F5) : const Color(0xFF111111),
+                            color: AppTheme.textPrimaryColor(context),
                           ),
                     )
                     .animate()

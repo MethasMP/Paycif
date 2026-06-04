@@ -68,13 +68,13 @@ class PaymentUtils {
   static Color getCardColor(String cardType) {
     switch (cardType) {
       case 'Visa':
-        return const Color(0xFF1A1F71);
+        return AppTheme.infoBlue;
       case 'Mastercard':
-        return const Color(0xFFEB001B);
+        return AppTheme.errorRed;
       case 'Amex':
-        return const Color(0xFF016FD0);
+        return AppTheme.infoBlue;
       case 'UnionPay':
-        return const Color(0xFFC00C1A);
+        return AppTheme.errorRed;
       default:
         return AppTheme.primaryTeal;
     }

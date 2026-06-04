@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'screens/splash_screen.dart';
@@ -38,7 +39,8 @@ Future<void> main() async {
   final supabaseUrl = dotenv.env['SUPABASE_URL'];
   final supabaseKey = dotenv.env['SUPABASE_ANON_KEY'];
 
-  if (supabaseUrl == null || !Uri.tryParse(supabaseUrl)!.isAbsolute) {
+  final parsedUrl = supabaseUrl != null ? Uri.tryParse(supabaseUrl) : null;
+  if (supabaseUrl == null || parsedUrl == null || !parsedUrl.isAbsolute) {
     throw Exception(
       '🚨 FATAL ERROR: Malformed or missing SUPABASE_URL in .env. Checking this prevents the "WebSocket 500" crash.',
     );
@@ -51,15 +53,18 @@ Future<void> main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-    // 📲 Obtain APNS token for iOS devices (required for Supabase realtime)
-    final apnsToken = await FirebaseMessaging.instance.getAPNSToken();
-    if (apnsToken != null) {
-      await Supabase.instance.client.auth.updateUser(
-        UserAttributes(data: {'apns_token': apnsToken}),
-      );
-      debugPrint('✅ APNS token set in Supabase');
-    } else {
-      debugPrint('⚠️ APNS token not available yet');
+    // 📲 Obtain APNS token for iOS devices (required for Supabase realtime / FCM on iOS)
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      final apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+      if (apnsToken != null) {
+        await Supabase.instance.client.auth.updateUser(
+          UserAttributes(data: {'apns_token': apnsToken}),
+        );
+        debugPrint('✅ APNS token set in Supabase');
+      } else {
+        // Simulators or apps without push entitlements won't have APNS tokens, which is fine in debug/dev
+        debugPrint('📡 APNS token not available yet (normal on iOS Simulator/Debug)');
+      }
     }
     await PushNotificationService.initialize();
   } catch (e) {
@@ -152,12 +157,24 @@ class _PaycifAppState extends State<PaycifApp> with WidgetsBindingObserver {
       debugPrint(
         "🚨 [Security] Lockdown triggered! Redirecting to SecurityUnlockScreen...",
       );
-      // 🛡️ World-Class Security: Force re-authentication
-      // Use navigatorKey to find the correct context for navigation
-      navigatorKey.currentState?.pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const SecurityUnlockScreen()),
-        (route) => false,
-      );
+      // 🛡️ World-Class Security: Force re-authentication if not already on the unlock screen
+      bool isAlreadyOnUnlockScreen = false;
+      navigatorKey.currentState?.popUntil((route) {
+        if (route.settings.name == '/unlock' || route.settings.name == 'SecurityUnlockScreen') {
+          isAlreadyOnUnlockScreen = true;
+        }
+        return true; // Don't pop anything, just inspect
+      });
+
+      if (!isAlreadyOnUnlockScreen) {
+        navigatorKey.currentState?.pushAndRemoveUntil(
+          MaterialPageRoute(
+            settings: const RouteSettings(name: '/unlock'),
+            builder: (_) => const SecurityUnlockScreen(),
+          ),
+          (route) => false,
+        );
+      }
     }
     _lastBackgroundTime = null; // Reset
   }

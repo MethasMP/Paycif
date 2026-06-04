@@ -116,9 +116,7 @@ class _NotificationSettingsScreenState
                       value: true,
                       onChanged: null, // Disabled: Security is mandatory
                       icon: PhosphorIcons.shield,
-                      activeColor: const Color(
-                        0xFF10B981,
-                      ), // Green for Security
+                      activeColor: AppTheme.successGreen, // Green for Security
                     ),
                   ]),
 
@@ -145,7 +143,7 @@ class _NotificationSettingsScreenState
                         _savePreference(_keyTransaction, val);
                       },
                       icon: PhosphorIcons.wallet,
-                      activeColor: const Color(0xFFF59E0B), // Brand Color
+                      activeColor: AppTheme.warningAmber, // Brand Color
                     ),
                   ]),
 
@@ -172,7 +170,7 @@ class _NotificationSettingsScreenState
                         _savePreference(_keyMarketing, val);
                       },
                       icon: PhosphorIcons.megaphone,
-                      activeColor: Colors.blueAccent,
+                      activeColor: AppTheme.infoBlue,
                     ),
                   ]),
 

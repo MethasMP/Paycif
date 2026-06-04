@@ -7,7 +7,7 @@ import 'package:frontend/services/api_service.dart';
 import 'package:frontend/widgets/paycif_icon_container.dart';
 import 'package:frontend/widgets/paycif_amount_text.dart';
 import 'pay_screen.dart';
-import '../theme/app_theme.dart';
+import 'package:frontend/theme/app_theme.dart';
 
 class AmountEntryScreen extends StatefulWidget {
   final EMFData data;
@@ -236,7 +236,7 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
           ),
           Icon(
             PhosphorIcons.sealCheck,
-            color: Color(0xFF10B981),
+            color: AppTheme.successGreen,
             size: 20,
           ),
         ],
@@ -285,7 +285,7 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: const Color(0xFFE1F5EE),
+              color: AppTheme.primaryTealLight,
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
@@ -294,13 +294,13 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
                 const Icon(
                   PhosphorIconsRegular.info,
                   size: 14,
-                  color: Color(0xFF0F6E56),
+                  color: AppTheme.primaryTeal,
                 ),
                 const SizedBox(width: 6),
                 Text(
                   'Rate locked. Includes 3.5% convenience fee.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: const Color(0xFF0F6E56),
+                        color: AppTheme.primaryTeal,
                         fontWeight: FontWeight.w600,
                       ),
                 ),

@@ -48,7 +48,7 @@ class ConnectivityWrapper extends StatelessWidget {
                               Icon(
                                     PhosphorIcons.wifiSlash,
                                     size: 100,
-                                    color: Color(0xFFF59E0B),
+                                    color: AppTheme.warningAmber,
                                   )
                                   .animate(
                                     onPlay: (c) => c.repeat(reverse: true),
@@ -93,15 +93,13 @@ class ConnectivityWrapper extends StatelessWidget {
                                     ).checkStatus();
                                   },
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFFF59E0B),
+                                    backgroundColor: AppTheme.warningAmber,
                                     foregroundColor: AppTheme.accentGoldDark,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(28),
                                     ),
                                     elevation: 8,
-                                    shadowColor: const Color(
-                                      0xFFF59E0B,
-                                    ).withValues(alpha: 0.4),
+                                      shadowColor: AppTheme.warningAmber.withValues(alpha: 0.4),
                                   ),
                                   child: Text(
                                     AppLocalizations.of(
