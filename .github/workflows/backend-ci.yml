@@ -23,7 +23,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.26'
           cache-dependency-path: back-end/go.sum
 
       - name: Verify Dependencies
@@ -34,6 +34,9 @@ jobs:
         with:
           version: latest
           working-directory: back-end
+          # Project targets Go 1.26 (experimental/future); 'install-mode: go'
+          # ensures the linter is compiled with the same Go runtime as the project.
+          install-mode: go
           args: --timeout=5m
 
       - name: Run Tests with Race Detector
@@ -54,7 +57,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.26'
           cache-dependency-path: back-end/go.sum
 
       - name: Build Microservice
