@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import '../models/saved_card.dart';
+import '../../../../models/saved_card.dart';
 
 enum PaymentMethodType { wallet, applePay, googlePay, card, promptPay }
 
@@ -8,8 +8,7 @@ class PaymentMethod extends Equatable {
   final PaymentMethodType type;
   final String title;
   final String? subtitle;
-  final SavedCard?
-  cardData; // Null if it's Wallet, Apple/Google Pay or PromptPay
+  final SavedCard? cardData;
 
   const PaymentMethod({
     required this.id,

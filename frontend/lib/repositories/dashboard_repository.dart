@@ -39,7 +39,7 @@ class DashboardRepository {
       channel?.unsubscribe();
 
       channel = _client
-          .channel('transactions:profile_id=eq.$profileId')
+          .channel('transactions_profile_$profileId')
           .onPostgresChanges(
             event: PostgresChangeEvent.all,
             schema: 'public',

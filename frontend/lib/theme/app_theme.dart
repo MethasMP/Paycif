@@ -3,27 +3,27 @@ import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   // Brand Colors - New Design System (Teal & Gold)
-  static const Color primaryTeal = Color(0xFF0F6E56); // primary-600
-  static const Color primaryTealDark = Color(0xFF085041); // primary-800
-  static const Color primaryTealLight = Color(0xFFE1F5EE); // primary-100
+  static const Color primaryTeal = Color(0xFF00A896); // primary-500
+  static const Color primaryTealDark = Color(0xFF005D53); // primary-800
+  static const Color primaryTealLight = Color(0xFFE6F7F5); // primary-50
   
-  static const Color accentGold = Color(0xFFEF9F27); // accent-500
-  static const Color accentGoldDisabled = Color(0xFFFAC775); // accent-300
-  static const Color accentGoldDark = Color(0xFF412402); // accent-900
+  static const Color accentGold = Color(0xFFF4B41A); // accent-500
+  static const Color accentGoldDisabled = Color(0xFFFBD983); // accent-300
+  static const Color accentGoldDark = Color(0xFF745100); // accent-900
 
   static const Color backgroundWhite = Color(0xFFFFFFFF); // bg-primary
-  static const Color backgroundGrey = Color(0xFFF7F7F5); // bg-secondary
-  static const Color borderGrey = Color(0xFFE5E5E3); // border
+  static const Color backgroundGrey = Color(0xFFF8FAFC); // bg-secondary
+  static const Color borderGrey = Color(0xFFE2E8F0); // border
 
-  static const Color textPrimary = Color(0xFF111111); // text-primary
-  static const Color textSecondary = Color(0xFF666664); // text-secondary
-  static const Color textPlaceholder = Color(0xFFAAAAAA); // text-tertiary
+  static const Color textPrimary = Color(0xFF0F172A); // text-primary
+  static const Color textSecondary = Color(0xFF64748B); // text-secondary
+  static const Color textPlaceholder = Color(0xFF94A3B8); // text-tertiary
 
   // Semantic
-  static const Color errorRed = Color(0xFFD92D20); // error
-  static const Color successGreen = Color(0xFF0F6E56); // success (primary-600)
-  static const Color warningAmber = Color(0xFFF79009); // warning
-  static const Color infoBlue = Color(0xFF1570EF); // info
+  static const Color errorRed = Color(0xFFEF4444); // error default
+  static const Color successGreen = Color(0xFF10B981); // success default
+  static const Color warningAmber = Color(0xFFF59E0B); // warning default
+  static const Color infoBlue = Color(0xFF3B82F6); // info
 
   static Color textPrimaryColor(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark ? const Color(0xFFF5F5F5) : textPrimary;
@@ -41,61 +41,56 @@ class AppTheme {
     
     return GoogleFonts.ibmPlexSansTextTheme(base.textTheme).copyWith(
       displayLarge: GoogleFonts.ibmPlexSans(
+        fontSize: 48,
+        fontWeight: FontWeight.w700,
+        height: 1.2,
+        letterSpacing: 1.5,
+        color: const Color(0xFF028090), // primary.900
+        fontFeatures: const [FontFeature.tabularFigures()],
+      ).copyWith(fontFamilyFallback: thaiFallback), // display: 48/57, 700, tnum
+      headlineLarge: GoogleFonts.ibmPlexSans(
         fontSize: 32,
         fontWeight: FontWeight.w600,
-        height: 40 / 32,
-      ).copyWith(fontFamilyFallback: thaiFallback), // Display: 32/40, 600
-      headlineLarge: GoogleFonts.ibmPlexSans(
+        height: 1.3,
+        letterSpacing: -0.3,
+      ).copyWith(fontFamilyFallback: thaiFallback), // H1: 32, 600
+      headlineMedium: GoogleFonts.ibmPlexSans(
         fontSize: 24,
         fontWeight: FontWeight.w600,
-        height: 32 / 24,
-      ).copyWith(fontFamilyFallback: thaiFallback), // H1: 24/32, 600
-      headlineMedium: GoogleFonts.ibmPlexSans(
-        fontSize: 20,
-        fontWeight: FontWeight.w500,
-        height: 28 / 20,
-      ).copyWith(fontFamilyFallback: thaiFallback), // H2: 20/28, 500
+        height: 1.3,
+        letterSpacing: -0.2,
+      ).copyWith(fontFamilyFallback: thaiFallback), // H2: 24, 600
       headlineSmall: GoogleFonts.ibmPlexSans(
         fontSize: 20,
-        fontWeight: FontWeight.w600,
-        height: 28 / 20,
-      ).copyWith(fontFamilyFallback: thaiFallback), // headlineSmall: 20/28, 600
-      titleLarge: GoogleFonts.ibmPlexSans(
-        fontSize: 20,
-        fontWeight: FontWeight.w600,
-        height: 28 / 20,
-      ).copyWith(fontFamilyFallback: thaiFallback), // titleLarge: 20/28, 600
+        fontWeight: FontWeight.w500,
+        height: 1.4,
+      ).copyWith(fontFamilyFallback: thaiFallback), // H3: 20, 500
       bodyLarge: GoogleFonts.ibmPlexSans(
         fontSize: 16,
         fontWeight: FontWeight.w400,
-        height: 24 / 16,
-      ).copyWith(fontFamilyFallback: thaiFallback), // Body: 16/24, 400
+        height: 1.5,
+      ).copyWith(fontFamilyFallback: thaiFallback), // bodyLg: 16, 400
       bodyMedium: GoogleFonts.ibmPlexSans(
         fontSize: 14,
         fontWeight: FontWeight.w400,
-        height: 22 / 14,
-      ).copyWith(fontFamilyFallback: thaiFallback), // bodyMedium: 14/22, 400
+        height: 1.5,
+      ).copyWith(fontFamilyFallback: thaiFallback), // body: 14, 400
       bodySmall: GoogleFonts.ibmPlexSans(
-        fontSize: 13,
-        fontWeight: FontWeight.w400,
-        height: 20 / 13,
-      ).copyWith(fontFamilyFallback: thaiFallback), // Caption: 13/20, 400
+        fontSize: 12,
+        fontWeight: FontWeight.w500,
+        height: 1.4,
+        letterSpacing: 0.2,
+      ).copyWith(fontFamilyFallback: thaiFallback), // caption: 12, 500
       labelLarge: GoogleFonts.ibmPlexSans(
         fontSize: 14,
         fontWeight: FontWeight.w500,
-        height: 20 / 14,
-      ).copyWith(fontFamilyFallback: thaiFallback), // labelLarge: 14/20, 500
+        height: 1.4,
+      ).copyWith(fontFamilyFallback: thaiFallback),
       labelSmall: GoogleFonts.ibmPlexSans(
         fontSize: 11,
         fontWeight: FontWeight.w500,
-        height: 16 / 11,
-      ).copyWith(fontFamilyFallback: thaiFallback), // labelSmall: 11/16, 500
-      displayMedium: GoogleFonts.ibmPlexSans(
-        fontSize: 28,
-        fontWeight: FontWeight.w500,
-        height: 36 / 28,
-        fontFeatures: const [FontFeature.tabularFigures()],
-      ).copyWith(fontFamilyFallback: thaiFallback), // Numeric: 28/36, 500
+        height: 1.4,
+      ).copyWith(fontFamilyFallback: thaiFallback),
     );
   }
 

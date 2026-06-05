@@ -7,8 +7,10 @@ import 'package:intl/intl.dart';
 
 import '../../theme/app_theme.dart';
 
-import '../../cubit/payment_cubit.dart';
-import '../../cubit/payment_state.dart';
+import '../../features/payment/presentation/logic/payment_cubit.dart';
+import '../../features/payment/presentation/logic/payment_state.dart';
+import '../../features/payment/domain/entities/payment_breakdown.dart';
+import '../../features/payment/data/repositories/payment_repository_impl.dart';
 import '../../services/api_service.dart';
 import '../../services/qr_aggregator_service.dart';
 import '../paycif_amount_text.dart';
@@ -16,9 +18,8 @@ import '../paycif_icon_container.dart';
 import '../virtual_keypad.dart';
 import 'swipe_to_pay_slider.dart';
 import '../../features/security/presentation/widgets/pin_entry_widget.dart';
-import '../../features/security/domain/repositories/security_repository.dart';
 import '../../controllers/dashboard_controller.dart';
-import '../../screens/payment_success_screen.dart';
+import '../../features/payment/presentation/pages/payment_success_screen.dart';
 
 enum UnifiedSheetStep { amountInput, preview, pinInput, processing, success, failure }
 
@@ -82,9 +83,9 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
     return widget.payContext.title;
   }
 
-  double get _amountUSD => _customAmount / 36.45;
-  double get _feeUSD => _amountUSD * 0.035;
-  double get _totalUSD => _amountUSD * 1.035;
+  PaymentBreakdown get _breakdown => PaymentBreakdown(amountTHB: _customAmount);
+  double get _feeUSD => _breakdown.feeUSD;
+  double get _totalUSD => _breakdown.totalUSD;
 
   bool get _canGoBack {
     if (_step == UnifiedSheetStep.preview && (widget.payContext.amount ?? 0) == 0) {
@@ -161,7 +162,7 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
     bool authenticated = false;
     if (_biometricReady) {
       try {
-        final double totalUSD = (_customAmount / 36.45) * 1.035;
+        final double totalUSD = _totalUSD;
         authenticated = await _auth.authenticate(
           localizedReason: 'Confirm payment of \$${totalUSD.toStringAsFixed(2)} USD (฿${_customAmount.toStringAsFixed(2)})',
           biometricOnly: true,
@@ -210,8 +211,7 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
 
     return BlocProvider(
       create: (context) => PaymentCubit(
-        apiService: ApiService(),
-        securityRepository: context.read<SecurityRepository>(),
+        paymentRepository: PaymentRepositoryImpl(apiService: ApiService()),
       )..initialize(_customAmount),
       child: BlocConsumer<PaymentCubit, PaymentState>(
         listener: (context, state) {

@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -7,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import '../../presentation/logic/security_controller.dart';
 import '../../../../utils/error_translator.dart';
+import 'package:flutter/foundation.dart';
 import 'package:frontend/l10n/generated/app_localizations.dart';
 import 'package:frontend/theme/app_theme.dart';
 
@@ -438,18 +440,24 @@ class _RecoveryScreenState extends State<RecoveryScreen>
                 ),
               )
             : (isActive
-                ? Container(
-                    width: 2,
-                    height: 22,
-                    decoration: BoxDecoration(
-                      color: primary.withValues(alpha: 0.6),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  )
-                    .animate(onPlay: (c) => c.repeat(reverse: true))
-                    .fadeIn(duration: 500.ms)
-                    .then()
-                    .fadeOut(duration: 500.ms)
+                ? (() {
+                    final container = Container(
+                      width: 2,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        color: primary.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    );
+                    if (!kIsWeb && Platform.environment.containsKey('FLUTTER_TEST')) {
+                      return container;
+                    }
+                    return container
+                        .animate(onPlay: (c) => c.repeat(reverse: true))
+                        .fadeIn(duration: 500.ms)
+                        .then()
+                        .fadeOut(duration: 500.ms);
+                  })()
                 : null),
       ),
     );

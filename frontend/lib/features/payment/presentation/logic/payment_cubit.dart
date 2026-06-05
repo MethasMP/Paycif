@@ -1,28 +1,25 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../services/api_service.dart';
-import 'payment_state.dart';
 import 'package:uuid/uuid.dart';
-import '../features/security/domain/repositories/security_repository.dart';
+import '../../domain/repositories/payment_repository.dart';
+import '../../domain/entities/payment_breakdown.dart';
+import 'payment_state.dart';
 
 class PaymentCubit extends Cubit<PaymentState> {
-  // ignore: unused_field
-  final SecurityRepository _securityRepository;
+  final IPaymentRepository _paymentRepository;
 
   PaymentCubit({
-    ApiService? apiService,
-    required SecurityRepository securityRepository,
-  }) : _securityRepository = securityRepository,
+    required IPaymentRepository paymentRepository,
+  }) : _paymentRepository = paymentRepository,
        super(PaymentInitial());
 
-  /// Initializes the payment screen for instant pay-per-use checkout.
   Future<void> initialize(double amount, {String? recipientName}) async {
     emit(PaymentLoading());
     try {
       const double balanceMajor = 0.0;
 
-      final payPerUseMethod = PaymentMethod(
+      const payPerUseMethod = PaymentMethod(
         id: 'pay_per_use',
-        type: PaymentMethodType.wallet, // Retain wallet type for UI widget compatibility
+        type: PaymentMethodType.wallet,
         title: 'Pay per use',
         subtitle: 'Direct charge & instant settlement',
       );
@@ -31,7 +28,7 @@ class PaymentCubit extends Cubit<PaymentState> {
         PaymentReady(
           method: payPerUseMethod,
           amount: amount,
-          availableMethods: [payPerUseMethod],
+          availableMethods: const [payPerUseMethod],
           balance: balanceMajor,
         ),
       );
@@ -49,7 +46,6 @@ class PaymentCubit extends Cubit<PaymentState> {
     }
   }
 
-  /// Executes the payment from the wallet to PromptPay.
   Future<void> pay({
     String? recipientPromptPayId,
     required String recipientName,
@@ -63,50 +59,28 @@ class PaymentCubit extends Cubit<PaymentState> {
     emit(PaymentProcessing(method: currentState.method));
 
     try {
-      // 🛡️ SECURITY: Hardened Idempotency (UUID v4)
       final idempotencyKey = const Uuid().v4();
 
-      // 🛡️ SECURITY: Non-Repudiation (Signature) (Bypassed for now)
-      /*
-      Map<String, String>? signatureHeaders;
-      try {
-        signatureHeaders = await _securityRepository.generateSignatureHeaders(
-          idempotencyKey,
-        );
-      } catch (e) {
-        // Skip for now, backend will reject if not signed (if enforced)
-      }
+      final breakdown = PaymentBreakdown(amountTHB: currentState.amount);
+      final amountInSatang = (breakdown.amountTHB * 100).toInt();
 
-      // Convert amount to satang (minor units)
-      final amountInSatang = (currentState.amount * 100).toInt();
-
-      // Call the real Payout API
-      final response = await _apiService.payToPromptPay(
+      final transactionId = await _paymentRepository.payToPromptPay(
         amountInSatang: amountInSatang,
-        promptPayId: recipientPromptPayId,
         recipientName: recipientName,
+        promptPayId: recipientPromptPayId,
         billerId: billerId,
         reference1: reference1,
         reference2: reference2,
         idempotencyKey: idempotencyKey,
-        headers: signatureHeaders,
       );
-      */
 
-      // Mock delay to simulate network request
-      await Future.delayed(const Duration(seconds: 1));
       if (isClosed) return;
-
-      // Success!
-      final transactionId = idempotencyKey;
-      final senderName = 'Mocked Sender';
-      final remainingBalance = 1000.0 - currentState.amount; // Mock remaining balance
 
       emit(
         PaymentSuccess(
           transactionId: transactionId,
-          senderName: senderName,
-          remainingBalance: remainingBalance,
+          senderName: 'Tourist Wallet',
+          remainingBalance: 0.0,
         ),
       );
     } catch (e) {

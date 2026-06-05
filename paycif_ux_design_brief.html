@@ -1,0 +1,217 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); }
+.brief-wrap { padding: 1rem 0 2rem; }
+.section { border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 1.25rem 1.5rem; margin-bottom: 1rem; background: var(--color-background-primary); }
+.section-header { display: flex; align-items: center; gap: 10px; margin-bottom: 1rem; border-bottom: 0.5px solid var(--color-border-tertiary); padding-bottom: 0.75rem; }
+.badge { font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: var(--border-radius-md); }
+.section-title { font-size: 15px; font-weight: 500; color: var(--color-text-primary); }
+.row { display: grid; grid-template-columns: 160px 1fr; gap: 6px 16px; margin-bottom: 10px; align-items: start; }
+.row:last-child { margin-bottom: 0; }
+.label { font-size: 12px; color: var(--color-text-secondary); padding-top: 2px; }
+.value { font-size: 13px; color: var(--color-text-primary); line-height: 1.6; }
+.tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: var(--border-radius-md); margin: 2px 3px 2px 0; }
+.tag-teal { background: #E1F5EE; color: #0F6E56; }
+.tag-gray { background: #F1EFE8; color: #5F5E5A; }
+.tag-amber { background: #FAEEDA; color: #854F0B; }
+.tag-blue { background: #E6F1FB; color: #185FA5; }
+.tag-coral { background: #FAECE7; color: #993C1D; }
+.tag-purple { background: #EEEDFE; color: #534AB7; }
+.num { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; font-size: 11px; font-weight: 500; flex-shrink: 0; }
+.divider { border: none; border-top: 0.5px solid var(--color-border-tertiary); margin: 8px 0; }
+</style>
+
+<div class="brief-wrap">
+
+<div class="section">
+  <div class="section-header">
+    <span class="num" style="background:#E1F5EE;color:#0F6E56;">1</span>
+    <span class="section-title">Product &amp; Business Context</span>
+    <span class="badge" style="background:#E1F5EE;color:#0F6E56;">Fintech / Orchestrator</span>
+  </div>
+  <div class="row">
+    <span class="label">Product Vision</span>
+    <span class="value">ให้นักท่องเที่ยวต่างชาติชำระเงินผ่าน PromptPay QR ของร้านค้าไทยได้ทันที โดยไม่ต้องมีบัญชีไทยหรือแลกเงินสด — bridge ระหว่าง global payment rails กับระบบ PromptPay</span>
+  </div>
+  <hr class="divider">
+  <div class="row">
+    <span class="label">Core Value Prop</span>
+    <span class="value">นักท่องเที่ยวจ่ายด้วย card/Apple Pay → ร้านค้าได้รับ THB via PromptPay ทันที ไม่มีฝ่ายใดต้องเปลี่ยนพฤติกรรม</span>
+  </div>
+  <hr class="divider">
+  <div class="row">
+    <span class="label">Business KPIs</span>
+    <span class="value">
+      <span class="tag tag-teal">จำนวน merchant QR ที่ active</span>
+      <span class="tag tag-teal">transaction volume (THB/เดือน)</span>
+      <span class="tag tag-teal">conversion rate (scan → pay success)</span>
+      <span class="tag tag-teal">tourist onboarding time</span>
+    </span>
+  </div>
+  <hr class="divider">
+  <div class="row">
+    <span class="label">Monetization</span>
+    <span class="value">Fee-per-transaction (spread บน FX + markup ต่อ transaction) — ไม่มี subscription, ไม่ hold customer funds, รายได้เกิดจาก volume</span>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-header">
+    <span class="num" style="background:#E6F1FB;color:#185FA5;">2</span>
+    <span class="section-title">User Insights</span>
+    <span class="badge" style="background:#E6F1FB;color:#185FA5;">2 Personas หลัก</span>
+  </div>
+  <div class="row">
+    <span class="label">Persona A — Tourist</span>
+    <span class="value">นักท่องเที่ยวต่างชาติ อายุ 20–45 ปี คุ้นเคย Apple Pay / Google Pay / card ต้องการจ่ายเงินได้เร็ว ไม่ชอบขั้นตอนซับซ้อน มีเวลาจำกัด อาจอยู่ในสถานที่ที่มีสัญญาณอินเทอร์เน็ตไม่ดี</span>
+  </div>
+  <hr class="divider">
+  <div class="row">
+    <span class="label">Persona B — Merchant</span>
+    <span class="value">ร้านค้าไทย (street food ถึง boutique hotel) มี PromptPay QR อยู่แล้ว ต้องการรับเงินต่างชาติโดยไม่ต้องติดตั้งอะไรเพิ่ม ไม่ถนัดเทคโนโลยี ต้องการความเชื่อมั่นว่าได้รับ THB ชัวร์</span>
+  </div>
+  <hr class="divider">
+  <div class="row">
+    <span class="label">Pain Points</span>
+    <span class="value">
+      <span class="tag tag-coral">Tourist: ไม่มีเงินสดไทย / ไม่รู้จะแลกที่ไหน</span>
+      <span class="tag tag-coral">Tourist: กลัวโดนเรทแย่ ไม่ทราบค่าธรรมเนียม</span>
+      <span class="tag tag-coral">Merchant: ลูกค้าต่างชาติจ่ายไม่ได้ → เสียรายได้</span>
+      <span class="tag tag-coral">Merchant: ไม่อยากติดตั้งอุปกรณ์ใหม่</span>
+    </span>
+  </div>
+  <hr class="divider">
+  <div class="row">
+    <span class="label">Context of Use</span>
+    <span class="value">กลางแจ้งแสงจ้า, มือเดียว, เร่งรีบ, คิวคน, สัญญาณอินเทอร์เน็ตไม่เสถียร — UI ต้องใช้งานได้ภายใน 3 tap, ตัวหนังสือใหญ่, contrast สูง, loading state ชัดเจน</span>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-header">
+    <span class="num" style="background:#FAEEDA;color:#854F0B;">3</span>
+    <span class="section-title">Functional &amp; Technical Scope</span>
+    <span class="badge" style="background:#FAEEDA;color:#854F0B;">Flutter / Go / Rust + Supabase</span>
+  </div>
+  <div class="row">
+    <span class="label">MVP (Core)</span>
+    <span class="value">
+      <span class="tag tag-amber">QR scan (EMVCo TLV parse)</span>
+      <span class="tag tag-amber">FX rate display (transparent)</span>
+      <span class="tag tag-amber">Card / Apple Pay on-ramp</span>
+      <span class="tag tag-amber">PromptPay disbursement confirm</span>
+      <span class="tag tag-amber">Multi-language receipt</span>
+    </span>
+  </div>
+  <hr class="divider">
+  <div class="row">
+    <span class="label">Platform</span>
+    <span class="value">iOS + Android (Flutter) primary — tourist ใช้ mobile 100% ส่วน merchant ไม่ต้องมี app (ใช้ QR เดิม)</span>
+  </div>
+  <hr class="divider">
+  <div class="row">
+    <span class="label">Architecture</span>
+    <span class="value">Paycif เป็น pure orchestrator — adapter pattern (IOnRampProvider, IOffRampProvider, IWalletProvider) รองรับ swap partner ได้ทุกเวลา ไม่ hold customer funds ไม่มี payment license</span>
+  </div>
+  <hr class="divider">
+  <div class="row">
+    <span class="label">Technical Constraints</span>
+    <span class="value">Low-light QR scanning, on-ramp latency (card auth ~3–5s), Base network tx confirmation, สัญญาณอินเทอร์เน็ตไม่เสถียรในพื้นที่ท่องเที่ยว — ต้อง design for offline-aware UX และ optimistic UI</span>
+  </div>
+  <hr class="divider">
+  <div class="row">
+    <span class="label">Partners (confirmed)</span>
+    <span class="value">SQRIL (Service Agreement signed, SIAC arbitration, 45-day fee notice, 12-month liability cap) — Alchemy Pay, Ramp Network ยังอยู่ระหว่าง BD</span>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-header">
+    <span class="num" style="background:#E1F5EE;color:#0F6E56;">4</span>
+    <span class="section-title">Brand &amp; Visual Identity</span>
+    <span class="badge" style="background:#E1F5EE;color:#0F6E56;">Teal + Gold</span>
+  </div>
+  <div class="row">
+    <span class="label">Brand Personality</span>
+    <span class="value">น่าเชื่อถือ + ทันสมัย + เข้าถึงได้ง่าย — ไม่ formal เกินไป ไม่ playful เกินไป ให้ความรู้สึก "ปลอดภัย จ่ายได้ เร็ว" เหมือน fintech ระดับ global ที่ design เพื่อเอเชียโดยเฉพาะ</span>
+  </div>
+  <hr class="divider">
+  <div class="row">
+    <span class="label">Color Palette</span>
+    <span class="value">
+      <span class="tag tag-teal">Primary: Teal (trust, digital, SE Asia)</span>
+      <span class="tag tag-amber">Accent: Gold (value, premium, Thai cultural)</span>
+      <span class="tag tag-gray">Neutral: White / Light gray</span>
+    </span>
+  </div>
+  <hr class="divider">
+  <div class="row">
+    <span class="label">Domain / Identity</span>
+    <span class="value">paysif.io — hello@paysif.io — ชื่อแบรนด์ "Paycif" (ไม่ใช่ PAYSIF ทั้งหมด)</span>
+  </div>
+  <hr class="divider">
+  <div class="row">
+    <span class="label">Design Inspiration</span>
+    <span class="value">Wise (FX transparency), Grab Pay (SE Asia context, simplicity), WeChat Pay merchant flow (zero-friction for merchant side) — แต่ต้องมี identity เป็นของตัวเอง ไม่ clone</span>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-header">
+    <span class="num" style="background:#EEEDFE;color:#534AB7;">5</span>
+    <span class="section-title">Market &amp; Competitive Landscape</span>
+    <span class="badge" style="background:#EEEDFE;color:#534AB7;">Merchant-side-first Strategy</span>
+  </div>
+  <div class="row">
+    <span class="label">Direct Competitors</span>
+    <span class="value">
+      <span class="tag tag-purple">Wise (tourist side)</span>
+      <span class="tag tag-purple">Revolut (tourist side)</span>
+      <span class="tag tag-purple">WeChat Pay / Alipay (tourist side, China-centric)</span>
+    </span>
+  </div>
+  <hr class="divider">
+  <div class="row">
+    <span class="label">Differentiation</span>
+    <span class="value">คู่แข่งทุกรายแข่งกันที่ "tourist wallet" — Paycif แข่งที่ "merchant acceptance" แทน ร้านค้าไม่ต้องทำอะไร QR เดิมก็ใช้ได้เลย = network effect จาก merchant side ดึง tourist มาเอง (WeChat/Alipay model)</span>
+  </div>
+  <hr class="divider">
+  <div class="row">
+    <span class="label">Industry Standards</span>
+    <span class="value">EMVCo QR standard (PromptPay ใช้ TLV format), PromptPay QR display conventions ที่ร้านค้าไทยคุ้นเคย — ไม่ควร reinvent QR UX ฝั่ง merchant</span>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-header">
+    <span class="num" style="background:#FAECE7;color:#993C1D;">6</span>
+    <span class="section-title">Project Constraints &amp; Compliance</span>
+    <span class="badge" style="background:#FAECE7;color:#993C1D;">Early-stage / MVP</span>
+  </div>
+  <div class="row">
+    <span class="label">Timeline</span>
+    <span class="value">Early-stage startup — vibe-coding workflow (AI-directed development) ทำให้ iteration เร็วกว่าปกติ ไม่มี fixed milestone ที่ hard-lock แต่ต้องการ MVP ที่ production-ready เร็วที่สุด</span>
+  </div>
+  <hr class="divider">
+  <div class="row">
+    <span class="label">Regulatory</span>
+    <span class="value">
+      <span class="tag tag-coral">BoT: Personal PromptPay QR อาจถูก classify เป็น remittance → launch ด้วย merchant QR only ก่อน</span>
+      <span class="tag tag-coral">Paycif ไม่มี payment license — regulated activity ทำโดย partners เท่านั้น</span>
+      <span class="tag tag-coral">ไม่ hold customer funds ณ จุดใดๆ</span>
+    </span>
+  </div>
+  <hr class="divider">
+  <div class="row">
+    <span class="label">Legal</span>
+    <span class="value">PAYSIF COMPANY LIMITED จดทะเบียนแล้ว (ศรีมหาโพธิ์, ปราจีนบุรี, 27 มี.ค. 2569) — Service Agreement กับ SQRIL มี SIAC arbitration clause</span>
+  </div>
+  <hr class="divider">
+  <div class="row">
+    <span class="label">Accessibility / Privacy</span>
+    <span class="value">Tourist มาจากหลายประเทศ → UI ต้องรองรับ multi-language (EN เป็น primary, CN/JP/KR secondary) ข้อมูลนักท่องเที่ยวต้องจัดการตาม PDPA (ไทย) + GDPR-aligned สำหรับ EU tourists</span>
+  </div>
+</div>
+
+</div>

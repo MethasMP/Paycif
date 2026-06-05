@@ -6,7 +6,8 @@ import 'package:frontend/widgets/virtual_keypad.dart';
 import 'package:frontend/services/api_service.dart';
 import 'package:frontend/widgets/paycif_icon_container.dart';
 import 'package:frontend/widgets/paycif_amount_text.dart';
-import 'pay_screen.dart';
+import '../features/payment/domain/entities/payment_breakdown.dart';
+import '../features/payment/presentation/pages/pay_screen.dart';
 import 'package:frontend/theme/app_theme.dart';
 
 class AmountEntryScreen extends StatefulWidget {
@@ -253,9 +254,8 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
 
   Widget _buildAmountDisplay(bool isDark) {
     final amountTHB = double.tryParse(_controller.text) ?? 0.0;
-    // Calculate USD equivalent (Rate: 1 USD = 36.45 THB, convenience fee 3.5%)
-    final amountUSD = amountTHB / 36.45;
-    final totalUSD = amountUSD * 1.035;
+    final breakdown = PaymentBreakdown(amountTHB: amountTHB);
+    final totalUSD = breakdown.totalUSD;
 
     return Column(
       children: [

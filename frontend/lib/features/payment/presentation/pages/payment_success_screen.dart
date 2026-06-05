@@ -4,9 +4,10 @@ import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:provider/provider.dart';
 
-import '../controllers/dashboard_controller.dart';
-import 'package:frontend/theme/app_theme.dart';
-import '../widgets/paycif_text.dart';
+import '../../../../controllers/dashboard_controller.dart';
+import '../../../../theme/app_theme.dart';
+import '../../../../widgets/paycif_text.dart';
+import '../../../../core/widgets/paycif_button.dart';
 
 class PaymentSuccessScreen extends StatelessWidget {
   final String transactionId;
@@ -24,22 +25,19 @@ class PaymentSuccessScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Using the default theme background
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return Scaffold(
       backgroundColor: AppTheme.primaryTeal,
       body: SafeArea(
         child: Column(
           children: [
-            // Top Nav
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const SizedBox(width: 48), // Spacer
+                  const SizedBox(width: 48),
                   const Text(
                     'e-Slip',
                     style: TextStyle(
@@ -56,16 +54,12 @@ class PaymentSuccessScreen extends StatelessWidget {
                 ],
               ),
             ),
-
-            // 3. The Slip (Expanded to fill space, no scrolling)
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 child: _buildSolidSlip(context, isDark),
               ),
             ),
-
-            // 4. Save & Done Buttons
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               child: Column(
@@ -73,27 +67,16 @@ class PaymentSuccessScreen extends StatelessWidget {
                 children: [
                   SizedBox(
                     width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
+                    child: PaycifButton(
+                      text: 'Back to Home',
                       onPressed: () => _navigateToHome(context),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: AppTheme.primaryTeal,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: const Text(
-                        'Back to Home',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                      ),
+                      variant: PaycifButtonVariant.accent,
+                      size: PaycifButtonSize.lg,
                     ),
                   ),
                   const SizedBox(height: 8),
                   TextButton.icon(
-                    onPressed: () {
-                    },
+                    onPressed: () {},
                     icon: const Icon(PhosphorIcons.downloadSimple, color: Colors.white, size: 20),
                     label: const Text(
                       'Save to Gallery',
@@ -111,7 +94,6 @@ class PaymentSuccessScreen extends StatelessWidget {
 
   Widget _buildSolidSlip(BuildContext context, bool isDark) {
     final now = DateTime.now();
-    // Bilingual Date Format
     final enDate = DateFormat('dd MMM yyyy - HH:mm').format(now);
 
     final slipBgColor = isDark ? Theme.of(context).colorScheme.surfaceContainerHighest : Colors.white;
@@ -137,7 +119,6 @@ class PaymentSuccessScreen extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Security Header
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 12),
@@ -172,15 +153,12 @@ class PaymentSuccessScreen extends StatelessWidget {
               ],
             ),
           ),
-
-          // Main Slip Content (Expanded to distribute space evenly)
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  // Success Icon & Title
                   Column(
                     children: [
                       Container(
@@ -206,20 +184,17 @@ class PaymentSuccessScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-
-                  // Transfer Details
                   Column(
                     children: [
                       _buildParticipantRow(
                         label: 'From',
-                        name: 'Google',
+                        name: 'Tourist Wallet',
                         subtext: 'นาย เมธัส (Mr. Methas)',
                         icon: PhosphorIcons.wallet,
                         textColor: textColor,
                         textMuted: textMuted,
                         isDark: isDark,
                       ),
-                      
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 20),
                         child: Row(
@@ -228,7 +203,6 @@ class PaymentSuccessScreen extends StatelessWidget {
                           ],
                         ),
                       ),
-
                       _buildParticipantRow(
                         label: 'ไปยัง To',
                         name: recipientName,
@@ -240,10 +214,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-
                   Divider(color: isDark ? Colors.white.withValues(alpha: 0.1) : AppTheme.borderGrey, height: 1),
-
-                  // Amount
                   Column(
                     children: [
                       Text(
@@ -282,10 +253,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-
                   Divider(color: isDark ? Colors.white.withValues(alpha: 0.1) : AppTheme.borderGrey, height: 1),
-
-                  // Footer: Ref ID & QR Code
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -327,8 +295,6 @@ class PaymentSuccessScreen extends StatelessWidget {
                           ],
                         ),
                       ),
-                      
-                      // QR Code
                       Container(
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
