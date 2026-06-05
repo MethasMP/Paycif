@@ -30,13 +30,13 @@ jobs:
         run: go mod verify
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v4
+        uses: golangci/golangci-lint-action@v9
         with:
           version: latest
           working-directory: back-end
-          # Project targets Go 1.26 (experimental/future); 'install-mode: go'
-          # ensures the linter is compiled with the same Go runtime as the project.
-          install-mode: go
+          # Project targets Go 1.26 (experimental/future); 'install-mode: goinstall'
+          # ensures the linter is compiled from source with the installed Go runtime.
+          install-mode: goinstall
           args: --timeout=5m
 
       - name: Run Tests with Race Detector
