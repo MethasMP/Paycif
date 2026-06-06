@@ -23,7 +23,8 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          # Project go.mod targets 1.26, which is available in this environment (June 2026)
+          go-version: '1.26'
           cache-dependency-path: back-end/go.sum
 
       - name: Verify Dependencies
@@ -35,6 +36,7 @@ jobs:
           version: latest
           working-directory: back-end
           args: --timeout=5m
+          install-mode: go
 
       - name: Run Tests with Race Detector
         run: go test -v -race ./...
@@ -54,7 +56,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.26'
           cache-dependency-path: back-end/go.sum
 
       - name: Build Microservice
