@@ -1,0 +1,3 @@
+## 2026-06-03 - [SQL Optimization & Cache Consistency]
+**Learning:** Redundant database roundtrips and joins in hot paths significantly impact latency and increase serialization conflict probability in `SERIALIZABLE` isolation mode. Specifically, separate `SELECT EXISTS` checks for idempotency and `JOIN`s for simple limit checks on indexed columns are anti-patterns.
+**Action:** Use `INSERT ... ON CONFLICT DO NOTHING` for atomic idempotency and query `ledger_entries` directly for limit checks to leverage the `(profile_id, created_at DESC)` composite index. Always normalize cache keys (e.g., `strings.ToUpper`) before lookup to prevent fragmentation. Properly handle `RowsAffected()` errors to ensure robust idempotency.
