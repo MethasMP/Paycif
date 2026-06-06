@@ -161,7 +161,10 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 		return fmt.Errorf("failed to insert transaction: %w", err)
 	}
 
-	rows, _ := res.RowsAffected()
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check rows affected: %w", err)
+	}
 	if rows == 0 {
 		log.Printf("ℹ[] Payment already processed for reference: %s", referenceID)
 		return nil
