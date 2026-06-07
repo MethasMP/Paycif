@@ -1,0 +1,3 @@
+## 2026-06-05 - [SERIALIZABLE Isolation & Round-Trip Optimization]
+**Learning:** In high-concurrency systems using `SERIALIZABLE` isolation, every database round-trip within a transaction increases the "contention window." Reducing round-trips (e.g., by combining `SELECT EXISTS` and `INSERT` into `INSERT ... ON CONFLICT`) not only improves latency but significantly reduces the probability of serialization failures.
+**Action:** Always look for "check-then-act" patterns within `SERIALIZABLE` transactions and consolidate them using atomic SQL operations (`UPSERT`, `ON CONFLICT`, `RETURNING`, etc.) to minimize transaction duration and conflict surface area.
