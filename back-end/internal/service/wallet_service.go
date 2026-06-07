@@ -169,7 +169,7 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 		return nil
 	}
 
-	// 3. Create Ledger Entry
+	// 2. Create Ledger Entry
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO ledger_entries (id, transaction_id, profile_id, amount, balance_after, base_currency_amount, home_currency_amount, created_at)
 		VALUES ($1, $2, $3, $4, 0, $4, $4, NOW())
@@ -178,7 +178,7 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 		return fmt.Errorf("failed to create ledger entry: %w", err)
 	}
 
-	// 4. Write to Outbox for async processing
+	// 3. Write to Outbox for async processing
 	payloadStr := fmt.Sprintf(`{"transaction_id": "%s", "amount": %f, "user_id": "%s", "merchant": "%s"}`, newTxID, amount, userID, merchant)
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO transaction_outbox (id, transaction_id, event_type, payload, status, created_at)

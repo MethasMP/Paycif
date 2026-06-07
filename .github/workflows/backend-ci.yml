@@ -34,8 +34,6 @@ jobs:
         with:
           version: latest
           working-directory: back-end
-          args: --timeout=5m
-          install-mode: go
 
       - name: Run Tests with Race Detector
         run: go test -v -race ./...
