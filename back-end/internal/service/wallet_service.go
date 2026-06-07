@@ -145,30 +145,31 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 	}
 	defer tx.Rollback()
 
-	// 1. Idempotency check
-	var exists bool
-	err = tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM transactions WHERE reference_id = $1)", referenceID).Scan(&exists)
-	if err != nil {
-		return err
-	}
-	if exists {
-		log.Printf("ℹ[] Payment already processed for reference: %s", referenceID)
-		return nil
-	}
-
-	// 2. Record Transaction
+	// 1. Record Transaction with Idempotency Check (Reduced Round-trip & Contention)
+	// Combining check and insert into a single statement reduces DB round-trips from 2 to 1
+	// and minimizes the contention window in SERIALIZABLE isolation mode.
 	newTxID := uuid.New()
 	description := "Pay per use: " + merchant
-	_, err = tx.ExecContext(ctx, `
+	res, err := tx.ExecContext(ctx, `
 		INSERT INTO transactions (id, profile_id, reference_id, amount, description, settlement_status, gateway_fee, provider_metadata, created_at)
 		VALUES ($1, $2, $3, $4, $5, 'SETTLED', 0, $6, NOW())
+		ON CONFLICT (reference_id) DO NOTHING
 	`, newTxID, userID, referenceID, int64(amount*100), description,
 		fmt.Sprintf(`{"provider": "stripe", "merchant": "%s", "amount": %f}`, merchant, amount))
 	if err != nil {
 		return fmt.Errorf("failed to insert transaction: %w", err)
 	}
 
-	// 3. Create Ledger Entry
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	if rows == 0 {
+		log.Printf("ℹ[] Payment already processed for reference: %s", referenceID)
+		return nil
+	}
+
+	// 2. Create Ledger Entry
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO ledger_entries (id, transaction_id, profile_id, amount, balance_after, base_currency_amount, home_currency_amount, created_at)
 		VALUES ($1, $2, $3, $4, 0, $4, $4, NOW())
@@ -177,7 +178,7 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 		return fmt.Errorf("failed to create ledger entry: %w", err)
 	}
 
-	// 4. Write to Outbox for async processing
+	// 3. Write to Outbox for async processing
 	payloadStr := fmt.Sprintf(`{"transaction_id": "%s", "amount": %f, "user_id": "%s", "merchant": "%s"}`, newTxID, amount, userID, merchant)
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO transaction_outbox (id, transaction_id, event_type, payload, status, created_at)
