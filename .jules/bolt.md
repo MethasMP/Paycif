@@ -8,4 +8,4 @@
 
 **Learning:** When a Go project targets a version (e.g., Go 1.26) higher than the version used to build the pre-compiled `golangci-lint` binary in CI, the linter will fail with a "Go language version used to build golangci-lint is lower than the targeted Go version" error.
 
-**Action:** In `golangci-lint-action`, set `install-mode: go` and ensure the `actions/setup-go` version matches the project's target version. This forces the linter to be compiled with the correct Go runtime, ensuring compatibility.
+**Action:** Manually install `golangci-lint` using `go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest` within the project's Go runtime environment (e.g., Go 1.26). This ensures the linter is compiled with the correct Go version, bypassing the limitations of pre-compiled binaries in `golangci-lint-action`.
