@@ -104,6 +104,9 @@ type ExchangeRateResponse struct {
 
 // GetExchangeRate retrieves the latest rate for a currency pair.
 func (s *WalletService) GetExchangeRate(ctx context.Context, fromCurr, toCurr string) (*ExchangeRateResponse, error) {
+	// Normalize to uppercase for consistent cache keys and DB queries
+	fromCurr = strings.ToUpper(fromCurr)
+	toCurr = strings.ToUpper(toCurr)
 	cacheKey := fmt.Sprintf("rate:%s:%s", fromCurr, toCurr)
 
 	if val, ok := s.localRateCache.Load(cacheKey); ok {
@@ -117,7 +120,7 @@ func (s *WalletService) GetExchangeRate(ctx context.Context, fromCurr, toCurr st
 	var rate float64
 	var updatedAt time.Time
 	err := s.DB.QueryRowContext(ctx, "SELECT provider_rate, updated_at FROM exchange_rates WHERE from_currency = $1 AND to_currency = $2",
-		strings.ToUpper(fromCurr), strings.ToUpper(toCurr)).Scan(&rate, &updatedAt)
+		fromCurr, toCurr).Scan(&rate, &updatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("rate not found for %s/%s", fromCurr, toCurr)
@@ -236,13 +239,14 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 	}
 
 	// Check Daily Limit (querying ledger_entries by profile_id)
+	// Optimization: Removed JOIN with transactions table and filtered directly on ledger_entries.created_at
+	// This leverages the composite index on (profile_id, created_at DESC) for faster retrieval.
 	var dailyDebitTotal sql.NullInt64
 	err = tx.QueryRowContext(ctx, `
 		SELECT COALESCE(SUM(ABS(le.amount)), 0) FROM ledger_entries le
-		JOIN transactions t ON le.transaction_id = t.id
 		WHERE le.profile_id = $1 
 		AND le.amount < 0 
-		AND t.created_at > NOW() - INTERVAL '24 hours'
+		AND le.created_at > NOW() - INTERVAL '24 hours'
 	`, req.UserID).Scan(&dailyDebitTotal)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("failed to check daily limit: %w", err)
