@@ -235,14 +235,13 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 		return nil, fmt.Errorf("failed to fetch profile: %w", err)
 	}
 
-	// Check Daily Limit (querying ledger_entries by profile_id)
+	// Check Daily Limit (querying ledger_entries by profile_id directly)
 	var dailyDebitTotal sql.NullInt64
 	err = tx.QueryRowContext(ctx, `
-		SELECT COALESCE(SUM(ABS(le.amount)), 0) FROM ledger_entries le
-		JOIN transactions t ON le.transaction_id = t.id
-		WHERE le.profile_id = $1 
-		AND le.amount < 0 
-		AND t.created_at > NOW() - INTERVAL '24 hours'
+		SELECT COALESCE(SUM(ABS(amount)), 0) FROM ledger_entries
+		WHERE profile_id = $1
+		AND amount < 0
+		AND created_at > NOW() - INTERVAL '24 hours'
 	`, req.UserID).Scan(&dailyDebitTotal)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("failed to check daily limit: %w", err)
