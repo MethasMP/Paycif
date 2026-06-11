@@ -1,0 +1,3 @@
+## 2026-06-11 - [Redundant JOIN in PayoutToPromptPay]
+**Learning:** In the `WalletService.PayoutToPromptPay` function, the daily limit check query was performing a redundant JOIN with the `transactions` table to filter by `created_at`. Since `ledger_entries` also contains a `created_at` timestamp that is transactionally consistent with `transactions`, this JOIN is unnecessary and prevents the query from fully utilizing the `idx_ledger_entries_profile_created` composite index.
+**Action:** Always check if timestamp-based filters can be applied directly to the primary table of a query, especially when composite indexes are available.
