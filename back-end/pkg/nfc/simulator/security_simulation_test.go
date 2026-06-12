@@ -17,7 +17,7 @@ func TestClonedPassportSimulation(t *testing.T) {
 		// ผู้ร้ายพยายามแก้ชื่อในหน้าพาสปอร์ต (DG1) จาก SOMCHAI เป็น HACKER
 		tamperedDG1 := make([]byte, len(realData.DG1))
 		copy(tamperedDG1, realData.DG1)
-		
+
 		dg1Str := string(tamperedDG1)
 		hackedDG1 := strings.Replace(dg1Str, "SOMCHAI", "HACKER ", 1)
 		tamperedDG1 = []byte(hackedDG1)
@@ -41,7 +41,7 @@ func TestClonedPassportSimulation(t *testing.T) {
 	t.Run("Attack: Swap Photo (DG2)", func(t *testing.T) {
 		// ผู้ร้ายพยายามเปลี่ยนรูปถ่ายในชิป (DG2) เป็นรูปคนอื่น
 		fakePhoto := []byte{0xDE, 0xAD, 0xBE, 0xEF}
-		
+
 		payload := nfc.NfcPassportPayload{
 			DG1:                realData.DG1,
 			DG2:                fakePhoto,

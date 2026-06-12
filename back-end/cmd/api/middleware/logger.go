@@ -13,16 +13,16 @@ import (
 func StructuredLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
-		
+
 		// generate or get request ID
 		requestID := c.GetHeader("X-Request-ID")
 		if requestID == "" {
 			requestID = uuid.New().String()
 		}
-		
+
 		// Set in headers and context
 		c.Header("X-Request-ID", requestID)
-		
+
 		// Add to context for slog usage
 		ctx := context.WithValue(c.Request.Context(), logger.RequestIDKey, requestID)
 		c.Request = c.Request.WithContext(ctx)

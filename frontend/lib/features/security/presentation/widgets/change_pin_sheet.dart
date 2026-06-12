@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
-import 'package:frontend/l10n/generated/app_localizations.dart';
-import 'package:frontend/theme/app_theme.dart';
-import '../logic/security_controller.dart';
-import 'pin_entry_widget.dart';
+import 'package:frontend/core/l10n/generated/app_localizations.dart';
+import 'package:frontend/core/theme/app_theme.dart';
+import 'package:frontend/features/security/presentation/logic/security_controller.dart';
+import 'package:frontend/features/security/presentation/widgets/pin_entry_widget.dart';
 
 class ChangePinSheet extends StatefulWidget {
   const ChangePinSheet({super.key});

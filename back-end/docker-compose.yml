@@ -1,31 +1,133 @@
-version: '3.8'
-
 services:
-  # 1. Rust FX Engine
-  fx-engine:
-    build:
-      context: ./rust/fx-engine
-      dockerfile: Dockerfile
-    ports:
-      - "50052:50052"
+  # 1. Database Service (Postgres)
+  postgres:
+    image: postgres:16-alpine
     environment:
-      - RUST_LOG=info
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Automatically run Supabase SQL migrations on startup (alphabetical order)
+      - ../supabase/migrations:/docker-entrypoint-initdb.d
     restart: always
 
-  # 2. Go API
+  # 2. Cache Service (Redis)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    restart: always
+
+  # 3. Go API Gateway
   api:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: api
     ports:
       - "8080:8080"
     environment:
-      - GIN_MODE=release
-      - FX_ENGINE_URL=fx-engine:50052  # Service name discovery
-      # Database URL is inherited from .env file or host env
+      - GIN_MODE=debug
+      - ACCOUNTING_CORE_URL=accounting-core:50051
+      - FX_ENGINE_URL=fx-engine:50052
+      - VERIFY_SERVICE_URL=verify-service:50053
+      - DATABASE_URL=postgres://postgres:postgrespassword@postgres:5432/postgres?sslmode=disable
+      - REDIS_URL=redis://redis:6379/0
     env_file:
       - .env
-    depends_on:
-      - fx-engine
     restart: always
+    depends_on:
+      - postgres
+      - redis
+      - accounting-core
+      - fx-engine
+      - verify-service
 
+  # 4. Go Outbox Queue Worker
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: worker
+    environment:
+      - GIN_MODE=release
+      - DATABASE_URL=postgres://postgres:postgrespassword@postgres:5432/postgres?sslmode=disable
+      - REDIS_URL=redis://redis:6379/0
+    env_file:
+      - .env
+    restart: always
+    depends_on:
+      - postgres
+      - redis
+      - accounting-core
+
+  # 5. Go Accounting Core (Ledger)
+  accounting-core:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: accounting-core
+    ports:
+      - "50051:50051"
+    environment:
+      - PORT=50051
+      - DATABASE_URL=postgres://postgres:postgrespassword@postgres:5432/postgres?sslmode=disable
+      - REDIS_URL=redis://redis:6379/0
+    env_file:
+      - .env
+    restart: always
+    depends_on:
+      - postgres
+      - redis
+
+  # 6. Go FX Engine
+  fx-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: fx-engine
+    ports:
+      - "50052:50052"
+    environment:
+      - PORT=50052
+      - DATABASE_URL=postgres://postgres:postgrespassword@postgres:5432/postgres?sslmode=disable
+      - REDIS_URL=redis://redis:6379/0
+    env_file:
+      - .env
+    restart: always
+    depends_on:
+      - postgres
+      - redis
+
+  # 7. Go Verify Service (KYC/NFC)
+  verify-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: verify-service
+    ports:
+      - "50053:50053"
+    environment:
+      - PORT=50053
+      - DATABASE_URL=postgres://postgres:postgrespassword@postgres:5432/postgres?sslmode=disable
+      - REDIS_URL=redis://redis:6379/0
+    env_file:
+      - .env
+    restart: always
+    depends_on:
+      - postgres
+      - redis
+
+volumes:
+  pgdata:
+  redisdata:

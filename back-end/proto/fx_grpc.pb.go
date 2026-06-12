@@ -27,7 +27,7 @@ const (
 	FXService_VerifySignature_FullMethodName = "/fx.FXService/VerifySignature"
 )
 
-// FXServiceClient is the client API for FXService service.
+// FXServiceClient is the client API for FXService usecase.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type FXServiceClient interface {
@@ -107,7 +107,7 @@ func (c *fXServiceClient) VerifySignature(ctx context.Context, in *VerifySignatu
 	return out, nil
 }
 
-// FXServiceServer is the server API for FXService service.
+// FXServiceServer is the server API for FXService usecase.
 // All implementations must embed UnimplementedFXServiceServer
 // for forward compatibility
 type FXServiceServer interface {
@@ -150,7 +150,7 @@ func (UnimplementedFXServiceServer) VerifySignature(context.Context, *VerifySign
 }
 func (UnimplementedFXServiceServer) mustEmbedUnimplementedFXServiceServer() {}
 
-// UnsafeFXServiceServer may be embedded to opt out of forward compatibility for this service.
+// UnsafeFXServiceServer may be embedded to opt out of forward compatibility for this usecase.
 // Use of this interface is not recommended, as added methods to FXServiceServer will
 // result in compilation errors.
 type UnsafeFXServiceServer interface {
@@ -269,7 +269,7 @@ func _FXService_VerifySignature_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
-// FXService_ServiceDesc is the grpc.ServiceDesc for FXService service.
+// FXService_ServiceDesc is the grpc.ServiceDesc for FXService usecase.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var FXService_ServiceDesc = grpc.ServiceDesc{

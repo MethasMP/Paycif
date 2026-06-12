@@ -3,6 +3,8 @@ package middleware
 import (
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -17,7 +19,7 @@ var (
 )
 
 const (
-	RateLimit   = 60             // Requests per minute
+	RateLimit   = 60 // Requests per minute
 	Window      = 1 * time.Minute
 	CleanupTick = 5 * time.Minute
 )
@@ -28,13 +30,21 @@ func initMemory() {
 		cleanupTicker = time.NewTicker(CleanupTick)
 		cleanupDone = make(chan bool)
 
-		// Background cleanup for memory map
+		// Background cleanup for memory map: only remove buckets for minutes
+		// that have already elapsed, so a client can't get a fresh quota by
+		// having the entire map wiped mid-window.
 		go func() {
 			for {
 				select {
 				case <-cleanupTicker.C:
+					currentMinute := time.Now().Unix() / 60
 					memoryStore.Range(func(key, value interface{}) bool {
-						memoryStore.Delete(key)
+						k := key.(string)
+						if idx := strings.LastIndex(k, ":"); idx != -1 {
+							if minute, err := strconv.ParseInt(k[idx+1:], 10, 64); err == nil && minute < currentMinute {
+								memoryStore.Delete(key)
+							}
+						}
 						return true
 					})
 				case <-cleanupDone:
@@ -52,7 +62,7 @@ func RateLimiterMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := c.GetString("user_id")
 		ip := c.ClientIP()
-		
+
 		// Identifier: Prefer UserID, fallback to IP
 		identifier := userID
 		if identifier == "" {
@@ -66,7 +76,7 @@ func RateLimiterMiddleware() gin.HandlerFunc {
 		// In-Memory Rate Limiter
 		val, _ := memoryStore.LoadOrStore(key, &SafeCounter{})
 		counter := val.(*SafeCounter)
-		
+
 		newVal := counter.Inc()
 		if newVal > RateLimit {
 			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
@@ -91,4 +101,3 @@ func (c *SafeCounter) Inc() int {
 	c.v++
 	return c.v
 }
-

@@ -1,0 +1,290 @@
+package usecase
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"log"
+	"math/rand"
+	"net/http"
+	"strings"
+	"time"
+
+	fxrpc "paysif/internal/adapter/grpc"
+
+	"github.com/shopspring/decimal"
+)
+
+// FXService handles currency exchange operations.
+type FXService struct {
+	DB         *sql.DB
+	GRPCClient fxrpc.FXClientInterface
+}
+
+// NewFXService creates a new FXService.
+func NewFXService(db *sql.DB, grpcClient fxrpc.FXClientInterface) *FXService {
+	return &FXService{
+		DB:         db,
+		GRPCClient: grpcClient,
+	}
+}
+
+// ExchangeRateAPIResponse structure for open.er-api.com
+type ExchangeRateAPIResponse struct {
+	Result string             `json:"result"`
+	Rates  map[string]float64 `json:"rates"`
+}
+
+// StartFXScheduler starts the background task to simulate rate updates.
+func (s *FXService) StartFXScheduler(ctx context.Context) {
+	// Update less frequently (e.g. every 15 minutes) as per user request
+	ticker := time.NewTicker(15 * time.Minute)
+	go func() {
+		log.Println("FX Simulation Scheduler started...")
+		// Run immediately on start
+		s.SimulateRates(ctx)
+
+		for {
+			select {
+			case <-ticker.C:
+				s.SimulateRates(ctx)
+			case <-ctx.Done():
+				ticker.Stop()
+				return
+			}
+		}
+	}()
+}
+
+// SimulateRates updates rates based on existing values with random noise.
+func (s *FXService) SimulateRates(ctx context.Context) {
+	currencies := []string{"EUR", "USD", "RUB", "INR", "AUD"}
+	targetCurrency := "THB"
+
+	for _, fromCurr := range currencies {
+		// Stateless Query for Simulation
+		var currentRateStr string
+		simQuery := "SELECT mid_rate FROM exchange_rates WHERE from_currency = $1 AND to_currency = 'THB'"
+
+		err := s.DB.QueryRowContext(ctx, simQuery, strings.ToUpper(fromCurr)).Scan(&currentRateStr)
+
+		if err == sql.ErrNoRows || currentRateStr == "" {
+			// Init: Fetch this currency from API and move on to the next one.
+			log.Printf("Initializing rate for %s/%s from API...", fromCurr, targetCurrency)
+			s.initRateFromAPI(ctx, fromCurr, targetCurrency)
+			continue
+		} else if err != nil {
+			log.Printf("Error checking rate for %s: %v", fromCurr, err)
+			continue
+		}
+
+		// 2. Fluctuate
+		currentRate, _ := decimal.NewFromString(currentRateStr)
+
+		// Random noise between -0.05% and +0.05%
+		// (rand - 0.5) * 0.001 => range -0.0005 to 0.0005
+		noiseFactor := (rand.Float64() - 0.5) * 0.001
+		change := currentRate.Mul(decimal.NewFromFloat(noiseFactor))
+		newMidRate := currentRate.Add(change)
+
+		// Apply Fair Logic (Spread)
+		spread := decimal.NewFromFloat(0.002) // 0.2%
+		providerRate := newMidRate.Mul(decimal.NewFromInt(1).Sub(spread))
+
+		if err := s.persistRate(ctx, fromCurr, targetCurrency, newMidRate, providerRate, spread); err != nil {
+			log.Printf("Error persisting simulated rate for %s: %v", fromCurr, err)
+		} else {
+			log.Printf("Simulated update %s/%s: Mid=%s (%.4f%%)",
+				fromCurr, targetCurrency, newMidRate.StringFixed(4), noiseFactor*100)
+		}
+	}
+}
+
+// FetchAndStoreRates fetches real rates for all tracked currencies (Fallback/Init).
+func (s *FXService) FetchAndStoreRates(ctx context.Context) {
+	currencies := []string{"EUR", "USD", "RUB", "INR", "AUD"}
+	targetCurrency := "THB"
+
+	for _, fromCurr := range currencies {
+		s.initRateFromAPI(ctx, fromCurr, targetCurrency)
+	}
+}
+
+// initRateFromAPI fetches and persists the rate for a single currency pair.
+func (s *FXService) initRateFromAPI(ctx context.Context, fromCurr, targetCurrency string) {
+	rate, err := s.fetchRateFromAPI(ctx, fromCurr, targetCurrency)
+	if err != nil {
+		log.Printf("Error fetching rate for %s/%s: %v", fromCurr, targetCurrency, err)
+		return
+	}
+
+	midRate := decimal.NewFromFloat(rate)
+	spread := decimal.NewFromFloat(0.002)
+	providerRate := midRate.Mul(decimal.NewFromInt(1).Sub(spread))
+
+	if err := s.persistRate(ctx, fromCurr, targetCurrency, midRate, providerRate, spread); err != nil {
+		log.Printf("Error persisting rate for %s/%s: %v", fromCurr, targetCurrency, err)
+	} else {
+		log.Printf("Updated rate %s/%s: Mid=%s, Prov=%s", fromCurr, targetCurrency, midRate.StringFixed(4), providerRate.StringFixed(4))
+	}
+}
+
+func (s *FXService) fetchRateFromAPI(ctx context.Context, base, target string) (float64, error) {
+	// Using open.er-api.com (free, reliable for demo)
+	url := fmt.Sprintf("https://open.er-api.com/v6/latest/%s", base)
+
+	reqCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, url, nil)
+	if err != nil {
+		return 0, err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("API returned status: %d", resp.StatusCode)
+	}
+
+	var data ExchangeRateAPIResponse
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return 0, err
+	}
+
+	rate, ok := data.Rates[target]
+	if !ok {
+		return 0, fmt.Errorf("rate for %s not found in response for base %s", target, base)
+	}
+
+	return rate, nil
+}
+
+func (s *FXService) persistRate(ctx context.Context, from, to string, mid, provider, spread decimal.Decimal) error {
+	// Simple upsert into exchange_rates
+	query := `
+		INSERT INTO exchange_rates (from_currency, to_currency, mid_rate, provider_rate, spread, updated_at)
+		VALUES ($1, $2, $3, $4, $5, NOW())
+		ON CONFLICT (from_currency, to_currency) 
+		DO UPDATE SET 
+			mid_rate = EXCLUDED.mid_rate,
+			provider_rate = EXCLUDED.provider_rate,
+			spread = EXCLUDED.spread,
+			updated_at = NOW();
+	`
+	_, err := s.DB.ExecContext(ctx, query, from, to, mid, provider, spread)
+	if err != nil {
+		return fmt.Errorf("failed to upsert exchange_rates: %w", err)
+	}
+
+	// Survivability: Push update to High-Performance Rust Engine
+	if s.GRPCClient != nil {
+		// Use a detached context for push to ensure it doesn't fail the schedule if slow
+		// But here we just use ctx for simplicity or create a quick timeout
+		pushCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		if err := s.GRPCClient.UpdateRate(pushCtx, from, to, provider, "scheduler"); err != nil {
+			log.Printf("⚠️ Failed to push rate %s/%s to Rust Engine: %v", from, to, err)
+			// Don't fail the whole operation, just log warning
+		} else if !provider.IsZero() {
+			// Our Rust update_rate implementation is a simple key-value store,
+			// so the inverse direction must be pushed separately.
+			inverse := decimal.NewFromInt(1).Div(provider)
+			if err := s.GRPCClient.UpdateRate(pushCtx, to, from, inverse, "scheduler-inverse"); err != nil {
+				log.Printf("⚠️ Failed to push inverse rate %s/%s to Rust Engine: %v", to, from, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// ConvertToBase converts an amount in a given currency to THB (Base).
+// Returns (baseAmount, usedRate, error)
+func (s *FXService) ConvertToBase(ctx context.Context, amount int64, currency string) (int64, decimal.Decimal, error) {
+	if currency == "THB" {
+		return amount, decimal.NewFromInt(1), nil
+	}
+
+	// 1. Try Rust FX Engine (High Performance)
+	if s.GRPCClient != nil {
+		resp, err := s.GRPCClient.Convert(ctx, currency, "THB", amount, "srv-req")
+		if err == nil && resp.Success {
+			// Success!
+			rate, _ := decimal.NewFromString(resp.RateUsed)
+			return resp.ConvertedAmount, rate, nil
+		}
+		// If failed, log and fall back to DB
+		log.Printf("⚠️ Rust FX Engine unreachable or failed: %v. Falling back to DB.", err)
+	}
+
+	// 2. Fallback: Stateless Query Logic
+	// This ensures survivability if the microservice is down.
+	var rateStr string
+	convQuery := "SELECT provider_rate FROM exchange_rates WHERE from_currency = $1 AND to_currency = 'THB'"
+
+	err := s.DB.QueryRowContext(ctx, convQuery, strings.ToUpper(currency)).Scan(&rateStr)
+
+	if err != nil {
+		return 0, decimal.Zero, fmt.Errorf("no exchange rate found for %s/THB (DB Fallback): %w", currency, err)
+	}
+
+	rate, err := decimal.NewFromString(rateStr)
+	if err != nil {
+		return 0, decimal.Zero, fmt.Errorf("invalid decimal in DB: %w", err)
+	}
+
+	amountDec := decimal.NewFromInt(amount)
+	baseAmountDec := amountDec.Mul(rate)
+
+	return baseAmountDec.IntPart(), rate, nil
+}
+
+// GetLimits returns the daily limit status from Rust FX Engine or dummy Fallback
+func (s *FXService) GetLimits(ctx context.Context, userID, currency string) (map[string]interface{}, error) {
+	// 1. Try Rust FX Engine
+	if s.GRPCClient != nil {
+		resp, err := s.GRPCClient.GetLimits(ctx, userID, currency)
+		if err == nil {
+			return map[string]interface{}{
+				"max_daily_amount":       resp.MaxDailyAmount,
+				"remaining_daily_amount": resp.RemainingDailyAmount,
+				"current_daily_total":    resp.CurrentDailyTotal,
+				"max_transaction_amount": resp.MaxTransactionAmount,
+			}, nil
+		}
+		log.Printf("⚠️ Rust Limit Check unreachable or failed: %v. Returning fallback.", err)
+	}
+
+	// 2. Fallback: Return dummy limits since topups are deprecated in Pay-per-use model
+	return map[string]interface{}{
+		"max_daily_amount":       20000.0,
+		"remaining_daily_amount": 20000.0,
+		"current_daily_total":    0.0,
+		"max_transaction_amount": 20000.0,
+	}, nil
+}
+
+// PreValidateTransfer checks signature and limits via Rust FX Engine
+func (s *FXService) PreValidateTransfer(ctx context.Context, userID, currency string, amount int64, publicKey, signature, message []byte) (bool, string, error) {
+	if s.GRPCClient == nil {
+		return false, "Service Unavailable", fmt.Errorf("Rust FX Engine unavailable")
+	}
+
+	resp, err := s.GRPCClient.PreValidateTransfer(ctx, userID, currency, amount, publicKey, signature, message)
+	if err != nil {
+		return false, "Validation Error", err
+	}
+
+	if !resp.Valid {
+		return false, resp.ErrorMessage, nil
+	}
+
+	return true, "", nil
+}

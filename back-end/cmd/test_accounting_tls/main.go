@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	grpcclient "paysif/internal/grpc"
+	grpcclient "paysif/internal/adapter/grpc"
 )
 
 func main() {

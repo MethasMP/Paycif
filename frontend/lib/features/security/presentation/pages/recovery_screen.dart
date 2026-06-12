@@ -6,11 +6,11 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:provider/provider.dart';
 
-import '../../presentation/logic/security_controller.dart';
-import '../../../../utils/error_translator.dart';
+import 'package:frontend/features/security/presentation/logic/security_controller.dart';
+import 'package:frontend/core/utils/error_translator.dart';
 import 'package:flutter/foundation.dart';
-import 'package:frontend/l10n/generated/app_localizations.dart';
-import 'package:frontend/theme/app_theme.dart';
+import 'package:frontend/core/l10n/generated/app_localizations.dart';
+import 'package:frontend/core/theme/app_theme.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RECOVERY SCREEN

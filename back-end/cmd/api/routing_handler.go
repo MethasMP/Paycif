@@ -2,7 +2,7 @@ package main
 
 import (
 	"net/http"
-	"paysif/internal/routing"
+	"paysif/internal/adapter/handler"
 
 	"github.com/gin-gonic/gin"
 )

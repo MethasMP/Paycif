@@ -3,7 +3,7 @@ import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 
 import 'package:local_auth/local_auth.dart';
-import '../../domain/repositories/security_repository.dart';
+import 'package:frontend/features/security/domain/repositories/security_repository.dart';
 
 /// 🚀 The Sentinel Identity Protocol (50 Years Ahead UX)
 /// Instead of just "checking hardware", it analyzes the "Confidence State".

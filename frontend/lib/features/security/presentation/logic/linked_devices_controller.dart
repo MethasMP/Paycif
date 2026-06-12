@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import '../../domain/repositories/security_repository.dart';
-import 'package:frontend/l10n/generated/app_localizations.dart';
+import 'package:frontend/features/security/domain/repositories/security_repository.dart';
+import 'package:frontend/core/l10n/generated/app_localizations.dart';
 
 class LinkedDevicesController extends ChangeNotifier {
   final SecurityRepository _repository;

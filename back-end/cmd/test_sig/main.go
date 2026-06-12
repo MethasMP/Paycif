@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 
-	fxrpc "paysif/internal/grpc"
+	fxrpc "paysif/internal/adapter/grpc"
 )
 
 func main() {
@@ -25,7 +25,7 @@ func main() {
 	pubKey, _ := hex.DecodeString("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a")
 	msg := []byte("paysif-signature-test")
 	// This is a fake signature, verification should fail gracefully
-	sig := make([]byte, 64) 
+	sig := make([]byte, 64)
 
 	fmt.Println("🚀 Testing SIMD-Accelerated Signature Verification...")
 
@@ -40,6 +40,6 @@ func main() {
 	} else {
 		fmt.Printf("❌ Signature INVALID: %s\n", resp.ErrorMessage)
 	}
-	
+
 	fmt.Println("🎉 Integration Test Passed (Connectivity & Protocol Verified)")
 }

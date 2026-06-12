@@ -7,18 +7,18 @@ import 'package:provider/provider.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
-import 'package:frontend/screens/login_screen.dart';
-import 'package:frontend/services/connectivity_service.dart';
+import 'package:frontend/features/auth/presentation/login_screen.dart';
+import 'package:frontend/core/network/connectivity_service.dart';
 import 'package:frontend/features/security/domain/repositories/security_repository.dart';
 import 'package:frontend/features/security/data/repositories/security_repository_impl.dart';
 import 'package:frontend/features/security/data/datasources/security_remote_data_source.dart';
 import 'package:frontend/features/security/data/datasources/crypto_service.dart';
 import 'package:frontend/features/security/data/datasources/secure_storage_service.dart';
-import 'package:frontend/controllers/payment_controller.dart';
-import 'package:frontend/controllers/dashboard_controller.dart';
-import 'package:frontend/repositories/dashboard_repository.dart';
+import 'package:frontend/features/payment/presentation/payment_controller.dart';
+import 'package:frontend/features/dashboard/presentation/dashboard_controller.dart';
+import 'package:frontend/features/dashboard/data/dashboard_repository.dart';
 import 'package:frontend/features/security/presentation/logic/security_controller.dart';
-import 'package:frontend/l10n/generated/app_localizations.dart';
+import 'package:frontend/core/l10n/generated/app_localizations.dart';
 
 void main() {
   setUpAll(() async {

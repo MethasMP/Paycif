@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"paysif/database"
-	"paysif/models"
+	"paysif/internal/adapter/repository"
+	"paysif/internal/domain/entities"
 )
 
 func main() {
@@ -15,5 +15,5 @@ func main() {
 
 	// Verify database connection function exists
 	// We won't actually call it to avoid runtime error without env var
-	fmt.Printf("Database connect function type: %T\n", database.Connect)
+	fmt.Printf("Database connect function type: %T\n", repository.Connect)
 }

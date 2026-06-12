@@ -1,0 +1,142 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
+import 'package:frontend/features/transactions/domain/transaction.dart';
+import 'package:frontend/features/dashboard/presentation/dashboard_controller.dart';
+import 'package:frontend/core/widgets/transaction_item.dart';
+import 'package:frontend/features/transactions/presentation/transaction_detail_screen.dart';
+import 'package:frontend/core/l10n/generated/app_localizations.dart';
+import 'package:frontend/core/theme/app_theme.dart';
+
+class HistoryScreen extends StatelessWidget {
+  const HistoryScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: Text(l10n.historyTitle),
+        // Style inherited from AppTheme.titleLarge via AppBarTheme.titleTextStyle
+      ),
+      body: BlocBuilder<DashboardController, DashboardState>(
+        builder: (context, state) {
+          if (state.transactions.isEmpty) {
+            return _buildEmptyState(context);
+          }
+
+          final grouped = _groupTransactions(
+            state.transactions,
+            context,
+          ); // Pass context
+
+          return RefreshIndicator(
+            onRefresh: () async {
+              await context.read<DashboardController>().refresh();
+            },
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              itemCount: grouped.keys.length,
+              itemBuilder: (context, index) {
+                final dateKey = grouped.keys.elementAt(index);
+                final transactions = grouped[dateKey]!;
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: Text(
+                        dateKey.toUpperCase(),
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: AppTheme.textSecondaryColor(context),
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                    ),
+                    ...transactions.map(
+                      (tx) => TransactionItem(
+                        transaction: tx,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  TransactionDetailScreen(transaction: tx),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Map<String, List<Transaction>> _groupTransactions(
+    List<Transaction> transactions,
+    BuildContext context,
+  ) {
+    final l10n = AppLocalizations.of(context)!;
+    final Map<String, List<Transaction>> grouped = {};
+    for (var tx in transactions) {
+      final date = tx.createdAt; // Assuming ISO String
+      final now = DateTime.now();
+      String key;
+
+      if (date.year == now.year &&
+          date.month == now.month &&
+          date.day == now.day) {
+        key = l10n.commonToday;
+      } else if (date.year == now.year &&
+          date.month == now.month &&
+          date.day == now.day - 1) {
+        key = l10n.commonYesterday;
+      } else {
+        key = DateFormat('MMMM d').format(date);
+      }
+
+      if (!grouped.containsKey(key)) {
+        grouped[key] = [];
+      }
+      grouped[key]!.add(tx);
+    }
+    return grouped;
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Semantics(
+      label: 'No transaction activity found',
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              PhosphorIcons.clock,
+              size: 60,
+              color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
+            ),
+            SizedBox(height: 16),
+            Text(
+              l10n.historyNoActivity,
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                color: AppTheme.textSecondaryColor(context),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

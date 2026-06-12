@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:nfc_manager/nfc_manager.dart';
-import '../../domain/entities/passport_data.dart';
+import 'package:frontend/features/identity/domain/entities/passport_data.dart';
 
 /// 🔐 NFC Passport Data Source
 /// 

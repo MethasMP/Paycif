@@ -2,16 +2,16 @@ package main
 
 import (
 	"log"
-	"paysif/database"
+	"paysif/internal/adapter/repository"
 
 	_ "github.com/joho/godotenv/autoload"
 )
 
 func main() {
-	if err := database.Connect(); err != nil {
+	if err := repository.Connect(); err != nil {
 		log.Fatalf("Failed to connect to DB: %v", err)
 	}
-	defer database.Close()
+	defer repository.Close()
 
 	query := `
 	CREATE TABLE IF NOT EXISTS transaction_outbox (
@@ -27,7 +27,7 @@ func main() {
 	CREATE INDEX IF NOT EXISTS idx_outbox_status ON transaction_outbox(status);
 	`
 
-	_, err := database.DB.Exec(query)
+	_, err := repository.DB.Exec(query)
 	if err != nil {
 		log.Fatalf("Failed to create table: %v", err)
 	}

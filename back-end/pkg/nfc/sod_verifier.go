@@ -13,9 +13,9 @@ import (
 
 // NfcPassportPayload represents the raw cryptographically signed data read from the e-Passport NFC chip.
 type NfcPassportPayload struct {
-	DG1 []byte `json:"dg1"`
-	DG2 []byte `json:"dg2"`
-	SOD []byte `json:"sod"`
+	DG1                []byte `json:"dg1"`
+	DG2                []byte `json:"dg2"`
+	SOD                []byte `json:"sod"`
 	DocumentSignerCert []byte `json:"ds_cert"`
 }
 
@@ -44,7 +44,7 @@ type PassportIdentity struct {
 // VerifyPassportNfcSignature implements Passive Authentication (PA).
 func VerifyPassportNfcSignature(payload NfcPassportPayload) (*PassportIdentity, error) {
 	slog.Info("Starting NFC Passport Passive Authentication (PA)...")
-	
+
 	if len(payload.DG1) == 0 {
 		return nil, errors.New("NFC Payload missing DG1 (Text data)")
 	}
@@ -65,11 +65,11 @@ func VerifyPassportNfcSignature(payload NfcPassportPayload) (*PassportIdentity, 
 	// We verify that the Hash of DG1/DG2 matches what's signed in the SOD.
 	if len(payload.SOD) > 0 && string(payload.SOD[0:13]) == "MOCK_SOD_CMS:" {
 		slog.Info("🔍 Integrity Check: Validating DG hashes against SOD signature...")
-		
+
 		dg1Hash := sha256.Sum256(payload.DG1)
 		dg2Hash := sha256.Sum256(payload.DG2)
 		signature := payload.SOD[13:]
-		
+
 		dsCert, err := x509.ParseCertificate(payload.DocumentSignerCert)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse DS certificate: %w", err)
@@ -88,7 +88,7 @@ func VerifyPassportNfcSignature(payload NfcPassportPayload) (*PassportIdentity, 
 		if err != nil {
 			return nil, fmt.Errorf("SECURITY ALERT: Passive Authentication Failed! Data groups tampered or signature invalid: %v", err)
 		}
-		
+
 		slog.Info("✅ Passive Authentication Successful: Data integrity verified.")
 	}
 
@@ -127,12 +127,12 @@ func parseDG1(data []byte) (*PassportIdentity, error) {
 	// Real-world parsing (Simplified for prototype)
 	// Line 1: P<THA[LASTNAME]<<[FIRSTNAME]<<...
 	// Line 2: [DOC#][DIGIT][NAT][DOB][DIGIT][SEX][EXP][DIGIT]...
-	
+
 	// This is a robust mock that emulates extracting from the physical MRZ
 	// Example Line 2: AA12345674THA9001015M3001013<<<<<<<<<<<<<<0
 	// Pos 0-9: DocNum, 10-13: Nationality, 13-19: DOB
 	return &PassportIdentity{
-		DocumentNumber: strings.TrimRight(mrzStr[44:53], "<"), 
+		DocumentNumber: strings.TrimRight(mrzStr[44:53], "<"),
 		FirstName:      "SIMULATED",
 		LastName:       "USER",
 		Nationality:    mrzStr[54:57],

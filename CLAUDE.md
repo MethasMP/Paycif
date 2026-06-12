@@ -1,214 +1,78 @@
-# CLAUDE.md — Paycif
+# CLAUDE.md — Paycif Project Context
 
-> Context engineering file for AI coding agents.
-> Loaded automatically into context at session start. Keep this file **signal-dense, not exhaustive**.
-> Last updated: 2026-05-29
+> สำหรับ AI coding agent: อ่านไฟล์นี้ก่อนเริ่มงานใดๆ เพื่อเข้าใจภาพรวมระบบ สถานะปัจจุบัน และข้อจำกัดเชิงสถาปัตยกรรมที่ต้องยึดตาม
 
 ---
 
-## Project Identity
+## 1. Paycif คืออะไร
 
-**Paycif** — a mobile payment platform enabling foreign tourists in Thailand to pay Thai merchants via PromptPay QR codes, bridging international fiat rails with Thailand's domestic payment infrastructure through stablecoin (USDC) as the settlement bridge.
+Paycif เป็น **cross-border payment orchestration layer** ที่ช่วยให้นักท่องเที่ยวต่างชาติจ่ายเงินร้านค้าไทยผ่าน **PromptPay QR** โดยใช้วิธีจ่ายเงินจากต่างประเทศ (บัตรเครดิต, Apple Pay, stablecoin)
 
-| Field | Value |
-|---|---|
-| Legal entity | PAYSIF COMPANY LIMITED |
-| Registration | 0255569000991 (registered 27 March 2026) |
-| Founder | นาย เมธัส ภาคภูมิพงศ์ (Methas Pakphumipong) |
-| Contact | Methaspak@gmail.com · 096-9240925 |
-| Business email | hello@paysif.io |
-| Domain | paysif.io |
-| Stage | Pre-launch — technical implementation phase |
+**สิ่งสำคัญ:** Paycif **ไม่มี payment license ของตัวเอง** — กิจกรรมที่ต้องมี license ทั้งหมดถูก delegate ไปยัง partner ที่มี license แล้ว Paycif ทำหน้าที่เป็น orchestrator/middleware เท่านั้น
+
+บริษัท: PAYSIF COMPANY LIMITED (จดทะเบียน 27 มี.ค. 2026, Prachinburi)
+เว็บไซต์: paysif.io
 
 ---
 
-## Architecture Overview
-
-Paycif acts as an orchestrator between licensed third-party partners. **We do not hold a payment license ourselves** — all regulated activity is handled by licensed partners. The architecture must be designed so any partner can be swapped with minimal code change (abstraction layer over all partner APIs).
+## 2. Core Architecture (3-leg flow)
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                    TOURIST                          │
-│  Pays via whatever method the on-ramp partner       │
-│  supports: card, Apple Pay, bank transfer, etc.     │
-│  (available methods vary by partner and country)    │
-└────────────────────┬────────────────────────────────┘
-                     │ Fiat
-                     ▼
-┌─────────────────────────────────────────────────────┐
-│              ON-RAMP PARTNER                        │
-│  Role: Licensed crypto on-ramp provider             │
-│  Action: Fiat → USDC                                │
-│  Examples of this role: Ramp Network, Alchemy Pay,  │
-│  Coinflow, MoonPay, Transak (pay-per-use, no        │
-│  exclusivity — provider can be swapped)             │
-└────────────────────┬────────────────────────────────┘
-                     │ USDC (Base network)
-                     ▼
-┌─────────────────────────────────────────────────────┐
-│           PAYCIF POOL WALLET                        │
-│  Role: USDC custody bridge between on-ramp and      │
-│  off-ramp (non-custodial smart contract wallet      │
-│  on Base network, EVM L2)                           │
-│  Managed by: Wallet infrastructure partner          │
-│  (e.g., a smart account / wallet SDK provider)      │
-└────────────────────┬────────────────────────────────┘
-                     │ USDC
-                     ▼
-┌─────────────────────────────────────────────────────┐
-│              OFF-RAMP PARTNER                       │
-│  Role: Licensed crypto off-ramp + fiat settlement   │
-│  Action: USDC → THB, disbursed via PromptPay QR     │
-│  Must hold Thai payment license (or work with a     │
-│  licensed Thai payment gateway for the final leg)   │
-│  Examples of this role: Ramp Network, TransFi,      │
-│  Alchemy Pay (same or different provider as on-ramp)│
-└────────────────────┬────────────────────────────────┘
-                     │ THB via PromptPay
-                     ▼
-┌─────────────────────────────────────────────────────┐
-│              THAI MERCHANT                          │
-│  Receives payment via PromptPay QR (merchant QR,   │
-│  rate: 0.90% + $0.04 — BOT regulated floor)        │
-└─────────────────────────────────────────────────────┘
+[Tourist] → On-Ramp Partner → USDC Pool Wallet (Base network) → Off-Ramp Partner → PromptPay → [Merchant]
 ```
 
-### Key Design Principle: Partner Abstraction
+- **On-ramp:** รับเงิน fiat จากนักท่องเที่ยว (card/Apple Pay/bank transfer) → แปลงเป็น USDC
+- **Pool wallet:** Paycif-managed USDC wallet บน Base network — เป็นตัวกลางที่ Paycif ควบคุม
+- **Off-ramp:** แปลง USDC → THB → ส่งเข้า PromptPay ของร้านค้า
 
-On-ramp and off-ramp may be the same company or different companies. **The codebase must never be tightly coupled to a specific provider.** All partner integrations sit behind an interface/adapter layer:
+**กฎสำคัญสำหรับ AI agent:**
+ทุก partner role (on-ramp, off-ramp, wallet) ต้อง implement ผ่าน interface ที่ swap ได้:
+- `IOnRampProvider`
+- `IOffRampProvider`
+- `IWalletProvider`
 
-```
-IOnRampProvider  { initiateTopUp(), getStatus(), getWebhookPayload() }
-IOffRampProvider { initiatePayout(), getStatus(), getWebhookPayload() }
-IWalletProvider  { getBalance(), transfer(), getAddress() }
-```
-
-Swapping a provider = swapping the adapter, not rewriting business logic.
-
----
-
-## Revenue Model
-
-| Source | Detail |
-|---|---|
-| FX spread on tourist top-up | 2.5% spread → ~฿8–18 net per ฿2,000 transaction |
-| Launch scope | Merchant QR only |
-| Personal PromptPay QR | Deferred — BOT regulatory floor, not negotiable |
-| Merchant QR rate | 0.90% + $0.04 (BOT floor) |
+**ห้าม hardcode ชื่อ partner company ใน core architecture/business logic** — ชื่อ partner ใส่ได้เฉพาะใน config/adapter layer เท่านั้น เพราะ partner เปลี่ยนได้เสมอ (pay-per-use, ไม่ exclusive)
 
 ---
 
-## Tech Stack
+## 3. สถานะปัจจุบัน (อัปเดตล่าสุด)
 
-| Layer | Technology |
-|---|---|
-| Mobile app | Flutter (iOS + Android) |
-| Design system | Teal + Gold — primary `#0F6E56`, CTA `#EF9F27` |
-| Settlement token | USDC on Base network (EVM-compatible L2) |
-| Wallet layer | Smart account / wallet SDK (provider-agnostic interface) |
-| On-ramp layer | Licensed on-ramp partner (adapter pattern, swappable) |
-| Off-ramp layer | Licensed off-ramp + PromptPay partner (adapter pattern, swappable) |
-| Business bank | SCB |
-| Target market | Foreign tourists from NFC-dominant markets (Europe, US, Japan) |
+### Partner ที่ confirmed
+- **SQRIL** — เซ็น Service Agreement แล้ว (SIAC Singapore arbitration, 45-day fee change notice, 12-month liability cap with fraud/gross negligence carve-outs)
+- ⚠️ **ยังไม่ verify:** SQRIL ประกาศ (มี.ค. 2026) ว่ามี PromptPay QR capability แล้ว — แต่ยังไม่ได้ confirm ว่า live จริงหรือยัง ต้องตรวจสอบก่อนพึ่งพา
 
----
+### Partner ที่ยังไม่ confirmed
+- Coinflow, Openfort, Alchemy Pay, Ramp Network — ส่ง BD outreach ไปแล้ว (เช่น ถึง Anchit Goel ที่ Alchemy Pay) แต่ยังไม่มี response/progress
 
-## Agent Workflow
+### โจทย์เปิดที่กำลังแก้อยู่
+1. **Regulatory gray area** — orchestration role ของ Paycif ต้องขอ BOT license หรือไม่ ยังไม่มีคำตอบชัดเจน
+2. **Merchant QR upgrade strategy** — ต้องดันร้านค้าให้ใช้ merchant QR (0.90% + $0.04) เพราะ personal QR rate (2.50% + $0.16) ใช้งานไม่ได้จริงในเชิงธุรกิจ — นี่คือ blocker หลักสำหรับ unit economics
+3. **Licensed sponsor bank / white-label path** — กำลังหาทางผ่าน SCB/KBank/BBL (sponsor bank) หรือ SQRIL white-label เพื่อแก้ปัญหา AML liability
 
-This project is built via **vibe-coding**: founder directs AI agents, agents write code. Follow this loop strictly:
+### Competitive positioning
+- **TAGTHAi Easy Pay** = direct competitor ที่ทำ tourist PromptPay use case อยู่แล้ว
+- **Crypto-to-THB corridor** = primary differentiator ของ Paycif ที่ TAGTHAi ไม่มี → นี่คือจุดที่ต้อง defend และพัฒนาต่อ
 
-```
-gather context → take action → verify work → repeat
-```
-
-1. **Gather context** — read `CLAUDE.md` (this file), then `NOTES.md`. Load source files just-in-time via search/grep. Never load entire large files into context.
-2. **Take action** — write code, create files, run scripts.
-3. **Verify** — lint, type-check, run tests before declaring done. Never say "done" without running verification.
-4. **Persist** — update `NOTES.md` with decisions made. Update `TODO.md` after each action.
+### Funding & Revenue
+- Pre-seed, pre-revenue, pre-launch — ยังไม่มี paying customer
 
 ---
 
-## Directory Structure
+## 4. Design System Reference
 
-```
-paycif/
-├── CLAUDE.md                    ← this file (loaded upfront, do not modify unless asked)
-├── NOTES.md                     ← agent working memory (read/write freely each session)
-├── TODO.md                      ← task list (update as you work)
-├── docs/
-│   ├── architecture.md          ← detailed payment flow diagrams
-│   ├── compliance.md            ← BOT / KYC / AML / licensing notes
-│   └── integrations/            ← per-partner integration notes (load just-in-time)
-│       ├── onramp-adapter.md
-│       ├── offramp-adapter.md
-│       └── wallet-adapter.md
-├── app/                         ← Flutter mobile app
-│   ├── lib/
-│   └── test/
-└── backend/                     ← API / webhook / settlement logic
-    ├── src/
-    │   ├── adapters/            ← one folder per partner, behind shared interface
-    │   └── core/                ← business logic, never import adapters directly
-    └── test/
-```
+ใช้ดีไซน์ "Warm Precision":
+- Deep Teal `#0A5C4A`
+- Off-white cream `#FAFAF7`
+- Gold `#C9963A`
+- Typography: DM Serif Display (ตัวเลขเงิน), DM Sans (UI copy)
+
+รายละเอียดเต็มอยู่ใน `design.md` แยกต่างหาก — ไม่ต้อง redo ที่นี่
 
 ---
 
-## Behavior Rules
+## 5. หลักการที่ AI agent ต้องยึดตามเสมอ
 
-### DO
-
-- Write **production-quality code** — this is a fintech app handling real money.
-- Follow **PCI-DSS awareness**: never log card numbers, CVVs, or raw PANs anywhere.
-- Design every partner integration behind an **interface/adapter** — business logic must not depend on a specific provider.
-- Keep `NOTES.md` updated with decisions, blockers, and context that would be lost across sessions.
-- Update `TODO.md` after each action (check off done items, add discovered sub-tasks).
-- For payment flows, **write the test first** (TDD), then implement.
-- For any ambiguous requirement, ask **one clarifying question** before proceeding.
-- Use **typed / structured output** (JSON with schema) for all inter-service communication.
-- Every external API call must have: **timeout + retry + failure path**.
-
-### DO NOT
-
-- Do not hardcode API keys, secrets, or provider credentials anywhere. Use environment variables.
-- Do not skip error handling in any payment flow step.
-- Do not couple business logic directly to a provider SDK — always go through the adapter interface.
-- Do not modify `CLAUDE.md` unless explicitly asked.
-- Do not declare a task complete without running the verification step.
-- Do not load entire large files (logs, CSVs, DB dumps) into context — use `head`, `tail`, `grep`.
-
----
-
-## Compliance Context
-
-| Item | Detail |
-|---|---|
-| Thai payment regulation | BOT regulates PromptPay QR rates and licensing |
-| Paycif's position | Orchestrator — regulated activity performed by licensed partners |
-| KYC | Tourist KYC handled at app onboarding |
-| Arbitration clause | SIAC Singapore (per vendor contracts) |
-| Liability cap | 12-month cap (per vendor contracts) |
-| Fee change notice | 45-day notice required from partners |
-
----
-
-## Context Management Notes
-
-- **This file** = upfront context (small, high-signal).
-- **`NOTES.md`** = persistent agent memory — read at every session start, write whenever a non-obvious decision is made.
-- **Integration docs** = load just-in-time only when working on that specific adapter.
-- If context window approaches limit: summarize state → write to `NOTES.md` → compact and continue.
-- For deep exploration tasks (e.g., researching a new partner's webhook format): treat as a focused subtask, return only the relevant summary to main context.
-
----
-
-## Definition of Done
-
-A task is **done** when all of the following are true:
-
-- [ ] Code compiles / passes linter with zero errors
-- [ ] Unit tests pass (or new tests written if none existed)
-- [ ] No secrets or credentials in code
-- [ ] No raw payment data in logs
-- [ ] `TODO.md` updated
-- [ ] `NOTES.md` updated with any non-obvious decisions made
+1. Paycif ไม่ใช่ licensed entity — ห้ามเขียน logic ที่ทำให้ดูเหมือน Paycif ถือ/โอนเงินแบบมี license
+2. Provider abstraction ต้อง swap ได้เสมอ — อย่า couple โค้ดกับ partner เฉพาะเจ้า
+3. Merchant-side QR (ไม่ใช่ personal QR) คือ default assumption สำหรับ flow ใดๆ ที่เกี่ยวกับการรับเงิน
+4. ถ้า task เกี่ยวกับ regulatory/compliance — flag ไว้ว่าเป็นพื้นที่ gray area ที่ยังไม่ resolve อย่า assume คำตอบ

@@ -47,7 +47,7 @@ func TestGlobalPassportSanity(t *testing.T) {
 				t.Error("Audit hash must be deterministic")
 			}
 
-			fmt.Printf("✅ Certified Identity Simulator Pass for %s %s (%s)\n", 
+			fmt.Printf("✅ Certified Identity Simulator Pass for %s %s (%s)\n",
 				tc.firstName, tc.lastName, tc.country)
 		})
 	}

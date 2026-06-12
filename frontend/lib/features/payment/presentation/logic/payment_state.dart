@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import '../../../../models/saved_card.dart';
+import 'package:frontend/features/profile/domain/saved_card.dart';
 
 enum PaymentMethodType { wallet, applePay, googlePay, card, promptPay }
 
@@ -38,16 +38,36 @@ class PaymentReady extends PaymentState {
   final double amount;
   final double balance;
   final List<PaymentMethod> availableMethods;
+  final String? sqrilTxId;
+  final double? exchangeRate;
+  final double? feeUSD;
+  final double? totalUSD;
+  final bool? isBusiness;
 
   const PaymentReady({
     required this.method,
     required this.amount,
     this.balance = 0.0,
     this.availableMethods = const [],
+    this.sqrilTxId,
+    this.exchangeRate,
+    this.feeUSD,
+    this.totalUSD,
+    this.isBusiness,
   });
 
   @override
-  List<Object?> get props => [method, amount, balance, availableMethods];
+  List<Object?> get props => [
+        method,
+        amount,
+        balance,
+        availableMethods,
+        sqrilTxId,
+        exchangeRate,
+        feeUSD,
+        totalUSD,
+        isBusiness,
+      ];
 }
 
 class PaymentInsufficientFunds extends PaymentState {

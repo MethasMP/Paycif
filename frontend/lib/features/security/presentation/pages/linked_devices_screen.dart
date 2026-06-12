@@ -1,12 +1,12 @@
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:frontend/l10n/generated/app_localizations.dart';
-import '../../domain/repositories/security_repository.dart';
-import '../logic/linked_devices_controller.dart';
-import 'package:frontend/utils/pay_notify.dart';
-import '../../../../screens/login_screen.dart'; // For logout redirection
-import 'package:frontend/theme/app_theme.dart';
+import 'package:frontend/core/l10n/generated/app_localizations.dart';
+import 'package:frontend/features/security/domain/repositories/security_repository.dart';
+import 'package:frontend/features/security/presentation/logic/linked_devices_controller.dart';
+import 'package:frontend/core/utils/pay_notify.dart';
+import 'package:frontend/features/auth/presentation/login_screen.dart'; // For logout redirection
+import 'package:frontend/core/theme/app_theme.dart';
 
 class LinkedDevicesScreen extends StatelessWidget {
   const LinkedDevicesScreen({super.key});

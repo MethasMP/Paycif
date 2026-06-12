@@ -15,7 +15,7 @@ import (
 	"syscall"
 	"time"
 
-	pb "paysif/internal/grpc/pb"
+	pb "paysif/internal/adapter/grpc/pb"
 
 	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -438,7 +438,7 @@ func (t *TransferExecutor) Execute(ctx context.Context, req *pb.TransferRequest)
 		// Roll back and release limit
 		tx.Rollback()
 		t.limitCache.ReleaseLimit(userUUID, req.Amount)
-		
+
 		log.Printf("Transfer double entry failed: %v", err)
 		return &pb.TransferResponse{
 			Success:      false,
@@ -761,7 +761,7 @@ func main() {
 
 	var listener net.Listener
 	udsPath := os.Getenv("ACCOUNTING_CORE_UDS")
-	
+
 	// UDS by default to match recommended config, fallback to TCP
 	if udsPath == "" {
 		udsPath = "/tmp/accounting_core.sock" // Default UDS

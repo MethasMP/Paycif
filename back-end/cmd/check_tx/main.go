@@ -3,20 +3,20 @@ package main
 import (
 	"fmt"
 	"log"
-	"paysif/database"
+	"paysif/internal/adapter/repository"
 
 	_ "github.com/joho/godotenv/autoload"
 )
 
 func main() {
-	if err := database.Connect(); err != nil {
+	if err := repository.Connect(); err != nil {
 		log.Fatal(err)
 	}
-	defer database.Close()
+	defer repository.Close()
 
 	// 1. Check Transactions
 	fmt.Println("\n--- Last 5 Transactions ---")
-	rows, err := database.DB.Query(`
+	rows, err := repository.DB.Query(`
 		SELECT id, description, created_at, settlement_status 
 		FROM transactions 
 		ORDER BY created_at DESC 
@@ -36,7 +36,7 @@ func main() {
 
 	// 2. Check Ledger Entries
 	fmt.Println("\n--- Last 5 Ledger Entries ---")
-	lRows, err := database.DB.Query(`
+	lRows, err := repository.DB.Query(`
 		SELECT id, amount, created_at 
 		FROM ledger_entries 
 		ORDER BY created_at DESC 

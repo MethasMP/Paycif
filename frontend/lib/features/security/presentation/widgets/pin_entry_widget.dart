@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import '../pages/pin_setup_screen.dart';
-import '../../presentation/logic/security_controller.dart';
-import '../../../../utils/error_translator.dart';
-import 'package:frontend/l10n/generated/app_localizations.dart';
-import 'package:frontend/theme/app_theme.dart';
+import 'package:frontend/features/security/presentation/pages/pin_setup_screen.dart';
+import 'package:frontend/features/security/presentation/logic/security_controller.dart';
+import 'package:frontend/core/utils/error_translator.dart';
+import 'package:frontend/core/l10n/generated/app_localizations.dart';
+import 'package:frontend/core/theme/app_theme.dart';
 
 /// 🚀 World-Class PIN Entry Widget
 /// Designed 20 years ahead with premium UX/UI patterns

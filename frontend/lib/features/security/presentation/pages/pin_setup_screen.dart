@@ -1,10 +1,10 @@
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../logic/security_controller.dart';
-import '../widgets/pin_entry_widget.dart';
-import '../../../../screens/main_screen.dart';
-import '../../../../widgets/paycif_icon_container.dart';
+import 'package:frontend/features/security/presentation/logic/security_controller.dart';
+import 'package:frontend/features/security/presentation/widgets/pin_entry_widget.dart';
+import 'package:frontend/features/dashboard/presentation/main_screen.dart';
+import 'package:frontend/core/widgets/paycif_icon_container.dart';
 
 
 import 'package:shared_preferences/shared_preferences.dart';

@@ -5,8 +5,9 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"paysif/internal/service"
+	"paysif/internal/usecase"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/MicahParks/keyfunc/v2"
@@ -17,8 +18,14 @@ import (
 
 var jwks *keyfunc.JWKS
 
+// ensuredAccounts caches user IDs whose wallet account has been verified/created
+// recently, so EnsureUserAccount isn't re-run (and a goroutine spawned) on every request.
+var ensuredAccounts sync.Map
+
+const ensuredAccountTTL = 1 * time.Hour
+
 // AuthMiddleware validates Supabase JWT using JWKS and sets userID in context.
-func AuthMiddleware(walletSvc *service.WalletService) gin.HandlerFunc {
+func AuthMiddleware(walletSvc *usecase.WalletService) gin.HandlerFunc {
 	// Load JWKS URL from environment variable with fallback to default
 	// CRITICAL: In production, always set JWKS_URL environment variable per environment
 	jwksURL := os.Getenv("JWKS_URL")
@@ -101,12 +108,17 @@ func AuthMiddleware(walletSvc *service.WalletService) gin.HandlerFunc {
 
 		c.Set("user_id", sub)
 
-		// SAFETY NET: Ensure user has a wallet asynchronously via Service layer 🛡️
-		go func(id uuid.UUID) {
-			if err := walletSvc.EnsureUserAccount(context.Background(), id); err != nil {
-				log.Printf("⚠️ Auto-Heal Error for %s: %v\n", id, err)
-			}
-		}(uid)
+		// SAFETY NET: Ensure user has a wallet, but only once per TTL window per user
+		// to avoid spawning a goroutine + DB write on every single request.
+		if expiresAt, ok := ensuredAccounts.Load(uid); !ok || time.Now().After(expiresAt.(time.Time)) {
+			ensuredAccounts.Store(uid, time.Now().Add(ensuredAccountTTL))
+			go func(id uuid.UUID) {
+				if err := walletSvc.EnsureUserAccount(context.Background(), id); err != nil {
+					log.Printf("⚠️ Auto-Heal Error for %s: %v\n", id, err)
+					ensuredAccounts.Delete(id)
+				}
+			}(uid)
+		}
 
 		c.Next()
 	}

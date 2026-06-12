@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
+	"hash/fnv"
 	"log"
 	"net/http"
-	"paysif/internal/service"
+	"paysif/internal/usecase"
 	"strings"
 	"time"
 
@@ -14,8 +15,8 @@ import (
 
 // TransferHandler holds dependencies for transfer operations.
 type TransferHandler struct {
-	Service          *service.WalletService
-	SignatureService *service.SignatureService
+	Service          *usecase.WalletService
+	SignatureService *usecase.SignatureService
 }
 
 // HandleBalance returns the balance for the authenticated user (mocked to 0 for pay-per-use).
@@ -129,7 +130,7 @@ func (h *TransferHandler) HandleGetLimits(c *gin.Context) {
 		return
 	}
 	// Assuming userID is valid UUID as middleware checks
-	
+
 	// Default to THB for now
 	currency := "THB"
 
@@ -141,16 +142,17 @@ func (h *TransferHandler) HandleGetLimits(c *gin.Context) {
 	}
 
 	// ETag & Cache-Control (Article Step 2)
-	// Create a unique fingerprint based on critical values
-	fingerprint := fmt.Sprintf("%v-%v-%v-%v", 
-		limits["max_daily_amount"], 
-		limits["current_daily_total"], 
+	// Create a unique fingerprint based on critical values, then hash it to a
+	// compact ETag (fnv64a) rather than hex-encoding the raw string.
+	fingerprint := fmt.Sprintf("%v-%v-%v-%v",
+		limits["max_daily_amount"],
+		limits["current_daily_total"],
 		limits["remaining_daily_amount"],
 		userIDStr)
-	
-	// Simple hash for ETag (or just raw string if short enough, but clean is better)
-	// We use FNV or just string since it's short.
-	etag := fmt.Sprintf("\"%x\"", fingerprint) 
+
+	hasher := fnv.New64a()
+	hasher.Write([]byte(fingerprint))
+	etag := fmt.Sprintf("\"%x\"", hasher.Sum64())
 
 	c.Header("ETag", etag)
 	c.Header("Cache-Control", "private, max-age=0, must-revalidate") // Private user data, validate always but save bandwidth
@@ -166,7 +168,7 @@ func (h *TransferHandler) HandleGetLimits(c *gin.Context) {
 		"max_daily_baht":           limits["max_daily_amount"],
 		"current_total_baht":       limits["current_daily_total"],
 		"remaining_limit_baht":     limits["remaining_daily_amount"],
-		"min_per_transaction_baht": 500.0, // Hardcoded minimum for now
+		"min_per_transaction_baht": float64(usecase.MinTransactionAmount) / 100,
 	}
 
 	c.JSON(http.StatusOK, response)

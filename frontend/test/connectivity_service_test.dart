@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:frontend/services/connectivity_service.dart';
+import 'package:frontend/core/network/connectivity_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

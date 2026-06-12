@@ -3,11 +3,13 @@ import 'package:intl/intl.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../../controllers/dashboard_controller.dart';
-import '../../../../theme/app_theme.dart';
-import '../../../../widgets/paycif_text.dart';
-import '../../../../core/widgets/paycif_button.dart';
+import 'package:frontend/features/dashboard/presentation/dashboard_controller.dart';
+import 'package:frontend/core/theme/app_theme.dart';
+import 'package:frontend/core/widgets/paycif_text.dart';
+import 'package:frontend/core/widgets/paycif_button.dart';
+import 'package:frontend/core/l10n/generated/app_localizations.dart';
 
 class PaymentSuccessScreen extends StatelessWidget {
   final String transactionId;
@@ -26,7 +28,8 @@ class PaymentSuccessScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: AppTheme.primaryTeal,
       body: SafeArea(
@@ -38,9 +41,9 @@ class PaymentSuccessScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const SizedBox(width: 48),
-                  const Text(
-                    'e-Slip',
-                    style: TextStyle(
+                  Text(
+                    l10n.successAppBarTitle,
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
@@ -68,7 +71,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                   SizedBox(
                     width: double.infinity,
                     child: PaycifButton(
-                      text: 'Back to Home',
+                      text: l10n.successBackToHome,
                       onPressed: () => _navigateToHome(context),
                       variant: PaycifButtonVariant.accent,
                       size: PaycifButtonSize.lg,
@@ -78,9 +81,9 @@ class PaymentSuccessScreen extends StatelessWidget {
                   TextButton.icon(
                     onPressed: () {},
                     icon: const Icon(PhosphorIcons.downloadSimple, color: Colors.white, size: 20),
-                    label: const Text(
-                      'Save to Gallery',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 14),
+                    label: Text(
+                      l10n.successSaveToGallery,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 14),
                     ),
                   )
                 ],
@@ -93,6 +96,7 @@ class PaymentSuccessScreen extends StatelessWidget {
   }
 
   Widget _buildSolidSlip(BuildContext context, bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
     final now = DateTime.now();
     final enDate = DateFormat('dd MMM yyyy - HH:mm').format(now);
 
@@ -142,7 +146,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'Verified by Paycif Network',
+                  l10n.successVerifiedBadge,
                   style: TextStyle(
                     color: isDark ? AppTheme.primaryColor(context) : AppTheme.primaryTeal,
                     fontSize: 12,
@@ -171,7 +175,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 10),
                       PaycifText(
-                        'โอนเงินสำเร็จ',
+                        l10n.paymentSuccessTitle,
                         style: PaycifTextStyle.h1,
                         color: textColor,
                         fontWeight: FontWeight.bold,
@@ -187,9 +191,9 @@ class PaymentSuccessScreen extends StatelessWidget {
                   Column(
                     children: [
                       _buildParticipantRow(
-                        label: 'From',
-                        name: 'Tourist Wallet',
-                        subtext: 'นาย เมธัส (Mr. Methas)',
+                        label: l10n.successFromLabel,
+                        name: l10n.successYourWallet,
+                        subtext: Supabase.instance.client.auth.currentUser?.email ?? '',
                         icon: PhosphorIcons.wallet,
                         textColor: textColor,
                         textMuted: textMuted,
@@ -204,9 +208,9 @@ class PaymentSuccessScreen extends StatelessWidget {
                         ),
                       ),
                       _buildParticipantRow(
-                        label: 'ไปยัง To',
+                        label: l10n.successToLabel,
                         name: recipientName,
-                        subtext: promptPayId != null ? 'PromptPay: $promptPayId' : 'Merchant',
+                        subtext: promptPayId != null ? 'PromptPay: $promptPayId' : l10n.successMerchantLabel,
                         icon: PhosphorIcons.storefront,
                         textColor: textColor,
                         textMuted: textMuted,
@@ -218,7 +222,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                   Column(
                     children: [
                       Text(
-                        'Amount',
+                        l10n.payAmountLabel,
                         style: TextStyle(color: textMuted, fontSize: 13, fontWeight: FontWeight.w500),
                       ),
                       const SizedBox(height: 4),

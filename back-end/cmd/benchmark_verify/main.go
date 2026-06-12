@@ -32,7 +32,7 @@ func main() {
 	jsonBytes, _ := json.Marshal(payload)
 
 	fmt.Println("🔥 Starting Rust Verify Service Benchmark (1,000 requests)...")
-	
+
 	client := &http.Client{Timeout: 1 * time.Second}
 	url := "http://localhost:3001/verify"
 

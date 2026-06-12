@@ -20,7 +20,7 @@ func GenerateTD3MRZ(docType, country, lastName, firstName, docNum, nationality, 
 	c1 := nfc.CalculateMRZChecksum(docNum)
 	c2 := nfc.CalculateMRZChecksum(dob)
 	c3 := nfc.CalculateMRZChecksum(expiry)
-	
+
 	// Final composite checksum (all numeric parts)
 	compositeSource := fmt.Sprintf("%s%d%s%d%s%d", docNum, c1, dob, c2, expiry, c3)
 	cOrg := nfc.CalculateMRZChecksum(compositeSource)

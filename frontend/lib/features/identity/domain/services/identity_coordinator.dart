@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
-import '../../../security/data/datasources/hardware_security_bridge.dart';
-import '../../domain/entities/passport_data.dart';
+import 'package:frontend/features/security/data/datasources/hardware_security_bridge.dart';
+import 'package:frontend/features/identity/domain/entities/passport_data.dart';
 
 /// 🏛️ Identity Coordinator
 /// 

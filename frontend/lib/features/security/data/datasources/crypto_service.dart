@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:cryptography/cryptography.dart';
-import 'hardware_security_bridge.dart';
+import 'package:frontend/features/security/data/datasources/hardware_security_bridge.dart';
 
 /// Service responsible for cryptographic operations.
 /// Supports Ed25519 (Software) and P256 (Hardware-Backed Secure Enclave).

@@ -1,40 +1,41 @@
 package main
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
+	"strings"
 
-	"paysif/internal/service"
+	"paysif/internal/usecase"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/stripe/stripe-go/v74"
-	"github.com/stripe/stripe-go/v74/paymentintent"
-	"github.com/stripe/stripe-go/v74/webhook"
 )
 
 type PaymentHandler struct {
-	Service *service.WalletService
+	Service *usecase.WalletService
 }
 
-func NewPaymentHandler(svc *service.WalletService) *PaymentHandler {
-	stripe.Key = os.Getenv("STRIPE_SECRET_KEY")
+func NewPaymentHandler(svc *usecase.WalletService) *PaymentHandler {
 	return &PaymentHandler{Service: svc}
 }
 
-type CreatePayPerUseIntentRequest struct {
-	Amount   float64 `json:"amount" binding:"required,min=1"`
-	Currency string  `json:"currency" binding:"required,len=3,uppercase"`
-	Merchant string  `json:"merchant" binding:"required"`
+type CreatePayoutIntentRequest struct {
+	Amount        int64  `json:"amount" binding:"required,gt=0"` // In satangs/cents
+	PromptPayID   string `json:"promptpay_id" binding:"required"`
+	RecipientName string `json:"recipient_name" binding:"required"`
+	SqrilTxID     string `json:"sqril_tx_id" binding:"required"`
 }
 
-// HandleCreateIntent creates a Stripe PaymentIntent for a specific pay-per-use purchase.
-// Renamed from HandleCreatePayPerUseIntent for route compatibility.
+// HandleCreateIntent creates an Alchemy Pay order intent in repository.
 func (h *PaymentHandler) HandleCreateIntent(c *gin.Context) {
-	var req CreatePayPerUseIntentRequest
+	var req CreatePayoutIntentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -51,29 +52,79 @@ func (h *PaymentHandler) HandleCreateIntent(c *gin.Context) {
 		return
 	}
 
-	// Create a PaymentIntent for the specific purchase
-	params := &stripe.PaymentIntentParams{
-		Amount:   stripe.Int64(int64(req.Amount * 100)),
-		Currency: stripe.String(req.Currency),
-		AutomaticPaymentMethods: &stripe.PaymentIntentAutomaticPaymentMethodsParams{
-			Enabled: stripe.Bool(true),
-		},
+	// 🛡️ Pre-flight Check: Validate quote validity via active provider
+	prov, ok := h.Service.PaymentEngine.GetProvider("sqril")
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "SQRIL provider not registered"})
+		return
 	}
-	params.AddMetadata("user_id", userID.String())
-	params.AddMetadata("merchant", req.Merchant)
-	params.AddMetadata("type", "pay_per_use")
+	sqril, ok := prov.(*usecase.SqrilProvider)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid SQRIL provider configuration"})
+		return
+	}
 
-	pi, err := paymentintent.New(params)
+	// Check if quote exists and is valid on SQRIL (pre-flight validation before holding funds)
+	_, err = sqril.GetQuotation(c.Request.Context(), req.SqrilTxID, "cust_paycif_"+userID.String(), req.Amount)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		errStr := strings.ToLower(err.Error())
+		if strings.Contains(errStr, "expire") || strings.Contains(errStr, "timeout") {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error_code": "QR_EXPIRED",
+				"header":     "QR Code Expired",
+				"message":    "Please ask the merchant for a new QR code.",
+			})
+		} else {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error_code": "INVALID_QR",
+				"header":     "Invalid QR Code",
+				"message":    "We only support Thai PromptPay. Please check the code.",
+			})
+		}
+		return
+	}
+
+
+
+	// Create a new PayoutIntent mapping
+	intentID := uuid.New()
+	intent := usecase.PayoutIntent{
+		ID:            intentID,
+		UserID:        userID,
+		Amount:        req.Amount,
+		PromptPayID:   req.PromptPayID,
+		RecipientName: req.RecipientName,
+		SqrilTxID:     req.SqrilTxID,
+		Status:        "PENDING",
+	}
+
+	err = h.Service.CreatePayoutIntent(c.Request.Context(), intent)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create payment intent: " + err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"client_secret": pi.ClientSecret,
+		"intent_id":   intentID.String(),
+		"merchant_no": intentID.String(), // mapping to Alchemy Pay merchantOrderNo
+		"amount":      req.Amount,
 	})
 }
 
+// AlchemyPayWebhookPayload matches Alchemy Pay callback schema
+type AlchemyPayWebhookPayload struct {
+	OrderNo         string `json:"orderNo"`
+	MerchantOrderNo string `json:"merchantOrderNo"`
+	Status          string `json:"status"` // FINISHED, FAILED, etc.
+	Amount          string `json:"amount"`
+	Currency        string `json:"currency"`
+	CryptoAmount    string `json:"cryptoAmount"`
+	Crypto          string `json:"crypto"`
+	UserId          string `json:"userId"`
+	Signature       string `json:"signature"`
+}
+
+// HandleWebhook processes payments and executes payouts atomically upon card authorization success.
 func (h *PaymentHandler) HandleWebhook(c *gin.Context) {
 	const MaxBodyBytes = int64(65536)
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, MaxBodyBytes)
@@ -83,39 +134,79 @@ func (h *PaymentHandler) HandleWebhook(c *gin.Context) {
 		return
 	}
 
-	endpointSecret := os.Getenv("STRIPE_WEBHOOK_SECRET")
-	event, err := webhook.ConstructEvent(payload, c.GetHeader("Stripe-Signature"), endpointSecret)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid signature"})
+	// Verify Alchemy Pay signature
+	signature := c.GetHeader("X-Alchemy-Signature")
+	secret := os.Getenv("ALCHEMY_PAY_SECRET_KEY")
+	if secret != "" && !verifyAlchemySignature(payload, signature, secret) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid Alchemy Pay signature"})
 		return
 	}
 
-	if event.Type == "payment_intent.succeeded" {
-		var paymentIntent stripe.PaymentIntent
-		err := json.Unmarshal(event.Data.Raw, &paymentIntent)
+	var data AlchemyPayWebhookPayload
+	if err := json.Unmarshal(payload, &data); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Error parsing webhook JSON"})
+		return
+	}
+
+	log.Printf("Received Alchemy Pay webhook for order: %s, status: %s", data.MerchantOrderNo, data.Status)
+
+	if data.Status == "FINISHED" {
+		intentUUID, err := uuid.Parse(data.MerchantOrderNo)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Error parsing webhook JSON"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid merchant order number format"})
 			return
 		}
 
-		userIDStr, ok := paymentIntent.Metadata["user_id"]
-		if !ok {
-			c.JSON(http.StatusOK, gin.H{"status": "ignored_no_user"})
-			return
-		}
-
-		userID, _ := uuid.Parse(userIDStr)
-		amount := float64(paymentIntent.Amount) / 100.0
-		merchant := paymentIntent.Metadata["merchant"]
-
-		// Record the transaction directly as a payment
-		err = h.Service.ProcessPayment(c.Request.Context(), userID, amount, merchant, paymentIntent.ID)
+		// 1. Fetch PayoutIntent
+		intent, err := h.Service.GetPayoutIntent(c.Request.Context(), intentUUID)
 		if err != nil {
-			fmt.Printf("Error processing payment: %v\n", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Error"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Payout intent not found"})
 			return
 		}
+
+		if intent.Status == "COMPLETED" {
+			c.JSON(http.StatusOK, gin.H{"status": "already_processed"})
+			return
+		}
+
+		// 2. Record payment in ledger (Credit USDC to tourist)
+		merchantDescription := fmt.Sprintf("Alchemy Pay: %s %s", data.Amount, data.Currency)
+		err = h.Service.ProcessPayment(c.Request.Context(), intent.UserID, float64(intent.Amount)/100.0, merchantDescription, data.OrderNo)
+		if err != nil {
+			log.Printf("⚠️ Failed to process payment record for intent %s: %v", intent.ID, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal ledger processing error"})
+			return
+		}
+
+		// 3. Trigger SQRIL payout instantly (Debit ledger + execute SQRIL API)
+		payoutReq := usecase.PayoutRequest{
+			UserID:         intent.UserID,
+			Amount:         intent.Amount,
+			PromptPayID:    intent.PromptPayID,
+			RecipientName:  intent.RecipientName,
+			IdempotencyKey: intent.ID.String(), // Use PayoutIntent ID as idempotency key
+			SqrilTxID:      intent.SqrilTxID,
+		}
+
+		payoutResp, err := h.Service.PayoutToPromptPay(c.Request.Context(), payoutReq)
+		if err != nil {
+			log.Printf("⚠️ Instant payout failed for intent %s (will be retried by outbox worker): %v", intent.ID, err)
+			// Still return 200 to Alchemy Pay because card payment is complete and outbox worker will retry the payout
+			_ = h.Service.UpdatePayoutIntentStatus(c.Request.Context(), intent.ID, "PAYMENT_SUCCESS_PAYOUT_PENDING")
+			c.JSON(http.StatusOK, gin.H{"status": "payout_pending_retry", "error": err.Error()})
+			return
+		}
+
+		_ = h.Service.UpdatePayoutIntentStatus(c.Request.Context(), intent.ID, "COMPLETED")
+		log.Printf("✅ Instant payout executed successfully for intent %s, status: %s", intent.ID, payoutResp.Status)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "success"})
+}
+
+func verifyAlchemySignature(payload []byte, signature string, secret string) bool {
+	h := hmac.New(sha256.New, []byte(secret))
+	h.Write(payload)
+	expectedSignature := hex.EncodeToString(h.Sum(nil))
+	return hmac.Equal([]byte(signature), []byte(expectedSignature))
 }

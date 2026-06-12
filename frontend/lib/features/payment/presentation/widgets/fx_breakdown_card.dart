@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../domain/entities/payment_breakdown.dart';
-import '../../../../theme/app_theme.dart';
+import 'package:frontend/features/payment/domain/entities/payment_breakdown.dart';
+import 'package:frontend/core/theme/app_theme.dart';
+import 'package:frontend/core/l10n/generated/app_localizations.dart';
 
 class FxBreakdownCard extends StatelessWidget {
   final PaymentBreakdown breakdown;
@@ -13,6 +14,7 @@ class FxBreakdownCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final Color labelColor = AppTheme.textSecondaryColor(context);
     final Color valueColor = AppTheme.textPrimaryColor(context);
 
@@ -39,7 +41,7 @@ class FxBreakdownCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                "Amount",
+                l10n.payAmountLabel,
                 style: theme.textTheme.bodyMedium?.copyWith(color: labelColor),
               ),
               Text(
@@ -59,7 +61,7 @@ class FxBreakdownCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                "FX Rate",
+                l10n.payFxRateLabel,
                 style: theme.textTheme.bodySmall?.copyWith(color: labelColor),
               ),
               Text(
@@ -76,7 +78,9 @@ class FxBreakdownCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                "Network Fee (3.5%)",
+                l10n.payNetworkFeeLabel(
+                  (breakdown.convenienceFeePercentage * 100).toStringAsFixed(1),
+                ),
                 style: theme.textTheme.bodySmall?.copyWith(color: labelColor),
               ),
               Text(
@@ -97,7 +101,7 @@ class FxBreakdownCard extends StatelessWidget {
             textBaseline: TextBaseline.alphabetic,
             children: [
               Text(
-                "Total",
+                l10n.payTotalLabel,
                 style: theme.textTheme.headlineLarge?.copyWith(
                   color: const Color(0xFF028090),
                 ),

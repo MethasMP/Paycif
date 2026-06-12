@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_theme.dart';
+import 'package:frontend/core/theme/app_theme.dart';
 
 enum PaycifButtonVariant { primary, secondary, accent, ghost }
 enum PaycifButtonSize { md, lg }

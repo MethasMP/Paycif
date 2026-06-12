@@ -49,7 +49,7 @@ func TestSystemHighAvailabilitySimulation(t *testing.T) {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			
+
 			// จำลองการสร้างพาสปอร์ตที่แตกต่างกัน (Heavy computation)
 			data, _ := GenerateMockPassport("THA", fmt.Sprintf("USER%d", idx), "TEST")
 			payload := nfc.NfcPassportPayload{
@@ -61,7 +61,7 @@ func TestSystemHighAvailabilitySimulation(t *testing.T) {
 
 			// รันการตรวจสอบแบบสากล
 			_, err := nfc.VerifyPassportNfcSignature(payload)
-			
+
 			if err == nil {
 				mu.Lock()
 				successCount++

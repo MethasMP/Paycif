@@ -1,0 +1,82 @@
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
+import 'package:flutter/material.dart';
+
+import 'package:frontend/core/theme/app_theme.dart';
+
+class PaymentUtils {
+  /// Validates a credit card number using the Luhn Algorithm.
+  static bool isValidLuhn(String cardNumber) {
+    String cleanNumber = cardNumber.replaceAll(RegExp(r'\D'), '');
+    if (cleanNumber.isEmpty) return false;
+
+    int sum = 0;
+    bool alternate = false;
+    for (int i = cleanNumber.length - 1; i >= 0; i--) {
+      int digit = int.parse(cleanNumber[i]);
+      if (alternate) {
+        digit *= 2;
+        if (digit > 9) {
+          digit -= 9;
+        }
+      }
+      sum += digit;
+      alternate = !alternate;
+    }
+    return sum % 10 == 0;
+  }
+
+  /// Detects the card provider based on the number pattern.
+  static String getCardType(String cardNumber) {
+    String input = cardNumber.replaceAll(RegExp(r'\D'), '');
+    if (input.startsWith(RegExp(r'^4'))) {
+      return 'Visa';
+    } else if (input.startsWith(RegExp(r'^(5[1-5]|2[2-7])'))) {
+      return 'Mastercard';
+    } else if (input.startsWith(RegExp(r'^3[47]'))) {
+      return 'Amex';
+    } else if (input.startsWith(RegExp(r'^(352[89]|35[3-8][0-9])'))) {
+      return 'JCB';
+    } else if (input.startsWith(RegExp(r'^62'))) {
+      return 'UnionPay';
+    } else if (input.startsWith(RegExp(r'^6(?:011|5[0-9]{2})'))) {
+      return 'Discover';
+    }
+    return 'Unknown';
+  }
+
+  /// Returns the corresponding icon for a card provider.
+  static IconData getCardIcon(String cardType) {
+    switch (cardType) {
+      // Note: In a production app, these would be custom SVG icons
+      // for Visa/Mastercard. Using standard Material icons as placeholders.
+      case 'Visa':
+        return PhosphorIcons.creditCard;
+      case 'Mastercard':
+        return PhosphorIcons.creditCard;
+      case 'Amex':
+        return PhosphorIcons.creditCard;
+      case 'JCB':
+        return PhosphorIcons.creditCard;
+      case 'UnionPay':
+        return PhosphorIcons.creditCard;
+      default:
+        return PhosphorIcons.creditCard;
+    }
+  }
+
+  /// Returns the brand color for a card provider.
+  static Color getCardColor(String cardType) {
+    switch (cardType) {
+      case 'Visa':
+        return AppTheme.infoBlue;
+      case 'Mastercard':
+        return AppTheme.errorRed;
+      case 'Amex':
+        return AppTheme.infoBlue;
+      case 'UnionPay':
+        return AppTheme.errorRed;
+      default:
+        return AppTheme.primaryTeal;
+    }
+  }
+}

@@ -64,7 +64,7 @@ func main() {
 
 	r := gin.New()
 	r.Use(gin.Recovery())
-	
+
 	// Add simple logger if not in release mode
 	if gin.Mode() != gin.ReleaseMode {
 		r.Use(gin.Logger())

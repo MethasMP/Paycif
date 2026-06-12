@@ -6,3 +6,4 @@ mcp_config.json
 .agent/
 *.jpg
 *.png
+.claude/

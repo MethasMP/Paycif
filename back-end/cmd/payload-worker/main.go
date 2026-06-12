@@ -20,10 +20,10 @@ import (
 )
 
 type OutboxEvent struct {
-	ID           string
-	EventType    string
-	Payload      string
-	RetryCount   int
+	ID         string
+	EventType  string
+	Payload    string
+	RetryCount int
 }
 
 type TransferPayload struct {
@@ -80,7 +80,7 @@ func (w *PayloadWorker) Run(ctx context.Context) error {
 				// Exponential backoff: 1s, 2s, 4s, 8s, max 30s
 				backoffSecs := int(math.Min(math.Pow(2, float64(failCount)), 30))
 				log.Printf("❌ Error processing batch (failCount: %d). Backing off for %ds: %v", failCount, backoffSecs, err)
-				
+
 				if failCount > 3 {
 					log.Println("Failures persisting. Checking database connection...")
 					if err := w.db.PingContext(ctx); err != nil {
@@ -268,7 +268,7 @@ func main() {
 	// We will parse it and append default_query_exec_mode=simple_protocol
 	dbURL = appendSimpleProtocol(dbURL)
 
-	log.Printf("Connecting to database...")
+	log.Printf("Connecting to repository...")
 	db, err := sql.Open("pgx", dbURL)
 	if err != nil {
 		log.Fatalf("Failed to open DB: %v", err)
@@ -352,7 +352,7 @@ func appendSimpleProtocol(connURL string) string {
 	if os.Getenv("USE_PGX_CACHE_DESCRIBE") == "true" {
 		importQueryMode = "default_query_exec_mode=cache_describe"
 	}
-	
+
 	// Add query parameter
 	// Check if already has query parameters
 	var delimiter string
@@ -364,11 +364,11 @@ func appendSimpleProtocol(connURL string) string {
 		}
 		connURL = connURL + delimiter + importQueryMode
 	}
-	
+
 	// Check if sslmode exists
 	if !strings.Contains(connURL, "sslmode=") && !strings.Contains(connURL, "localhost") && !strings.Contains(connURL, "127.0.0.1") {
 		connURL = connURL + "&sslmode=require"
 	}
-	
+
 	return connURL
 }

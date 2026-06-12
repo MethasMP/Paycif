@@ -3,18 +3,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:frontend/features/security/presentation/widgets/pin_entry_widget.dart';
-import 'package:frontend/theme/app_theme.dart';
-import 'package:frontend/widgets/paycif_icon_container.dart';
-import 'package:frontend/widgets/paycif_amount_text.dart';
-import 'package:frontend/services/api_service.dart';
+import 'package:frontend/core/theme/app_theme.dart';
+import 'package:frontend/core/widgets/paycif_icon_container.dart';
+import 'package:frontend/core/widgets/paycif_amount_text.dart';
+import 'package:frontend/core/network/api_service.dart';
 
-import '../../domain/entities/payment_breakdown.dart';
-import '../../data/repositories/payment_repository_impl.dart';
-import '../logic/payment_cubit.dart';
-import '../logic/payment_state.dart';
-import '../widgets/fx_breakdown_card.dart';
-import '../../../../core/widgets/paycif_button.dart';
-import 'payment_success_screen.dart';
+import 'package:frontend/features/payment/domain/entities/payment_breakdown.dart';
+import 'package:frontend/features/payment/data/repositories/payment_repository_impl.dart';
+import 'package:frontend/features/payment/presentation/logic/payment_cubit.dart';
+import 'package:frontend/features/payment/presentation/logic/payment_state.dart';
+import 'package:frontend/features/payment/presentation/widgets/fx_breakdown_card.dart';
+import 'package:frontend/core/widgets/paycif_button.dart';
+import 'package:frontend/features/payment/presentation/pages/payment_success_screen.dart';
+import 'package:frontend/features/profile/domain/saved_card.dart';
+import 'package:frontend/core/l10n/generated/app_localizations.dart';
 
 class PayScreen extends StatefulWidget {
   final double amount;
@@ -41,11 +43,27 @@ class PayScreen extends StatefulWidget {
 class _PayScreenState extends State<PayScreen> {
   final LocalAuthentication _auth = LocalAuthentication();
   bool _biometricReady = false;
+  SavedCard? _selectedCard;
+  bool _loadingCard = true;
 
   @override
   void initState() {
     super.initState();
     _prewarmBiometric();
+    _loadPaymentMethod();
+  }
+
+  Future<void> _loadPaymentMethod() async {
+    try {
+      final cards = await ApiService().getSavedCards();
+      if (!mounted) return;
+      setState(() {
+        _selectedCard = cards.isNotEmpty ? cards.first : null;
+        _loadingCard = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadingCard = false);
+    }
   }
 
   void _prewarmBiometric() {
@@ -109,6 +127,7 @@ class _PayScreenState extends State<PayScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final isDark = theme.brightness == Brightness.dark;
     final breakdown = PaymentBreakdown(amountTHB: widget.amount);
 
@@ -126,7 +145,7 @@ class _PayScreenState extends State<PayScreen> {
             onPressed: () => Navigator.pop(context),
           ),
           title: Text(
-            "Review Payment",
+            l10n.payReviewTitle,
             style: theme.appBarTheme.titleTextStyle?.copyWith(
               color: isDark ? Colors.white : AppTheme.textPrimary,
             ),
@@ -183,10 +202,10 @@ class _PayScreenState extends State<PayScreen> {
                   ),
                   const Spacer(),
                   FxBreakdownCard(breakdown: breakdown),
-                  _buildPaymentMethodCard(theme, isDark),
+                  _buildPaymentMethodCard(theme, isDark, l10n),
                   const SizedBox(height: 16),
                   Text(
-                    "* Your card issuer may apply cross-border fees.",
+                    l10n.payCrossBorderDisclaimer,
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: AppTheme.textSecondaryColor(context).withValues(alpha: 0.7),
@@ -214,7 +233,7 @@ class _PayScreenState extends State<PayScreen> {
     );
   }
 
-  Widget _buildPaymentMethodCard(ThemeData theme, bool isDark) {
+  Widget _buildPaymentMethodCard(ThemeData theme, bool isDark, AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -227,25 +246,36 @@ class _PayScreenState extends State<PayScreen> {
           PaycifIconContainer(icon: PhosphorIcons.creditCard),
           const SizedBox(width: 16),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "Pay per use",
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
+            child: _loadingCard
+                ? Container(
+                    width: double.infinity,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: AppTheme.textSecondaryColor(context).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _selectedCard != null ? l10n.payMethodPayPerUse : l10n.payNoMethodSelected,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (_selectedCard != null)
+                        Text(
+                          '${_selectedCard!.brand} •••• ${_selectedCard!.lastDigits}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.grey,
+                          ),
+                        ),
+                    ],
                   ),
-                ),
-                Text(
-                  "Visa **** 8899",
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: Colors.grey,
-                  ),
-                ),
-              ],
-            ),
           ),
-          const Icon(PhosphorIcons.checkCircle, color: AppTheme.successGreen),
+          if (!_loadingCard && _selectedCard != null)
+            const Icon(PhosphorIcons.checkCircle, color: AppTheme.successGreen),
         ],
       ),
     );

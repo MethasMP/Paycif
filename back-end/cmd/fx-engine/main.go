@@ -19,7 +19,7 @@ import (
 	"syscall"
 	"time"
 
-	pb "paysif/internal/grpc/pb"
+	pb "paysif/internal/adapter/grpc/pb"
 
 	"github.com/bytedance/sonic"
 	"github.com/google/uuid"

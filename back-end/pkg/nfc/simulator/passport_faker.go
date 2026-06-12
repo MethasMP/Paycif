@@ -52,7 +52,7 @@ func GenerateMockPassport(nationality string, firstName string, lastName string)
 	// In reality, SOD contains SHA256 hashes of all DGs.
 	dg1Hash := sha256.Sum256(dg1)
 	dg2Hash := sha256.Sum256(dg2)
-	
+
 	// Composite data to be signed
 	content := append(dg1Hash[:], dg2Hash[:]...)
 	hashedContent := sha256.Sum256(content)
@@ -60,7 +60,7 @@ func GenerateMockPassport(nationality string, firstName string, lastName string)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Fake SOD structure for the demo (normally ASN.1 CMS)
 	sod := append([]byte("MOCK_SOD_CMS:"), signature...)
 

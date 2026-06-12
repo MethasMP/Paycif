@@ -38,7 +38,7 @@ func VerifyDocumentSigner(dsCertRaw []byte, nationality string) error {
 		// High Standard Rule: If we don't have the CSCA, we log a critical warning.
 		// For absolute certainty, we might choose to fail here, but for now we skip with a warning.
 		slog.Warn("CRITICAL: Nationality CSCA not found in Master List. Cryptographic trust cannot be established.", "nationality", nationality)
-		return nil 
+		return nil
 	}
 
 	// Try verifying against each available CSCA cert for that country
@@ -64,7 +64,7 @@ func RegisterTrustedCSCA(nationality string, certData []byte) error {
 
 	masterList.mu.Lock()
 	defer masterList.mu.Unlock()
-	
+
 	masterList.certificates[nationality] = append(masterList.certificates[nationality], cert)
 	slog.Info("Registered new CSCA root certificate", "nationality", nationality, "subject", cert.Subject.CommonName)
 	return nil

@@ -1,6 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
-import '../../../../services/api_service.dart';
+import 'package:frontend/core/network/api_service.dart';
 
 class SecurityRemoteDataSource {
   final SupabaseClient _supabase;
