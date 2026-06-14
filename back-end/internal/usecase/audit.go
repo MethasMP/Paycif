@@ -28,7 +28,7 @@ func (s *AuditService) Log(ctx context.Context, userID uuid.UUID, action, resour
 	_, err := s.DB.ExecContext(ctx, `
 		INSERT INTO audit_logs (user_id, action, resource_type, resource_id, metadata, request_id)
 		VALUES ($1, $2, $3, $4, $5, $6)
-	`, userID, action, resourceType, resourceID, metaJSON, requestID)
+	`, userID, action, resourceType, resourceID, string(metaJSON), requestID)
 
 	if err != nil {
 		// Log the failure to write to audit log

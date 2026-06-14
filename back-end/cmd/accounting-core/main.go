@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -32,20 +33,23 @@ const (
 	MaxTransactionLimit = 5000.0  // ฿5,000
 )
 
-// UserLimitEntry is pointer-free to avoid Go GC scanning overhead
+// UserLimitEntry is cache-line aligned and thread-safe via atomics
 type UserLimitEntry struct {
-	DailyTotal int64 // represented in minor units (satangs/cents) to avoid pointers
-	Date       int32 // YYYYMMDD representation
-	LastSynced int64 // Unix nanosecond timestamp
-	Hydrated   bool
+	DailyTotal int64    // represented in minor units (satangs/cents)
+	Date       int32    // YYYYMMDD representation
+	LastSynced int64    // Unix nanosecond timestamp
+	Hydrated   int32    // 0 = false, 1 = true
+	_          [40]byte // Padding to fit exactly 64 bytes (Cache Line alignment)
 }
 
-func (e UserLimitEntry) IsStale(maxAge time.Duration) bool {
-	return time.Since(time.Unix(0, e.LastSynced)) > maxAge
+func (e *UserLimitEntry) IsStale(maxAge time.Duration) bool {
+	lastSynced := atomic.LoadInt64(&e.LastSynced)
+	return time.Since(time.Unix(0, lastSynced)) > maxAge
 }
 
-func (e UserLimitEntry) IsDifferentDay(today int32) bool {
-	return e.Date != today
+func (e *UserLimitEntry) IsDifferentDay(today int32) bool {
+	date := atomic.LoadInt32(&e.Date)
+	return date != today
 }
 
 func getTodayInt() int32 {
@@ -71,7 +75,7 @@ type ShardedLimitCache struct {
 
 type LimitShard struct {
 	mu   sync.RWMutex
-	data map[uuid.UUID]UserLimitEntry
+	data map[uuid.UUID]*UserLimitEntry
 }
 
 func NewShardedLimitCache(db *sql.DB, maxAge time.Duration) *ShardedLimitCache {
@@ -81,7 +85,7 @@ func NewShardedLimitCache(db *sql.DB, maxAge time.Duration) *ShardedLimitCache {
 	}
 	for i := 0; i < 32; i++ {
 		c.shards[i] = &LimitShard{
-			data: make(map[uuid.UUID]UserLimitEntry),
+			data: make(map[uuid.UUID]*UserLimitEntry),
 		}
 	}
 	return c
@@ -106,46 +110,44 @@ func (c *ShardedLimitCache) CheckTransaction(ctx context.Context, userID uuid.UU
 	shard := c.getShard(userID)
 	maxDailySatang := int64(MaxDailyLimit * 100)
 
-	// 2. Try fast-path under read lock
+	// 2. Fast-path: read lock to fetch pointer
 	shard.mu.RLock()
 	entry, exists := shard.data[userID]
-	if exists && !entry.IsDifferentDay(today) && !entry.IsStale(c.maxAge) {
-		if entry.DailyTotal+amount > maxDailySatang {
-			remaining := maxDailySatang - entry.DailyTotal
-			if remaining < 0 {
-				remaining = 0
-			}
-			shard.mu.RUnlock()
-			return false, remaining, fmt.Sprintf("Daily limit exceeded. Remaining: %.2f", float64(remaining)/100.0), nil
-		}
-		shard.mu.RUnlock()
+	shard.mu.RUnlock()
 
-		// Write lock for atomic reservation
-		shard.mu.Lock()
-		entry = shard.data[userID]
-		// Double check under write lock to prevent TOCTOU
-		if !entry.IsDifferentDay(today) && !entry.IsStale(c.maxAge) {
-			if entry.DailyTotal+amount > maxDailySatang {
-				remaining := maxDailySatang - entry.DailyTotal
+	if exists && atomic.LoadInt32(&entry.Hydrated) == 1 && !entry.IsStale(c.maxAge) {
+		// CAS loop for atomic checking and reservation
+		for {
+			currentTotal := atomic.LoadInt64(&entry.DailyTotal)
+			currentDate := atomic.LoadInt32(&entry.Date)
+
+			if currentDate != today {
+				// Reset balance for new day atomically
+				if atomic.CompareAndSwapInt32(&entry.Date, currentDate, today) {
+					atomic.StoreInt64(&entry.DailyTotal, 0)
+					currentTotal = 0
+				} else {
+					continue // Conflict, retry
+				}
+			}
+
+			if currentTotal+amount > maxDailySatang {
+				remaining := maxDailySatang - currentTotal
 				if remaining < 0 {
 					remaining = 0
 				}
-				shard.mu.Unlock()
 				return false, remaining, fmt.Sprintf("Daily limit exceeded. Remaining: %.2f", float64(remaining)/100.0), nil
 			}
-			entry.DailyTotal += amount
-			entry.LastSynced = time.Now().UnixNano()
-			shard.data[userID] = entry
-			remaining := maxDailySatang - entry.DailyTotal
-			if remaining < 0 {
-				remaining = 0
+
+			if atomic.CompareAndSwapInt64(&entry.DailyTotal, currentTotal, currentTotal+amount) {
+				atomic.StoreInt64(&entry.LastSynced, time.Now().UnixNano())
+				remaining := maxDailySatang - (currentTotal + amount)
+				if remaining < 0 {
+					remaining = 0
+				}
+				return true, remaining, "", nil
 			}
-			shard.mu.Unlock()
-			return true, remaining, "", nil
 		}
-		shard.mu.Unlock()
-	} else {
-		shard.mu.RUnlock()
 	}
 
 	// 3. Slow-path: Hydrate from DB
@@ -154,73 +156,133 @@ func (c *ShardedLimitCache) CheckTransaction(ctx context.Context, userID uuid.UU
 		return false, 0, "", err
 	}
 
-	// Acquire write lock to update and check/reserve atomically
+	// Acquire write lock to insert new pointer or update existing
 	shard.mu.Lock()
-	defer shard.mu.Unlock()
-
-	currEntry, currExists := shard.data[userID]
-	if currExists && !currEntry.IsDifferentDay(today) && !currEntry.IsStale(c.maxAge) {
-		entry = currEntry
-	} else {
-		entry = UserLimitEntry{
+	entry, exists = shard.data[userID]
+	if !exists {
+		entry = &UserLimitEntry{
 			DailyTotal: usage,
 			Date:       today,
 			LastSynced: time.Now().UnixNano(),
-			Hydrated:   true,
+			Hydrated:   1,
 		}
 		shard.data[userID] = entry
+	} else {
+		// Update existing pointer fields atomically
+		atomic.StoreInt64(&entry.DailyTotal, usage)
+		atomic.StoreInt32(&entry.Date, today)
+		atomic.StoreInt64(&entry.LastSynced, time.Now().UnixNano())
+		atomic.StoreInt32(&entry.Hydrated, 1)
 	}
+	shard.mu.Unlock()
 
-	if entry.DailyTotal+amount > maxDailySatang {
-		remaining := maxDailySatang - entry.DailyTotal
-		if remaining < 0 {
-			remaining = 0
+	// Run check and reservation again on the pointer
+	for {
+		currentTotal := atomic.LoadInt64(&entry.DailyTotal)
+		currentDate := atomic.LoadInt32(&entry.Date)
+
+		if currentDate != today {
+			if atomic.CompareAndSwapInt32(&entry.Date, currentDate, today) {
+				atomic.StoreInt64(&entry.DailyTotal, 0)
+				currentTotal = 0
+			} else {
+				continue
+			}
 		}
-		return false, remaining, fmt.Sprintf("Daily limit exceeded. Remaining: %.2f", float64(remaining)/100.0), nil
-	}
 
-	entry.DailyTotal += amount
-	entry.LastSynced = time.Now().UnixNano()
-	shard.data[userID] = entry
+		if currentTotal+amount > maxDailySatang {
+			remaining := maxDailySatang - currentTotal
+			if remaining < 0 {
+				remaining = 0
+			}
+			return false, remaining, fmt.Sprintf("Daily limit exceeded. Remaining: %.2f", float64(remaining)/100.0), nil
+		}
 
-	remaining := maxDailySatang - entry.DailyTotal
-	if remaining < 0 {
-		remaining = 0
+		if atomic.CompareAndSwapInt64(&entry.DailyTotal, currentTotal, currentTotal+amount) {
+			atomic.StoreInt64(&entry.LastSynced, time.Now().UnixNano())
+			remaining := maxDailySatang - (currentTotal + amount)
+			if remaining < 0 {
+				remaining = 0
+			}
+			return true, remaining, "", nil
+		}
 	}
-	return true, remaining, "", nil
 }
 
 func (c *ShardedLimitCache) ReleaseLimit(userID uuid.UUID, amount int64) {
 	shard := c.getShard(userID)
-	shard.mu.Lock()
-	if entry, exists := shard.data[userID]; exists {
-		entry.DailyTotal -= amount
-		if entry.DailyTotal < 0 {
-			entry.DailyTotal = 0
+	shard.mu.RLock()
+	entry, exists := shard.data[userID]
+	shard.mu.RUnlock()
+
+	if exists {
+		for {
+			currentTotal := atomic.LoadInt64(&entry.DailyTotal)
+			newTotal := currentTotal - amount
+			if newTotal < 0 {
+				newTotal = 0
+			}
+			if atomic.CompareAndSwapInt64(&entry.DailyTotal, currentTotal, newTotal) {
+				atomic.StoreInt64(&entry.LastSynced, time.Now().UnixNano())
+				break
+			}
 		}
-		shard.data[userID] = entry
 	}
-	shard.mu.Unlock()
 }
 
 func (c *ShardedLimitCache) ApplyRemoteIncrement(userID uuid.UUID, amount int64) {
 	shard := c.getShard(userID)
 	today := getTodayInt()
 
-	shard.mu.Lock()
+	shard.mu.RLock()
 	entry, exists := shard.data[userID]
-	if !exists || entry.IsDifferentDay(today) {
-		entry = UserLimitEntry{
-			DailyTotal: 0,
-			Date:       today,
-			LastSynced: time.Now().UnixNano(),
-			Hydrated:   false,
+	shard.mu.RUnlock()
+
+	if exists {
+		for {
+			currentTotal := atomic.LoadInt64(&entry.DailyTotal)
+			currentDate := atomic.LoadInt32(&entry.Date)
+
+			newTotal := currentTotal + amount
+			if currentDate != today {
+				newTotal = amount // Reset to only the new transaction amount if day has changed
+			}
+
+			// We need to write back the new balance and date atomically
+			if currentDate != today {
+				if atomic.CompareAndSwapInt32(&entry.Date, currentDate, today) {
+					atomic.StoreInt64(&entry.DailyTotal, newTotal)
+					atomic.StoreInt64(&entry.LastSynced, time.Now().UnixNano())
+					break
+				}
+				continue
+			}
+
+			if atomic.CompareAndSwapInt64(&entry.DailyTotal, currentTotal, newTotal) {
+				atomic.StoreInt64(&entry.LastSynced, time.Now().UnixNano())
+				break
+			}
 		}
+	} else {
+		shard.mu.Lock()
+		// Double check
+		entry, exists = shard.data[userID]
+		if !exists {
+			entry = &UserLimitEntry{
+				DailyTotal: amount,
+				Date:       today,
+				LastSynced: time.Now().UnixNano(),
+				Hydrated:   0, // Not hydrated from DB, but contains state
+			}
+			shard.data[userID] = entry
+		} else {
+			// Exist now, release lock and update atomically
+			shard.mu.Unlock()
+			c.ApplyRemoteIncrement(userID, amount)
+			return
+		}
+		shard.mu.Unlock()
 	}
-	entry.DailyTotal += amount
-	entry.LastSynced = time.Now().UnixNano()
-	shard.data[userID] = entry
-	shard.mu.Unlock()
 }
 
 func (c *ShardedLimitCache) GetLimits(ctx context.Context, userID uuid.UUID) (currentDaily, maxDaily, maxTransaction, remaining int64, err error) {
@@ -232,8 +294,15 @@ func (c *ShardedLimitCache) GetLimits(ctx context.Context, userID uuid.UUID) (cu
 	shard.mu.RUnlock()
 
 	var usage int64
-	if exists && !entry.IsDifferentDay(today) && !entry.IsStale(c.maxAge) {
-		usage = entry.DailyTotal
+	if exists && atomic.LoadInt32(&entry.Hydrated) == 1 && !entry.IsStale(c.maxAge) {
+		currentDate := atomic.LoadInt32(&entry.Date)
+		if currentDate != today {
+			// Try to reset day atomically
+			if atomic.CompareAndSwapInt32(&entry.Date, currentDate, today) {
+				atomic.StoreInt64(&entry.DailyTotal, 0)
+			}
+		}
+		usage = atomic.LoadInt64(&entry.DailyTotal)
 	} else {
 		usage, err = c.hydrateFromDB(ctx, userID)
 		if err != nil {
@@ -241,11 +310,20 @@ func (c *ShardedLimitCache) GetLimits(ctx context.Context, userID uuid.UUID) (cu
 		}
 
 		shard.mu.Lock()
-		shard.data[userID] = UserLimitEntry{
-			DailyTotal: usage,
-			Date:       today,
-			LastSynced: time.Now().UnixNano(),
-			Hydrated:   true,
+		entry, exists = shard.data[userID]
+		if !exists {
+			entry = &UserLimitEntry{
+				DailyTotal: usage,
+				Date:       today,
+				LastSynced: time.Now().UnixNano(),
+				Hydrated:   1,
+			}
+			shard.data[userID] = entry
+		} else {
+			atomic.StoreInt64(&entry.DailyTotal, usage)
+			atomic.StoreInt32(&entry.Date, today)
+			atomic.StoreInt64(&entry.LastSynced, time.Now().UnixNano())
+			atomic.StoreInt32(&entry.Hydrated, 1)
 		}
 		shard.mu.Unlock()
 	}
@@ -316,11 +394,11 @@ func (c *ShardedLimitCache) PreHydrate(ctx context.Context) error {
 
 		shard := c.getShard(profileID)
 		shard.mu.Lock()
-		shard.data[profileID] = UserLimitEntry{
+		shard.data[profileID] = &UserLimitEntry{
 			DailyTotal: total,
 			Date:       today,
 			LastSynced: time.Now().UnixNano(),
-			Hydrated:   true,
+			Hydrated:   1,
 		}
 		shard.mu.Unlock()
 		count++

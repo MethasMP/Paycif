@@ -47,21 +47,24 @@ func (s *KYCService) RegisterOnRampCustomer(ctx context.Context, dto OnRampCusto
 	// Alchemy Pay creates a profile mapping our userID to their KYC systems.
 	onRampCustomerID := "onramp_cust_" + dto.UserID.String()
 
-	// 2. Persist the On-Ramp Customer ID in our DB
-	_, err := s.DB.ExecContext(ctx, `
-		INSERT INTO identity_verification (
-			user_id, passport_number, full_name, nationality, 
-			kyc_status, sumsub_applicant_id, updated_at
-		)
-		VALUES ($1, $2, $3, $4, 'PENDING_ONRAMP_VERIFICATION', $5, NOW())
-		ON CONFLICT (user_id) DO UPDATE SET
-			kyc_status = EXCLUDED.kyc_status,
-			sumsub_applicant_id = EXCLUDED.sumsub_applicant_id,
+	// 2. Persist the On-Ramp Customer ID and last 4 of ID in our DB inside public.profiles
+	res, err := s.DB.ExecContext(ctx, `
+		UPDATE public.profiles
+		SET kyc_status = 'PENDING_ONRAMP_VERIFICATION',
+			external_customer_id = $2,
+			full_name = COALESCE(NULLIF($3, ''), full_name),
+			id_last_4 = RIGHT($4, 4),
 			updated_at = NOW()
-	`, dto.UserID, dto.PassportNumber, dto.FullName, dto.Nationality, onRampCustomerID)
+		WHERE id = $1
+	`, dto.UserID, onRampCustomerID, dto.FullName, dto.PassportNumber)
 
 	if err != nil {
 		return "", fmt.Errorf("failed to register customer identity locally: %w", err)
+	}
+
+	rows, err := res.RowsAffected()
+	if err == nil && rows == 0 {
+		return "", fmt.Errorf("failed to register customer identity locally: profile not found")
 	}
 
 	// 3. Log Audit
@@ -80,10 +83,9 @@ func (s *KYCService) GetOnRampKycStatus(ctx context.Context, userID uuid.UUID) (
 	var verifiedAt sql.NullTime
 
 	err := s.DB.QueryRowContext(ctx, `
-		SELECT iv.kyc_status, p.kyc_tier, iv.updated_at, iv.verified_at
-		FROM identity_verification iv
-		JOIN profiles p ON iv.user_id = p.id
-		WHERE iv.user_id = $1
+		SELECT COALESCE(kyc_status, 'UNVERIFIED'), COALESCE(kyc_tier, 'tier0'), COALESCE(updated_at, NOW()), verified_at
+		FROM public.profiles
+		WHERE id = $1
 	`, userID).Scan(&kycStatus, &kycTier, &updatedAt, &verifiedAt)
 
 	if err != nil {
@@ -114,40 +116,19 @@ func (s *KYCService) GetOnRampKycStatus(ctx context.Context, userID uuid.UUID) (
 
 // SyncOnRampKycStatus updates verification status received via On-Ramp Webhook / Webhook callback.
 func (s *KYCService) SyncOnRampKycStatus(ctx context.Context, userID uuid.UUID, status string, tier string) error {
-	tx, err := s.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	// 1. Update identity_verification status
-	_, err = tx.ExecContext(ctx, `
-		UPDATE identity_verification 
-		SET kyc_status = $2, 
-		    verified_at = CASE WHEN $2 = 'VERIFIED' THEN NOW() ELSE verified_at END,
-		    updated_at = NOW()
-		WHERE user_id = $1
-	`, userID, status)
-	if err != nil {
-		return err
-	}
-
-	// 2. Update profile kyc_tier
-	_, err = tx.ExecContext(ctx, `
-		UPDATE profiles 
-		SET kyc_tier = $2, 
-		    updated_at = NOW()
+	_, err := s.DB.ExecContext(ctx, `
+		UPDATE public.profiles
+		SET kyc_status = $2,
+			kyc_tier = $3,
+			verified_at = CASE WHEN $2 = 'VERIFIED' THEN NOW() ELSE verified_at END,
+			updated_at = NOW()
 		WHERE id = $1
-	`, userID, tier)
+	`, userID, status, tier)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to sync onramp KYC status: %w", err)
 	}
 
-	if err := tx.Commit(); err != nil {
-		return err
-	}
-
-	// 3. Log Audit
+	// Log Audit
 	s.Audit.Log(ctx, userID, "ONRAMP_KYC_SYNC_SUCCESS", "IDENTITY_VERIFICATION", userID.String(), map[string]interface{}{
 		"status": status,
 		"tier":   tier,

@@ -44,7 +44,8 @@ func TestSqrilProvider_DecodeQR(t *testing.T) {
 			"amount_usd": 6.84,
 			"fee": 0.1,
 			"percentage_fee": 0.1,
-			"fixed_fee": 0.0
+			"fixed_fee": 0.0,
+			"deposit_address": "0xABCDEF1234567890"
 		}`))
 	}))
 	defer server.Close()
@@ -60,6 +61,7 @@ func TestSqrilProvider_DecodeQR(t *testing.T) {
 	assert.Equal(t, "TESCO LOTUS", resp.Merchant)
 	assert.Equal(t, int64(25000), resp.Amount)
 	assert.Equal(t, false, resp.IsDynamic)
+	assert.Equal(t, "0xABCDEF1234567890", resp.DepositAddress)
 }
 
 func TestSqrilProvider_GetQuotation(t *testing.T) {
@@ -85,7 +87,8 @@ func TestSqrilProvider_GetQuotation(t *testing.T) {
 			"fee": 0.10,
 			"percentage_fee": 0.10,
 			"fixed_fee": 0.00,
-			"expires_at": "2026-06-11T15:30:00Z"
+			"expires_at": "2026-06-11T15:30:00Z",
+			"deposit_address": "0xABCDEF1234567890"
 		}`))
 	}))
 	defer server.Close()
@@ -100,4 +103,5 @@ func TestSqrilProvider_GetQuotation(t *testing.T) {
 	assert.Equal(t, "tx_sqril_123456", resp.TxID)
 	assert.Equal(t, 0.02739726, resp.ExchangeRate)
 	assert.Equal(t, 6.85, resp.AmountUSD)
+	assert.Equal(t, "0xABCDEF1234567890", resp.DepositAddress)
 }

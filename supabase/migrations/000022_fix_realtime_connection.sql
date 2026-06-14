@@ -35,6 +35,7 @@ GRANT USAGE ON SCHEMA public TO authenticated, anon;
 GRANT USAGE ON SCHEMA realtime TO authenticated, anon;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO authenticated, anon;
 
--- 6. Table-level Realtime Flags
-ALTER TABLE public.wallets SET (realtime = true);
-ALTER TABLE public.transactions SET (realtime = true);
+-- 6. Table-level Realtime Flags (Bypassed for standard Postgres compatibility)
+-- ALTER TABLE public.wallets SET (realtime = true);
+-- ALTER TABLE public.transactions SET (realtime = true);
+

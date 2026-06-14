@@ -126,22 +126,22 @@ serve(async (req: Request) => {
     // ------------------------------------------------------------------------
     // D. VALIDATE CHALLENGE & RESET
     // ------------------------------------------------------------------------
-    const { data: kyc, error: kycError } = await supabase
-      .from('identity_verification')
-      .select('passport_number')
-      .eq('user_id', user.id)
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id_last_4')
+      .eq('id', user.id)
       .single();
 
-    if (kycError || !kyc) {
+    if (profileError || !profile || !profile.id_last_4) {
       return jsonError('No identity record found. Contact support.', 403, 'KYC_MISSING');
     }
 
-    const idNumber = kyc.passport_number.trim();
-    if (idNumber.length < 4) {
+    const idLast4 = profile.id_last_4.trim();
+    if (idLast4.length !== 4) {
       return jsonError('Identity record invalid. Contact support.', 403, 'KYC_INVALID');
     }
 
-    const expectedLast4 = idNumber.slice(-4);
+    const expectedLast4 = idLast4;
 
     if (answer === expectedLast4) {
       // SUCCESS: Perform Atomic Reset

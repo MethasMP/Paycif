@@ -18,18 +18,17 @@ Paycif เป็น **cross-border payment orchestration layer** ที่ช่
 ## 2. Core Architecture (3-leg flow)
 
 ```
-[Tourist] → On-Ramp Partner → USDC Pool Wallet (Base network) → Off-Ramp Partner → PromptPay → [Merchant]
+[Tourist] → On-Ramp Partner → USDC Pool Wallet (Base network - Held/Controlled by Partner) → Off-Ramp Partner → PromptPay → [Merchant]
 ```
 
 - **On-ramp:** รับเงิน fiat จากนักท่องเที่ยว (card/Apple Pay/bank transfer) → แปลงเป็น USDC
-- **Pool wallet:** Paycif-managed USDC wallet บน Base network — เป็นตัวกลางที่ Paycif ควบคุม
+- **Pool wallet:** USDC wallet บน Base network ที่ถือครองและควบคุมโดย Licensed Partner (เช่น SQRIL หรือ Off-ramp partner) — Paycif ทำหน้าที่ส่งคำสั่งหรือจัดการ (orchestrate) เท่านั้น ไม่ได้จัดการกระเป๋าหรือควบคุมสิทธิ์ในการเคลื่อนย้ายเงินโดยตรง
 - **Off-ramp:** แปลง USDC → THB → ส่งเข้า PromptPay ของร้านค้า
 
 **กฎสำคัญสำหรับ AI agent:**
-ทุก partner role (on-ramp, off-ramp, wallet) ต้อง implement ผ่าน interface ที่ swap ได้:
+ทุก partner role (on-ramp, off-ramp) ต้อง implement ผ่าน interface ที่ swap ได้:
 - `IOnRampProvider`
 - `IOffRampProvider`
-- `IWalletProvider`
 
 **ห้าม hardcode ชื่อ partner company ใน core architecture/business logic** — ชื่อ partner ใส่ได้เฉพาะใน config/adapter layer เท่านั้น เพราะ partner เปลี่ยนได้เสมอ (pay-per-use, ไม่ exclusive)
 
@@ -72,7 +71,7 @@ Paycif เป็น **cross-border payment orchestration layer** ที่ช่
 
 ## 5. หลักการที่ AI agent ต้องยึดตามเสมอ
 
-1. Paycif ไม่ใช่ licensed entity — ห้ามเขียน logic ที่ทำให้ดูเหมือน Paycif ถือ/โอนเงินแบบมี license
+1. Paycif ไม่ใช่ licensed entity — ห้ามเขียน logic ที่ทำให้ดูเหมือน Paycif ถือ/โอนเงิน หรือควบคุมกระเป๋าเงิน (Pool Wallet) เองโดยเด็ดขาด (กระเป๋าต้องเป็นของ Licensed Partner และเราเพียงส่งคำสั่งหรืองานเท่านั้น)
 2. Provider abstraction ต้อง swap ได้เสมอ — อย่า couple โค้ดกับ partner เฉพาะเจ้า
 3. Merchant-side QR (ไม่ใช่ personal QR) คือ default assumption สำหรับ flow ใดๆ ที่เกี่ยวกับการรับเงิน
 4. ถ้า task เกี่ยวกับ regulatory/compliance — flag ไว้ว่าเป็นพื้นที่ gray area ที่ยังไม่ resolve อย่า assume คำตอบ

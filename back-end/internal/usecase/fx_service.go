@@ -166,7 +166,13 @@ func (s *FXService) fetchRateFromAPI(ctx context.Context, base, target string) (
 }
 
 func (s *FXService) persistRate(ctx context.Context, from, to string, mid, provider, spread decimal.Decimal) error {
-	// Simple upsert into exchange_rates
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// 1. Upsert exchange_rates and return the row ID
 	query := `
 		INSERT INTO exchange_rates (from_currency, to_currency, mid_rate, provider_rate, spread, updated_at)
 		VALUES ($1, $2, $3, $4, $5, NOW())
@@ -175,17 +181,32 @@ func (s *FXService) persistRate(ctx context.Context, from, to string, mid, provi
 			mid_rate = EXCLUDED.mid_rate,
 			provider_rate = EXCLUDED.provider_rate,
 			spread = EXCLUDED.spread,
-			updated_at = NOW();
+			updated_at = NOW()
+		RETURNING id;
 	`
-	_, err := s.DB.ExecContext(ctx, query, from, to, mid, provider, spread)
+	var rateID string
+	err = tx.QueryRowContext(ctx, query, from, to, mid, provider, spread).Scan(&rateID)
 	if err != nil {
 		return fmt.Errorf("failed to upsert exchange_rates: %w", err)
+	}
+
+	// 2. Insert into fx_rate_history for auditing / historical tracking
+	historyQuery := `
+		INSERT INTO fx_rate_history (exchange_rate_id, from_currency, to_currency, mid_rate, provider_rate, captured_at)
+		VALUES ($1, $2, $3, $4, $5, NOW())
+	`
+	_, err = tx.ExecContext(ctx, historyQuery, rateID, from, to, mid, provider)
+	if err != nil {
+		return fmt.Errorf("failed to insert fx_rate_history: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	// Survivability: Push update to High-Performance Rust Engine
 	if s.GRPCClient != nil {
 		// Use a detached context for push to ensure it doesn't fail the schedule if slow
-		// But here we just use ctx for simplicity or create a quick timeout
 		pushCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 

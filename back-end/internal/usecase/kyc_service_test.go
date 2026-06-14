@@ -2,7 +2,6 @@ package usecase_test
 
 import (
 	"context"
-	"encoding/base64"
 	"os"
 	"strings"
 	"testing"
@@ -43,77 +42,57 @@ func TestKYC_EndToEndFlow(t *testing.T) {
 		}
 	}
 
-	encryptionKey := os.Getenv("ENCRYPTION_KEY")
-	if encryptionKey == "" {
-		os.Setenv("ENCRYPTION_KEY", "p4ssw0rd_v3ry_s3cr3t_paysif_2026") // Fallback for local runners
-	}
-
 	db, err := sql.Open("pgx", dbURL)
 	require.NoError(t, err)
 	defer db.Close()
 
-	crypto := usecase.NewCryptoService()
 	audit := usecase.NewAuditService(db)
-	svc := usecase.NewKYCService(db, crypto, audit)
+	svc := usecase.NewKYCService(db, audit)
 
 	userID := uuid.New()
 	ctx := context.Background()
 
 	// 0. Create dummy Profile (Required by Foreign Key)
-	_, err = db.Exec("INSERT INTO profiles (id, full_name, email) VALUES ($1, $2, $3)", userID, "Test User", "test@example.com")
+	_, err = db.Exec("INSERT INTO profiles (id, username, full_name, email) VALUES ($1, $2, $3, $4)", userID, "testuser_"+userID.String()[:8], "Test User", "test@example.com")
 	require.NoError(t, err)
 	defer db.Exec("DELETE FROM profiles WHERE id = $1", userID)
 
-	// --- PHASE 1: NFC Submission (Passive Auth) ---
-	t.Run("Phase 1: NFC Submission", func(t *testing.T) {
-		// Mock data groups
-		dg1 := []byte("DG1_DATA")
-		dg2 := []byte("DG2_DATA_ICAO_COMPLIANT_IMAGE")
-		sod := []byte("") // Skip signature check in mock test by using empty or valid sod
-
-		dto := usecase.KYCSubmissionDTO{
+	// --- PHASE 1: Register OnRamp Customer ---
+	t.Run("Phase 1: Register OnRamp Customer", func(t *testing.T) {
+		dto := usecase.OnRampCustomerDTO{
 			UserID:         userID,
 			FullName:       "John Doe",
 			PassportNumber: "AB123456",
 			Nationality:    "TH",
-			DG1:            dg1,
-			DG2:            dg2,
-			SOD:            sod,
 		}
 
-		err := svc.SubmitKYC(ctx, dto)
+		onRampID, err := svc.RegisterOnRampCustomer(ctx, dto)
 		assert.NoError(t, err)
+		assert.Contains(t, onRampID, "onramp_cust_")
 
-		// Verify state is PENDING_BIOMETRIC
-		var status string
-		err = db.QueryRow("SELECT kyc_status FROM identity_verification WHERE user_id = $1", userID).Scan(&status)
+		// Verify state is PENDING_ONRAMP_VERIFICATION
+		status, err := svc.GetOnRampKycStatus(ctx, userID)
 		assert.NoError(t, err)
-		assert.Equal(t, "PENDING_BIOMETRIC", status)
+		assert.Equal(t, "PENDING_ONRAMP_VERIFICATION", status.KycStatus)
+
+		// Verify id_last_4 is correctly stored as "3456" (from "AB123456")
+		var idLast4 sql.NullString
+		err = db.QueryRow("SELECT id_last_4 FROM profiles WHERE id = $1", userID).Scan(&idLast4)
+		assert.NoError(t, err)
+		assert.True(t, idLast4.Valid)
+		assert.Equal(t, "3456", idLast4.String)
 	})
 
-	// --- PHASE 2: Biometric Matching (Liveness + Face) ---
-	t.Run("Phase 2: Biometric Matching", func(t *testing.T) {
-		// Simulate a valid session ID from the previous step
-		sessionID := uuid.New().String()
-
-		// Mocked selfie (Base64)
-		// Needs to be > 1KB to pass mock logic
-		mockSelfie := make([]byte, 2048)
-		for i := 0; i < len(mockSelfie); i++ {
-			mockSelfie[i] = 0xAA
-		}
-		selfieB64 := base64.StdEncoding.EncodeToString(mockSelfie)
-
-		err := svc.VerifySelfie(ctx, userID, selfieB64, sessionID)
+	// --- PHASE 2: Sync OnRamp Status ---
+	t.Run("Phase 2: Sync OnRamp Status", func(t *testing.T) {
+		err := svc.SyncOnRampKycStatus(ctx, userID, "VERIFIED", "tier1")
 		assert.NoError(t, err)
 
 		// Verify state is VERIFIED
-		var status string
-		err = db.QueryRow("SELECT kyc_status FROM identity_verification WHERE user_id = $1", userID).Scan(&status)
+		status, err := svc.GetOnRampKycStatus(ctx, userID)
 		assert.NoError(t, err)
-		assert.Equal(t, "VERIFIED", status)
+		assert.Equal(t, "VERIFIED", status.KycStatus)
+		assert.Equal(t, "tier1", status.KycTier)
+		assert.NotNil(t, status.ConfirmedAt)
 	})
-
-	// Cleanup
-	db.Exec("DELETE FROM identity_verification WHERE user_id = $1", userID)
 }

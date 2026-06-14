@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, boolean, integer, bigint, numeric, decimal, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, boolean, integer, bigint, numeric, decimal, pgEnum, doublePrecision } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 // ----------------------------------------------------------------------------
@@ -24,6 +24,18 @@ export const profiles = pgTable('profiles', {
   biometricEnabled: boolean('biometric_enabled').default(false),
   hasPin: boolean('has_pin').default(false),
   kycStatus: text('kyc_status').default('PENDING'),
+  kycTier: text('kyc_tier').default('tier0'),
+  externalCustomerId: text('external_customer_id').unique(),
+  externalCustomerType: text('external_customer_type').default('OMISE'),
+  openfortWalletAddress: text('openfort_wallet_address'),
+  coinflowCustomerId: text('coinflow_customer_id'),
+  paymentProvider: text('payment_provider').default('coinflow'),
+  lastLat: doublePrecision('last_lat'),
+  lastLng: doublePrecision('last_lng'),
+  lastTxnAt: timestamp('last_txn_at', { withTimezone: true }),
+  accountStatus: text('account_status').default('ACTIVE'),
+  verifiedAt: timestamp('verified_at', { withTimezone: true }),
+  idLast4: text('id_last_4'),
 });
 
 export const transactions = pgTable('transactions', {
@@ -52,16 +64,7 @@ export const ledgerEntries = pgTable('ledger_entries', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
 
-export const identityVerification = pgTable('identity_verification', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
-  passportNumber: text('passport_number').notNull(),
-  fullName: text('full_name').notNull(),
-  nationality: text('nationality').notNull(),
-  kycStatus: text('kyc_status').default('PENDING'),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
-});
+// identity_verification table has been dropped to conform to pure Delegated KYC
 
 export const exchangeRates = pgTable('exchange_rates', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -116,7 +119,6 @@ export const profilesRelations = relations(profiles, ({ many }) => ({
   transactions: many(transactions),
   ledgerEntries: many(ledgerEntries),
   deviceBindings: many(userDeviceBindings),
-  kycRecords: many(identityVerification),
 }));
 
 export const transactionsRelations = relations(transactions, ({ one, many }) => ({
@@ -137,3 +139,14 @@ export const ledgerEntriesRelations = relations(ledgerEntries, ({ one }) => ({
     references: [profiles.id],
   }),
 }));
+
+export const jobs = pgTable('jobs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  type: text('type').notNull(),
+  payload: text('payload').default('{}'), // jsonb
+  status: text('status').default('pending'),
+  errorMessage: text('error_message'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  lockedAt: timestamp('locked_at', { withTimezone: true }),
+});

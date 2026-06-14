@@ -14,7 +14,8 @@ ALTER TABLE public.ledger_entries ADD CONSTRAINT ledger_entries_profile_id_fkey 
 
 -- 2. Modify transactions to drop wallet_id and add profile_id
 ALTER TABLE public.transactions DROP COLUMN IF EXISTS wallet_id;
-ALTER TABLE public.transactions ADD COLUMN profile_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS profile_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE;
+
 
 -- Recreate policy for transactions based on profile_id
 CREATE POLICY "Users can only see their own transactions" ON public.transactions

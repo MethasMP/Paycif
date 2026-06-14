@@ -59,6 +59,7 @@ type DecodeQRResponse struct {
 	Fee                  float64                  `json:"fee"`
 	PercentageFee        float64                  `json:"percentage_fee"`
 	FixedFee             float64                  `json:"fixed_fee"`
+	DepositAddress       string                   `json:"deposit_address,omitempty"`
 	MissingFields        []map[string]interface{} `json:"missing_fields,omitempty"`
 }
 
@@ -110,9 +111,10 @@ type GetQuotationResponse struct {
 	ExchangeRate  float64   `json:"exchange_rate"`
 	AmountUSD     float64   `json:"amount_usd"`
 	Fee           float64   `json:"fee"`
-	PercentageFee float64   `json:"percentage_fee"`
-	FixedFee      float64   `json:"fixed_fee"`
-	ExpiresAt     time.Time `json:"expires_at"`
+	PercentageFee  float64   `json:"percentage_fee"`
+	FixedFee       float64   `json:"fixed_fee"`
+	ExpiresAt      time.Time `json:"expires_at"`
+	DepositAddress string    `json:"deposit_address,omitempty"`
 }
 
 // GetQuotation invokes SQRIL /getQuotation
