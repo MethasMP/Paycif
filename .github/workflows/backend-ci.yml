@@ -29,20 +29,13 @@ jobs:
       - name: Verify Dependencies
         run: go mod verify
 
-      - name: Cache golangci-lint
-        uses: actions/cache@v4
-        with:
-          path: ~/go/bin/golangci-lint
-          key: ${{ runner.os }}-golangci-lint-${{ hashFiles('back-end/go.sum') }}
-
-      - name: Install golangci-lint
-        run: |
-          if [ ! -f ~/go/bin/golangci-lint ]; then
-            go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
-          fi
-
       - name: Run golangci-lint
-        run: ~/go/bin/golangci-lint run --timeout=5m
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: v1.64.8
+          install-mode: goinstall
+          working-directory: back-end
+          args: --timeout=5m
 
       - name: Run Tests with Race Detector
         run: go test -v -race ./...
