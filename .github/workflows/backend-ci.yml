@@ -23,18 +23,19 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.25'
           cache-dependency-path: back-end/go.sum
 
       - name: Verify Dependencies
         run: go mod verify
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v4
+        uses: golangci/golangci-lint-action@v6
         with:
           version: latest
           working-directory: back-end
           args: --timeout=5m
+          only-new-issues: true
 
       - name: Run Tests with Race Detector
         run: go test -v -race ./...
@@ -54,7 +55,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.25'
           cache-dependency-path: back-end/go.sum
 
       - name: Build Microservice
