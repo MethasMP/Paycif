@@ -1,6 +1,6 @@
 module paysif
 
-go 1.26
+go 1.25
 
 require (
 	github.com/MicahParks/keyfunc/v2 v2.1.0
