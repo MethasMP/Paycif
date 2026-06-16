@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	models "paysif/internal/domain/entities"
+	"paysif/internal/domain/entities"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"

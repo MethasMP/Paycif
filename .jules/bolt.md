@@ -13,5 +13,5 @@
 **Action:** Keep performance PRs focused strictly on measurable efficiency gains. Correct existing bugs found during exploration only if they block the performance fix, and do so minimally.
 
 ## 2026-06-15 - Go Version Compatibility with golangci-lint
-**Learning:** Target Go versions in `go.mod` that are significantly higher than the version used to build the `golangci-lint` binary can cause CI failures ("can't load config: the Go language version... used to build golangci-lint is lower than the targeted Go version").
-**Action:** Align the project's Go version with a stable version supported by CI infrastructure and linting tools. Downgrading from 1.26 to 1.25 resolved this without affecting functionality.
+**Learning:** Target Go versions in `go.mod` that are higher than the version used to build the `golangci-lint` binary cause CI failures ("can't load config: the Go language version... used to build golangci-lint is lower than the targeted Go version").
+**Action:** Align the project's Go version with a stable version supported by CI infrastructure. To resolve persistent mismatch, install `golangci-lint` manually via `go install` using the target Go version, ensuring the linter binary is compatible with the project's source code.

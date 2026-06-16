@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"paysif/internal/adapter/repository"
-	models "paysif/internal/domain/entities"
+	"paysif/internal/domain/entities"
 )
 
 func main() {
