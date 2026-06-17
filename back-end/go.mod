@@ -3,6 +3,7 @@ module paysif
 go 1.26
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/MicahParks/keyfunc/v2 v2.1.0
 	github.com/bytedance/sonic v1.15.1
 	github.com/gin-gonic/gin v1.12.0
