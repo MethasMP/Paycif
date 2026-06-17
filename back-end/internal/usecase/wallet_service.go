@@ -145,27 +145,27 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 	}
 	defer tx.Rollback()
 
-	// 1. Idempotency check
-	var exists bool
-	err = tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM transactions WHERE reference_id = $1)", referenceID).Scan(&exists)
-	if err != nil {
-		return err
-	}
-	if exists {
-		log.Printf("ℹ[] Payment already processed for reference: %s", referenceID)
-		return nil
-	}
-
-	// 2. Record Transaction
+	// ⚡ OPTIMIZATION: Use atomic idempotency with ON CONFLICT DO NOTHING.
+	// This reduces database round-trips and minimizes serialization conflict window.
 	newTxID := uuid.New()
 	description := "Pay per use: " + merchant
-	_, err = tx.ExecContext(ctx, `
+	res, err := tx.ExecContext(ctx, `
 		INSERT INTO transactions (id, profile_id, reference_id, amount, description, settlement_status, gateway_fee, provider_metadata, created_at)
 		VALUES ($1, $2, $3, $4, $5, 'SETTLED', 0, $6, NOW())
+		ON CONFLICT (reference_id) DO NOTHING
 	`, newTxID, userID, referenceID, int64(amount*100), description,
 		fmt.Sprintf(`{"provider": "alchemypay", "merchant": "%s", "amount": %f}`, merchant, amount))
 	if err != nil {
 		return fmt.Errorf("failed to insert transaction: %w", err)
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check rows affected: %w", err)
+	}
+	if rows == 0 {
+		log.Printf("ℹ[] Payment already processed (idempotent): %s", referenceID)
+		return nil
 	}
 
 	// 3. Create Ledger Entry
