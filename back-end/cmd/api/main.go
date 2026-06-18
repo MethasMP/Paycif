@@ -111,7 +111,7 @@ func main() {
 	}
 
 	r := gin.New()                                // Use New() to avoid default logger
-	r.SetTrustedProxies(nil)                      // Security: Disable trusting all proxies
+	_ = r.SetTrustedProxies(nil)                  // Security: Disable trusting all proxies
 	r.Use(middleware.Recovery())                  // 🛡️ Secure Recovery from panics
 	r.Use(middleware.StructuredLogger())          // World-Class JSON Logger
 	r.Use(middleware.CORSMiddleware())            // CORS Configuration

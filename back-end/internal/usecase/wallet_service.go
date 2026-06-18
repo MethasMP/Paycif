@@ -104,7 +104,12 @@ type ExchangeRateResponse struct {
 
 // GetExchangeRate retrieves the latest rate for a currency pair.
 func (s *WalletService) GetExchangeRate(ctx context.Context, fromCurr, toCurr string) (*ExchangeRateResponse, error) {
-	cacheKey := fmt.Sprintf("rate:%s:%s", fromCurr, toCurr)
+	// Normalize to uppercase for consistent caching and querying
+	fromCurr = strings.ToUpper(fromCurr)
+	toCurr = strings.ToUpper(toCurr)
+
+	// Optimize cache key generation (string concatenation is faster than fmt.Sprintf)
+	cacheKey := "rate:" + fromCurr + ":" + toCurr
 
 	if val, ok := s.localRateCache.Load(cacheKey); ok {
 		item := val.(localCacheItem)
@@ -117,7 +122,7 @@ func (s *WalletService) GetExchangeRate(ctx context.Context, fromCurr, toCurr st
 	var rate float64
 	var updatedAt time.Time
 	err := s.DB.QueryRowContext(ctx, "SELECT provider_rate, updated_at FROM exchange_rates WHERE from_currency = $1 AND to_currency = $2",
-		strings.ToUpper(fromCurr), strings.ToUpper(toCurr)).Scan(&rate, &updatedAt)
+		fromCurr, toCurr).Scan(&rate, &updatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("rate not found for %s/%s", fromCurr, toCurr)
@@ -143,7 +148,7 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// 1. Idempotency check
 	var exists bool
@@ -307,7 +312,7 @@ func (s *WalletService) reservePayout(ctx context.Context, req PayoutRequest) (*
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// 1. Lock profile row (Mutex for this specific user's wallet)
 	var senderFullName string
@@ -402,7 +407,7 @@ func (s *WalletService) releasePayoutReservation(ctx context.Context, transactio
 	if err != nil {
 		return fmt.Errorf("failed to begin release transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if _, err := tx.ExecContext(ctx, "DELETE FROM transactions WHERE id = $1 AND settlement_status = 'PENDING'", transactionID); err != nil {
 		return fmt.Errorf("failed to delete reserved transaction: %w", err)
