@@ -35,18 +35,24 @@ func TestGetExchangeRate_CacheNormalization(t *testing.T) {
 	assert.Equal(t, "THB", res.ToCurrency)
 }
 
+var sink string
+
 func BenchmarkGetExchangeRate_KeyGeneration_Concat(b *testing.B) {
 	from := "USD"
 	to := "THB"
+	var r string
 	for i := 0; i < b.N; i++ {
-		_ = "rate:" + from + ":" + to
+		r = "rate:" + from + ":" + to
 	}
+	sink = r
 }
 
 func BenchmarkGetExchangeRate_KeyGeneration_Sprintf(b *testing.B) {
 	from := "USD"
 	to := "THB"
+	var r string
 	for i := 0; i < b.N; i++ {
-		_ = fmt.Sprintf("rate:%s:%s", from, to)
+		r = fmt.Sprintf("rate:%s:%s", from, to)
 	}
+	sink = r
 }
