@@ -43,14 +43,14 @@ func (h *TransferHandler) HandleGetTransactions(c *gin.Context) {
 	}
 	userID, err := uuid.Parse(userIDStr.(string))
 	if err != nil {
-		c.Error(err)
+		_ = c.Error(err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID in token"})
 		return
 	}
 
 	transactions, err := h.Service.GetTransactions(c.Request.Context(), userID)
 	if err != nil {
-		c.Error(err)
+		_ = c.Error(err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
 		return
 	}

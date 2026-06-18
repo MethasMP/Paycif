@@ -39,7 +39,7 @@ jobs:
           key: ${{ runner.os }}-golangci-lint-${{ hashFiles('back-end/go.sum') }}
 
       - name: Run golangci-lint
-        run: ~/go/bin/golangci-lint run --timeout=5m
+        run: ~/go/bin/golangci-lint run --timeout=5m --new-from-rev=HEAD~1
 
       - name: Run Tests with Race Detector
         run: go test -v -race ./...

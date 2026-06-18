@@ -148,7 +148,7 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// 1. Idempotency check
 	var exists bool
@@ -312,7 +312,7 @@ func (s *WalletService) reservePayout(ctx context.Context, req PayoutRequest) (*
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// 1. Lock profile row (Mutex for this specific user's wallet)
 	var senderFullName string
@@ -407,7 +407,7 @@ func (s *WalletService) releasePayoutReservation(ctx context.Context, transactio
 	if err != nil {
 		return fmt.Errorf("failed to begin release transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if _, err := tx.ExecContext(ctx, "DELETE FROM transactions WHERE id = $1 AND settlement_status = 'PENDING'", transactionID); err != nil {
 		return fmt.Errorf("failed to delete reserved transaction: %w", err)
