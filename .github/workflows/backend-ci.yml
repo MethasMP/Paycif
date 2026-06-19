@@ -29,12 +29,21 @@ jobs:
       - name: Verify Dependencies
         run: go mod verify
 
-      - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v4
+      - name: Cache golangci-lint binary
+        id: cache-linter
+        uses: actions/cache@v4
         with:
-          version: latest
-          working-directory: back-end
-          args: --timeout=5m
+          path: ~/go/bin/golangci-lint
+          key: ${{ runner.os }}-golangci-lint-${{ hashFiles('back-end/go.sum') }}
+
+      - name: Install golangci-lint
+        if: steps.cache-linter.outputs.cache-hit != 'true'
+        # Build from source using Go 1.26 to avoid "can't load config" errors
+        # caused by linter binaries built with older Go versions.
+        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+      - name: Run golangci-lint
+        run: ~/go/bin/golangci-lint run --timeout=5m
 
       - name: Run Tests with Race Detector
         run: go test -v -race ./...
