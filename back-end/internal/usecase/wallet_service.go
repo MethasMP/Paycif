@@ -132,8 +132,8 @@ func (s *WalletService) GetExchangeRate(ctx context.Context, fromCurr, toCurr st
 	}
 
 	response := &ExchangeRateResponse{
-		FromCurrency: fromCurrUpper,
-		ToCurrency:   toCurrUpper,
+		FromCurrency: fromCurr,
+		ToCurrency:   toCurr,
 		ProviderRate: rate,
 		UpdatedAt:    updatedAt,
 	}

@@ -42,7 +42,9 @@ jobs:
           fi
 
       - name: Run golangci-lint
-        run: ~/go/bin/golangci-lint run --timeout=5m
+        run: |
+          git fetch origin ${{ github.base_ref }} --depth=1
+          ~/go/bin/golangci-lint run --timeout=5m --new-from-rev=origin/${{ github.base_ref }}
 
       - name: Run Tests with Race Detector
         run: go test -v -race ./...
