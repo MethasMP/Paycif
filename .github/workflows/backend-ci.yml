@@ -23,18 +23,38 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version-file: back-end/go.mod
           cache-dependency-path: back-end/go.sum
 
       - name: Verify Dependencies
         run: go mod verify
 
-      - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v4
+      - name: Fetch base branch for linting
+        if: github.event_name == 'pull_request'
+        run: git fetch origin ${{ github.base_ref }}
+
+      - name: Cache golangci-lint binary
+        id: cache-linter
+        uses: actions/cache@v4
         with:
-          version: latest
-          working-directory: back-end
-          args: --timeout=5m
+          path: ~/go/bin/golangci-lint
+          key: ${{ runner.os }}-golangci-lint-${{ hashFiles('back-end/go.sum') }}
+
+      - name: Install golangci-lint
+        if: steps.cache-linter.outputs.cache-hit != 'true'
+        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+      - name: Run golangci-lint (PR)
+        if: github.event_name == 'pull_request'
+        run: |
+          # Use linter built with the project's Go version to avoid config loading errors
+          ~/go/bin/golangci-lint run --new-from-rev=origin/${{ github.base_ref }} --timeout=5m
+
+      - name: Run golangci-lint (Push)
+        if: github.event_name == 'push'
+        run: |
+          # Use linter built with the project's Go version to avoid config loading errors
+          ~/go/bin/golangci-lint run --new-from-rev=HEAD~1 --timeout=5m
 
       - name: Run Tests with Race Detector
         run: go test -v -race ./...
@@ -54,7 +74,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version-file: back-end/go.mod
           cache-dependency-path: back-end/go.sum
 
       - name: Build Microservice
