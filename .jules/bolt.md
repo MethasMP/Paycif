@@ -1,0 +1,3 @@
+## 2026-06-22 - Atomic Idempotency and sqlmock Rollbacks
+**Learning:** Collapsing check-then-insert patterns into atomic `INSERT ... ON CONFLICT DO NOTHING` reduces DB round-trips and serialization risk. However, when using `defer tx.Rollback()` in Go, even successful early returns that don't call `tx.Commit()` will trigger a rollback. In tests using `sqlmock`, this `ExpectRollback()` must be explicitly defined to avoid expectation mismatches.
+**Action:** Always include `mock.ExpectRollback()` in `sqlmock` for any path that returns before a commit when a transaction is started with a deferred rollback.
