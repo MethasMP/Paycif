@@ -28,6 +28,8 @@ ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS kyc_tier TEXT NOT NULL DEFAULT 'tier0'
   CHECK (kyc_tier IN ('tier0', 'tier1', 'tier2'));
 
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS kyc_status TEXT DEFAULT 'UNVERIFIED';
+
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS external_customer_id TEXT UNIQUE;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS external_customer_type TEXT DEFAULT 'OMISE';
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS openfort_wallet_address TEXT;
@@ -39,4 +41,9 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS last_txn_at TIMESTAMP WITH 
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS account_status TEXT DEFAULT 'ACTIVE';
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP WITH TIME ZONE;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS id_last_4 VARCHAR(4);
+
+-- 4. Alchemy Pay KYC columns
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS ach_kyc_platform TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS ach_kyc_type TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS ach_user_no TEXT;
 

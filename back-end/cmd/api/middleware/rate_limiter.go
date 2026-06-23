@@ -3,6 +3,7 @@ package middleware
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -60,6 +61,12 @@ func RateLimiterMiddleware() gin.HandlerFunc {
 	initMemory()
 
 	return func(c *gin.Context) {
+		// Load test/local dev bypass (only if GIN_MODE is not release)
+		if bypassUID := c.GetHeader("X-Load-Test-User-Id"); bypassUID != "" && os.Getenv("GIN_MODE") != "release" {
+			c.Next()
+			return
+		}
+
 		userID := c.GetString("user_id")
 		ip := c.ClientIP()
 

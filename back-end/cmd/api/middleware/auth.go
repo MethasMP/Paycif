@@ -52,6 +52,16 @@ func AuthMiddleware(walletSvc *usecase.WalletService) gin.HandlerFunc {
 	log.Println("✅ JWKS Initialized")
 
 	return func(c *gin.Context) {
+		// Load test/local dev bypass (only if GIN_MODE is not release)
+		if bypassUID := c.GetHeader("X-Load-Test-User-Id"); bypassUID != "" && os.Getenv("GIN_MODE") != "release" {
+			c.Set("user_id", bypassUID)
+			if uid, err := uuid.Parse(bypassUID); err == nil {
+				ensuredAccounts.Store(uid, time.Now().Add(ensuredAccountTTL))
+			}
+			c.Next()
+			return
+		}
+
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})

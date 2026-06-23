@@ -2,16 +2,14 @@ import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:frontend/core/l10n/generated/app_localizations.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:frontend/features/dashboard/presentation/dashboard_controller.dart';
 import 'package:frontend/features/transactions/domain/transaction.dart';
 import 'package:frontend/core/widgets/transaction_item.dart';
-import 'package:frontend/features/transactions/presentation/history_screen.dart';
 import 'package:frontend/core/utils/error_translator.dart';
 import 'package:frontend/core/models/exchange_rate_model.dart';
 import 'package:frontend/core/network/api_service.dart';
-import 'package:frontend/features/profile/presentation/profile_page.dart';
-import 'package:frontend/features/payment/presentation/payment_settings_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -105,10 +103,7 @@ class _HomeViewState extends State<HomeView> {
           icon: PhosphorIconsRegular.creditCard,
           onTap: () {
             HapticFeedback.lightImpact();
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const PaymentSettingsScreen()),
-            );
+            context.push('/payment_settings');
           },
         ),
         _QuickActionButton(
@@ -116,10 +111,7 @@ class _HomeViewState extends State<HomeView> {
           icon: PhosphorIconsRegular.chartLineUp,
           onTap: () {
             HapticFeedback.lightImpact();
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const HistoryScreen()),
-            );
+            context.push('/history');
           },
         ),
       ],
@@ -229,10 +221,7 @@ class _HomeViewState extends State<HomeView> {
               size: 22.0,
               color: AppTheme.textPrimaryColor(context),
             ),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const ProfilePage()),
-            ),
+            onPressed: () => context.push('/profile'),
           ),
         ),
       ],
@@ -256,10 +245,7 @@ class _HomeViewState extends State<HomeView> {
             ),
           ),
           TextButton(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const HistoryScreen()),
-            ),
+            onPressed: () => context.push('/history'),
             style: TextButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               minimumSize: Size.zero,

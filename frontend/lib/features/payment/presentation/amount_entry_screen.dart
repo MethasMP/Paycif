@@ -7,7 +7,7 @@ import 'package:frontend/core/network/api_service.dart';
 import 'package:frontend/core/widgets/paycif_icon_container.dart';
 import 'package:frontend/core/widgets/paycif_amount_text.dart';
 import 'package:frontend/features/payment/domain/entities/payment_breakdown.dart';
-import 'package:frontend/features/payment/presentation/pages/pay_screen.dart';
+import 'package:go_router/go_router.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 
 class AmountEntryScreen extends StatefulWidget {
@@ -61,32 +61,26 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
     return widget.data.merchantName;
   }
 
-  void _onNext() {
+  Future<void> _onNext() async {
     final amount = double.tryParse(_controller.text) ?? 0.0;
     if (amount <= 0) return;
 
     setState(() => _isProcessing = true);
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => PayScreen(
-          amount: amount,
-          merchantName: _displayName, // Use looked up name
-          promptPayId: widget.data.promptPayId,
-          billerId: widget.data.billerId,
-          reference1: widget.data.reference1,
-          reference2: widget.data.reference2,
-        ),
-      ),
-    ).then((result) {
-      if (mounted) {
-        setState(() => _isProcessing = false);
-        if (result == true) {
-          Navigator.pop(context, true);
-        }
-      }
+    final result = await context.push('/pay', extra: {
+      'amount': amount,
+      'merchantName': _displayName,
+      'promptPayId': widget.data.promptPayId,
+      'billerId': widget.data.billerId,
+      'reference1': widget.data.reference1,
+      'reference2': widget.data.reference2,
     });
+    if (mounted) {
+      setState(() => _isProcessing = false);
+      if (result == true) {
+        Navigator.pop(context, true);
+      }
+    }
   }
 
   void _handleKeypadInput(String key) {

@@ -1,14 +1,17 @@
 package main
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
+	"os"
 	"paysif/internal/usecase"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-// KYCHandler handles identity verification requests with the On-Ramp KYC system.
+// KYCHandler handles identity verification requests via the delegated KYC provider.
 type KYCHandler struct {
 	Service *usecase.KYCService
 }
@@ -18,45 +21,63 @@ func NewKYCHandler(svc *usecase.KYCService) *KYCHandler {
 	return &KYCHandler{Service: svc}
 }
 
-// RegisterOnRampCustomerRequest matches the JSON input for registration.
-type RegisterOnRampCustomerRequest struct {
-	FullName       string `json:"full_name" binding:"required,min=3,max=100"`
-	PassportNumber string `json:"passport_number" binding:"required,alphanum,min=6,max=20"`
-	Nationality    string `json:"nationality" binding:"required,len=2"` // ISO Alpha-2
+// initiateKYCRequest is the JSON input for starting a KYC flow.
+type initiateKYCRequest struct {
+	KycPlatform string `json:"kyc_platform" binding:"required"` // "sumsub" or "onfido"
+	KycType     string `json:"kyc_type" binding:"required"`     // e.g. "1"
+	RedirectURL string `json:"redirect_url"`
 }
 
-// HandleRegisterOnRampCustomer handles registering the customer with Alchemy Pay's delegated KYC system.
+// HandleRegisterOnRampCustomer initiates a KYC session with Alchemy Pay and returns the verification URL.
 func (h *KYCHandler) HandleRegisterOnRampCustomer(c *gin.Context) {
-	var req RegisterOnRampCustomerRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
 	userIDStr, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
-	userID, _ := uuid.Parse(userIDStr.(string))
-
-	dto := usecase.OnRampCustomerDTO{
-		UserID:         userID,
-		FullName:       req.FullName,
-		PassportNumber: req.PassportNumber,
-		Nationality:    req.Nationality,
+	userID, err := uuid.Parse(userIDStr.(string))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID"})
+		return
 	}
 
-	custID, err := h.Service.RegisterOnRampCustomer(c.Request.Context(), dto)
+	var req initiateKYCRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	callbackURL := os.Getenv("ALCHEMY_PAY_KYC_CALLBACK_URL")
+	if callbackURL == "" {
+		callbackURL = os.Getenv("API_BASE_URL") + "/api/v1/kyc/onramp-webhook"
+	}
+
+	svcReq := usecase.RegisterOnRampCustomerRequest{
+		UserID:      userID,
+		KycPlatform: req.KycPlatform,
+		KycType:     req.KycType,
+		CallbackURL: callbackURL,
+		RedirectURL: req.RedirectURL,
+	}
+
+	result, err := h.Service.RegisterOnRampCustomer(c.Request.Context(), svcReq)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	if result.AlreadyRegistered {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "already_registered",
+			"message": "User is already registered for KYC. Check /kyc/status for current state.",
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"status":             "pending_verification",
-		"message":            "Customer registered with On-Ramp KYC system.",
-		"onramp_customer_id": custID,
+		"status":  "pending_verification",
+		"kyc_url": result.KycURL,
+		"message": "Redirect the user to kyc_url to complete identity verification.",
 	})
 }
 
@@ -78,38 +99,44 @@ func (h *KYCHandler) HandleGetOnRampKycStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, status)
 }
 
-// HandleOnRampKycWebhook handles status callbacks/webhooks from the On-Ramp provider (e.g. MoonPay/Alchemy Pay KYC success).
+// HandleOnRampKycWebhook handles KYC result callbacks from Alchemy Pay.
+// Alchemy Pay may deliver the same notification multiple times — this handler is idempotent.
 func (h *KYCHandler) HandleOnRampKycWebhook(c *gin.Context) {
-	// Scaffolding for Webhook: In production, verify signatures and map webhook to user ID
-	var payload struct {
-		Event          string `json:"event"` // e.g. "kyc.verified", "kyc.failed"
-		ExternalUserID string `json:"externalUserId"`
-		Status         string `json:"status"` // e.g. "VERIFIED", "REJECTED"
-		Tier           string `json:"tier"`   // e.g. "tier1", "tier2"
+	const maxBodyBytes = int64(65536)
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxBodyBytes)
+	body, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Error reading request body"})
+		return
 	}
 
-	if err := c.ShouldBindJSON(&payload); err != nil {
+	// Verify Alchemy Pay HMAC-SHA256 signature when the KYC client is configured.
+	if h.Service != nil && h.Service.KYCClient != nil && h.Service.KYCClient.AppKey() != "" {
+		ts := c.GetHeader("ach-access-timestamp")
+		sig := c.GetHeader("ach-access-sign")
+		// Webhooks arrive as POST to /api/v1/kyc/onramp-webhook
+		if !h.Service.KYCClient.VerifyWebhookSignature(ts, "POST", "/api/v1/kyc/onramp-webhook", string(body), sig) {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid signature"})
+			return
+		}
+	}
+
+	var payload usecase.AchWebhookPayload
+	if err := json.Unmarshal(body, &payload); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid payload"})
 		return
 	}
 
-	userID, err := uuid.Parse(payload.ExternalUserID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid external user ID"})
+	if payload.Email == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing email in webhook payload"})
 		return
 	}
 
-	kycStatus := "PENDING"
-	if payload.Status == "VERIFIED" {
-		kycStatus = "VERIFIED"
-	} else if payload.Status == "REJECTED" {
-		kycStatus = "REJECTED"
-	}
-
-	if err := h.Service.SyncOnRampKycStatus(c.Request.Context(), userID, kycStatus, payload.Tier); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to sync status"})
+	if err := h.Service.SyncOnRampKycStatus(c.Request.Context(), payload); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to sync KYC status"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"status": "success"})
+	// Must return HTTP 200 to stop Alchemy Pay retry schedule.
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }

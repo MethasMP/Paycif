@@ -1,6 +1,9 @@
+import 'package:frontend/core/models/decoded_qr.dart';
+import 'package:frontend/core/models/quotation_model.dart';
+
 abstract class IPaymentRepository {
-  Future<Map<String, dynamic>> decodeQR(String qrString);
-  Future<Map<String, dynamic>> getQuotation(String txId, int amountSatang);
+  Future<DecodedQr> decodeQR(String qrString);
+  Future<QuotationModel> getQuotation(String txId, int amountSatang);
 
   Future<String> payToPromptPay({
     required int amountInSatang,
@@ -11,6 +14,5 @@ abstract class IPaymentRepository {
     String? reference2,
     required String idempotencyKey,
     String? sqrilTxId,
-    Map<String, String>? headers,
   });
 }

@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:frontend/features/security/presentation/logic/security_controller.dart';
 import 'package:frontend/features/security/presentation/widgets/pin_entry_widget.dart';
-import 'package:frontend/features/dashboard/presentation/main_screen.dart';
 import 'package:frontend/core/widgets/paycif_icon_container.dart';
+import 'package:go_router/go_router.dart';
 
 
 import 'package:shared_preferences/shared_preferences.dart';
@@ -102,10 +102,7 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
     }
 
     if (mounted) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const MainScreen()),
-        (route) => false,
-      );
+      context.go('/main');
     }
   }
 

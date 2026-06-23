@@ -17,12 +17,16 @@ class Transaction {
 
   factory Transaction.fromJson(Map<String, dynamic> json) {
     return Transaction(
-      id: json['id'],
-      profileId: json['profile_id'] ?? json['wallet_id'] ?? '',
-      type: json['type'] ?? 'UNKNOWN',
-      amount: json['amount'] ?? 0,
-      description: json['description'] ?? '',
-      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']).toLocal() : DateTime.now(),
+      id: (json['id'] ?? '').toString(),
+      profileId: (json['profile_id'] ?? json['wallet_id'] ?? '').toString(),
+      type: (json['type'] ?? 'UNKNOWN').toString(),
+      amount: (json['amount'] is num)
+          ? (json['amount'] as num).toInt()
+          : (int.tryParse(json['amount']?.toString() ?? '') ?? 0),
+      description: (json['description'] ?? '').toString(),
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'].toString()).toLocal()
+          : DateTime.now(),
     );
   }
 

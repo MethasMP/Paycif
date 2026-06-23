@@ -3,13 +3,9 @@ package usecase
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"log"
-	"math/rand"
-	"net/http"
 	"strings"
-	"time"
 
 	fxrpc "paysif/internal/adapter/grpc"
 
@@ -30,200 +26,58 @@ func NewFXService(db *sql.DB, grpcClient fxrpc.FXClientInterface) *FXService {
 	}
 }
 
-// ExchangeRateAPIResponse structure for open.er-api.com
-type ExchangeRateAPIResponse struct {
-	Result string             `json:"result"`
-	Rates  map[string]float64 `json:"rates"`
+// QuoteDetails holds the transparent breakdown of the calculated rate.
+type QuoteDetails struct {
+	BaseFiatAmount    decimal.Decimal
+	PaycifPlatformFee decimal.Decimal
+	TotalFiatAmount   decimal.Decimal
+	MidMarketRate     decimal.Decimal
+	CorridorSpread    decimal.Decimal
+	CorridorType      string
 }
 
-// StartFXScheduler starts the background task to simulate rate updates.
-func (s *FXService) StartFXScheduler(ctx context.Context) {
-	// Update less frequently (e.g. every 15 minutes) as per user request
-	ticker := time.NewTicker(15 * time.Minute)
-	go func() {
-		log.Println("FX Simulation Scheduler started...")
-		// Run immediately on start
-		s.SimulateRates(ctx)
-
-		for {
-			select {
-			case <-ticker.C:
-				s.SimulateRates(ctx)
-			case <-ctx.Done():
-				ticker.Stop()
-				return
-			}
-		}
-	}()
-}
-
-// SimulateRates updates rates based on existing values with random noise.
-func (s *FXService) SimulateRates(ctx context.Context) {
-	currencies := []string{"EUR", "USD", "RUB", "INR", "AUD"}
-	targetCurrency := "THB"
-
-	for _, fromCurr := range currencies {
-		// Stateless Query for Simulation
-		var currentRateStr string
-		simQuery := "SELECT mid_rate FROM exchange_rates WHERE from_currency = $1 AND to_currency = 'THB'"
-
-		err := s.DB.QueryRowContext(ctx, simQuery, strings.ToUpper(fromCurr)).Scan(&currentRateStr)
-
-		if err == sql.ErrNoRows || currentRateStr == "" {
-			// Init: Fetch this currency from API and move on to the next one.
-			log.Printf("Initializing rate for %s/%s from API...", fromCurr, targetCurrency)
-			s.initRateFromAPI(ctx, fromCurr, targetCurrency)
-			continue
-		} else if err != nil {
-			log.Printf("Error checking rate for %s: %v", fromCurr, err)
-			continue
-		}
-
-		// 2. Fluctuate
-		currentRate, _ := decimal.NewFromString(currentRateStr)
-
-		// Random noise between -0.05% and +0.05%
-		// (rand - 0.5) * 0.001 => range -0.0005 to 0.0005
-		noiseFactor := (rand.Float64() - 0.5) * 0.001
-		change := currentRate.Mul(decimal.NewFromFloat(noiseFactor))
-		newMidRate := currentRate.Add(change)
-
-		// Apply Fair Logic (Spread)
-		spread := decimal.NewFromFloat(0.002) // 0.2%
-		providerRate := newMidRate.Mul(decimal.NewFromInt(1).Sub(spread))
-
-		if err := s.persistRate(ctx, fromCurr, targetCurrency, newMidRate, providerRate, spread); err != nil {
-			log.Printf("Error persisting simulated rate for %s: %v", fromCurr, err)
-		} else {
-			log.Printf("Simulated update %s/%s: Mid=%s (%.4f%%)",
-				fromCurr, targetCurrency, newMidRate.StringFixed(4), noiseFactor*100)
-		}
+// CalculateDynamicQuote calculates the dynamic quote based on the Transparent Corridor Spread strategy.
+func (s *FXService) CalculateDynamicQuote(ctx context.Context, targetAmountUSD float64, fiatCurrency string, achQuote *QuoteResult, corridorType string) (*QuoteDetails, error) {
+	// 1. Determine Corridor Spread (The "Wise" Transparent Fee)
+	spreadPct := decimal.NewFromFloat(0.015) // Card Default: 1.5%
+	if corridorType == "CRYPTO" {
+		spreadPct = decimal.NewFromFloat(0.02) // Crypto: 2.0%
 	}
-}
 
-// FetchAndStoreRates fetches real rates for all tracked currencies (Fallback/Init).
-func (s *FXService) FetchAndStoreRates(ctx context.Context) {
-	currencies := []string{"EUR", "USD", "RUB", "INR", "AUD"}
-	targetCurrency := "THB"
-
-	for _, fromCurr := range currencies {
-		s.initRateFromAPI(ctx, fromCurr, targetCurrency)
-	}
-}
-
-// initRateFromAPI fetches and persists the rate for a single currency pair.
-func (s *FXService) initRateFromAPI(ctx context.Context, fromCurr, targetCurrency string) {
-	rate, err := s.fetchRateFromAPI(ctx, fromCurr, targetCurrency)
+	// 2. Parse Alchemy Pay Live Data (Base Cost)
+	price, err := decimal.NewFromString(achQuote.Price)
 	if err != nil {
-		log.Printf("Error fetching rate for %s/%s: %v", fromCurr, targetCurrency, err)
-		return
+		return nil, fmt.Errorf("invalid price from ACH: %v", err)
 	}
 
-	midRate := decimal.NewFromFloat(rate)
-	spread := decimal.NewFromFloat(0.002)
-	providerRate := midRate.Mul(decimal.NewFromInt(1).Sub(spread))
+	// 3. Calculate Base Fiat Needed
+	// targetAmountUSD represents the USDC required by SQRIL
+	targetCrypto := decimal.NewFromFloat(targetAmountUSD)
 
-	if err := s.persistRate(ctx, fromCurr, targetCurrency, midRate, providerRate, spread); err != nil {
-		log.Printf("Error persisting rate for %s/%s: %v", fromCurr, targetCurrency, err)
-	} else {
-		log.Printf("Updated rate %s/%s: Mid=%s, Prov=%s", fromCurr, targetCurrency, midRate.StringFixed(4), providerRate.StringFixed(4))
-	}
-}
+	// Add ACH Network Fee (in Crypto) to target before converting to Fiat
+	networkFee, _ := decimal.NewFromString(achQuote.NetworkFee)
+	totalCryptoNeeded := targetCrypto.Add(networkFee)
 
-func (s *FXService) fetchRateFromAPI(ctx context.Context, base, target string) (float64, error) {
-	// Using open.er-api.com (free, reliable for demo)
-	url := fmt.Sprintf("https://open.er-api.com/v6/latest/%s", base)
+	baseFiatAmount := totalCryptoNeeded.Mul(price)
 
-	reqCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
+	// Add ACH RampFee
+	rampFee, _ := decimal.NewFromString(achQuote.RampFee)
+	baseFiatAmount = baseFiatAmount.Add(rampFee)
 
-	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, url, nil)
-	if err != nil {
-		return 0, err
-	}
+	// 4. Calculate Paycif Platform Fee (Our Dynamic Corridor Spread)
+	paycifFee := baseFiatAmount.Mul(spreadPct)
 
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return 0, err
-	}
-	defer resp.Body.Close()
+	// 5. Total Fiat Amount
+	totalFiatAmount := baseFiatAmount.Add(paycifFee)
 
-	if resp.StatusCode != http.StatusOK {
-		return 0, fmt.Errorf("API returned status: %d", resp.StatusCode)
-	}
-
-	var data ExchangeRateAPIResponse
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return 0, err
-	}
-
-	rate, ok := data.Rates[target]
-	if !ok {
-		return 0, fmt.Errorf("rate for %s not found in response for base %s", target, base)
-	}
-
-	return rate, nil
-}
-
-func (s *FXService) persistRate(ctx context.Context, from, to string, mid, provider, spread decimal.Decimal) error {
-	tx, err := s.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer tx.Rollback()
-
-	// 1. Upsert exchange_rates and return the row ID
-	query := `
-		INSERT INTO exchange_rates (from_currency, to_currency, mid_rate, provider_rate, spread, updated_at)
-		VALUES ($1, $2, $3, $4, $5, NOW())
-		ON CONFLICT (from_currency, to_currency) 
-		DO UPDATE SET 
-			mid_rate = EXCLUDED.mid_rate,
-			provider_rate = EXCLUDED.provider_rate,
-			spread = EXCLUDED.spread,
-			updated_at = NOW()
-		RETURNING id;
-	`
-	var rateID string
-	err = tx.QueryRowContext(ctx, query, from, to, mid, provider, spread).Scan(&rateID)
-	if err != nil {
-		return fmt.Errorf("failed to upsert exchange_rates: %w", err)
-	}
-
-	// 2. Insert into fx_rate_history for auditing / historical tracking
-	historyQuery := `
-		INSERT INTO fx_rate_history (exchange_rate_id, from_currency, to_currency, mid_rate, provider_rate, captured_at)
-		VALUES ($1, $2, $3, $4, $5, NOW())
-	`
-	_, err = tx.ExecContext(ctx, historyQuery, rateID, from, to, mid, provider)
-	if err != nil {
-		return fmt.Errorf("failed to insert fx_rate_history: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	// Survivability: Push update to High-Performance Rust Engine
-	if s.GRPCClient != nil {
-		// Use a detached context for push to ensure it doesn't fail the schedule if slow
-		pushCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-
-		if err := s.GRPCClient.UpdateRate(pushCtx, from, to, provider, "scheduler"); err != nil {
-			log.Printf("⚠️ Failed to push rate %s/%s to Rust Engine: %v", from, to, err)
-			// Don't fail the whole operation, just log warning
-		} else if !provider.IsZero() {
-			// Our Rust update_rate implementation is a simple key-value store,
-			// so the inverse direction must be pushed separately.
-			inverse := decimal.NewFromInt(1).Div(provider)
-			if err := s.GRPCClient.UpdateRate(pushCtx, to, from, inverse, "scheduler-inverse"); err != nil {
-				log.Printf("⚠️ Failed to push inverse rate %s/%s to Rust Engine: %v", to, from, err)
-			}
-		}
-	}
-
-	return nil
+	return &QuoteDetails{
+		BaseFiatAmount:    baseFiatAmount,
+		PaycifPlatformFee: paycifFee,
+		TotalFiatAmount:   totalFiatAmount,
+		MidMarketRate:     price,
+		CorridorSpread:    spreadPct,
+		CorridorType:      corridorType,
+	}, nil
 }
 
 // ConvertToBase converts an amount in a given currency to THB (Base).

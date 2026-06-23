@@ -39,11 +39,11 @@ echo "🐹 Building Go Microservices..."
 echo "🚀 Starting Go Microservices..."
 ./start-go-services.sh start
 
-# 2. Wait for UDS Socket
+# 2. Wait for UDS Sockets
 echo "⏳ Waiting for services to stabilize..."
 for i in {1..15}; do
-    if [ -S "/tmp/fx_engine.sock" ]; then
-        echo "📡 UDS Socket ready!"
+    if [ -S "/tmp/fx_engine.sock" ] && [ -S "/tmp/verify_service.sock" ]; then
+        echo "📡 UDS Sockets ready!"
         break
     fi
     sleep 1

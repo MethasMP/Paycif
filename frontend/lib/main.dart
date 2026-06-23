@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:frontend/features/auth/presentation/splash_screen.dart';
 import 'package:frontend/core/network/connectivity_service.dart';
 import 'package:frontend/core/network/api_service.dart';
 import 'package:frontend/core/widgets/connectivity_wrapper.dart';
@@ -11,6 +10,8 @@ import 'package:frontend/core/utils/language_notifier.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:frontend/core/l10n/generated/app_localizations.dart';
+import 'package:go_router/go_router.dart';
+import 'package:frontend/core/router/app_router.dart';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
@@ -29,7 +30,6 @@ import 'package:frontend/features/security/data/datasources/secure_storage_servi
 import 'package:frontend/features/security/domain/repositories/security_repository.dart';
 import 'package:frontend/features/security/data/repositories/security_repository_impl.dart';
 import 'package:frontend/features/security/presentation/logic/security_controller.dart';
-import 'package:frontend/features/security/presentation/pages/security_unlock_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -95,8 +95,6 @@ class PaycifApp extends StatefulWidget {
 }
 
 class _PaycifAppState extends State<PaycifApp> with WidgetsBindingObserver {
-  static final GlobalKey<NavigatorState> navigatorKey =
-      GlobalKey<NavigatorState>();
   Timer? _heartbeatTimer;
 
   @override
@@ -158,22 +156,13 @@ class _PaycifAppState extends State<PaycifApp> with WidgetsBindingObserver {
         "🚨 [Security] Lockdown triggered! Redirecting to SecurityUnlockScreen...",
       );
       // 🛡️ World-Class Security: Force re-authentication if not already on the unlock screen
-      bool isAlreadyOnUnlockScreen = false;
-      navigatorKey.currentState?.popUntil((route) {
-        if (route.settings.name == '/unlock' || route.settings.name == 'SecurityUnlockScreen') {
-          isAlreadyOnUnlockScreen = true;
-        }
-        return true; // Don't pop anything, just inspect
-      });
+      final currentConfig = appRouter.routerDelegate.currentConfiguration;
+      final isAlreadyOnUnlockScreen = currentConfig.uri.path == '/unlock';
 
       if (!isAlreadyOnUnlockScreen) {
-        navigatorKey.currentState?.pushAndRemoveUntil(
-          MaterialPageRoute(
-            settings: const RouteSettings(name: '/unlock'),
-            builder: (_) => const SecurityUnlockScreen(),
-          ),
-          (route) => false,
-        );
+        if (rootNavigatorKey.currentContext != null) {
+          rootNavigatorKey.currentContext!.go('/unlock');
+        }
       }
     }
     _lastBackgroundTime = null; // Reset
@@ -196,8 +185,8 @@ class _PaycifAppState extends State<PaycifApp> with WidgetsBindingObserver {
         );
 
         // 🕯️ Background Security Warmup
-        if (navigatorKey.currentContext != null) {
-          navigatorKey.currentContext!
+        if (rootNavigatorKey.currentContext != null) {
+          rootNavigatorKey.currentContext!
               .read<SecurityController>()
               .warmUp()
               .ignore();
@@ -246,8 +235,8 @@ class _PaycifAppState extends State<PaycifApp> with WidgetsBindingObserver {
                       SecurityController(context.read<SecurityRepository>()),
                 ),
               ],
-              child: MaterialApp(
-                navigatorKey: navigatorKey,
+              child: MaterialApp.router(
+                routerConfig: appRouter,
                 title: 'Paycif',
                 themeMode: currentMode,
                 locale: currentLocale,
@@ -265,7 +254,6 @@ class _PaycifAppState extends State<PaycifApp> with WidgetsBindingObserver {
                 theme: AppTheme.lightTheme,
                 darkTheme: AppTheme.darkTheme,
                 // ───────────────────────────────────────────────────────────
-                home: const SplashScreen(),
               ),
             );
           },

@@ -51,8 +51,8 @@ func Connect() error {
 
 	// Set connection pool settings
 	// 🛡️ Resilience: Set lifetime < 5 mins (AWS LB Default) to avoid "Connection Reset by Peer"
-	DB.SetMaxOpenConns(25)
-	DB.SetMaxIdleConns(1)                  // Keep minimal idle connections for local worker
+	DB.SetMaxOpenConns(15)
+	DB.SetMaxIdleConns(5)                  // Keep some idle connections for the worker
 	DB.SetConnMaxLifetime(3 * time.Minute) // Rotate before server kills it
 
 	// Verify connection
@@ -61,51 +61,6 @@ func Connect() error {
 	}
 
 	log.Println("Successfully connected to the database")
-
-	// --- Auto-Migration: Ensure necessary tables exist ---
-	query := `
-	CREATE TABLE IF NOT EXISTS transaction_outbox (
-		id UUID PRIMARY KEY,
-		transaction_id UUID NOT NULL,
-		event_type VARCHAR(50) NOT NULL,
-		payload JSONB NOT NULL,
-		status VARCHAR(20) DEFAULT 'PENDING',
-		created_at TIMESTAMPTZ DEFAULT NOW(),
-		processed_at TIMESTAMPTZ
-	);
-	CREATE INDEX IF NOT EXISTS idx_outbox_status ON transaction_outbox(status);
-
-	CREATE TABLE IF NOT EXISTS audit_logs (
-		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-		user_id UUID NOT NULL,
-		action VARCHAR(100) NOT NULL,
-		resource_type VARCHAR(50) NOT NULL,
-		resource_id VARCHAR(100),
-		metadata JSONB,
-		request_id VARCHAR(100),
-		ip_address VARCHAR(50),
-		created_at TIMESTAMPTZ DEFAULT NOW()
-	);
-	CREATE INDEX IF NOT EXISTS idx_audit_user_action ON audit_logs(user_id, action);
-	CREATE INDEX IF NOT EXISTS idx_audit_created_at ON audit_logs(created_at);
-
-	CREATE TABLE IF NOT EXISTS payout_intents (
-		id UUID PRIMARY KEY,
-		user_id UUID NOT NULL,
-		amount BIGINT NOT NULL,
-		promptpay_id VARCHAR(50) NOT NULL,
-		recipient_name VARCHAR(100) NOT NULL,
-		sqril_tx_id VARCHAR(100) NOT NULL,
-		status VARCHAR(20) DEFAULT 'PENDING',
-		created_at TIMESTAMPTZ DEFAULT NOW()
-	);
-	`
-	if _, err := DB.Exec(query); err != nil {
-		log.Printf("⚠️ Warning: Failed to ensure system tables exist: %v\n", err)
-	} else {
-		log.Println("✅ Verified system tables (outbox, audit_logs, payout_intents).")
-	}
-	// --------------------------------------------------------
 
 	return nil
 }

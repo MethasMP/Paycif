@@ -9,6 +9,7 @@ import 'package:frontend/core/theme/app_theme.dart';
 
 import 'package:frontend/features/payment/presentation/logic/payment_cubit.dart';
 import 'package:frontend/features/payment/presentation/logic/payment_state.dart';
+import 'package:frontend/features/security/domain/repositories/security_repository.dart';
 import 'package:frontend/features/payment/domain/entities/payment_breakdown.dart';
 import 'package:frontend/features/payment/data/repositories/payment_repository_impl.dart';
 import 'package:frontend/core/network/api_service.dart';
@@ -19,7 +20,7 @@ import 'package:frontend/core/widgets/virtual_keypad.dart';
 import 'package:frontend/core/widgets/kyc/swipe_to_pay_slider.dart';
 import 'package:frontend/features/security/presentation/widgets/pin_entry_widget.dart';
 import 'package:frontend/features/dashboard/presentation/dashboard_controller.dart';
-import 'package:frontend/features/payment/presentation/pages/payment_success_screen.dart';
+import 'package:go_router/go_router.dart';
 
 enum UnifiedSheetStep { amountInput, preview, pinInput, processing, success, failure }
 
@@ -55,8 +56,11 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
     _lookupRecipientName();
   }
 
-  void _prewarmBiometric() {
-    _auth.canCheckBiometrics.then((ready) => _biometricReady = ready).catchError((_) => false);
+  Future<void> _prewarmBiometric() async {
+    try {
+      final ready = await _auth.canCheckBiometrics;
+      if (mounted) setState(() => _biometricReady = ready);
+    } catch (_) {}
   }
 
   Future<void> _lookupRecipientName() async {
@@ -241,7 +245,10 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
 
     return BlocProvider(
       create: (context) => PaymentCubit(
-        paymentRepository: PaymentRepositoryImpl(apiService: ApiService()),
+        paymentRepository: PaymentRepositoryImpl(
+          apiService: ApiService(),
+          securityRepository: context.read<SecurityRepository>(),
+        ),
       )..initializeWithQR(
           qrString: widget.payContext.metadata['raw'] ?? '',
           amount: _customAmount,
@@ -252,16 +259,12 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
             // Close the unified payment sheet
             Navigator.of(context).pop();
             // Navigate to the full-screen Premium Trust e-Slip
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => PaymentSuccessScreen(
-                  transactionId: state.transactionId,
-                  amount: _customAmount,
-                  recipientName: _displayName,
-                  promptPayId: widget.payContext.accountId,
-                ),
-              ),
-            );
+            context.push('/payment_success', extra: {
+              'transactionId': state.transactionId,
+              'amount': _customAmount,
+              'recipientName': _displayName,
+              'promptPayId': widget.payContext.accountId,
+            });
           } else if (state is PaymentFailure) {
             setState(() {
               _step = UnifiedSheetStep.failure;

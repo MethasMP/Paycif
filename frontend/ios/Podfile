@@ -2,6 +2,7 @@ source 'https://cdn.cocoapods.org/'
 source 'https://github.com/SumSubstance/Specs.git'
 
 platform :ios, '17.0'
+inhibit_all_warnings!
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -42,6 +43,7 @@ post_install do |installer|
     flutter_additional_ios_build_settings(target)
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '17.0'
+      config.build_settings['CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER'] = 'NO'
       config.build_settings['CLANG_ENABLE_EXPLICIT_MODULES'] = 'NO'
       config.build_settings['DEFINES_MODULE'] = 'YES'
       config.build_settings['CLANG_ENABLE_MODULES'] = 'YES'

@@ -42,9 +42,22 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
   bool _isProcessing = false;
   bool _hasCameraError = false;
 
+  final TextEditingController _testInputController = TextEditingController();
+
+  static const List<String> _testQrs = [
+    "00020101021230820016A000000677010112011501055360926419902150000022000755960320461131666018170000005303764540580.855802TH5918TESCO LOTUS CO LTD62120708461131666304BC28",
+    "00020101021130580016A00000067701011201150994002378766900210DONATION0203010530376454043.005802TH5930UNITED NATIONS CHILDREN S FUND6304266C",
+    "00020101021130670016A0000006770101120115010556103866388021012345678900310112233445553037645406103.005802TH5925CPF RESTAURANT AND FOOD C6304AB1D",
+    "00020101021130700016A0000006770101120115010556001059500021300011100011120310081909761453037645406104.005802TH5921SMART WASH 24 COMPANY6304108C",
+    "00020101021230820016A0000006770101120115010753600037405021500000220066077703204611316260181X00000053037645406178.225802TH5918LIM TREND EMPORIUM6212070846113162630427E5",
+    "00020101021230820016A0000006770101120115010753600037401021500000220100001503204611316460181300000053037645406201.785802TH5907S HOTEL621207084611316463043CCF",
+    "00020101021230820016A000000677010112011501075360003740502150000022005548220320461131616018260000005303764540870000.005802TH5918LIM TREND EMPORIUM6212070846113161630484BE"
+  ];
+
   @override
   void dispose() {
     _cameraController.dispose();
+    _testInputController.dispose();
     super.dispose();
   }
 
@@ -192,12 +205,88 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
                     },
                   ),
 
-                  const Spacer(),
-
-                  // Instruction text below the scan frame
+                   // Instruction text below the scan frame
                   _ScanInstruction(),
 
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 12),
+
+                  // 🧪 Simulator Bypass Panel
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _testInputController,
+                                keyboardType: TextInputType.number,
+                                style: const TextStyle(color: Colors.white, fontSize: 13),
+                                decoration: InputDecoration(
+                                  hintText: 'Enter 1-7 to bypass...',
+                                  hintStyle: TextStyle(color: Colors.white54, fontSize: 13),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  filled: true,
+                                  fillColor: Colors.white.withValues(alpha: 0.08),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
+                                  ),
+                                ),
+                                onChanged: (value) {
+                                  final num = int.tryParse(value.trim());
+                                  if (num != null && num >= 1 && num <= 7) {
+                                    _testInputController.clear();
+                                    _handleCode(_testQrs[num - 1]);
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List.generate(7, (index) {
+                              final labels = [
+                                "1.Tesco", "2.Unicef", "3.CPF", "4.Smart", "5.Lim(S)", "6.Hotel", "7.Lim(E)"
+                              ];
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppTheme.primaryTeal.withValues(alpha: 0.8),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    minimumSize: Size.zero,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                  ),
+                                  onPressed: () {
+                                    _handleCode(_testQrs[index]);
+                                  },
+                                  child: Text(
+                                    labels[index],
+                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              );
+                            }),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
 
                   // Actions bar
                   _BottomActionsBar(
@@ -219,17 +308,16 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
     );
   }
 
-  void _showHelpModal() {
+  Future<void> _showHelpModal() async {
     _cameraController.stop();
     final l10n = AppLocalizations.of(context)!;
-    showModalBottomSheet(
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => _HelpSheet(l10n: l10n),
-    ).then((_) {
-      if (mounted) _resumeScanning();
-    });
+    );
+    if (mounted) _resumeScanning();
   }
 }
 

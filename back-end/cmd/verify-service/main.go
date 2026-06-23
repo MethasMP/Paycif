@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/ed25519"
 	"encoding/base64"
+	"net"
 	"net/http"
 	"os"
 	"unsafe"
@@ -72,13 +73,34 @@ func main() {
 
 	r.POST("/verify", verifyHandler)
 
-	port := os.Getenv("VERIFY_SERVICE_PORT")
-	if port == "" {
-		port = "3001"
+	var listener net.Listener
+	var err error
+	udsPath := os.Getenv("VERIFY_SERVICE_UDS")
+	if udsPath == "" {
+		udsPath = "/tmp/verify_service.sock"
 	}
 
-	println("🚀 Go Verify Service running on http://0.0.0.0:" + port)
-	if err := r.Run("0.0.0.0:" + port); err != nil {
+	if os.Getenv("VERIFY_SERVICE_TCP_ONLY") == "true" {
+		port := os.Getenv("VERIFY_SERVICE_PORT")
+		if port == "" {
+			port = "3001"
+		}
+		listener, err = net.Listen("tcp", "0.0.0.0:"+port)
+		if err != nil {
+			panic(err)
+		}
+		println("🚀 Go Verify Service running on http://0.0.0.0:" + port)
+	} else {
+		_ = os.Remove(udsPath)
+		listener, err = net.Listen("unix", udsPath)
+		if err != nil {
+			panic(err)
+		}
+		_ = os.Chmod(udsPath, 0777)
+		println("⚡ Go Verify Service running on UDS socket: " + udsPath)
+	}
+
+	if err := http.Serve(listener, r); err != nil {
 		panic(err)
 	}
 }

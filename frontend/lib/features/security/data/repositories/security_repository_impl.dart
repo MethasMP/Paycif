@@ -307,6 +307,8 @@ class SecurityRepositoryImpl implements SecurityRepository {
       debugPrint('✅ [Background-Verify] Server confirmed PIN.');
     } catch (e) {
       debugPrint('❌ [Background-Verify] Server REJECTED PIN (Sync Issue!): $e');
+      // 🛡️ SECURITY: Wipe local cached PIN keys to prevent further optimistic bypasses
+      await clearAllPinData();
     }
   }
 

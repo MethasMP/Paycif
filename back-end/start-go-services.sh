@@ -30,6 +30,7 @@ VERIFY_PID_FILE="$LOG_DIR/go-verify-service.pid"
 ACCOUNTING_PID_FILE="$LOG_DIR/go-accounting-core.pid"
 FX_PID_FILE="$LOG_DIR/go-fx-engine.pid"
 WORKER_PID_FILE="$LOG_DIR/go-payload-worker.pid"
+OUTBOX_WORKER_PID_FILE="$LOG_DIR/go-worker.pid"
 
 log_info() { echo -e "${GREEN}[INFO]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
@@ -115,6 +116,12 @@ case "${1:-start}" in
             "$WORKER_PID_FILE" \
             "N/A"
         
+        # outbox-worker (Background)
+        start_service "worker" \
+            "$BIN_DIR/worker" \
+            "$OUTBOX_WORKER_PID_FILE" \
+            "N/A"
+        
         log_section "All Services Started"
         echo ""
         echo "Services:"
@@ -128,6 +135,7 @@ case "${1:-start}" in
         
     stop)
         log_section "Stopping Go Microservices"
+        stop_service "worker" "$OUTBOX_WORKER_PID_FILE"
         stop_service "payload-worker" "$WORKER_PID_FILE"
         stop_service "fx-engine" "$FX_PID_FILE"
         stop_service "accounting-core" "$ACCOUNTING_PID_FILE"
@@ -144,7 +152,7 @@ case "${1:-start}" in
     status)
         log_section "Service Status"
         
-        for pid_file in "$VERIFY_PID_FILE" "$ACCOUNTING_PID_FILE" "$FX_PID_FILE" "$WORKER_PID_FILE"; do
+        for pid_file in "$VERIFY_PID_FILE" "$ACCOUNTING_PID_FILE" "$FX_PID_FILE" "$WORKER_PID_FILE" "$OUTBOX_WORKER_PID_FILE"; do
             name=$(basename "$pid_file" .pid | sed 's/go-//')
             if [ -f "$pid_file" ] && kill -0 "$(cat "$pid_file")" 2>/dev/null; then
                 log_info "$name: Running (PID: $(cat "$pid_file"))"
@@ -166,7 +174,7 @@ case "${1:-start}" in
     build)
         log_section "Building All Go Services"
         
-        for service in verify-service accounting-core fx-engine payload-worker; do
+        for service in verify-service accounting-core fx-engine payload-worker worker; do
             log_info "Building $service..."
             go build -o "$BIN_DIR/$service" "./cmd/$service"
             log_info "$service built successfully"

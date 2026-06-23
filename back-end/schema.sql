@@ -116,3 +116,30 @@ CREATE TABLE fx_rate_history (
     captured_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Table: audit_logs
+CREATE TABLE audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL,
+    action VARCHAR(100) NOT NULL,
+    resource_type VARCHAR(50) NOT NULL,
+    resource_id VARCHAR(100),
+    metadata JSONB,
+    request_id VARCHAR(100),
+    ip_address VARCHAR(50),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_audit_user_action ON audit_logs(user_id, action);
+CREATE INDEX idx_audit_created_at ON audit_logs(created_at);
+
+-- Table: payout_intents
+CREATE TABLE payout_intents (
+    id UUID PRIMARY KEY,
+    user_id UUID NOT NULL,
+    amount BIGINT NOT NULL,
+    promptpay_id VARCHAR(50) NOT NULL,
+    recipient_name VARCHAR(100) NOT NULL,
+    sqril_tx_id VARCHAR(100) NOT NULL,
+    status VARCHAR(20) DEFAULT 'PENDING',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);

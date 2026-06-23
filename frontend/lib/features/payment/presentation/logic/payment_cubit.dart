@@ -2,7 +2,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:uuid/uuid.dart';
 import 'package:frontend/features/payment/domain/repositories/payment_repository.dart';
 import 'package:frontend/features/payment/presentation/logic/payment_state.dart';
-
+import 'package:frontend/core/models/decoded_qr.dart';
+import 'package:frontend/core/models/quotation_model.dart';
 class PaymentCubit extends Cubit<PaymentState> {
   final IPaymentRepository _paymentRepository;
 
@@ -52,15 +53,13 @@ class PaymentCubit extends Cubit<PaymentState> {
     emit(PaymentLoading());
     try {
       // 1. Decode QR via Backend/SQRIL
-      final decodeResp = await _paymentRepository.decodeQR(qrString);
-      final bool isBusiness = decodeResp['is_business'] ?? false;
-      final String? sqrilTxId = decodeResp['tx_id'];
+      final DecodedQr decodeResp = await _paymentRepository.decodeQR(qrString);
+      final bool isBusiness = decodeResp.isBusiness;
+      final String sqrilTxId = decodeResp.txId;
 
-      if (!isBusiness) {
-        throw Exception('PERSONAL_QR_NOT_SUPPORTED');
-      }
 
-      if (sqrilTxId == null) {
+
+      if (sqrilTxId.isEmpty) {
         throw Exception('Failed to decode QR code identifier.');
       }
 
@@ -71,10 +70,10 @@ class PaymentCubit extends Cubit<PaymentState> {
       double amountUSD = 0.0;
 
       if (amountSatang > 0) {
-        final quoteResp = await _paymentRepository.getQuotation(sqrilTxId, amountSatang);
-        rate = (quoteResp['exchange_rate'] as num?)?.toDouble() ?? 36.45;
-        feeUSD = (quoteResp['fee'] as num?)?.toDouble() ?? 0.0;
-        amountUSD = (quoteResp['amount_usd'] as num?)?.toDouble() ?? (amount / rate);
+        final QuotationModel quoteResp = await _paymentRepository.getQuotation(sqrilTxId, amountSatang);
+        rate = quoteResp.exchangeRate;
+        feeUSD = quoteResp.fee;
+        amountUSD = quoteResp.amountUsd;
       }
 
       const payPerUseMethod = PaymentMethod(

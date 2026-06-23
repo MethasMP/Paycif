@@ -8,6 +8,10 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import 'package:frontend/features/profile/domain/saved_card.dart';
+import 'package:frontend/core/models/user_profile.dart';
+import 'package:frontend/core/models/decoded_qr.dart';
+import 'package:frontend/core/models/quotation_model.dart';
+import 'package:frontend/features/transactions/domain/transaction.dart';
 import 'dart:async'; // Required for Completer
 
 class ApiService {
@@ -20,8 +24,9 @@ class ApiService {
   static bool get isBackendAvailable {
     if (!_isBackendDead) return true;
     // Auto-reset after cooldown period
-    if (_lastBackendFailure != null &&
-        DateTime.now().difference(_lastBackendFailure!) >
+    final lastFailure = _lastBackendFailure;
+    if (lastFailure != null &&
+        DateTime.now().difference(lastFailure) >
             _circuitBreakerCooldown) {
       _isBackendDead = false;
       debugPrint('🟢 [Circuit Breaker] Cooldown expired. Retrying backend...');
@@ -88,8 +93,9 @@ class ApiService {
   // Use: flutter run --dart-define=BACKEND_URL=http://192.168.1.XX:8080/api/v1
   static String get baseUrl {
     // 0. Try Custom Host Override (Run Anywhere developer feature)
-    if (_customHostOverride != null && _customHostOverride!.isNotEmpty) {
-      return _resolveLocalHost(_customHostOverride!);
+    final hostOverride = _customHostOverride;
+    if (hostOverride != null && hostOverride.isNotEmpty) {
+      return _resolveLocalHost(hostOverride);
     }
 
     // 1. Try Dart Define (The most flexible way)
@@ -111,7 +117,7 @@ class ApiService {
     }
   }
 
-  /// �️ [Performance] Pre-warm Connection
+  /// ️ [Performance] Pre-warm Connection
   /// Establishes TCP/TLS handshake with the backend early to eliminate
   /// the 200-500ms connection delay for the first actual request.
   static Future<void> prewarmConnection() async {
@@ -145,9 +151,10 @@ class ApiService {
     }
 
     // 🔒 MUTEX START: If a refresh is already running, wait for it.
-    if (_refreshCompleter != null) {
+    final completer = _refreshCompleter;
+    if (completer != null) {
       debugPrint("⏳ [Universal] Waiting for ongoing refresh...");
-      await _refreshCompleter!.future;
+      await completer.future;
       return;
     }
 
@@ -356,8 +363,7 @@ class ApiService {
     final supabaseKey = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
     final sanitizedApiKey = supabaseKey
         .trim()
-        .replaceAll('\n', '')
-        .replaceAll('\r', '');
+        .replaceAll('\n', '').replaceAll('\r', '');
 
     // 🛡️ World-Class: Always send both apikey and Authorization
     return {
@@ -431,14 +437,15 @@ class ApiService {
   }
 
   // Get User Profile
-  Future<Map<String, dynamic>?> getUserProfile() async {
+  Future<UserProfile?> getUserProfile() async {
     // 1. 🔒 MUTEX: Prevent multiple concurrent profile fetches
-    if (_profileCompleter != null) {
+    final completer = _profileCompleter;
+    if (completer != null) {
       debugPrint('⏳ [ApiService] Waiting for concurrent Profile Fetch...');
-      return await _profileCompleter!.future;
+      return await completer.future;
     }
 
-    _profileCompleter = Completer<Map<String, dynamic>?>();
+    _profileCompleter = Completer<UserProfile?>();
 
     try {
       await ApiService.ensureSessionValid(); // 🛡️ Protect Profile
@@ -457,8 +464,9 @@ class ApiService {
       _cachedPreferredMethodId = response['preferred_payment_method_id'];
       _cachedPreferredMethodType = response['preferred_payment_method_type'];
 
-      _profileCompleter?.complete(response);
-      return response;
+      final profileObj = UserProfile.fromJson(response);
+      _profileCompleter?.complete(profileObj);
+      return profileObj;
     } catch (e) {
       debugPrint('Error fetching profile: $e');
       _profileCompleter?.completeError(e);
@@ -559,7 +567,7 @@ class ApiService {
   }
 
   // Decode PromptPay QR Code via SQRIL
-  Future<Map<String, dynamic>> decodeQR(String qrString) async {
+  Future<DecodedQr> decodeQR(String qrString) async {
     return _retry(() async {
       final response = await _safeRequest(
         (headers) => http.post(
@@ -570,7 +578,7 @@ class ApiService {
       );
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        return jsonDecode(response.body);
+        return DecodedQr.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
       } else {
         String errorMessage = 'Failed to decode QR code';
         try {
@@ -583,7 +591,7 @@ class ApiService {
   }
 
   // Get Quotation for payout via SQRIL
-  Future<Map<String, dynamic>> getQuotation(String txId, int amountSatang) async {
+  Future<QuotationModel> getQuotation(String txId, int amountSatang) async {
     return _retry(() async {
       final response = await _safeRequest(
         (headers) => http.post(
@@ -597,7 +605,7 @@ class ApiService {
       );
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        return jsonDecode(response.body);
+        return QuotationModel.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
       } else {
         String errorMessage = 'Failed to get quotation';
         try {
@@ -629,7 +637,7 @@ class ApiService {
       'reference1': reference1,
       'reference2': reference2,
       'idempotency_key': idempotencyKey,
-      'sqril_tx_id': ?sqrilTxId,
+      'sqril_tx_id': sqrilTxId,
     });
 
     final response = await _safeRequest(
@@ -686,7 +694,7 @@ class ApiService {
     }
   }
 
-  Future<List<dynamic>> getTransactions(String walletId) async {
+  Future<List<Transaction>> getTransactions(String walletId) async {
     // 🔌 Circuit Breaker: If backend is dead, fallback to Supabase directly
     if (!ApiService.isBackendAvailable) {
       debugPrint(
@@ -707,7 +715,8 @@ class ApiService {
         if (response.statusCode == 200) {
           // 🚀 10/10 Performance: Decode JSON in background isolate
           // to keep Main Thread free for animations (0% Jank).
-          return await compute(_decodeJson, response.body) as List<dynamic>;
+          final decoded = await compute(_decodeJson, response.body) as List<dynamic>;
+          return decoded.map((e) => Transaction.fromJson(e as Map<String, dynamic>)).toList();
         } else {
           debugPrint("Backend Error: ${response.body}");
           throw Exception(
@@ -725,7 +734,7 @@ class ApiService {
   }
 
   /// Fallback: Get transactions directly from Supabase
-  Future<List<dynamic>> _getTransactionsFromSupabase(String profileId) async {
+  Future<List<Transaction>> _getTransactionsFromSupabase(String profileId) async {
     try {
       final response = await Supabase.instance.client
           .from('transactions')
@@ -733,7 +742,8 @@ class ApiService {
           .eq('profile_id', profileId)
           .order('created_at', ascending: false)
           .limit(20);
-      return response as List<dynamic>;
+      final list = response as List<dynamic>;
+      return list.map((e) => Transaction.fromJson(e as Map<String, dynamic>)).toList();
     } catch (e) {
       debugPrint('❌ Supabase fallback also failed: $e');
       return []; // Return empty list instead of crashing
@@ -894,7 +904,7 @@ class ApiService {
 
   // 🛡️ Double-Fetch Protection
   static Completer<List<SavedCard>>? _cardsCompleter;
-  static Completer<Map<String, dynamic>?>? _profileCompleter;
+  static Completer<UserProfile?>? _profileCompleter;
 
   // Get Cached Cards (Manual Access)
   static List<SavedCard>? getCachedCards() => _cachedSavedCards;
@@ -913,15 +923,17 @@ class ApiService {
 
   Future<List<SavedCard>> getSavedCards({bool forceRefresh = false}) async {
     // 1. Return cached data if available and not forced to refresh
-    if (_cachedSavedCards != null && !forceRefresh) {
+    final cachedCards = _cachedSavedCards;
+    if (cachedCards != null && !forceRefresh) {
       debugPrint('🚀 Using cached saved cards (Instant Load)');
-      return _cachedSavedCards!;
+      return cachedCards;
     }
 
     // 2. 🔒 MUTEX: If a fetch is already running, wait for it.
-    if (_cardsCompleter != null) {
+    final completer = _cardsCompleter;
+    if (completer != null) {
       debugPrint('⏳ [ApiService] Waiting for concurrent Card Fetch...');
-      return await _cardsCompleter!.future;
+      return await completer.future;
     }
 
     // 3. Start new fetch
@@ -1016,8 +1028,9 @@ class ApiService {
       }
 
       // 2. Optimistic Update: Update cache directly instead of clearing it
-      if (_cachedSavedCards != null) {
-        _cachedSavedCards!.removeWhere((card) => card.id == cardId);
+      final cachedCards = _cachedSavedCards;
+      if (cachedCards != null) {
+        cachedCards.removeWhere((card) => card.id == cardId);
       }
       debugPrint('✅ Card deleted successfully (Cache Updated)');
     } catch (e) {
@@ -1054,9 +1067,13 @@ class ApiService {
     }
   }
 
-  /// 🔐 SDK: Fetch Sumsub verification token
-  static Future<Map<String, dynamic>> getSumsubToken() async {
-    final url = Uri.parse('$baseUrl/kyc/sumsub-token');
+  /// 🔐 KYC: Initiate Alchemy Pay KYC — returns { status, kyc_url? }
+  static Future<Map<String, dynamic>> initiateKyc({
+    String kycPlatform = 'sumsub',
+    String kycType = '1',
+    String redirectUrl = '',
+  }) async {
+    final url = Uri.parse('$baseUrl/kyc/register');
     await ensureSessionValid();
     final session = Supabase.instance.client.auth.currentSession;
     final token = session?.accessToken ?? '';
@@ -1067,27 +1084,35 @@ class ApiService {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
       },
+      body: jsonEncode({
+        'kyc_platform': kycPlatform,
+        'kyc_type': kycType,
+        if (redirectUrl.isNotEmpty) 'redirect_url': redirectUrl,
+      }),
     ).timeout(const Duration(seconds: 15));
 
     if (response.statusCode == 200) {
-      return jsonDecode(response.body);
+      return jsonDecode(response.body) as Map<String, dynamic>;
     }
-    throw Exception('Failed to fetch verification token: ${response.body}');
+    throw Exception('Failed to initiate KYC: ${response.body}');
   }
 
-  /// 👤 Identity: Fetch user status and tier
-  static Future<String> getUserTier() async {
-    // Current profile data from Supabase
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user == null) return 'tier0';
+  /// 👤 KYC: Poll current verification status from backend
+  static Future<Map<String, dynamic>> getKycStatus() async {
+    final url = Uri.parse('$baseUrl/kyc/status');
+    await ensureSessionValid();
+    final session = Supabase.instance.client.auth.currentSession;
+    final token = session?.accessToken ?? '';
 
-    final res = await Supabase.instance.client
-        .from('profiles')
-        .select('kyc_tier')
-        .eq('id', user.id)
-        .single();
-    
-    return res['kyc_tier'] ?? 'tier0';
+    final response = await http.get(
+      url,
+      headers: {'Authorization': 'Bearer $token'},
+    ).timeout(const Duration(seconds: 10));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Failed to fetch KYC status: ${response.body}');
   }
 }
 

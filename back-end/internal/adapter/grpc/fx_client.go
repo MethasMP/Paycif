@@ -127,7 +127,7 @@ func NewFXClientWithConfig(cfg *FXClientConfig) (*FXClient, error) {
 		grpc.WithKeepaliveParams(keepalive.ClientParameters{
 			Time:                cfg.KeepAliveTime,
 			Timeout:             cfg.KeepAliveTimeout,
-			PermitWithoutStream: true,
+			PermitWithoutStream: false,
 		}),
 		// Backoff configuration for retries
 		grpc.WithConnectParams(grpc.ConnectParams{

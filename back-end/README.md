@@ -1,4 +1,4 @@
-# 🛠️ Paycif Backend (Go + Rust)
+# 🛠️ Paycif Backend (Pure Go)
 
 This is the core engine of Paycif, designed for extreme throughput and high security.
 
@@ -8,14 +8,14 @@ This is the core engine of Paycif, designed for extreme throughput and high secu
 
 ### **1. API Gateway (Go)**
 
-- Located in: `back-end/`
+- Located in: `cmd/api/`
 - **Role**: Authentication (via Supabase), Route Management, Rate Limiting, and Orchestration.
 - **Framework**: [Gin Gonic](https://github.com/gin-gonic/gin)
 
-### **2. FX & Security Engine (Rust)**
+### **2. FX & Security Engine (Go)**
 
-- Located in: `back-end/rust/fx-engine`
-- **Role**: CPU-intensive tasks.
+- Located in: `cmd/fx-engine/`
+- **Role**: High-performance background services.
   - Ed25519 Signature Verification
   - Complex FX Calculations (Floating point precision management)
 - **Communication**: Via Unix Domain Socket (UDS) using Protobuf.
@@ -30,14 +30,13 @@ This is the core engine of Paycif, designed for extreme throughput and high secu
 ./start-all.sh
 ```
 
-This script cleans up old processes, builds the Rust engine, and starts the Go server.
+This script cleans up old processes, builds all Go microservices, and starts the API Gateway.
 
 ### **Option B: Manual Execution**
 
-1. **Start Rust Engine**:
+1. **Start FX Engine**:
    ```bash
-   cd rust/fx-engine
-   cargo run --release
+   go run cmd/fx-engine/main.go
    ```
 2. **Start Go API**:
    ```bash
@@ -54,4 +53,4 @@ This script cleans up old processes, builds the Rust engine, and starts the Go s
 
 ---
 
-_Fintech excellence through memory safety (Rust) and concurrency (Go)._
+_Fintech excellence through optimized Go runtime concurrency and lockless event-driven design._

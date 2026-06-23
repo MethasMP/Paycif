@@ -5,14 +5,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:frontend/features/dashboard/presentation/dashboard_controller.dart';
-import 'package:frontend/features/auth/presentation/login_screen.dart';
+import 'package:go_router/go_router.dart' as import_go_router;
 import 'package:frontend/core/l10n/generated/app_localizations.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 
 import 'package:provider/provider.dart';
 import 'package:frontend/features/security/presentation/logic/security_controller.dart';
-import 'package:frontend/features/security/presentation/pages/security_unlock_screen.dart';
-import 'package:frontend/features/security/presentation/pages/pin_setup_screen.dart';
 import 'package:frontend/core/widgets/paycif_text.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 
@@ -55,7 +53,6 @@ class _SplashScreenState extends State<SplashScreen> {
           debugPrint("✅ Session recovered successfully.");
         } catch (e) {
           debugPrint("❌ Recovery failed. Redirecting to login.");
-          await Supabase.instance.client.auth.signOut();
           await _delayedNavigateToLogin();
           return;
         }
@@ -89,10 +86,10 @@ class _SplashScreenState extends State<SplashScreen> {
 
       if (hasPin) {
         debugPrint("🚨 [Security] PIN detected. Challenging user identity...");
-        _navigateTo(const SecurityUnlockScreen());
+        _navigateTo('/unlock');
       } else {
         debugPrint("🔓 [Security] No PIN set. Enforcing PIN setup...");
-        _navigateTo(const PinSetupScreen());
+        _navigateTo('/pin_setup');
       }
     } catch (e) {
       debugPrint("❌ Fatal error during startup: $e");
@@ -105,33 +102,13 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _delayedNavigateToLogin() async {
     // Small animation buffer for branding
     await Future.delayed(const Duration(milliseconds: 1500));
-    _navigateTo(const LoginScreen());
+    _navigateTo('/login');
   }
 
-  void _navigateTo(Widget page) {
+  void _navigateTo(String path) {
     if (!mounted) return;
     HapticFeedback.mediumImpact(); // 🧠 Haptic Ritual: The vibration of 'Ready'
-    Navigator.pushReplacement(
-      context,
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) => page,
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          // 🚀 Steve Jobs Unfold: Scale and Fade together for 'opening' feel
-          var curve = Curves.easeInOutQuart;
-          var tween = Tween(begin: 0.92, end: 1.0).chain(CurveTween(curve: curve));
-          var fadeTween = Tween(begin: 0.0, end: 1.0).chain(CurveTween(curve: curve));
-
-          return FadeTransition(
-            opacity: animation.drive(fadeTween),
-            child: ScaleTransition(
-              scale: animation.drive(tween),
-              child: child,
-            ),
-          );
-        },
-        transitionDuration: const Duration(milliseconds: 1200),
-      ),
-    );
+    import_go_router.GoRouter.of(context).go(path);
   }
 
   @override

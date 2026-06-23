@@ -26,7 +26,7 @@ class DashboardRepository {
             .order('created_at', ascending: false);
         if (!controller.isClosed) {
           final txs = (data as List<dynamic>)
-              .map((json) => Transaction.fromJson(json))
+              .map((json) => Transaction.fromJson(json as Map<String, dynamic>))
               .toList();
           controller.add(txs);
         }
@@ -91,7 +91,7 @@ class DashboardRepository {
           .eq('profile_id', profileId)
           .order('created_at', ascending: false);
       return (response as List<dynamic>)
-          .map((json) => Transaction.fromJson(json))
+          .map((json) => Transaction.fromJson(json as Map<String, dynamic>))
           .toList();
     } catch (e) {
       debugPrint('❌ Failed to fetch transactions once: $e');

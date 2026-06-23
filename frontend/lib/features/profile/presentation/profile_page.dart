@@ -1,13 +1,9 @@
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:frontend/core/utils/pay_notify.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:frontend/features/auth/presentation/login_screen.dart'; // For redirection after logout
-import 'package:frontend/features/profile/presentation/help_center_screen.dart';
-import 'package:frontend/features/profile/presentation/contact_support_screen.dart';
-import 'package:frontend/features/profile/presentation/terms_of_service_screen.dart';
-import 'package:frontend/features/profile/presentation/privacy_policy_screen.dart';
 import 'package:frontend/core/network/api_service.dart';
 import 'package:frontend/core/l10n/generated/app_localizations.dart';
 import 'package:local_auth/local_auth.dart';
@@ -17,10 +13,7 @@ import 'package:frontend/core/utils/error_translator.dart';
 import 'package:frontend/features/security/presentation/widgets/pin_entry_widget.dart';
 import 'package:frontend/features/security/presentation/widgets/change_pin_sheet.dart';
 import 'package:frontend/features/security/presentation/logic/security_controller.dart';
-import 'package:frontend/features/security/presentation/pages/linked_devices_screen.dart';
 import 'package:provider/provider.dart';
-import 'package:frontend/features/profile/presentation/notification_settings_screen.dart';
-import 'package:frontend/features/kyc/presentation/nfc_scan_screen.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -177,10 +170,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
       // 5. Hard Navigation Reset
       if (mounted) {
-        Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-          (route) => false,
-        );
+        context.go('/login');
       }
     } catch (e) {
       debugPrint('🚨 Sign Out Disaster: $e');
@@ -458,10 +448,10 @@ class _ProfilePageState extends State<ProfilePage> {
                       width: double.infinity,
                       height: 40,
                       child: ElevatedButton(
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const NfcScanScreen()),
-                        ),
+                        onPressed: () async {
+                          final verified = await context.push<bool>('/kyc');
+                          if (verified == true && mounted) _fetchProfile();
+                        },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.accentGold,
                           foregroundColor: AppTheme.accentGoldDark,
@@ -500,12 +490,7 @@ class _ProfilePageState extends State<ProfilePage> {
               _buildMenuItem(
                 PhosphorIcons.devices,
                 l10n.linkedDevices,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const LinkedDevicesScreen(),
-                  ),
-                ),
+                onTap: () => context.push('/linked_devices'),
               ),
             ]),
 
@@ -554,12 +539,7 @@ class _ProfilePageState extends State<ProfilePage> {
               _buildMenuItem(
                 PhosphorIcons.bell,
                 l10n.notifications,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const NotificationSettingsScreen(),
-                  ),
-                ),
+                onTap: () => context.push('/notification_settings'),
               ),
             ]),
 
@@ -572,20 +552,12 @@ class _ProfilePageState extends State<ProfilePage> {
               _buildMenuItem(
                 PhosphorIcons.question,
                 l10n.helpCenter,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const HelpCenterScreen()),
-                ),
+                onTap: () => context.push('/help'),
               ),
               _buildMenuItem(
                 PhosphorIcons.chat,
                 l10n.contactSupport,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const ContactSupportScreen(),
-                  ),
-                ),
+                onTap: () => context.push('/contact_support'),
               ),
             ]),
 
@@ -596,10 +568,7 @@ class _ProfilePageState extends State<ProfilePage> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 GestureDetector(
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const TermsOfServiceScreen()),
-                  ),
+                  onTap: () => context.push('/terms'),
                   child: Text(
                     l10n.termsOfService,
                     style: theme.textTheme.bodySmall?.copyWith(
@@ -615,10 +584,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ),
                 GestureDetector(
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
-                  ),
+                  onTap: () => context.push('/privacy'),
                   child: Text(
                     l10n.privacyPolicy,
                     style: theme.textTheme.bodySmall?.copyWith(

@@ -4,8 +4,8 @@ import 'package:provider/provider.dart';
 import 'package:frontend/core/l10n/generated/app_localizations.dart';
 import 'package:frontend/features/security/domain/repositories/security_repository.dart';
 import 'package:frontend/features/security/presentation/logic/linked_devices_controller.dart';
+import 'package:go_router/go_router.dart';
 import 'package:frontend/core/utils/pay_notify.dart';
-import 'package:frontend/features/auth/presentation/login_screen.dart'; // For logout redirection
 import 'package:frontend/core/theme/app_theme.dart';
 
 class LinkedDevicesScreen extends StatelessWidget {
@@ -145,11 +145,7 @@ class _LinkedDevicesView extends StatelessWidget {
           final shouldLogout = await controller.revokeDevice(deviceId, l10n);
           if (context.mounted && shouldLogout) {
             // Force Logout logic
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (_) => const LoginScreen()),
-              (route) => false,
-            );
+            context.go('/login');
           } else if (context.mounted) {
             PayNotify.success(context, 'Device revoked successfully');
           }

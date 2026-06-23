@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:frontend/features/transactions/domain/transaction.dart';
 import 'package:frontend/features/dashboard/presentation/dashboard_controller.dart';
 import 'package:frontend/core/widgets/transaction_item.dart';
-import 'package:frontend/features/transactions/presentation/transaction_detail_screen.dart';
+import 'package:go_router/go_router.dart';
 import 'package:frontend/core/l10n/generated/app_localizations.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 
@@ -62,13 +62,7 @@ class HistoryScreen extends StatelessWidget {
                       (tx) => TransactionItem(
                         transaction: tx,
                         onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  TransactionDetailScreen(transaction: tx),
-                            ),
-                          );
+                          context.push('/transaction_detail', extra: tx);
                         },
                       ),
                     ),

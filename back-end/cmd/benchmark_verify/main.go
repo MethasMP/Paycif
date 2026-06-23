@@ -2,12 +2,15 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -33,8 +36,30 @@ func main() {
 
 	fmt.Println("🔥 Starting Rust Verify Service Benchmark (1,000 requests)...")
 
-	client := &http.Client{Timeout: 1 * time.Second}
-	url := "http://localhost:3001/verify"
+	var client *http.Client
+	url := "http://localhost/verify"
+
+	if os.Getenv("VERIFY_SERVICE_TCP_ONLY") == "true" {
+		client = &http.Client{Timeout: 1 * time.Second}
+		port := os.Getenv("VERIFY_SERVICE_PORT")
+		if port == "" {
+			port = "3001"
+		}
+		url = "http://localhost:" + port + "/verify"
+	} else {
+		udsPath := os.Getenv("VERIFY_SERVICE_UDS")
+		if udsPath == "" {
+			udsPath = "/tmp/verify_service.sock"
+		}
+		client = &http.Client{
+			Timeout: 1 * time.Second,
+			Transport: &http.Transport{
+				DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+					return net.Dial("unix", udsPath)
+				},
+			},
+		}
+	}
 
 	start := time.Now()
 	success := 0

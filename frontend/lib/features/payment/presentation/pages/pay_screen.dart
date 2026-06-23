@@ -1,6 +1,7 @@
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:frontend/features/security/presentation/widgets/pin_entry_widget.dart';
 import 'package:frontend/core/theme/app_theme.dart';
@@ -12,9 +13,9 @@ import 'package:frontend/features/payment/domain/entities/payment_breakdown.dart
 import 'package:frontend/features/payment/data/repositories/payment_repository_impl.dart';
 import 'package:frontend/features/payment/presentation/logic/payment_cubit.dart';
 import 'package:frontend/features/payment/presentation/logic/payment_state.dart';
+import 'package:frontend/features/security/domain/repositories/security_repository.dart';
 import 'package:frontend/features/payment/presentation/widgets/fx_breakdown_card.dart';
 import 'package:frontend/core/widgets/paycif_button.dart';
-import 'package:frontend/features/payment/presentation/pages/payment_success_screen.dart';
 import 'package:frontend/features/profile/domain/saved_card.dart';
 import 'package:frontend/core/l10n/generated/app_localizations.dart';
 
@@ -66,10 +67,11 @@ class _PayScreenState extends State<PayScreen> {
     }
   }
 
-  void _prewarmBiometric() {
-    _auth.canCheckBiometrics.then((ready) => _biometricReady = ready).catchError((_) {
-      return false;
-    });
+  Future<void> _prewarmBiometric() async {
+    try {
+      final ready = await _auth.canCheckBiometrics;
+      if (mounted) setState(() => _biometricReady = ready);
+    } catch (_) {}
   }
 
   Future<void> _authenticateAndPay(PaymentCubit cubit) async {
@@ -133,7 +135,10 @@ class _PayScreenState extends State<PayScreen> {
 
     return BlocProvider(
       create: (context) => PaymentCubit(
-        paymentRepository: PaymentRepositoryImpl(apiService: ApiService()),
+        paymentRepository: PaymentRepositoryImpl(
+          apiService: ApiService(),
+          securityRepository: context.read<SecurityRepository>(),
+        ),
       )..initialize(widget.amount),
       child: Scaffold(
         backgroundColor: theme.scaffoldBackgroundColor,
@@ -154,17 +159,12 @@ class _PayScreenState extends State<PayScreen> {
         body: BlocConsumer<PaymentCubit, PaymentState>(
           listener: (context, state) {
             if (state is PaymentSuccess) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => PaymentSuccessScreen(
-                    transactionId: state.transactionId,
-                    amount: widget.amount,
-                    recipientName: widget.merchantName,
-                    promptPayId: widget.promptPayId,
-                  ),
-                ),
-              );
+              context.pushReplacement('/payment_success', extra: {
+                'transactionId': state.transactionId,
+                'amount': widget.amount,
+                'recipientName': widget.merchantName,
+                'promptPayId': widget.promptPayId,
+              });
             } else if (state is PaymentFailure) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text("Payment Failed: ${state.errorMessage}")),

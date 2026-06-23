@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:frontend/features/security/presentation/pages/pin_setup_screen.dart';
 import 'package:frontend/features/security/presentation/logic/security_controller.dart';
+import 'package:go_router/go_router.dart';
 import 'package:frontend/core/utils/error_translator.dart';
 import 'package:frontend/core/l10n/generated/app_localizations.dart';
 import 'package:frontend/core/theme/app_theme.dart';
@@ -141,9 +141,7 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
       } else {
         if (controller.state.errorMessage?.contains('PIN not setup') == true) {
           if (mounted) {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (context) => const PinSetupScreen()),
-            );
+            context.go('/pin_setup');
             return;
           }
         }

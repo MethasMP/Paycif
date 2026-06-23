@@ -48,11 +48,16 @@ class LinkedDevicesController extends ChangeNotifier {
       onError: (e) {
         debugPrint('⚠️ [LinkedDevices] Real-time Sync Error: $e');
         // Fallback: One-time network refresh if Real-time fails
-        _repository.getLinkedDevices(forceRefresh: true).then((fresh) {
-          _devices = fresh;
-          _isLoading = false;
-          notifyListeners();
-        });
+        () async {
+          try {
+            final fresh = await _repository.getLinkedDevices(forceRefresh: true);
+            if (!_isDisposed) {
+              _devices = fresh;
+              _isLoading = false;
+              notifyListeners();
+            }
+          } catch (_) {}
+        }();
       },
     );
   }

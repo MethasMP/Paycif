@@ -1,33 +1,52 @@
 package usecase
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
-	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"net"
+	"net/http"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
-
-	pb "paysif/internal/adapter/grpc/pb" // Correct import path based on go_package option
 )
 
-// SignatureService handles Ed25519 signature verification via High-Performance Rust Microservice.
+type keyCacheEntry struct {
+	publicKey string
+	expiresAt time.Time
+}
+
+// SignatureService handles Ed25519 signature verification via the Go verify-service.
 type SignatureService struct {
-	grpcClient pb.FXServiceClient
-	DB         *sql.DB
+	DB      *sql.DB
+	udsPath string
+	cache   sync.Map
 }
 
 // NewSignatureService creates a new SignatureService injecting dependencies.
-func NewSignatureService(client pb.FXServiceClient, db *sql.DB) *SignatureService {
+func NewSignatureService(db *sql.DB, udsPath string) *SignatureService {
+	if udsPath == "" {
+		udsPath = "/tmp/verify_service.sock"
+	}
 	return &SignatureService{
-		grpcClient: client,
-		DB:         db,
+		DB:      db,
+		udsPath: udsPath,
 	}
 }
 
 // GetDevicePublicKey retrieves the public key for a specific user and device.
 func (s *SignatureService) GetDevicePublicKey(ctx context.Context, userID uuid.UUID, deviceID string) (string, error) {
+	cacheKey := userID.String() + ":" + deviceID
+	if val, ok := s.cache.Load(cacheKey); ok {
+		entry := val.(keyCacheEntry)
+		if time.Now().Before(entry.expiresAt) {
+			return entry.publicKey, nil
+		}
+	}
+
 	var publicKey string
 	err := s.DB.QueryRowContext(ctx, "SELECT public_key FROM user_device_bindings WHERE user_id = $1 AND device_id = $2 AND is_active = true", userID, deviceID).Scan(&publicKey)
 	if err != nil {
@@ -36,44 +55,74 @@ func (s *SignatureService) GetDevicePublicKey(ctx context.Context, userID uuid.U
 		}
 		return "", fmt.Errorf("failed to fetch device public key: %w", err)
 	}
+
+	s.cache.Store(cacheKey, keyCacheEntry{
+		publicKey: publicKey,
+		expiresAt: time.Now().Add(5 * time.Minute),
+	})
+
 	return publicKey, nil
 }
 
-// VerifySignature delegates verification to the high-performance Rust usecase.
-// publicKey and signature are expected to be base64 encoded strings.
+type VerifyRequest struct {
+	PublicKeyB64 string `json:"public_key_b64"`
+	SignatureB64 string `json:"signature_b64"`
+	Message      string `json:"message"`
+}
+
+type VerifyResponse struct {
+	IsValid bool    `json:"is_valid"`
+	Error   *string `json:"error,omitempty"`
+}
+
+// VerifySignature delegates verification to the verify-service over Unix Domain Socket.
 func (s *SignatureService) VerifySignature(ctx context.Context, publicKeyB64, signatureB64, message string) (bool, error) {
-	// 1. Decode Base64 Inputs
-	pubKeyBytes, err := base64.StdEncoding.DecodeString(publicKeyB64)
+	client := &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+				var d net.Dialer
+				return d.DialContext(ctx, "unix", s.udsPath)
+			},
+		},
+		Timeout: 200 * time.Millisecond,
+	}
+
+	verifyReq := VerifyRequest{
+		PublicKeyB64: publicKeyB64,
+		SignatureB64: signatureB64,
+		Message:      message,
+	}
+	reqBytes, err := json.Marshal(verifyReq)
 	if err != nil {
-		return false, fmt.Errorf("invalid public key encoding: %w", err)
+		return false, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	sigBytes, err := base64.StdEncoding.DecodeString(signatureB64)
+	req, err := http.NewRequestWithContext(ctx, "POST", "http://localhost/verify", bytes.NewReader(reqBytes))
 	if err != nil {
-		return false, fmt.Errorf("invalid signature encoding: %w", err)
+		return false, fmt.Errorf("failed to create http request: %w", err)
 	}
+	req.Header.Set("Content-Type", "application/json")
 
-	// 2. Call Rust via gRPC (over UDS/TCP)
-	if s.grpcClient == nil {
-		return false, fmt.Errorf("signature verification unavailable: rust engine is offline")
-	}
-
-	rpcCtx, cancel := context.WithTimeout(ctx, 2*time.Second) // Fast timeout for auth
-	defer cancel()
-
-	resp, err := s.grpcClient.VerifySignature(rpcCtx, &pb.VerifySignatureRequest{
-		PublicKey: pubKeyBytes,
-		Signature: sigBytes,
-		Message:   []byte(message),
-	})
-
+	resp, err := client.Do(req)
 	if err != nil {
-		// Log error but don't leak details to caller for security
-		return false, fmt.Errorf("rust signature verification error: %w", err)
+		return false, fmt.Errorf("failed to contact verify service: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("verify service returned status %d", resp.StatusCode)
 	}
 
-	if !resp.Valid {
-		return false, fmt.Errorf("verification failed: %s", resp.ErrorMessage)
+	var verifyResp VerifyResponse
+	if err := json.NewDecoder(resp.Body).Decode(&verifyResp); err != nil {
+		return false, fmt.Errorf("failed to decode verify response: %w", err)
+	}
+
+	if !verifyResp.IsValid {
+		if verifyResp.Error != nil {
+			return false, fmt.Errorf("verification failed: %s", *verifyResp.Error)
+		}
+		return false, fmt.Errorf("verification failed")
 	}
 
 	return true, nil

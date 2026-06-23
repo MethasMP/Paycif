@@ -7,8 +7,8 @@ import 'package:frontend/core/l10n/generated/app_localizations.dart';
 
 import 'package:frontend/features/dashboard/presentation/dashboard_controller.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:frontend/features/auth/presentation/login_screen.dart' as import_login;
 import 'package:frontend/core/network/api_service.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'dart:ui' as ui;
@@ -17,7 +17,6 @@ import 'package:frontend/features/dashboard/presentation/home_view.dart';
 import 'package:frontend/features/payment/presentation/payment_settings_screen.dart';
 import 'package:frontend/features/transactions/presentation/history_screen.dart';
 import 'package:frontend/features/profile/presentation/profile_page.dart';
-import 'package:frontend/features/payment/presentation/scan_page.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -62,10 +61,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
       if (data.event == AuthChangeEvent.signedOut) {
         if (mounted) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (context) => const import_login.LoginScreen()),
-            (route) => false,
-          );
+          context.go('/login');
         }
       }
     });
@@ -103,11 +99,10 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     setState(() => _selectedIndex = index);
   }
 
-  void _openScanner() {
+  Future<void> _openScanner() async {
     HapticFeedback.mediumImpact();
-    Navigator.of(context).push(MaterialPageRoute(builder: (context) => const ScanPage())).then((_) {
-      if (mounted) context.read<DashboardController>().refresh();
-    });
+    await context.push('/scan');
+    if (mounted) context.read<DashboardController>().refresh();
   }
 
   // Calculates the horizontal starting point of the sliding active dot

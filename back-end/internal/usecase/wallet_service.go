@@ -6,12 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 	"sync"
 	"time"
 
 	"paysif/internal/domain/entities"
+	"paysif/internal/infrastructure/logger"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -21,6 +21,12 @@ import (
 const (
 	MaxTransactionAmount = 500000 // ฿5,000.00
 	MinTransactionAmount = 50000  // ฿500.00
+)
+
+var (
+	ErrLimitExceeded       = errors.New("kyc verification limit exceeded")
+	ErrNetworkUnavailable  = errors.New("thai payment network is unavailable")
+	ErrMerchantUnavailable = errors.New("merchant account is unavailable")
 )
 
 // WalletService handles wallet operations.
@@ -152,7 +158,7 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 		return err
 	}
 	if exists {
-		log.Printf("ℹ[] Payment already processed for reference: %s", referenceID)
+		logger.WithContext(ctx).Info("Payment already processed", "reference_id", referenceID)
 		return nil
 	}
 
@@ -216,6 +222,12 @@ func isSerializationFailure(err error) bool {
 	return errors.As(err, &pgErr) && pgErr.Code == "40001"
 }
 
+// isDeadlockFailure reports whether err is a Postgres deadlock error (SQLSTATE 40P01).
+func isDeadlockFailure(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "40P01"
+}
+
 // payoutReservation holds the result of the fast reservation transaction (Phase 1).
 type payoutReservation struct {
 	TransactionID  uuid.UUID
@@ -224,77 +236,107 @@ type payoutReservation struct {
 }
 
 // PayoutToPromptPay processes a PromptPay payout.
-// It uses "Reject Before Debit" semantics: funds are tentatively reserved in a
-// short SERIALIZABLE transaction (Phase 1), SQRIL is called OUTSIDE the DB
-// transaction/lock (Phase 2), and the reservation is then finalized or rolled
-// back in a second short transaction (Phase 3). This avoids holding a row
-// lock and a pooled DB connection for the duration of the external HTTP call.
+// In the Async FIFO pattern, this function accepts the request, verifies basic inputs and limits,
+// and immediately writes the payout event to the transaction_outbox in under 1ms with NO profile row locks
+// or serialization checks. The balance check and actual fund deduction occur asynchronously in FIFO order
+// within the background worker.
 func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest) (*PayoutResponse, error) {
 	if req.Amount <= 0 {
 		return nil, errors.New("amount must be positive")
 	}
 	if req.Amount > MaxTransactionAmount {
-		return nil, fmt.Errorf("amount exceeds single transaction limit of %.2f", float64(MaxTransactionAmount)/100)
+		return nil, fmt.Errorf("%w: amount exceeds single transaction limit of %.2f", ErrLimitExceeded, float64(MaxTransactionAmount)/100)
 	}
 
 	// 🛡️ Pre-flight Check: Circuit Breaker State (Yonisomanasikara L0 gate)
 	if s.cb.State() == gobreaker.StateOpen {
-		return nil, errors.New("payment provider is temporarily unavailable (circuit breaker open)")
+		return nil, fmt.Errorf("%w: payment provider is temporarily unavailable (circuit breaker open)", ErrNetworkUnavailable)
 	}
 
-	// Phase 1: Reserve funds in a short-lived SERIALIZABLE transaction.
-	// Retry on serialization failures (pg error 40001), which SERIALIZABLE
-	// isolation can raise under concurrent access to the same profile row.
-	var reservation *payoutReservation
-	var alreadyProcessed *PayoutResponse
-	var err error
-	for attempt := 0; attempt < 3; attempt++ {
-		reservation, alreadyProcessed, err = s.reservePayout(ctx, req)
-		if !isSerializationFailure(err) {
-			break
-		}
-		time.Sleep(time.Duration(attempt+1) * 50 * time.Millisecond)
-	}
+	// Get the user's full name without any row lock
+	var senderFullName string
+	err := s.DB.QueryRowContext(ctx, "SELECT full_name FROM profiles WHERE id = $1", req.UserID).Scan(&senderFullName)
 	if err != nil {
-		return nil, err
-	}
-	if alreadyProcessed != nil {
-		return alreadyProcessed, nil
-	}
-
-	// Phase 2: Call SQRIL OUTSIDE the DB transaction/lock.
-	cbResult, cbErr := s.cb.Execute(func() (interface{}, error) {
-		httpCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
-		defer cancel()
-		return s.PaymentEngine.ExecutePayout(httpCtx, "", req.Amount, "THB", req.PromptPayID, req.RecipientName, req.IdempotencyKey, req.SqrilTxID, "cust_paycif_"+req.UserID.String())
-	})
-
-	if cbErr != nil {
-		log.Printf("⚠️ PaymentEngine payout call failed: %v", cbErr)
-		// SQRIL FAILED. Release the reservation so the funds become available again.
-		if relErr := s.releasePayoutReservation(context.Background(), reservation.TransactionID); relErr != nil {
-			log.Printf("🚨 CRITICAL: Failed to release payout reservation %s after SQRIL failure: %v", reservation.TransactionID, relErr)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.New("profile not found")
 		}
-		return nil, fmt.Errorf("payout execution failed: %w", cbErr)
+		return nil, fmt.Errorf("failed to fetch profile: %w", err)
 	}
 
-	payoutResult := cbResult.(*PayoutResult)
-	finalStatus := payoutResult.Status
-	externalID := payoutResult.ExternalID
+	newTxID := uuid.New()
+	description := fmt.Sprintf("PromptPay to %s (%s)", req.RecipientName, req.PromptPayID)
+	metadata, err := json.Marshal(map[string]string{
+		"promptpay_id":   req.PromptPayID,
+		"recipient_name": req.RecipientName,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode metadata: %w", err)
+	}
 
-	// Phase 3: Finalize the reservation with the provider's result.
-	if err := s.finalizePayoutReservation(ctx, reservation.TransactionID, finalStatus, externalID, req); err != nil {
-		// Edge case: SQRIL paid the merchant, but we failed to finalize the DB record.
-		log.Printf("🚨 CRITICAL: SQRIL payout %s succeeded but finalizing the DB record failed! User %s reservation %s: %v", externalID, req.UserID, reservation.TransactionID, err)
-		return nil, fmt.Errorf("payout succeeded but database update failed: %w", err)
+	payoutPayload, err := json.Marshal(map[string]interface{}{
+		"transaction_id": newTxID.String(),
+		"promptpay_id":   req.PromptPayID,
+		"recipient_name": req.RecipientName,
+		"amount":         req.Amount,
+		"sqril_tx_id":    req.SqrilTxID,
+		"customer_id":    "cust_paycif_" + req.UserID.String(),
+		"user_id":        req.UserID.String(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal outbox payload: %w", err)
+	}
+
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start write transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Check Idempotency (has this payout already been completed or is it in-flight?)
+	var existingID uuid.UUID
+	var existingStatus string
+	err = tx.QueryRowContext(ctx, "SELECT id, settlement_status FROM transactions WHERE reference_id = $1", req.IdempotencyKey).Scan(&existingID, &existingStatus)
+	if err == nil {
+		if existingStatus == "PENDING" {
+			return nil, fmt.Errorf("a payout for this reference is already in progress, please retry shortly")
+		}
+		return &PayoutResponse{
+			TransactionID: existingID.String(),
+			Status:        "already_processed",
+			Message:       "This payout was already processed",
+			SenderName:    senderFullName,
+			NewBalance:    0,
+		}, nil
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("error checking idempotency: %w", err)
+	}
+
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO transactions (id, reference_id, description, settlement_status, metadata, profile_id, amount, type, status)
+		VALUES ($1, $2, $3, 'PENDING', $4, $5, $6, 'PAYOUT', 'PENDING')
+	`, newTxID, req.IdempotencyKey, description, metadata, req.UserID, req.Amount)
+	if err != nil {
+		return nil, fmt.Errorf("failed to insert transaction: %w", err)
+	}
+
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO transaction_outbox (id, transaction_id, event_type, payload, status, created_at)
+		VALUES ($1, $2, 'PAYOUT_REQUESTED', $3, 'PENDING', NOW())
+	`, uuid.New(), newTxID, string(payoutPayload))
+	if err != nil {
+		return nil, fmt.Errorf("failed to insert outbox event: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit outbox write: %w", err)
 	}
 
 	return &PayoutResponse{
-		TransactionID: reservation.TransactionID.String(),
-		Status:        finalStatus,
-		Message:       fmt.Sprintf("Payout processed: %s", finalStatus),
-		SenderName:    reservation.SenderFullName,
-		NewBalance:    reservation.NewBalance,
+		TransactionID: newTxID.String(),
+		Status:        "PENDING",
+		Message:       "Payout queued for execution",
+		SenderName:    senderFullName,
+		NewBalance:    0,
 	}, nil
 }
 
@@ -383,6 +425,26 @@ func (s *WalletService) reservePayout(ctx context.Context, req PayoutRequest) (*
 		return nil, nil, fmt.Errorf("failed to create ledger entry: %w", err)
 	}
 
+	payoutPayload, err := json.Marshal(map[string]interface{}{
+		"transaction_id": newTxID.String(),
+		"promptpay_id":   req.PromptPayID,
+		"recipient_name": req.RecipientName,
+		"amount":         req.Amount,
+		"sqril_tx_id":    req.SqrilTxID,
+		"customer_id":    "cust_paycif_" + req.UserID.String(),
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to marshal outbox payload: %w", err)
+	}
+
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO transaction_outbox (id, transaction_id, event_type, payload, status, created_at)
+		VALUES ($1, $2, 'PROMPTPAY_PAYOUT', $3, 'PENDING', NOW())
+	`, uuid.New(), newTxID, string(payoutPayload))
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to insert outbox event: %w", err)
+	}
+
 	if err := tx.Commit(); err != nil {
 		return nil, nil, fmt.Errorf("failed to commit reservation: %w", err)
 	}
@@ -422,11 +484,19 @@ func (s *WalletService) finalizePayoutReservation(ctx context.Context, transacti
 		return fmt.Errorf("failed to encode provider metadata: %w", err)
 	}
 
+	settlementStatus := "PENDING"
+	switch finalStatus {
+	case "SUCCESS":
+		settlementStatus = "SETTLED"
+	case "FAILED":
+		settlementStatus = "FAILED"
+	}
+
 	_, err = s.DB.ExecContext(ctx, `
 		UPDATE transactions
-		SET settlement_status = $1, status = $1, provider_metadata = $2
-		WHERE id = $3
-	`, finalStatus, providerMetadata, transactionID)
+		SET settlement_status = $1::settlement_status_enum, status = $2, provider_metadata = $3
+		WHERE id = $4
+	`, settlementStatus, finalStatus, providerMetadata, transactionID)
 	if err != nil {
 		return fmt.Errorf("failed to finalize transaction: %w", err)
 	}

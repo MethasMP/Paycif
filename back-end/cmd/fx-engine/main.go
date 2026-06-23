@@ -993,6 +993,10 @@ func main() {
 			Time:    30 * time.Second,
 			Timeout: 10 * time.Second,
 		}),
+		grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
+			MinTime:             5 * time.Second,
+			PermitWithoutStream: true,
+		}),
 	)
 	pb.RegisterFXServiceServer(grpcServer, srv)
 

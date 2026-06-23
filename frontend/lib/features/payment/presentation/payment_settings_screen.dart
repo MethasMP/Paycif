@@ -1,12 +1,12 @@
 import 'dart:io' show Platform;
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:frontend/core/l10n/generated/app_localizations.dart';
-import 'package:frontend/features/profile/presentation/add_card_screen.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:frontend/features/profile/domain/saved_card.dart';
 import 'package:frontend/features/payment/presentation/payment_controller.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 import 'dart:ui' as ui;
@@ -108,10 +108,7 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
 
   Future<void> _navigateToAddCard() async {
     HapticFeedback.mediumImpact();
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const AddCardScreen()),
-    );
+    await context.push('/add_card');
   }
 
   void _toggleEditMode() {

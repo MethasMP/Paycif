@@ -1,16 +1,17 @@
 package main
 
 import (
-	"context"
 	"log/slog" // Added for HandlerGetLimits return type logic if needed, but mainly standard lib
+	"net/http"
+	_ "net/http/pprof" // Register pprof endpoints
 	"os"
 	"paysif/cmd/api/middleware"
-	fxrpc "paysif/internal/adapter/grpc"    // Rename for clarity
-	fx_pb "paysif/internal/adapter/grpc/pb" // Import pb for FXServiceClient type
+	fxrpc "paysif/internal/adapter/grpc" // Rename for clarity
 	"paysif/internal/adapter/handler"
 	"paysif/internal/adapter/repository"
 	"paysif/internal/infrastructure/logger"
 	"paysif/internal/usecase"
+	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -21,6 +22,20 @@ func main() {
 	// 0. Initialize Structured Logger (World-Class JSON Logging)
 	logger.Init()
 
+	// 0.5 Raise File Descriptor Limits for High Concurrency Performance
+	var rLimit syscall.Rlimit
+	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rLimit); err == nil {
+		rLimit.Cur = 65535
+		if rLimit.Max < 65535 {
+			rLimit.Max = 65535
+		}
+		if err := syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rLimit); err != nil {
+			slog.Warn("Failed to raise file descriptor limit", "error", err)
+		} else {
+			slog.Info("Successfully raised file descriptor limits to 65535")
+		}
+	}
+
 	// 1. Database Connection
 	if err := repository.Connect(); err != nil {
 		slog.Error("Failed to connect to database", "error", err)
@@ -28,9 +43,9 @@ func main() {
 	}
 	defer repository.Close()
 
-	// Professional DB Tuning
-	repository.DB.SetMaxOpenConns(25)
-	repository.DB.SetMaxIdleConns(5)
+	// Professional DB Tuning (Balanced for 100 max connections)
+	repository.DB.SetMaxOpenConns(30)
+	repository.DB.SetMaxIdleConns(10)
 	repository.DB.SetConnMaxIdleTime(1 * time.Minute)
 
 	// 1.8 Rust Microservices Integration (Supports TCP & IPC)
@@ -54,7 +69,6 @@ func main() {
 
 	var fxClient *fxrpc.FXClient
 	var fxClientInterface fxrpc.FXClientInterface
-	var sigServiceClient fx_pb.FXServiceClient
 
 	fxClient, err := fxrpc.NewFXClientWithConfig(fxClientConfig)
 	if err != nil {
@@ -65,13 +79,11 @@ func main() {
 	slog.Info("Rust FX Engine integration initialized", "address", fxAddress)
 	defer fxClient.Close()
 	fxClientInterface = fxClient
-	sigServiceClient = fxClient.GetClient()
 
 	// 2. Service Initialization
 	auditService := usecase.NewAuditService(repository.DB)
 	alertService := usecase.NewAlertService()
 	fxService := usecase.NewFXService(repository.DB, fxClientInterface) // Inject Rust Client
-	fxService.StartFXScheduler(context.Background())                    // Start FX loop
 
 	// 2.5 Payment Engine Initialization (Provider Abstraction)
 	sqrilBaseURL := os.Getenv("SQRIL_BASE_URL")
@@ -91,15 +103,31 @@ func main() {
 
 	// Pass AuditService to WalletService
 	walletService := usecase.NewWalletService(repository.DB, fxService, alertService, auditService, paymentEngine)
-	kycService := usecase.NewKYCService(repository.DB, auditService)
-	sigService := usecase.NewSignatureService(sigServiceClient, repository.DB) // Inject Rust gRPC Client and DB 🛡️
+	achKYCClient := usecase.NewAlchemyPayKYCClient(
+		os.Getenv("ALCHEMY_PAY_APP_ID"),
+		os.Getenv("ALCHEMY_PAY_APP_SECRET"),
+		os.Getenv("ALCHEMY_PAY_MERCHANT_NO"),
+		os.Getenv("ALCHEMY_PAY_SANDBOX") != "false",
+	)
+	kycService := usecase.NewKYCService(repository.DB, auditService, achKYCClient)
+	verifyServiceUDS := os.Getenv("VERIFY_SERVICE_UDS")
+	if verifyServiceUDS == "" {
+		verifyServiceUDS = "/tmp/verify_service.sock"
+	}
+	sigService := usecase.NewSignatureService(repository.DB, verifyServiceUDS)
+
+	// 2.8 Alchemy Pay On-Ramp Adapter
+	achAppID := os.Getenv("ALCHEMY_PAY_APP_ID")
+	achAppSecret := os.Getenv("ALCHEMY_PAY_APP_SECRET")
+	achSandbox := os.Getenv("ALCHEMY_PAY_SANDBOX") != "false"
+	achAdapter := usecase.NewAlchemyPayAdapter(achAppID, achAppSecret, achSandbox)
 
 	// 3. Handler Initialization
 	transferHandler := &TransferHandler{
 		Service:          walletService,
 		SignatureService: sigService,
 	}
-	paymentHandler := NewPaymentHandler(walletService)
+	paymentHandler := NewPaymentHandler(walletService, achAdapter, fxService)
 	payoutHandler := NewPayoutHandler(walletService, sigService)
 	kycHandler := NewKYCHandler(kycService)
 	routingService := routing.NewStaticRouter(walletService)
@@ -132,7 +160,9 @@ func main() {
 		v1.GET("/transactions", transferHandler.HandleGetTransactions)
 		v1.GET("/quote", routingHandler.HandleGetQuote) // requires user_id from auth context
 
-		// Payment Routes (Protected)
+		// On-Ramp Routes (Protected)
+		v1.GET("/onramp/check-region", paymentHandler.HandleCheckRegion)
+		v1.POST("/onramp/quote", paymentHandler.HandleGetQuote)
 		v1.POST("/payments/create-intent", paymentHandler.HandleCreateIntent)
 
 		// Payout Routes (Wallet -> External)
@@ -153,7 +183,15 @@ func main() {
 		c.String(200, "User-agent: *\nAllow: /\nSitemap: https://paycif.com/sitemap.xml")
 	})
 
-	// 5. Start Server
+	// 5. Start Pprof Server (Internal Only for Security)
+	go func() {
+		slog.Info("Starting internal pprof server", "port", 6060)
+		if err := http.ListenAndServe("127.0.0.1:6060", nil); err != nil {
+			slog.Error("pprof server failed", "error", err)
+		}
+	}()
+
+	// 6. Start Main API Server
 	slog.Info("Starting server", "port", 8080)
 	if err := r.Run(":8080"); err != nil {
 		slog.Error("Failed to start server", "error", err)

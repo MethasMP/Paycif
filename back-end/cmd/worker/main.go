@@ -48,14 +48,18 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	// 4. Start Worker
-	go w.Run(ctx)
+	doneChan := make(chan struct{})
+	go func() {
+		w.Run(ctx)
+		close(doneChan)
+	}()
 
 	// Wait for signal
 	sig := <-sigChan
-	log.Printf("Received signal: %v. Shutting down...", sig)
+	log.Printf("Received signal: %v. Shutting down gracefully...", sig)
 	cancel()
 
-	// Wait a bit for worker to finish (simplified)
-	// In production, use WaitGroup
+	// Wait for worker to finish
+	<-doneChan
 	log.Println("Shutdown complete.")
 }

@@ -105,11 +105,17 @@ class DashboardController extends Cubit<DashboardState> {
     emit(state.copyWith(status: 'loading'));
 
     try {
-      final tier = await ApiService.getUserTier();
+      String kycStatus = 'UNVERIFIED';
+      try {
+        final statusData = await ApiService.getKycStatus();
+        kycStatus = (statusData['kyc_status'] as String? ?? 'UNVERIFIED').toUpperCase();
+      } catch (_) {
+        // Non-fatal — dashboard loads even if KYC status fails
+      }
       if (isClosed) return;
-      
+
       emit(state.copyWith(
-        kycTier: tier,
+        kycTier: kycStatus,
         status: 'success',
       ));
 
@@ -147,14 +153,17 @@ class DashboardController extends Cubit<DashboardState> {
         if (isClosed) return;
 
         // Fallback: one-time query so UI always has data
-        _repository.getTransactionsOnce(profileId).then((transactions) {
-          if (!isClosed) {
-            emit(state.copyWith(
-              transactions: transactions,
-              isTransactionsLoaded: true,
-            ));
-          }
-        });
+        () async {
+          try {
+            final transactions = await _repository.getTransactionsOnce(profileId);
+            if (!isClosed) {
+              emit(state.copyWith(
+                transactions: transactions,
+                isTransactionsLoaded: true,
+              ));
+            }
+          } catch (_) {}
+        }();
 
         // Exponential backoff retry (max _maxRetries times)
         if (_retryCount < _maxRetries) {

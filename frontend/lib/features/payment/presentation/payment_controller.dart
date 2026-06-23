@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:frontend/core/network/api_service.dart';
 import 'package:frontend/features/profile/domain/saved_card.dart';
+import 'package:frontend/core/models/user_profile.dart';
 import 'package:frontend/features/security/data/datasources/secure_storage_service.dart';
 import 'dart:convert';
 
@@ -43,12 +44,12 @@ class PaymentController extends ChangeNotifier {
         _apiService.getSavedCards(forceRefresh: false),
       ]);
 
-      final profile = results[0] as Map<String, dynamic>?;
+      final profile = results[0] as UserProfile?;
       _savedCards = results[1] as List<SavedCard>;
 
       if (profile != null) {
-        _preferredMethodId = profile['preferred_payment_method_id'];
-        _preferredMethodType = profile['preferred_payment_method_type'];
+        _preferredMethodId = profile.preferredPaymentMethodId;
+        _preferredMethodType = profile.preferredPaymentMethodType;
       }
 
       // 📡 [Side-Effect] Persist Ground Truth to Disk
@@ -71,14 +72,14 @@ class PaymentController extends ChangeNotifier {
       final prefJson = await _storage.read(_kPrefCacheKey);
 
       if (cardsJson != null) {
-        final List<dynamic> decoded = jsonDecode(cardsJson);
-        _savedCards = decoded.map((i) => SavedCard.fromJson(i)).toList();
+        final List<dynamic> decoded = jsonDecode(cardsJson) as List<dynamic>;
+        _savedCards = decoded.map((i) => SavedCard.fromJson(i as Map<String, dynamic>)).toList();
       }
 
       if (prefJson != null) {
-        final pref = jsonDecode(prefJson);
-        _preferredMethodId = pref['id'];
-        _preferredMethodType = pref['type'];
+        final pref = jsonDecode(prefJson) as Map<String, dynamic>;
+        _preferredMethodId = pref['id'] as String?;
+        _preferredMethodType = pref['type'] as String?;
       }
 
       if (_savedCards.isNotEmpty) notifyListeners();
