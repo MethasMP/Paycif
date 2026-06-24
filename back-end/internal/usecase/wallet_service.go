@@ -110,7 +110,12 @@ type ExchangeRateResponse struct {
 
 // GetExchangeRate retrieves the latest rate for a currency pair.
 func (s *WalletService) GetExchangeRate(ctx context.Context, fromCurr, toCurr string) (*ExchangeRateResponse, error) {
-	cacheKey := fmt.Sprintf("rate:%s:%s", fromCurr, toCurr)
+	// Normalize currency codes to prevent cache fragmentation and reduce redundant ToUpper calls
+	fromCurrUpper := strings.ToUpper(fromCurr)
+	toCurrUpper := strings.ToUpper(toCurr)
+
+	// Optimization: String concatenation is faster than fmt.Sprintf for simple key generation (~4x)
+	cacheKey := "rate:" + fromCurrUpper + ":" + toCurrUpper
 
 	if val, ok := s.localRateCache.Load(cacheKey); ok {
 		item := val.(localCacheItem)
@@ -122,8 +127,9 @@ func (s *WalletService) GetExchangeRate(ctx context.Context, fromCurr, toCurr st
 
 	var rate float64
 	var updatedAt time.Time
+	// Use pre-normalized uppercase strings in SQL query
 	err := s.DB.QueryRowContext(ctx, "SELECT provider_rate, updated_at FROM exchange_rates WHERE from_currency = $1 AND to_currency = $2",
-		strings.ToUpper(fromCurr), strings.ToUpper(toCurr)).Scan(&rate, &updatedAt)
+		fromCurrUpper, toCurrUpper).Scan(&rate, &updatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("rate not found for %s/%s", fromCurr, toCurr)
