@@ -1,0 +1,3 @@
+## 2026-06-25 - [Atomic Idempotency and String Concatenation]
+**Learning:** Found that `ProcessPayment` had regressed to a two-step `SELECT` then `INSERT` pattern for idempotency, and several hot paths were using `fmt.Sprintf` for simple string building and JSON construction. String concatenation in Go is significantly faster for these use cases (~2x to 4x).
+**Action:** Always prefer `INSERT ... ON CONFLICT DO NOTHING` for idempotency in high-concurrency paths. Use string concatenation + `strconv` instead of `fmt.Sprintf` for cache keys and simple JSON payloads in performance-critical sections.
