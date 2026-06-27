@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -110,7 +111,9 @@ type ExchangeRateResponse struct {
 
 // GetExchangeRate retrieves the latest rate for a currency pair.
 func (s *WalletService) GetExchangeRate(ctx context.Context, fromCurr, toCurr string) (*ExchangeRateResponse, error) {
-	cacheKey := fmt.Sprintf("rate:%s:%s", fromCurr, toCurr)
+	fromCurr = strings.ToUpper(fromCurr)
+	toCurr = strings.ToUpper(toCurr)
+	cacheKey := "rate:" + fromCurr + ":" + toCurr
 
 	if val, ok := s.localRateCache.Load(cacheKey); ok {
 		item := val.(localCacheItem)
@@ -123,7 +126,7 @@ func (s *WalletService) GetExchangeRate(ctx context.Context, fromCurr, toCurr st
 	var rate float64
 	var updatedAt time.Time
 	err := s.DB.QueryRowContext(ctx, "SELECT provider_rate, updated_at FROM exchange_rates WHERE from_currency = $1 AND to_currency = $2",
-		strings.ToUpper(fromCurr), strings.ToUpper(toCurr)).Scan(&rate, &updatedAt)
+		fromCurr, toCurr).Scan(&rate, &updatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("rate not found for %s/%s", fromCurr, toCurr)
@@ -169,7 +172,7 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 		INSERT INTO transactions (id, profile_id, reference_id, amount, description, settlement_status, gateway_fee, provider_metadata, created_at)
 		VALUES ($1, $2, $3, $4, $5, 'SETTLED', 0, $6, NOW())
 	`, newTxID, userID, referenceID, int64(amount*100), description,
-		fmt.Sprintf(`{"provider": "alchemypay", "merchant": "%s", "amount": %f}`, merchant, amount))
+		`{"provider": "alchemypay", "merchant": "`+merchant+`", "amount": `+strconv.FormatFloat(amount, 'f', -1, 64)+`}`)
 	if err != nil {
 		return fmt.Errorf("failed to insert transaction: %w", err)
 	}
@@ -184,7 +187,7 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 	}
 
 	// 4. Write to Outbox for async processing
-	payloadStr := fmt.Sprintf(`{"transaction_id": "%s", "amount": %f, "user_id": "%s", "merchant": "%s"}`, newTxID, amount, userID, merchant)
+	payloadStr := `{"transaction_id": "` + newTxID.String() + `", "amount": ` + strconv.FormatFloat(amount, 'f', -1, 64) + `, "user_id": "` + userID.String() + `", "merchant": "` + merchant + `"}`
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO transaction_outbox (id, transaction_id, event_type, payload, status, created_at)
 		VALUES ($1, $2, 'PAYMENT_COMPLETED', $3, 'PENDING', NOW())
@@ -264,7 +267,7 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 	}
 
 	newTxID := uuid.New()
-	description := fmt.Sprintf("PromptPay to %s (%s)", req.RecipientName, req.PromptPayID)
+	description := "PromptPay to " + req.RecipientName + " (" + req.PromptPayID + ")"
 	metadata, err := json.Marshal(map[string]string{
 		"promptpay_id":   req.PromptPayID,
 		"recipient_name": req.RecipientName,
@@ -400,7 +403,7 @@ func (s *WalletService) reservePayout(ctx context.Context, req PayoutRequest) (*
 
 	// 5. Reserve funds: insert PENDING transaction + debiting ledger entry.
 	newTxID := uuid.New()
-	description := fmt.Sprintf("PromptPay to %s (%s)", req.RecipientName, req.PromptPayID)
+	description := "PromptPay to " + req.RecipientName + " (" + req.PromptPayID + ")"
 	metadata, err := json.Marshal(map[string]string{
 		"promptpay_id":   req.PromptPayID,
 		"recipient_name": req.RecipientName,
