@@ -172,7 +172,7 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 		INSERT INTO transactions (id, profile_id, reference_id, amount, description, settlement_status, gateway_fee, provider_metadata, created_at)
 		VALUES ($1, $2, $3, $4, $5, 'SETTLED', 0, $6, NOW())
 	`, newTxID, userID, referenceID, int64(amount*100), description,
-		`{"provider": "alchemypay", "merchant": "`+merchant+`", "amount": `+strconv.FormatFloat(amount, 'f', -1, 64)+`}`)
+		`{"provider": "alchemypay", "merchant": `+strconv.Quote(merchant)+`, "amount": `+strconv.FormatFloat(amount, 'f', -1, 64)+`}`)
 	if err != nil {
 		return fmt.Errorf("failed to insert transaction: %w", err)
 	}
@@ -187,7 +187,7 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 	}
 
 	// 4. Write to Outbox for async processing
-	payloadStr := `{"transaction_id": "` + newTxID.String() + `", "amount": ` + strconv.FormatFloat(amount, 'f', -1, 64) + `, "user_id": "` + userID.String() + `", "merchant": "` + merchant + `"}`
+	payloadStr := `{"transaction_id": "` + newTxID.String() + `", "amount": ` + strconv.FormatFloat(amount, 'f', -1, 64) + `, "user_id": "` + userID.String() + `", "merchant": ` + strconv.Quote(merchant) + `}`
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO transaction_outbox (id, transaction_id, event_type, payload, status, created_at)
 		VALUES ($1, $2, 'PAYMENT_COMPLETED', $3, 'PENDING', NOW())

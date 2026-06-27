@@ -27,10 +27,12 @@ jobs:
           cache-dependency-path: back-end/go.sum
 
       - name: Verify Dependencies
-        run: go mod verify
+        run: |
+          go mod download
+          go mod verify
 
       - name: Fetch base branch for linter
-        run: git fetch origin ${{ github.base_ref }}
+        run: git fetch origin main
 
       - name: Run golangci-lint
         run: |
