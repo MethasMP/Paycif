@@ -40,6 +40,7 @@ func BenchmarkJSONConcat(b *testing.B) {
 	userID := uuid.New()
 	merchant := "Test Merchant"
 	for i := 0; i < b.N; i++ {
-		_ = `{"transaction_id": "` + newTxID.String() + `", "amount": ` + strconv.FormatFloat(amount, 'f', -1, 64) + `, "user_id": "` + userID.String() + `", "merchant": "` + merchant + `"}`
+		// Use strconv.Quote to match implementation safety and performance profile.
+		_ = `{"transaction_id": "` + newTxID.String() + `", "amount": ` + strconv.FormatFloat(amount, 'f', -1, 64) + `, "user_id": "` + userID.String() + `", "merchant": ` + strconv.Quote(merchant) + `}`
 	}
 }
