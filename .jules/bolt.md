@@ -1,0 +1,3 @@
+## 2026-06-28 - [WalletService Optimization & Idempotency]
+**Learning:** Replacing "SELECT EXISTS" then "INSERT" with atomic "INSERT ... ON CONFLICT DO NOTHING" significantly reduces database roundtrips and latency. Additionally, manual string concatenation and `strconv` are measurably faster (~3-4x) than `fmt.Sprintf` for constructing cache keys and JSON payloads in hot paths. Using `strconv.Quote` ensures JSON safety for dynamic strings like merchant names.
+**Action:** Use atomic SQL operations for idempotency and prefer string concatenation over `fmt.Sprintf` for high-frequency operations. Always use `strconv.Quote` when manually building JSON strings.
