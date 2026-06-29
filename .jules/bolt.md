@@ -1,0 +1,3 @@
+## 2026-06-28 - Re-optimization and Regression Prevention
+**Learning:** Performance optimizations in `WalletService.go` (atomic `ON CONFLICT` and string concatenation) were found to have regressed. This suggests that without a dedicated benchmark suite that runs during development/CI, these micro-optimizations are easily lost during refactoring.
+**Action:** Always include or run `wallet_service_perf_test.go` when touching `WalletService` to verify that performance critical paths remain optimized. Use `strconv.Quote` for safe manual JSON construction to maintain performance without sacrificing security.
