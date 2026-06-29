@@ -2,10 +2,7 @@ package usecase
 
 import (
 	"fmt"
-	"strconv"
 	"testing"
-
-	"github.com/google/uuid"
 )
 
 func BenchmarkCacheKeySprintf(b *testing.B) {
@@ -24,23 +21,18 @@ func BenchmarkCacheKeyConcat(b *testing.B) {
 	}
 }
 
-func BenchmarkJSONSprintf(b *testing.B) {
-	newTxID := uuid.New()
-	amount := 123.45
-	userID := uuid.New()
-	merchant := "Test Merchant"
+func BenchmarkDescriptionSprintf(b *testing.B) {
+	recipientName := "John Doe"
+	promptPayID := "0812345678"
 	for i := 0; i < b.N; i++ {
-		_ = fmt.Sprintf(`{"transaction_id": "%s", "amount": %f, "user_id": "%s", "merchant": "%s"}`, newTxID, amount, userID, merchant)
+		_ = fmt.Sprintf("PromptPay to %s (%s)", recipientName, promptPayID)
 	}
 }
 
-func BenchmarkJSONConcat(b *testing.B) {
-	newTxID := uuid.New()
-	amount := 123.45
-	userID := uuid.New()
-	merchant := "Test Merchant"
+func BenchmarkDescriptionConcat(b *testing.B) {
+	recipientName := "John Doe"
+	promptPayID := "0812345678"
 	for i := 0; i < b.N; i++ {
-		// Use strconv.Quote to match implementation safety and performance profile.
-		_ = `{"transaction_id": "` + newTxID.String() + `", "amount": ` + strconv.FormatFloat(amount, 'f', -1, 64) + `, "user_id": "` + userID.String() + `", "merchant": ` + strconv.Quote(merchant) + `}`
+		_ = "PromptPay to " + recipientName + " (" + promptPayID + ")"
 	}
 }
