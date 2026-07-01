@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -110,7 +111,10 @@ type ExchangeRateResponse struct {
 
 // GetExchangeRate retrieves the latest rate for a currency pair.
 func (s *WalletService) GetExchangeRate(ctx context.Context, fromCurr, toCurr string) (*ExchangeRateResponse, error) {
-	cacheKey := fmt.Sprintf("rate:%s:%s", fromCurr, toCurr)
+	fromCurr = strings.ToUpper(fromCurr)
+	toCurr = strings.ToUpper(toCurr)
+	// Performance: Use string concatenation instead of fmt.Sprintf for hot path cache key.
+	cacheKey := "rate:" + fromCurr + ":" + toCurr
 
 	if val, ok := s.localRateCache.Load(cacheKey); ok {
 		item := val.(localCacheItem)
@@ -123,7 +127,7 @@ func (s *WalletService) GetExchangeRate(ctx context.Context, fromCurr, toCurr st
 	var rate float64
 	var updatedAt time.Time
 	err := s.DB.QueryRowContext(ctx, "SELECT provider_rate, updated_at FROM exchange_rates WHERE from_currency = $1 AND to_currency = $2",
-		strings.ToUpper(fromCurr), strings.ToUpper(toCurr)).Scan(&rate, &updatedAt)
+		fromCurr, toCurr).Scan(&rate, &updatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("rate not found for %s/%s", fromCurr, toCurr)
@@ -151,30 +155,34 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 	}
 	defer tx.Rollback()
 
-	// 1. Idempotency check
-	var exists bool
-	err = tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM transactions WHERE reference_id = $1)", referenceID).Scan(&exists)
-	if err != nil {
-		return err
-	}
-	if exists {
-		logger.WithContext(ctx).Info("Payment already processed", "reference_id", referenceID)
-		return nil
-	}
-
-	// 2. Record Transaction
+	// 1. Record Transaction with atomic idempotency (ON CONFLICT DO NOTHING)
 	newTxID := uuid.New()
 	description := "Pay per use: " + merchant
-	_, err = tx.ExecContext(ctx, `
+
+	// Performance: Use manual string concatenation and strconv for JSON construction to avoid fmt.Sprintf overhead.
+	// Also use strconv.Quote for safe merchant name escaping.
+	amountStr := strconv.FormatFloat(amount, 'f', -1, 64)
+	providerMetadata := `{"provider": "alchemypay", "merchant": ` + strconv.Quote(merchant) + `, "amount": ` + amountStr + `}`
+
+	res, err := tx.ExecContext(ctx, `
 		INSERT INTO transactions (id, profile_id, reference_id, amount, description, settlement_status, gateway_fee, provider_metadata, created_at)
 		VALUES ($1, $2, $3, $4, $5, 'SETTLED', 0, $6, NOW())
-	`, newTxID, userID, referenceID, int64(amount*100), description,
-		fmt.Sprintf(`{"provider": "alchemypay", "merchant": "%s", "amount": %f}`, merchant, amount))
+		ON CONFLICT (reference_id) DO NOTHING
+	`, newTxID, userID, referenceID, int64(amount*100), description, providerMetadata)
 	if err != nil {
 		return fmt.Errorf("failed to insert transaction: %w", err)
 	}
 
-	// 3. Create Ledger Entry
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		logger.WithContext(ctx).Info("Payment already processed (idempotent)", "reference_id", referenceID)
+		return nil
+	}
+
+	// 2. Create Ledger Entry
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO ledger_entries (id, transaction_id, profile_id, amount, balance_after, base_currency_amount, home_currency_amount, created_at)
 		VALUES ($1, $2, $3, $4, 0, $4, $4, NOW())
@@ -183,8 +191,8 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 		return fmt.Errorf("failed to create ledger entry: %w", err)
 	}
 
-	// 4. Write to Outbox for async processing
-	payloadStr := fmt.Sprintf(`{"transaction_id": "%s", "amount": %f, "user_id": "%s", "merchant": "%s"}`, newTxID, amount, userID, merchant)
+	// 3. Write to Outbox for async processing
+	payloadStr := `{"transaction_id": "` + newTxID.String() + `", "amount": ` + amountStr + `, "user_id": "` + userID.String() + `", "merchant": ` + strconv.Quote(merchant) + `}`
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO transaction_outbox (id, transaction_id, event_type, payload, status, created_at)
 		VALUES ($1, $2, 'PAYMENT_COMPLETED', $3, 'PENDING', NOW())
@@ -264,7 +272,8 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 	}
 
 	newTxID := uuid.New()
-	description := fmt.Sprintf("PromptPay to %s (%s)", req.RecipientName, req.PromptPayID)
+	// Performance: Use string concatenation instead of fmt.Sprintf for transaction description.
+	description := "PromptPay to " + req.RecipientName + " (" + req.PromptPayID + ")"
 	metadata, err := json.Marshal(map[string]string{
 		"promptpay_id":   req.PromptPayID,
 		"recipient_name": req.RecipientName,
@@ -400,7 +409,8 @@ func (s *WalletService) reservePayout(ctx context.Context, req PayoutRequest) (*
 
 	// 5. Reserve funds: insert PENDING transaction + debiting ledger entry.
 	newTxID := uuid.New()
-	description := fmt.Sprintf("PromptPay to %s (%s)", req.RecipientName, req.PromptPayID)
+	// Performance: Use string concatenation instead of fmt.Sprintf for transaction description.
+	description := "PromptPay to " + req.RecipientName + " (" + req.PromptPayID + ")"
 	metadata, err := json.Marshal(map[string]string{
 		"promptpay_id":   req.PromptPayID,
 		"recipient_name": req.RecipientName,
