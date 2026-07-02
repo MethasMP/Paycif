@@ -159,8 +159,10 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 	newTxID := uuid.New()
 	description := "Pay per use: " + merchant
 
-	// Performance: Using string concatenation and strconv for JSON construction instead of fmt.Sprintf
-	providerMetadata := `{"provider": "alchemypay", "merchant": ` + strconv.Quote(merchant) + `, "amount": ` + strconv.FormatFloat(amount, 'f', 6, 64) + `}`
+	// Performance: Using string concatenation for JSON construction instead of fmt.Sprintf or json.Marshal
+	// Safety: Using json.Marshal for the merchant name to ensure correct JSON escaping, as strconv.Quote is Go-specific.
+	merchantJSON, _ := json.Marshal(merchant)
+	providerMetadata := `{"provider": "alchemypay", "merchant": ` + string(merchantJSON) + `, "amount": ` + strconv.FormatFloat(amount, 'f', 6, 64) + `}`
 
 	res, err := tx.ExecContext(ctx, `
 		INSERT INTO transactions (id, profile_id, reference_id, amount, description, settlement_status, gateway_fee, provider_metadata, created_at)
@@ -192,7 +194,8 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 
 	// 4. Write to Outbox for async processing
 	// Performance: High-performance JSON construction for outbox payload
-	payloadStr := `{"transaction_id": "` + newTxID.String() + `", "amount": ` + strconv.FormatFloat(amount, 'f', 6, 64) + `, "user_id": "` + userID.String() + `", "merchant": ` + strconv.Quote(merchant) + `}`
+	// Safety: Using json.Marshal for the merchant name to ensure correct JSON escaping.
+	payloadStr := `{"transaction_id": "` + newTxID.String() + `", "amount": ` + strconv.FormatFloat(amount, 'f', 6, 64) + `, "user_id": "` + userID.String() + `", "merchant": ` + string(merchantJSON) + `}`
 
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO transaction_outbox (id, transaction_id, event_type, payload, status, created_at)
