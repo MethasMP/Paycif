@@ -60,7 +60,7 @@ func (w *OutboxWorker) runPruner(ctx context.Context) {
 
 // Run starts the worker loop.
 func (w *OutboxWorker) Run(ctx context.Context) {
-	ticker := time.NewTicker(50 * time.Millisecond)
+	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 
 	go w.runPruner(ctx)
@@ -158,11 +158,16 @@ func (w *OutboxWorker) processBatch(ctx context.Context) error {
 		}
 
 		if err == nil {
-			_, _ = updateTx.ExecContext(ctx, `
+			_, dbErr := updateTx.ExecContext(ctx, `
 				UPDATE transaction_outbox 
 				SET status = 'PROCESSED', processed_at = NOW()
 				WHERE id = $1
 			`, event.id)
+			if dbErr != nil {
+				log.Printf("⚠️ Failed to update outbox status to PROCESSED for event %s: %v. Rolling back transaction.", event.id, dbErr)
+				_ = updateTx.Rollback()
+				continue
+			}
 		} else {
 			log.Printf("Event %s failed: %v", event.id, err)
 			w.handleFailureInTx(updateTx, event.id, event.retry, err)
@@ -284,11 +289,17 @@ func (w *OutboxWorker) processPromptPayPayout(ctx context.Context, idempotencyKe
 		defer refundTx.Rollback()
 
 		// Lock profile row
-		_ = refundTx.QueryRowContext(ctx, "SELECT full_name FROM profiles WHERE id = $1 FOR UPDATE", userUUID).Scan(&senderFullName)
+		err = refundTx.QueryRowContext(ctx, "SELECT full_name FROM profiles WHERE id = $1 FOR UPDATE", userUUID).Scan(&senderFullName)
+		if err != nil {
+			return fmt.Errorf("failed to lock profile for refund: %w", err)
+		}
 
-		// Calculate current balance
+		// Calculate current balance (locking is handled by the profiles row lock above)
 		var balanceBeforeRefund int64
-		_ = refundTx.QueryRowContext(ctx, "SELECT COALESCE(SUM(amount), 0) FROM ledger_entries WHERE profile_id = $1", userUUID).Scan(&balanceBeforeRefund)
+		err = refundTx.QueryRowContext(ctx, "SELECT COALESCE(SUM(amount), 0) FROM ledger_entries WHERE profile_id = $1", userUUID).Scan(&balanceBeforeRefund)
+		if err != nil {
+			return fmt.Errorf("failed to calculate balance for refund: %w", err)
+		}
 
 		// Insert refund ledger entry (credit)
 		_, err = refundTx.ExecContext(ctx, `
@@ -309,7 +320,9 @@ func (w *OutboxWorker) processPromptPayPayout(ctx context.Context, idempotencyKe
 			return fmt.Errorf("failed to update transaction status to failed: %w", err)
 		}
 
-		_ = refundTx.Commit()
+		if err := refundTx.Commit(); err != nil {
+			return fmt.Errorf("failed to commit refund transaction: %w", err)
+		}
 		return fmt.Errorf("payment engine payout execution failed: %w (refunded)", payoutErr)
 	}
 
@@ -344,11 +357,17 @@ func (w *OutboxWorker) processPromptPayPayout(ctx context.Context, idempotencyKe
 	if payoutResult.Status == "FAILED" {
 		log.Printf("⚠️ Provider status returned FAILED. Performing refund for transaction %s.", data.TransactionID)
 		// Lock profile row
-		_ = finalizeTx.QueryRowContext(ctx, "SELECT full_name FROM profiles WHERE id = $1 FOR UPDATE", userUUID).Scan(&senderFullName)
+		err = finalizeTx.QueryRowContext(ctx, "SELECT full_name FROM profiles WHERE id = $1 FOR UPDATE", userUUID).Scan(&senderFullName)
+		if err != nil {
+			return fmt.Errorf("failed to lock profile for finalize refund: %w", err)
+		}
 
-		// Calculate current balance
+		// Calculate current balance (locking is handled by the profiles row lock above)
 		var balanceBeforeRefund int64
-		_ = finalizeTx.QueryRowContext(ctx, "SELECT COALESCE(SUM(amount), 0) FROM ledger_entries WHERE profile_id = $1", userUUID).Scan(&balanceBeforeRefund)
+		err = finalizeTx.QueryRowContext(ctx, "SELECT COALESCE(SUM(amount), 0) FROM ledger_entries WHERE profile_id = $1", userUUID).Scan(&balanceBeforeRefund)
+		if err != nil {
+			return fmt.Errorf("failed to calculate balance for finalize refund: %w", err)
+		}
 
 		// Insert refund ledger entry (credit)
 		_, err = finalizeTx.ExecContext(ctx, `

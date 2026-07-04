@@ -29,11 +29,11 @@ func main() {
 		sqrilBaseURL,
 		os.Getenv("SQRIL_CLIENT_ID"),
 		os.Getenv("SQRIL_CLIENT_SECRET"),
+		repository.DB,
 	)
 
 	paymentEngine := usecase.NewPaymentEngine("sqril")
 	paymentEngine.RegisterProvider(sqrilProvider)
-	paymentEngine.RegisterProvider(&usecase.OmiseProvider{APIKey: os.Getenv("OMISE_API_KEY")})
 	paymentEngine.RegisterProvider(&usecase.WiseProvider{Token: os.Getenv("WISE_API_TOKEN")})
 
 	// 2. Worker Initialization

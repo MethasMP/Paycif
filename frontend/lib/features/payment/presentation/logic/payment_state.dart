@@ -121,3 +121,29 @@ class PaymentFailure extends PaymentState {
   @override
   List<Object?> get props => [errorMessage, failedMethod];
 }
+
+/// AlchemyPay checkout URL is ready — Flutter should open it immediately.
+class PaymentOnRampReady extends PaymentState {
+  final String webUrl;
+  final String intentId;
+  final PaymentMethod method;
+
+  const PaymentOnRampReady({
+    required this.webUrl,
+    required this.intentId,
+    required this.method,
+  });
+
+  @override
+  List<Object?> get props => [webUrl, intentId, method];
+}
+
+/// Checkout launched — polling backend until COMPLETED or FAILED.
+class PaymentPolling extends PaymentState {
+  final String intentId;
+
+  const PaymentPolling({required this.intentId});
+
+  @override
+  List<Object?> get props => [intentId];
+}

@@ -49,21 +49,36 @@ class _ChangePinSheetState extends State<ChangePinSheet> {
 
   void _onConfirmNewPinEntered(String pin) async {
     if (pin != _newPin) {
-      // Mismatch
-      // Shake and clear?
-      // We need a way to signal error.
+      setState(() => _errorMessage = 'PINs do not match. Please try again.');
+      // Reset back to step 2 so user re-enters new PIN cleanly
+      await Future.delayed(1200.ms);
+      if (!mounted) return;
+      _pageController.animateToPage(
+        1,
+        duration: 300.ms,
+        curve: Curves.easeInOutCubicEmphasized,
+      );
+      setState(() {
+        _currentStep = 1;
+        _newPin = null;
+        _errorMessage = null;
+      });
       return;
     }
 
     final controller = context.read<SecurityController>();
     final success = await controller.changePin(oldPin: _oldPin!, newPin: pin);
 
-    if (success && mounted) {
+    if (!mounted) return;
+    if (success) {
       setState(() => _isSuccess = true);
       HapticFeedback.lightImpact();
       Future.delayed(1500.ms, () {
         if (mounted) Navigator.pop(context);
       });
+    } else {
+      final errorMsg = controller.state.errorMessage ?? 'Failed to update PIN. Please try again.';
+      setState(() => _errorMessage = errorMsg);
     }
   }
 

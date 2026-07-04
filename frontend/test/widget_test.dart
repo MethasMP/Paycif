@@ -25,7 +25,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     await Supabase.initialize(
       url: 'https://mock.supabase.co',
-      anonKey: 'mockAnonKey',
+      publishableKey: 'mockAnonKey',
       authOptions: const FlutterAuthClientOptions(
         localStorage: EmptyLocalStorage(),
       ),

@@ -6,7 +6,6 @@
   "navPayment": "Methods",
   "navProfile": "Profile",
   "navScan": "Scan",
-
   "profileTitle": "Profile",
   "passportLabel": "PASSPORT",
   "accountSecurity": "ACCOUNT SECURITY",
@@ -24,7 +23,6 @@
   "signOut": "Sign Out",
   "version": "Version",
   "verifyIdentity": "Verify Identity",
-
   "paymentStatus": "Payment Status",
   "paymentReady": "READY",
   "paymentReliable": "reliable",
@@ -35,7 +33,6 @@
   "paymentEmptyDesc": "Once you add a payment method, we'll automatically select the best option for every transaction.",
   "paymentChangeMethod": "Change method (if needed)",
   "paymentHideOptions": "Hide other options",
-
   "sheetAddPayment": "Add Payment Method",
   "sheetCreditCard": "Credit or Debit Card",
   "sheetCreditCardDesc": "Visa, Mastercard, JCB, Amex",
@@ -43,7 +40,6 @@
   "sheetTopUpDesc": "Via Bank Transfer or PromptPay",
   "sheetDigitalWallet": "Connect Digital Wallet",
   "sheetDigitalWalletDesc": "PayPal, Alipay, WeChat Pay",
-
   "commonEnabled": "Enabled",
   "commonDisabled": "Disabled",
   "commonSuccess": "Success",
@@ -66,7 +62,6 @@
   "commonContinue": "Continue",
   "commonNext": "Next",
   "commonConfirm": "Confirm",
-
   "homeTopUp": "Top Up",
   "homeInfo": "Info",
   "homeMore": "More",
@@ -77,12 +72,26 @@
   "homePaycifPremier": "Paycif PREMIER",
   "homeRecentTransactions": "Recent Transactions",
   "homeViewAll": "View All",
+  "homeQuickActions": "Quick actions",
+  "homeActionCards": "Cards",
+  "homeActionRates": "Rates",
+  "homeNoRecentTransactions": "No recent transactions",
+  "homeFxLocked": "Locked",
+  "homeFxUnavailable": "Live FX rates unavailable",
+  "homeFxRate": "Live FX: 1 USD ≈ {rate} THB",
+  "@homeFxRate": {
+    "description": "Live USD to THB exchange rate shown on the dashboard",
+    "placeholders": {
+      "rate": {
+        "type": "String",
+        "example": "35.42"
+      }
+    }
+  },
   "homeNoTransactions": "No transactions yet",
   "homeNoTransactionsDesc": "Your financial activity will appear here once you start using your card.",
-
   "historyTitle": "Transaction history",
   "historyNoActivity": "No Activity Yet",
-
   "scanTitle": "Scan QR Code",
   "scanErrorCamera": "Camera Error",
   "scanGuideTitle": "Thai QR Payment Guide",
@@ -94,7 +103,6 @@
   "scanGuideCurrencyDesc": "We show prices in both Baht and USD.",
   "scanPaymentSuccess": "Payment Successful!",
   "scanNoQrFound": "No QR code found in image",
-
   "topUpTitle": "Add Money",
   "topUpAmountLabel": "Amount to Add",
   "topUpEnterAmount": "Enter amount",
@@ -113,8 +121,8 @@
   },
   "topUpVat": "VAT (7%)",
   "topUpTotalCharge": "Total Charge",
-  "topUpAmountToWallet": "Amount to Wallet",
-   "topUpFeeGateway": "Omise Processing Fee ({percent}%)",
+  "topUpAmountToWallet": "You receive in wallet",
+  "topUpFeeGateway": "Omise Processing Fee ({percent}%)",
   "@topUpFeeGateway": {
     "placeholders": {
       "percent": {
@@ -124,7 +132,6 @@
   },
   "topUpFeePaysif": "Paycif Service Fee",
   "topUpFeeFree": "Free",
-  "topUpAmountToWallet": "You receive in wallet",
   "topUpFeeInfoTitle": "Fee Transparency",
   "topUpFeeInfoOmiseTitle": "External Costs (Omise)",
   "topUpFeeInfoOmiseDesc": "Securely processed by Omise. This fee goes directly to cover gateway and card network costs (Visa/Mastercard).",
@@ -151,7 +158,6 @@
       }
     }
   },
-
   "cardTitle": "Add New Card",
   "cardNumber": "Card Number",
   "cardInvalidNumber": "Invalid card number",
@@ -171,27 +177,23 @@
   "cardPreviewHolder": "CARD HOLDER",
   "cardPreviewExpires": "EXPIRES",
   "cardAddBtn": "Add Card",
-
   "confirmTitle": "Confirm Payment",
   "confirmBestOption": "Best Option",
   "confirmEnterAmount": "Enter Amount",
   "confirmTotalPayment": "Total Payment",
   "confirmPaymentSuccess": "Payment Successful",
   "confirmMyWallet": "My Wallet",
-
   "walletZeroFees": "Zero Fees",
   "walletInstantTransfer": "Instant Transfer",
   "walletReliablePayment": "Reliable Payment",
   "walletPaymentMethod": "Payment Method",
-
   "scanUnknownRecipient": "Unknown Recipient",
-
   "profileGuestUser": "Guest User",
   "noInternetTitle": "No Connection",
   "noInternetMessage": "Please check your internet settings.",
   "noInternetRetry": "Retry",
   "splashLoading": "Connecting to services...",
-
+  "splashTagline": "Secure. Simple. Global.",
   "paymentSuccessTitle": "Payment Successful!",
   "payReviewTitle": "Review Payment",
   "payAmountLabel": "Amount",
@@ -208,6 +210,37 @@
   "payCrossBorderDisclaimer": "* Your card issuer may apply cross-border fees.",
   "payMethodPayPerUse": "Pay per use",
   "payNoMethodSelected": "No payment method selected",
+  "paySecuredByPartner": "Secured by our card partner",
+  "payViaCardPartnerTitle": "Pay by card",
+  "payViaCardPartnerSubtitle": "You'll be taken to a secure checkout. Payment credentials stay with our card partner — never stored by Paycif.",
+  "sendMoneyTitle": "Send Money",
+  "amountLookingUpRecipient": "Looking up...",
+  "amountInputLabel": "Input Amount",
+  "amountApproxUsdLabel": "≈ ${amount} USD",
+  "@amountApproxUsdLabel": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "amountRateLockedNotice": "Rate locked. Includes {percent}% convenience fee.",
+  "@amountRateLockedNotice": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "paymentSettingsTitle": "Payment Settings",
+  "paymentSettingsHeroLabel": "Secure Card Vault",
+  "paymentSettingsSectionTitle": "All-in-One Payment Management",
+  "paymentSettingsDescription": "Manage your saved credit/debit cards, Apple Pay, Google Pay, bank transfers, and preferred fiat/crypto currencies — securely, in one place.",
+  "paymentSettingsManageCta": "Manage Payment Preferences",
+  "paymentSettingsSetupCta": "Set Up Payment Methods",
+  "paymentSettingsFootnote": "Your payment information is encrypted and managed securely by our card partner. Paycif does not store your card details.",
+  "paymentSettingsOpenFailed": "Could not open the payment widget. Please try again.",
+  "paymentSettingsWebviewTitle": "Manage Payment Methods",
   "successAppBarTitle": "e-Slip",
   "successVerifiedBadge": "Verified by Paycif Network",
   "successFromLabel": "From",
@@ -215,6 +248,7 @@
   "successYourWallet": "Your Wallet",
   "successMerchantLabel": "Merchant",
   "successRefIdLabel": "Ref ID",
+  "successVerifiedLabel": "Verified",
   "successBackToHome": "Back to Home",
   "successSaveToGallery": "Save to Gallery",
   "commonSomethingWentWrong": "Something went wrong.",
@@ -246,7 +280,6 @@
       }
     }
   },
-  "paymentSettingsTitle": "Payment Settings",
   "paymentPayWithApple": "Pay with Apple Pay",
   "paymentPayWith": "Pay with {method}",
   "@paymentPayWith": {
@@ -317,24 +350,24 @@
   "topUpNameOnCard": "Name on Card",
   "topUpPayNow": "Pay Now",
   "topUpTestCardHint": "Test Card: 4242 4242... (Any future date)",
-
   "biometricLabel": "Biometric",
   "biometricSettingsUpdated": "Biometric settings updated",
   "biometricNotAvailable": "Biometric not available on this device",
   "biometricNotEnrolled": "No biometrics enrolled. Please set up in device settings.",
   "biometricConfirmManage": "Confirm to manage biometric settings",
-
+  "biometricPinPrompt": "Please verify your PIN to continue.",
+  "profileVerifiedBadge": "Verified account",
+  "profileKycRequiredTitle": "Identity verification required",
+  "profileKycRequiredMessage": "Verify your identity to unlock higher limits and secure your account.",
+  "profileVerifyNowCta": "Verify now",
   "kycStatusVerified": "Verified",
   "kycStatusPending": "Pending",
   "kycStatusUnverified": "Not Verified",
-
   "aboutApp": "ABOUT",
   "termsOfService": "Terms of Service",
   "privacyPolicy": "Privacy Policy",
-
   "signOutConfirmTitle": "Sign Out",
   "signOutConfirmMessage": "Are you sure you want to sign out?",
-
   "helpSearchHint": "Search for help...",
   "helpNoResults": "No results found",
   "helpStillNeedHelp": "Still need help?",
@@ -363,7 +396,6 @@
   "helpCardA1": "We support Visa, Mastercard, JCB, and American Express. Both credit and debit cards are accepted.",
   "helpCardQ2": "How do I remove a saved card?",
   "helpCardA2": "Go to Payment > Your saved card > Swipe left or tap the menu icon > Delete. You'll be asked to confirm before removal.",
-
   "supportHeaderTitle": "We're here to help",
   "supportHeaderSubtitle": "Usually responds within 2 hours",
   "supportSelectCategory": "What can we help you with?",
@@ -379,7 +411,6 @@
   "supportSubmit": "Submit Request",
   "supportTicketSubmitted": "Support ticket submitted. We'll respond within 24 hours.",
   "supportAlternativeContact": "Or reach us directly at",
-
   "termsLastUpdated": "Last updated: January 2026",
   "termsSection1Title": "1. Acceptance of Terms",
   "termsSection1Content": "By accessing or using Paycif services, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our services. We reserve the right to modify these terms at any time.",
@@ -394,7 +425,6 @@
   "termsSection6Title": "6. Governing Law",
   "termsSection6Content": "These terms are governed by the laws of Thailand. Any disputes shall be resolved through arbitration in Bangkok, Thailand, in accordance with the rules of the Thai Arbitration Institute.",
   "termsContact": "For questions about these terms, please contact legal@paycif.com",
-
   "privacyLastUpdated": "Last updated: January 2026",
   "privacyHighlightsTitle": "Privacy at a Glance",
   "privacyHighlight1": "We never sell your personal data to third parties",
@@ -413,7 +443,6 @@
   "privacySection5Content": "You have the right to access, correct, or delete your personal data. You can opt out of marketing communications. You may request a copy of your data in a portable format.",
   "privacyContactTitle": "Privacy Inquiries",
   "privacyContactContent": "If you have questions about our privacy practices or wish to exercise your data rights, please contact our Data Protection Officer:",
-
   "notificationSettingsTitle": "Notification Settings",
   "notificationSecurityAlwaysOn": "Security (Always On)",
   "notificationAccountSecurity": "Account Security",
@@ -423,5 +452,33 @@
   "notificationTransactionAlertsDesc": "Sent, received, and top-up notifications.",
   "notificationUpdates": "Updates",
   "notificationNewsPromotions": "News & Promotions",
-  "notificationNewsPromotionsDesc": "Exclusive offers and feature updates."
+  "notificationNewsPromotionsDesc": "Exclusive offers and feature updates.",
+  "loginMagicLinkSent": "Magic login link sent! Check your inbox.",
+  "loginHeroTagline": "Pay anywhere. Instantly.",
+  "loginContinueWithGoogle": "Continue with Google",
+  "loginContinueWithApple": "Continue with Apple",
+  "loginEmailHint": "Email address",
+  "loginEmailRequired": "Email is required",
+  "loginEmailInvalid": "Enter a valid email address",
+  "loginContinueButton": "Continue",
+  "loginBankGradeSecurity": "Bank-grade security",
+  "loginUseEmailInstead": "Use email instead →",
+  "kycAppBarTitle": "Identity Verification",
+  "kycStatusPreparing": "Preparing Verification...",
+  "kycStatusOpening": "Opening Verification...",
+  "kycStatusInProgress": "Verification In Progress",
+  "kycStatusChecking": "Checking Your Status...",
+  "kycStatusComplete": "Verification Complete",
+  "kycStatusIssue": "Verification Issue",
+  "kycMessageSettingUp": "Setting up your secure verification session...",
+  "kycMessageWaiting": "Waiting for your verification result. This usually takes a few seconds.",
+  "kycMessageVerified": "Your identity has been verified successfully.",
+  "kycMessageDefault": "Please follow the instructions to verify your identity and unlock all features.",
+  "kycReopenVerification": "Re-open Verification",
+  "kycTryAgain": "Try Again",
+  "kycDoThisLater": "Do This Later",
+  "devicesRevokeSuccess": "Device revoked successfully",
+  "devicesRevokeFailed": "Failed to revoke device",
+  "profileSignOutCriticalError": "Critical error during sign out. Please force close app.",
+  "kycMessageAwaitingResult": "Your verification is being processed. We'll update your status automatically once complete."
 }

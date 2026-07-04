@@ -42,6 +42,14 @@ void main() {
         .thenAnswer((_) async => 'mock_hardware_pub_key_base64');
     when(() => mockCryptoService.signWithHardware(payload: any(named: 'payload')))
         .thenAnswer((_) async => 'mock_hardware_signature');
+    when(() => mockCryptoService.generateSalt())
+        .thenReturn(List<int>.filled(16, 0));
+    when(() => mockCryptoService.randomBytes(any()))
+        .thenReturn(List<int>.filled(32, 0));
+    when(() => mockCryptoService.encryptPinToken(any(), any()))
+        .thenAnswer((_) async => List<int>.filled(60, 0));
+    when(() => mockCryptoService.decryptPinToken(any(), any()))
+        .thenAnswer((_) async => List<int>.filled(32, 0));
 
     repository = SecurityRepositoryImpl(
       remoteDataSource: mockRemoteDataSource,
@@ -186,7 +194,7 @@ void main() {
         () => mockCryptoService.keyPairFromSeed(any()),
       ).thenAnswer((_) async => keyPair);
       when(
-        () => mockCryptoService.signPayload(keyPair, '123456'),
+        () => mockCryptoService.signPayload(keyPair, any()),
       ).thenAnswer((_) async => 'mock_sig');
 
       when(

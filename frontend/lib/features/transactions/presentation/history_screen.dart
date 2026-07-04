@@ -16,11 +16,30 @@ class HistoryScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
 
+    final canPop = Navigator.of(context).canPop();
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(l10n.historyTitle),
-        // Style inherited from AppTheme.titleLarge via AppBarTheme.titleTextStyle
+        leading: canPop
+            ? IconButton(
+                icon: Icon(
+                  PhosphorIcons.caretLeft,
+                  color: AppTheme.textPrimaryColor(context),
+                  size: 24,
+                ),
+                onPressed: () => Navigator.of(context).pop(),
+              )
+            : (GoRouterState.of(context).uri.path == '/history'
+                ? IconButton(
+                    icon: Icon(
+                      PhosphorIcons.house,
+                      color: AppTheme.textPrimaryColor(context),
+                      size: 24,
+                    ),
+                    onPressed: () => context.go('/main'),
+                  )
+                : null),
       ),
       body: BlocBuilder<DashboardController, DashboardState>(
         builder: (context, state) {

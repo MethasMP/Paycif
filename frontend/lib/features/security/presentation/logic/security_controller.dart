@@ -161,11 +161,11 @@ class SecurityController extends ChangeNotifier {
     );
   }
 
-  /// Verifies the PIN. Handles Server-Side Lockout responses (423).
-  Future<bool> verifyPin(String pin) async {
+  /// Verifies the PIN. Pass [serverVerify: true] for payment confirmation.
+  Future<bool> verifyPin(String pin, {bool serverVerify = false}) async {
     _setState(_state.copyWith(status: SecurityStatus.loading));
     try {
-      await _repository.verifyPin(pin);
+      await _repository.verifyPin(pin, serverVerify: serverVerify);
       _setState(
         _state.copyWith(
           status: SecurityStatus.success,
@@ -179,7 +179,22 @@ class SecurityController extends ChangeNotifier {
                             errorStr.contains('Device not bound') ||
                             errorStr.contains('credentials missing');
 
-      if (errorStr.contains('PIN not setup')) {
+      if (errorStr.contains('PIN not setup') || errorStr.contains('PIN not set up')) {
+        await _repository.clearAllPinData();
+        _setState(
+          _state.copyWith(
+            status: SecurityStatus.error,
+            errorMessage: 'PIN not setup on server. Redirecting...',
+          ),
+        );
+        return false;
+      }
+
+      if (errorStr.contains('PIN not setup') || 
+          errorStr.contains('PIN not set up') ||
+          errorStr.contains('401') ||
+          errorStr.contains('Unauthorized') ||
+          errorStr.contains('Invalid JWT')) {
         await _repository.clearAllPinData();
         _setState(
           _state.copyWith(
@@ -197,21 +212,6 @@ class SecurityController extends ChangeNotifier {
             errorMessage: 'Device link broken. Please log in again.',
           ),
         );
-        // Special case: Unlike normal 401, this usually needs a full re-auth to re-bind
-        return false;
-      }
-
-      if (errorStr.contains('401') ||
-          errorStr.contains('Unauthorized') ||
-          errorStr.contains('Invalid JWT')) {
-        // 🛡️ World-Class Security: Log warning but don't force logout here.
-        // The API Interceptor/DataSource will handle refresh or force logout if refresh truly fails.
-        _setState(
-          _state.copyWith(
-            status: SecurityStatus.error,
-            errorMessage: 'Session error. Please try again.',
-          ),
-        );
         return false;
       }
 
@@ -220,6 +220,17 @@ class SecurityController extends ChangeNotifier {
         _setState(
           _state.copyWith(
             status: SecurityStatus.locked,
+            errorMessage: e.toString().replaceAll('Exception:', '').trim(),
+          ),
+        );
+      } else if (msg.contains('socketexception') ||
+                 msg.contains('connection failed') ||
+                 msg.contains('name resolution failed') ||
+                 msg.contains('503') ||
+                 msg.contains('502')) {
+        _setState(
+          _state.copyWith(
+            status: SecurityStatus.error,
             errorMessage: e.toString().replaceAll('Exception:', '').trim(),
           ),
         );
@@ -251,13 +262,19 @@ class SecurityController extends ChangeNotifier {
     }
   }
 
-  /// Silently ensures the device is bound (Background).
+  /// Ensures the device is bound. Callers must check [state.status] afterward —
+  /// if it equals [SecurityStatus.error], payment flows must be blocked.
   Future<void> ensureDeviceBinding() async {
     try {
       await _repository.bindCurrentDevice();
     } catch (e) {
-      debugPrint('Silent binding failed: $e');
-      // Do not update UI state to avoid disruption
+      debugPrint('Device binding failed: $e');
+      _setState(
+        _state.copyWith(
+          status: SecurityStatus.error,
+          errorMessage: 'Device binding failed. Payment actions are blocked until the device is re-linked.',
+        ),
+      );
     }
   }
 

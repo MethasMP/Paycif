@@ -2,8 +2,10 @@ abstract class SecurityRepository {
   /// Sets up a new PIN for the user.
   Future<void> setupPin(String pin);
 
-  /// Verifies the PIN. Returns true if valid, or throws failure.
-  Future<void> verifyPin(String pin);
+  /// Verifies the PIN locally (AES-256-GCM). Use for app unlock.
+  /// For payment confirmation, pass [serverVerify: true] to also run
+  /// Argon2id verification on the server.
+  Future<void> verifyPin(String pin, {bool serverVerify = false});
 
   /// Binds the current device to the user's account using hardware keys.
   Future<void> bindCurrentDevice();

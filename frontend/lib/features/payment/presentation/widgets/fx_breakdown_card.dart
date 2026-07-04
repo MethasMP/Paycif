@@ -103,7 +103,7 @@ class FxBreakdownCard extends StatelessWidget {
               Text(
                 l10n.payTotalLabel,
                 style: theme.textTheme.headlineLarge?.copyWith(
-                  color: const Color(0xFF028090),
+                  color: AppTheme.primaryTealDeep,
                 ),
               ),
               Text(

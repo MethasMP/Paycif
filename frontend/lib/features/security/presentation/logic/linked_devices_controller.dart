@@ -56,7 +56,9 @@ class LinkedDevicesController extends ChangeNotifier {
               _isLoading = false;
               notifyListeners();
             }
-          } catch (_) {}
+          } catch (err) {
+            debugPrint('⚠️ [LinkedDevices] Fallback refresh failed: $err');
+          }
         }();
       },
     );

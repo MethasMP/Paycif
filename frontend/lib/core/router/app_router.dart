@@ -13,7 +13,7 @@ import 'package:frontend/features/profile/presentation/profile_page.dart';
 import 'package:frontend/features/transactions/presentation/history_screen.dart';
 import 'package:frontend/features/payment/presentation/payment_settings_screen.dart';
 import 'package:frontend/features/profile/presentation/add_card_screen.dart';
-import 'package:frontend/features/kyc/presentation/nfc_scan_screen.dart';
+
 import 'package:frontend/features/kyc/presentation/kyc_screen.dart';
 import 'package:frontend/features/kyc/presentation/sumsub_kyc_cubit.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -101,11 +101,7 @@ final GoRouter appRouter = GoRouter(
       name: 'add_card',
       builder: (context, state) => const AddCardScreen(),
     ),
-    GoRoute(
-      path: '/nfc_scan',
-      name: 'nfc_scan',
-      builder: (context, state) => const NfcScanScreen(),
-    ),
+
     GoRoute(
       path: '/kyc',
       name: 'kyc',
@@ -170,7 +166,6 @@ final GoRouter appRouter = GoRouter(
         );
       },
     ),
-    // TODO: Phase 2 - Add inner screen routes here
   ],
   // Centralized Route Guards (Redirects)
   redirect: (BuildContext context, GoRouterState state) {

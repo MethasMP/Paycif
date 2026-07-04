@@ -127,7 +127,7 @@ class DigitalWalletButton extends StatelessWidget {
       case DigitalWalletType.applePay:
         return Colors.black;
       case DigitalWalletType.googlePay:
-        return Theme.of(context).brightness == Brightness.dark ? Colors.white24 : Colors.grey[300]!;
+        return Theme.of(context).brightness == Brightness.dark ? Colors.white24 : AppTheme.borderGrey;
     }
   }
 

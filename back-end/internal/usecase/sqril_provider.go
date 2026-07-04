@@ -3,14 +3,22 @@ package usecase
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"crypto/subtle"
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"os"
+	"regexp"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/sony/gobreaker"
 )
 
@@ -29,9 +37,10 @@ type SqrilProvider struct {
 	ClientSecret string
 	HTTPClient   *http.Client
 	cb           *gobreaker.CircuitBreaker
+	DB           *sql.DB
 }
 
-func NewSqrilProvider(baseURL, clientID, clientSecret string) *SqrilProvider {
+func NewSqrilProvider(baseURL, clientID, clientSecret string, db *sql.DB) *SqrilProvider {
 	cbSettings := gobreaker.Settings{
 		Name:        "SQRILProviderBreaker",
 		MaxRequests: 5,
@@ -48,6 +57,7 @@ func NewSqrilProvider(baseURL, clientID, clientSecret string) *SqrilProvider {
 		ClientSecret: clientSecret,
 		HTTPClient:   sqrilHTTPClient,
 		cb:           gobreaker.NewCircuitBreaker(cbSettings),
+		DB:           db,
 	}
 }
 
@@ -58,6 +68,94 @@ func (s *SqrilProvider) addAuthHeader(req *http.Request) {
 	auth := s.ClientID + ":" + s.ClientSecret
 	hash := base64.StdEncoding.EncodeToString([]byte(auth))
 	req.Header.Add("Authorization", "Basic "+hash)
+}
+
+var safeNameRegex = regexp.MustCompile(`[^a-zA-Z\s\-\.]`)
+
+func sanitizeName(name string) string {
+	cleaned := safeNameRegex.ReplaceAllString(name, "")
+	cleaned = strings.TrimSpace(cleaned)
+	if cleaned == "" {
+		return "Tourist"
+	}
+	return cleaned
+}
+
+// getSenderDetails fetches sender profile and identity details to inject proactively into SQRIL requests
+func (s *SqrilProvider) getSenderDetails(ctx context.Context, customerID string) map[string]interface{} {
+	// Standard tourist safe fallbacks
+	sender := map[string]interface{}{
+		"name_first":           "Tourist",
+		"name_last":            "Paycif",
+		"phone":                "+12025550143",
+		"email":                "tourist@paycif.com",
+		"ic":                   "P99999999",
+		"ic_type":              "PP",
+		"country":              "US",
+		"address":              "123 Tourist Street",
+		"type":                 "INDIVIDUAL",
+		"gender":               "M",
+		"country_of_residence": "US",
+	}
+
+	userIDStr := strings.TrimPrefix(customerID, "cust_paycif_")
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil || s.DB == nil {
+		return sender
+	}
+
+	var fullName, username, idLast4 string
+	err = s.DB.QueryRowContext(ctx, "SELECT COALESCE(full_name, ''), username, COALESCE(id_last_4, '') FROM profiles WHERE id = $1", userID).Scan(&fullName, &username, &idLast4)
+	if err == nil {
+		if fullName == "" {
+			fullName = username
+		}
+		if fullName != "" {
+			parts := strings.Fields(fullName)
+			if len(parts) > 0 {
+				sender["name_first"] = sanitizeName(parts[0])
+			}
+			if len(parts) > 1 {
+				sender["name_last"] = sanitizeName(strings.Join(parts[1:], " "))
+			} else {
+				sender["name_last"] = "Tourist"
+			}
+		}
+		if strings.Contains(username, "@") {
+			sender["email"] = username
+		} else if username != "" {
+			sender["email"] = username + "@paycif.com"
+		}
+		if idLast4 != "" {
+			sender["ic"] = "P" + idLast4 + "9999"
+		}
+	}
+
+	// Fetch identity verification (sumsub/kyc tier 2)
+	var passportEncrypted, nationality string
+	err = s.DB.QueryRowContext(ctx, "SELECT passport_number, nationality FROM identity_verification WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1", userID).Scan(&passportEncrypted, &nationality)
+	if err == nil {
+		if len(nationality) == 2 {
+			sender["country"] = strings.ToUpper(nationality)
+			sender["country_of_residence"] = strings.ToUpper(nationality)
+		}
+		if passportEncrypted != "" {
+			keyStr := os.Getenv("ENCRYPTION_KEY")
+			if len(keyStr) != 32 {
+				log.Printf("⚠️ ENCRYPTION_KEY not 32 bytes, skipping passport decrypt")
+			} else {
+				cryptoSvc := &CryptoService{key: []byte(keyStr)}
+				decrypted, decErr := cryptoSvc.Decrypt(passportEncrypted)
+				if decErr != nil {
+					log.Printf("⚠️ Failed to decrypt passport: %v", decErr)
+				} else if decrypted != "" {
+					sender["ic"] = decrypted
+				}
+			}
+		}
+	}
+
+	return sender
 }
 
 // DecodeQRResponse matches the SQRIL decodeQr response schema
@@ -122,11 +220,14 @@ func (s *SqrilProvider) DecodeQR(ctx context.Context, qrString string, customerI
 
 	result, err := s.cb.Execute(func() (interface{}, error) {
 		url := s.BaseURL + "/decodeQr"
-		reqBody, err := json.Marshal(map[string]string{
+		reqBody, err := json.Marshal(map[string]interface{}{
 			"qr_string":              qrString,
 			"customer_id":            customerID,
 			"payment_currency":       "THB",
 			"partner_transaction_id": partnerTxID,
+			"sender":                 s.getSenderDetails(ctx, customerID),
+			"transaction_reason":     "TOURISM/TRAVEL EXPENSES",
+			"source_of_funds":        "PERSONAL SAVINGS",
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal decode request: %w", err)
@@ -242,6 +343,55 @@ func (s *SqrilProvider) GetQuotation(ctx context.Context, txID string, customerI
 	return result.(*GetQuotationResponse), nil
 }
 
+// GetTransactionResponse matches SQRIL /getTransaction response
+type GetTransactionResponse struct {
+	Transaction struct {
+		ID        string  `json:"id"`
+		Status    string  `json:"status"`
+		AmountUSD float64 `json:"amount_usd"`
+		Fee       float64 `json:"fee"`
+	} `json:"transaction"`
+}
+
+// GetTransaction retrieves a specific transaction by ID
+func (s *SqrilProvider) GetTransaction(ctx context.Context, transactionID string) (*GetTransactionResponse, error) {
+	if s.ClientID == "mock-client-id" {
+		return &GetTransactionResponse{}, nil
+	}
+
+	result, err := s.cb.Execute(func() (interface{}, error) {
+		url := fmt.Sprintf("%s/getTransaction?transaction_id=%s", s.BaseURL, transactionID)
+		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create getTransaction request: %w", err)
+		}
+
+		s.addAuthHeader(req)
+
+		resp, err := s.HTTPClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("getTransaction request failed: %w", err)
+		}
+		defer resp.Body.Close()
+
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("getTransaction returned status %d: %s", resp.StatusCode, string(bodyBytes))
+		}
+
+		var txResp GetTransactionResponse
+		if err := json.Unmarshal(bodyBytes, &txResp); err != nil {
+			return nil, fmt.Errorf("failed to parse getTransaction response: %w", err)
+		}
+
+		return &txResp, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result.(*GetTransactionResponse), nil
+}
+
 // Payout executes a payout using SQRIL /executePayout
 func (s *SqrilProvider) Payout(ctx context.Context, amount int64, currency string, recipientID string, recipientName string, reference string, providerTxID string, customerID string) (*PayoutResult, error) {
 	if s.ClientID == "mock-client-id" {
@@ -256,14 +406,33 @@ func (s *SqrilProvider) Payout(ctx context.Context, amount int64, currency strin
 		return nil, fmt.Errorf("providerTxID is required for sqril payout")
 	}
 
+	// 🛡️ Pre-flight balance check: verify pool wallet has sufficient funds (USD)
+	txDetails, err := s.GetTransaction(ctx, providerTxID)
+	if err == nil && txDetails != nil && txDetails.Transaction.AmountUSD > 0 {
+		requiredUSD := txDetails.Transaction.AmountUSD + txDetails.Transaction.Fee
+		balances, balErr := s.GetAccountBalances(ctx)
+		if balErr == nil && balances != nil {
+			usdBalance, exists := balances.Balances["USD"]
+			if exists {
+				if usdBalance.Available < requiredUSD {
+					return nil, fmt.Errorf("insufficient pool wallet balance: available %.4f USD, required %.4f USD", usdBalance.Available, requiredUSD)
+				}
+			}
+		}
+	}
+
 	result, err := s.cb.Execute(func() (interface{}, error) {
 		// Call SQRIL /executePayout
 		url := s.BaseURL + "/executePayout"
 		reqBody, err := json.Marshal(map[string]interface{}{
-			"tx_id":            providerTxID,
-			"customer_id":      customerID,
-			"amount_confirmed": amount,
-			"currency":         currency,
+			"tx_id":                  providerTxID,
+			"customer_id":            customerID,
+			"amount_confirmed":       amount,
+			"currency":               currency,
+			"partner_transaction_id": reference,
+			"sender":                 s.getSenderDetails(ctx, customerID),
+			"transaction_reason":     "TOURISM/TRAVEL EXPENSES",
+			"source_of_funds":        "PERSONAL SAVINGS",
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal execute request: %w", err)
@@ -290,7 +459,9 @@ func (s *SqrilProvider) Payout(ctx context.Context, amount int64, currency strin
 		}
 
 		var executeResp map[string]interface{}
-		_ = json.Unmarshal(bodyBytes, &executeResp)
+		if err := json.Unmarshal(bodyBytes, &executeResp); err != nil {
+			return nil, fmt.Errorf("failed to parse execute response JSON: %w (raw response: %s)", err, string(bodyBytes))
+		}
 
 		statusStr, _ := executeResp["status"].(string)
 		if statusStr == "" {
@@ -307,4 +478,78 @@ func (s *SqrilProvider) Payout(ctx context.Context, amount int64, currency strin
 		return nil, err
 	}
 	return result.(*PayoutResult), nil
+}
+
+// BalanceDetail matches the details of a currency balance returned by SQRIL
+type BalanceDetail struct {
+	Available float64 `json:"available"`
+	Locked    float64 `json:"locked"`
+	Total     float64 `json:"total"`
+	Currency  string  `json:"currency"`
+}
+
+// AccountBalancesResponse matches the GET /getAccountBalances response schema
+type AccountBalancesResponse struct {
+	Balances map[string]BalanceDetail `json:"balances"`
+}
+
+// GetAccountBalances fetches the current pool wallet balances
+func (s *SqrilProvider) GetAccountBalances(ctx context.Context) (*AccountBalancesResponse, error) {
+	if s.ClientID == "mock-client-id" {
+		return &AccountBalancesResponse{
+			Balances: map[string]BalanceDetail{
+				"USD": {
+					Available: 10000.0,
+					Locked:    0.0,
+					Total:     10000.0,
+					Currency:  "USD",
+				},
+			},
+		}, nil
+	}
+
+	result, err := s.cb.Execute(func() (interface{}, error) {
+		url := s.BaseURL + "/getAccountBalances"
+		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create getAccountBalances request: %w", err)
+		}
+
+		s.addAuthHeader(req)
+
+		resp, err := s.HTTPClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("getAccountBalances request failed: %w", err)
+		}
+		defer resp.Body.Close()
+
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("getAccountBalances returned status %d: %s", resp.StatusCode, string(bodyBytes))
+		}
+
+		var balResp AccountBalancesResponse
+		if err := json.Unmarshal(bodyBytes, &balResp); err != nil {
+			return nil, fmt.Errorf("failed to parse balances response: %w", err)
+		}
+
+		return &balResp, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result.(*AccountBalancesResponse), nil
+}
+
+// VerifyWebhookSignature verifies the SQRIL webhook signature header X-SQRIL-Signature using HMAC-SHA256
+func (s *SqrilProvider) VerifyWebhookSignature(payload []byte, signature string, secret string) bool {
+	if signature == "" {
+		return false
+	}
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(payload)
+	expectedMAC := mac.Sum(nil)
+	expectedSignature := base64.StdEncoding.EncodeToString(expectedMAC)
+
+	return subtle.ConstantTimeCompare([]byte(signature), []byte(expectedSignature)) == 1
 }

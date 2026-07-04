@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:frontend/core/utils/error_translator.dart';
 import 'package:frontend/core/l10n/generated/app_localizations.dart';
 import 'package:frontend/core/theme/app_theme.dart';
+import 'package:frontend/core/widgets/paycif_icon_container.dart';
 
 /// 🚀 World-Class PIN Entry Widget
 /// Designed 20 years ahead with premium UX/UI patterns
@@ -20,6 +21,10 @@ class PinEntryWidget extends StatefulWidget {
   final VoidCallback? onForgotPin;
   final VoidCallback? onBiometricPressed;
   final IconData? biometricIcon;
+  final ValueChanged<bool>? onStateChanged;
+  /// When true, PIN verification also hits the server (Argon2id gate).
+  /// Use for payment confirmation; leave false for app unlock.
+  final bool serverVerify;
 
   const PinEntryWidget({
     super.key,
@@ -31,6 +36,8 @@ class PinEntryWidget extends StatefulWidget {
     this.onForgotPin,
     this.onBiometricPressed,
     this.biometricIcon,
+    this.onStateChanged,
+    this.serverVerify = false,
   });
 
   @override
@@ -83,11 +90,6 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
     });
   }
 
-  void _onClear() {
-    setState(() {
-      _pin = '';
-    });
-  }
 
   void _triggerErrorAnimation() {
     setState(() => _hasError = true);
@@ -107,23 +109,30 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
 
     if (widget.isSetupMode) {
       if (!_isConfirming) {
+        await Future.delayed(const Duration(milliseconds: 50));
+        if (!mounted) return;
         _firstPin = _pin;
-        _isConfirming = true;
-        _onClear();
+        setState(() {
+          _isConfirming = true;
+          _pin = '';
+        });
+        widget.onStateChanged?.call(true);
       } else {
+        await Future.delayed(const Duration(milliseconds: 50));
+        if (!mounted) return;
         if (_pin == _firstPin) {
+          HapticFeedback.mediumImpact();
+          final pinSnapshot = _pin;
+          // Await PIN setup so local token is stored before navigation.
+          // Without this, a verifyPin call on the next screen races against
+          // the background write and sees no local token or cached key.
           if (widget.onPinConfirmed != null) {
-            await widget.onPinConfirmed!(_pin);
+            await widget.onPinConfirmed!(pinSnapshot);
           } else {
-            await controller.setupPin(_pin);
+            await controller.setupPin(pinSnapshot);
           }
-          if (controller.state.status == SecurityStatus.success) {
-            HapticFeedback.mediumImpact();
-            widget.onSuccess?.call(_pin);
-          } else {
-            _triggerErrorAnimation();
-            _resetSetup();
-          }
+          if (!mounted) return;
+          widget.onSuccess?.call(pinSnapshot);
         } else {
           _triggerErrorAnimation();
           _resetSetup();
@@ -133,7 +142,7 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
       HapticFeedback.mediumImpact();
       final success = widget.onVerify != null
           ? await widget.onVerify!(_pin)
-          : await controller.verifyPin(_pin);
+          : await controller.verifyPin(_pin, serverVerify: widget.serverVerify);
 
       if (success) {
         HapticFeedback.lightImpact();
@@ -142,6 +151,12 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
         if (controller.state.errorMessage?.contains('PIN not setup') == true) {
           if (mounted) {
             context.go('/pin_setup');
+            return;
+          }
+        }
+        if (controller.state.errorMessage?.contains('Session expired') == true) {
+          if (mounted) {
+            context.go('/login');
             return;
           }
         }
@@ -155,11 +170,14 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
       _firstPin = null;
       _isConfirming = false;
     });
+    widget.onStateChanged?.call(false);
   }
 
   String _formatErrorMessage(String error, AppLocalizations l10n) {
     return ErrorTranslator.translate(l10n, error);
   }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -174,63 +192,112 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
           return _buildLockedUI(errorMsg ?? 'Account Locked');
         }
 
-        return Column(
-          children: [
-            // 🚨 Error Banner
-            if (errorMsg != null && !isLocked)
-              _buildErrorBanner(
-                errorMsg,
-                isDark,
-                AppLocalizations.of(context)!,
+        final String titleText = widget.isSetupMode
+            ? (_isConfirming ? 'Confirm your PIN' : 'Create your PIN')
+            : 'Unlock Paycif';
+
+        final String descText = widget.isSetupMode
+            ? (_isConfirming
+                ? 'Please re-enter your PIN to confirm.'
+                : 'Protect your account and approve payments.')
+            : 'Verify your identity to continue';
+
+        final IconData headerIcon = widget.isSetupMode
+            ? PhosphorIcons.lock
+            : PhosphorIcons.shieldCheck;
+
+        final Color descColor = isDark
+            ? Colors.white.withValues(alpha: 0.60) // 60-65% Opacity
+            : Colors.black.withValues(alpha: 0.60); // 60-65% Opacity
+
+        return SafeArea(
+          child: CustomScrollView(
+            slivers: [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // 🚨 Error Banner
+                      if (errorMsg != null && !isLocked)
+                        _buildErrorBanner(
+                          errorMsg,
+                          isDark,
+                          AppLocalizations.of(context)!,
+                        ),
+
+                      // Top safety padding (const 32 px)
+                      // 1. Top space (Proportional spacer)
+                      const Spacer(flex: 3),
+
+                      // --- PART 1: Tight Context Block (Header) ---
+                      PaycifIconContainer(
+                        icon: headerIcon,
+                      ).animate().scale(
+                        duration: 500.ms,
+                        curve: Curves.easeOutBack,
+                      ),
+
+                      const SizedBox(height: 16), // Icon -> Title: 16
+
+                      // Title: Semibold, 24 pt, letterSpacing -0.5
+                      Text(
+                        titleText,
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w600, // Semibold
+                          letterSpacing: -0.5,
+                          color: AppTheme.textPrimaryColor(context),
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+
+                      const SizedBox(height: 12), // Title -> Description: 12
+
+                      // Description: Regular, 17 pt, Line Height 22, 60% Opacity
+                      Text(
+                        descText,
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w400, // Regular
+                          height: 22 / 17, // Line Height 22
+                          color: descColor,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+
+                      const SizedBox(height: 32), // Description -> Dots: 32 (Tightened)
+
+                      // PIN Dots
+                      RepaintBoundary(
+                        child: _buildPinDots(isDark),
+                      ),
+
+                      // 2. Fixed connection space between dots and keypad
+                      const SizedBox(height: 48),
+
+                      // --- PART 2: Keypad block ---
+                      RepaintBoundary(
+                        child: _buildKeypadGrid(isDark),
+                      ),
+
+                      if (widget.onForgotPin != null) ...[
+                        const SizedBox(height: 20),
+                        _buildForgotAction(isDark),
+                      ],
+
+                      // 3. Bottom space (Proportional spacer)
+                      const Spacer(flex: 4),
+                    ],
+                  ),
+                ),
               ),
-
-            // 📝 Setup Context
-            if (widget.isSetupMode && widget.showLabel)
-              _buildSetupPrompt(isDark),
-
-            // 🏛️ The Silent Sentinel (Clean, Fast)
-            _buildUnifiedConsole(isDark),
-          ],
+            ],
+          ),
         );
       },
-    );
-  }
-
-  Widget _buildSetupPrompt(bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        _isConfirming ? 'Confirm Your PIN' : 'Create Your Security PIN',
-        style: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-          color: isDark ? Colors.white70 : Colors.black54,
-          letterSpacing: 0.5,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildUnifiedConsole(bool isDark) {
-    return Column(
-      children: [
-        // 🔘 Deep Gold/Accent Dots with pulse/error feedback (isolated repaint layer)
-        RepaintBoundary(
-          child: _buildPinDots(isDark),
-        ),
-
-        const SizedBox(height: 48),
-
-        // 🔢 Precision Keypad (isolated repaint layer)
-        RepaintBoundary(
-          child: _buildKeypadGrid(isDark),
-        ),
-
-        if (widget.onForgotPin != null) ...[
-          const SizedBox(height: 32),
-          _buildForgotAction(isDark),
-        ],
-      ],
     );
   }
 
@@ -299,9 +366,9 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
   }
 
   Widget _buildPinDots(bool isDark) {
-    // Brand design system mapping
-    final Color filledColor = isDark ? AppTheme.accentGoldDisabled : AppTheme.accentGold; // Gold Accent
-    final Color emptyColor = isDark ? Colors.white24 : Colors.grey.shade300;
+    // Brand design system mapping - High Contrast Primary Focus
+    final Color filledColor = AppTheme.primaryTeal;
+    final Color emptyColor = isDark ? Colors.white30 : Colors.grey.shade400;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -310,7 +377,7 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
 
         return AnimatedContainer(
           duration: 150.ms,
-          margin: const EdgeInsets.symmetric(horizontal: 12),
+          margin: const EdgeInsets.symmetric(horizontal: 8),
           width: 14,
           height: 14,
           decoration: BoxDecoration(
@@ -354,7 +421,7 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
       child: Text(
         digit,
         style: TextStyle(
-          fontSize: 30,
+          fontSize: 22,
           fontWeight: FontWeight.w500,
           color: AppTheme.textPrimaryColor(context),
           fontFamily: 'Outfit',
@@ -365,15 +432,16 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
 
   Widget _buildBiometricButton(bool isDark) {
     if (widget.biometricIcon == null || widget.onBiometricPressed == null) {
-      return const SizedBox(width: 80, height: 80);
+      return const SizedBox(width: 64, height: 64);
     }
     return KeypadButton(
       isDark: isDark,
+      flat: false,
       onTap: widget.onBiometricPressed!,
       child: Icon(
         widget.biometricIcon,
-        size: 28,
-        color: isDark ? AppTheme.accentGoldDisabled : AppTheme.primaryTeal, // Gold for dark, Teal for light
+        size: 26,
+        color: AppTheme.primaryTeal, // Primary Teal for Focus
       ),
     );
   }
@@ -381,11 +449,12 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
   Widget _buildDeleteButton(bool isDark) {
     return KeypadButton(
       isDark: isDark,
+      flat: false,
       onTap: _onDelete,
       child: Icon(
         PhosphorIcons.backspace,
-        size: 26,
-        color: isDark ? Colors.white70 : Colors.grey.shade700,
+        size: 30, // Larger, more prominent
+        color: isDark ? Colors.white : Colors.black87, // High contrast neutral
       ),
     );
   }
@@ -466,12 +535,14 @@ class KeypadButton extends StatefulWidget {
   final Widget child;
   final VoidCallback onTap;
   final bool isDark;
+  final bool flat;
 
   const KeypadButton({
     super.key,
     required this.child,
     required this.onTap,
     required this.isDark,
+    this.flat = false,
   });
 
   @override
@@ -483,9 +554,10 @@ class _KeypadButtonState extends State<KeypadButton> {
 
   @override
   Widget build(BuildContext context) {
-    final Color buttonColor = widget.isDark 
-        ? AppTheme.darkTheme.cardColor 
-        : AppTheme.backgroundGrey;
+    final Color buttonColor = widget.flat
+        ? Colors.transparent
+        : (widget.isDark ? AppTheme.darkTheme.cardColor : AppTheme.backgroundGrey);
+    
     final Color borderColor = widget.isDark 
         ? Colors.white.withValues(alpha: 0.08) 
         : AppTheme.borderGrey;
@@ -500,22 +572,26 @@ class _KeypadButtonState extends State<KeypadButton> {
       onTap: widget.onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 100),
-        width: 80,
-        height: 80,
+        width: 64,
+        height: 64,
         curve: Curves.easeOut,
-        transform: Matrix4.diagonal3Values(_isPressed ? 0.92 : 1.0, _isPressed ? 0.92 : 1.0, 1.0),
+        transform: Matrix4.diagonal3Values(_isPressed ? 0.96 : 1.0, _isPressed ? 0.96 : 1.0, 1.0),
         alignment: Alignment.center,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: _isPressed
-              ? (widget.isDark ? Colors.white.withValues(alpha: 0.15) : Colors.grey.shade300)
+              ? (widget.flat 
+                  ? (widget.isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.04))
+                  : (widget.isDark ? Colors.white.withValues(alpha: 0.15) : Colors.grey.shade300))
               : buttonColor,
-          border: Border.all(
-            color: borderColor,
-            width: 1.2,
-          ),
+          border: widget.flat 
+              ? null 
+              : Border.all(
+                  color: borderColor,
+                  width: 1.2,
+                ),
           boxShadow: [
-            if (!_isPressed)
+            if (!_isPressed && !widget.flat)
               BoxShadow(
                 color: widget.isDark ? Colors.black.withValues(alpha: 0.25) : Colors.black.withValues(alpha: 0.03),
                 blurRadius: 6,

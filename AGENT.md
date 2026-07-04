@@ -57,6 +57,13 @@ Antigravity: Adhere to these constraints to maximize performance and save tokens
 - **@architecture-decision-records**: บันทึกเหตุผลการออกแบบสถาปัตยกรรม (ADR) เสมอเมื่อเลือกทิศทางระบบ
 - **@lint-and-validate (MANDATORY)**: รัน [lint-and-validate](file:///Users/methas/.agents/skills/lint-and-validate/SKILL.md) ตรวจสอบความถูกต้องของซอร์สโค้ดเสมอ ห้ามส่งโค้ดที่มีข้อผิดพลาด
 - **@closed-loop-delivery**: การสแกนเช็คคุณภาพและการทำงานรอบสุดท้ายแบบลูปปิดก่อนทำการส่งงาน
+- **@app-store-optimization (MANDATORY for Frontend/Store releases)**: นำหลักการ App Store Optimization (ASO) มาใช้ตรวจสอบการตั้งค่า ความพร้อม และคำอธิบายแอปก่อนการปล่อยเวอร์ชันใหม่เสมอ
+- **Apple Platform Design Pack (MANDATORY for Frontend/UI changes)**: บังคับใช้แนวทางของ Apple Human Interface Guidelines (HIG) เพื่อสร้าง UX/UI ที่เป็นธรรมชาติสำหรับอุปกรณ์ Apple:
+  - `@hig-foundations`: ยึดหลักการออกแบบพื้นฐานของ Apple
+  - `@hig-patterns`: ใช้รูปแบบการโต้ตอบ (Interaction) และ Layout ที่เป็นมิตรต่อผู้ใช้งาน
+  - `@hig-inputs`: ออกแบบระบบ Gesture, Focus states และการรับค่าที่เสถียรบนอุปกรณ์ iOS/iPadOS
+  - `@hig-components-layout` & `@hig-components-system`: การเลือกใช้คอมโพเนนต์และการรองรับระบบ Widgets หรือ Live Activities
+  - `@hig-platforms`: ออกแบบ Responsive ให้รองรับการปรับขยายหน้าจอข้ามทุกอุปกรณ์ของ Apple อย่างสมบูรณ์แบบ
 
 ## 5. 🔄 วงจรการเรียนรู้ (Continuous Evolution)
 - **@skill-optimizer**: วิเคราะห์ข้อผิดพลาดและบันทึกแนวทางลงสู่ Harness เพื่อปรับปรุงความแม่นยำ

@@ -31,48 +31,72 @@ class SecurityRepositoryImpl implements SecurityRepository {
 
   static const _kDeviceIdKey = 'device_binding_id';
   static const _kPrivateKeySeedKey = 'device_private_key_seed';
-  static const _kLocalPinHashKey = 'local_pin_hash';
-  static const _kLocalPinSaltKey = 'local_pin_salt';
   static const _kDevicesCacheKey = 'linked_devices_cache';
   static const _kHasPinCacheKey = 'cache_has_pin_configured';
-  static const _kIsHardwareKey = 'is_hardware_backed'; // 🛡️ Sentinel Flag
+  static const _kIsHardwareKey = 'is_hardware_backed';
+
+  // AES-256-GCM + PBKDF2-SHA256 PIN token (v2 suffix avoids collision with old Argon2id keys)
+  static const _kPinEncryptedToken = 'pin_enc_token_v2';
+  static const _kPinTokenSalt = 'pin_token_salt_v2';
+  static const _kPinAttemptCount = 'pin_attempt_count';
+  static const _kMaxLocalAttempts = 5;
+
+  // Old Argon2id keys — read-only, used only for migration detection then deleted
+  static const _kLegacyPinHashKey = 'local_pin_hash';
+  static const _kLegacyPinSaltKey = 'local_pin_salt';
 
   // ⚡ Lightning-Fast Cache: In-memory storage to skip Disk I/O & Reconstruction
   List<Map<String, dynamic>>? _devicesCache;
 
-  // ⚡ Security Fast-Path: Memory-cached local hash for instant PIN entry
-  String? _cachedLocalHash;
-  List<int>? _cachedLocalSalt;
+  // ⚡ Derived PIN key cached in RAM for fast subsequent local verifications.
+  // Lives only in process memory — cleared on app restart or clearAllPinData().
+  List<int>? _cachedPinKey;
 
-  Future<void> _updateLocalPinHash(String pin) async {
+  // ⚡ Device credential cache — stable within a session
+  String? _cachedDeviceId;
+  bool? _cachedIsHardware;
+  dynamic _cachedKeyPair; // reconstructed once, reused every sign
+
+  /// Persists PIN as AES-256-GCM encrypted token (PBKDF2-SHA256 key derivation).
+  /// Runs PBKDF2 in compute() isolate to keep UI smooth (~10ms).
+  Future<void> _persistLocalPinToken(String pin) async {
     try {
-      final salt = _cryptoService.generateSalt();
-      // ⚡ Move to Isolate for UI smoothness. Uses Fast Hash for local storage.
-      final hash = await compute(CryptoService.computePinHashFast, {
+      final salt = _cryptoService.randomBytes(32);
+      final token = _cryptoService.randomBytes(32); // random verification marker
+
+      final keyBytes = await compute(CryptoService.derivePinKey, {
         'pin': pin,
         'salt': salt,
       });
 
-      // Update Memory Cache
-      _cachedLocalHash = hash;
-      _cachedLocalSalt = salt;
+      _cachedPinKey = keyBytes;
 
-      // Persist to Disk
-      await _secureStorage.write(_kLocalPinSaltKey, base64Encode(salt));
-      await _secureStorage.write(_kLocalPinHashKey, hash);
+      final encrypted = await _cryptoService.encryptPinToken(keyBytes, token);
 
-      debugPrint('✅ [Cache] Local PIN hash updated & cached in memory.');
+      await Future.wait([
+        _secureStorage.write(_kPinEncryptedToken, base64Encode(encrypted)),
+        _secureStorage.write(_kPinTokenSalt, base64Encode(salt)),
+        _secureStorage.write(_kPinAttemptCount, '0'),
+        // Clean up legacy Argon2id keys if present
+        _secureStorage.delete(_kLegacyPinHashKey),
+        _secureStorage.delete(_kLegacyPinSaltKey),
+      ]);
+
+      debugPrint('✅ [PIN] Local AES-256-GCM token persisted.');
     } catch (e) {
-      debugPrint('❌ [Cache] Failed to update local PIN hash: $e');
+      debugPrint('❌ [PIN] Failed to persist local PIN token: $e');
     }
   }
 
   @override
   Future<void> setupPin(String pin) async {
-    // 1. Optimistic: Store locally first
-    await _updateLocalPinHash(pin);
-    // 2. Sync with Server
+    // 1. Confirm with server first — throws if it fails, we propagate
     await _remoteDataSource.setupPin(pin);
+    // 2. Server confirmed: persist local token and mark configured
+    await Future.wait([
+      _persistLocalPinToken(pin),
+      _secureStorage.write(_kHasPinCacheKey, 'true'),
+    ]);
   }
 
   @override
@@ -152,34 +176,48 @@ class SecurityRepositoryImpl implements SecurityRepository {
   /// Helper to generate headers with signature for critical actions.
   @override
   Future<Map<String, String>> generateSignatureHeaders(String payload) async {
-    final isHardware = await _secureStorage.read(_kIsHardwareKey) == 'true';
-    final deviceId = await _secureStorage.read(_kDeviceIdKey);
-
-    if (deviceId == null) {
-      throw Exception('Device not bound. Cannot sign request.');
+    // ⚡ Warm device credential cache on first call (parallel reads)
+    if (_cachedDeviceId == null || _cachedIsHardware == null) {
+      final results = await Future.wait([
+        _secureStorage.read(_kDeviceIdKey),
+        _secureStorage.read(_kIsHardwareKey),
+      ]);
+      _cachedDeviceId = results[0];
+      _cachedIsHardware = results[1] == 'true';
     }
 
+    final deviceId = _cachedDeviceId;
+    if (deviceId == null) throw Exception('Device not bound. Cannot sign request.');
+    final isHardware = _cachedIsHardware!;
+
+    // Nonce + minute bucket for replay protection — must match server: "PAYLOAD:NONCE:MINUTE"
+    final nonce = _uuidSource.v4();
+    final minuteBucket = (DateTime.now().millisecondsSinceEpoch ~/ 60000).toString();
+    final signaturePayload = '$payload:$nonce:$minuteBucket';
+
+    String signature;
     if (isHardware) {
-      // 🛡️ Hardware Path (Secure Enclave)
-      final signature = await _cryptoService.signWithHardware(
-        payload: payload,
-      );
-      if (signature == null) throw Exception('Biometric authentication failed.');
-      
-      return {'X-Device-Id': deviceId, 'X-Device-Signature': signature};
+      final sig = await _cryptoService.signWithHardware(payload: signaturePayload);
+      if (sig == null) throw Exception('Biometric authentication failed.');
+      signature = sig;
+    } else {
+      // ⚡ Cache reconstructed key pair — expensive operation, result is stable
+      if (_cachedKeyPair == null) {
+        final privateKeyB64 = await _secureStorage.read(_kPrivateKeySeedKey);
+        if (privateKeyB64 == null) {
+          throw Exception('Security credentials missing. Please re-bind device.');
+        }
+        _cachedKeyPair = await _cryptoService.keyPairFromSeed(base64Decode(privateKeyB64));
+      }
+      signature = await _cryptoService.signPayload(_cachedKeyPair, signaturePayload);
     }
 
-    // 🐢 Legacy Software Path (SecureStorage + Key Reconstruction)
-    final privateKeyB64 = await _secureStorage.read(_kPrivateKeySeedKey);
-    if (privateKeyB64 == null) {
-      throw Exception('Security credentials missing. Please re-bind device.');
-    }
-
-    final seed = base64Decode(privateKeyB64);
-    final keyPair = await _cryptoService.keyPairFromSeed(seed);
-
-    final signature = await _cryptoService.signPayload(keyPair, payload);
-    return {'X-Device-Id': deviceId, 'X-Device-Signature': signature};
+    return {
+      'X-Device-Id': deviceId,
+      'X-Device-Signature': signature,
+      'X-Nonce': nonce,
+      'X-Timestamp-Bucket': minuteBucket,
+    };
   }
 
   /// 🛡️ Universal Self-Healing Wrapper
@@ -229,86 +267,72 @@ class SecurityRepositoryImpl implements SecurityRepository {
   }
 
   @override
-  Future<void> verifyPin(String pin) async {
-    // ⚡ 1. Optimistic Local Verification (Argon2id)
-    bool isOptimisticSuccess = false;
+  Future<void> verifyPin(String pin, {bool serverVerify = false}) async {
+    // ── Attempt guard ──────────────────────────────────────────────────────────
+    final attemptsStr = await _secureStorage.read(_kPinAttemptCount);
+    final attempts = int.tryParse(attemptsStr ?? '0') ?? 0;
+    if (attempts >= _kMaxLocalAttempts) {
+      await clearAllPinData();
+      throw Exception('Too many incorrect attempts. PIN data wiped for security.');
+    }
+
+    // ── Local fast-fail via AES-256-GCM decryption ────────────────────────────
+    // Wrong PIN → GCM auth tag fails → throws → skip network, save latency.
+    // No hash to brute-force offline; attacker needs device + Keychain + PIN.
     try {
-      // 🚀 Fast Lane: Use Memory Cache first
-      String? localHash = _cachedLocalHash;
-      List<int>? localSalt = _cachedLocalSalt;
-
-      // Warm up from Disk if memory cache is empty
-      if (localHash == null || localSalt == null) {
-        final diskHash = await _secureStorage.read(_kLocalPinHashKey);
-        final diskSaltB64 = await _secureStorage.read(_kLocalPinSaltKey);
-
-        if (diskHash != null && diskSaltB64 != null) {
-          localHash = diskHash;
-          localSalt = base64Decode(diskSaltB64);
-          // populate memory for next time
-          _cachedLocalHash = localHash;
-          _cachedLocalSalt = localSalt;
-          debugPrint('📂 [Cache] Local hash loaded from Disk into Memory.');
-        }
-      }
-
-      if (localHash != null && localSalt != null) {
-        // ⚡ Fast Local Hash (8MB/1 round) for <200ms verification
-        // Server verification uses full strength (32MB/3 rounds)
-        final computedHash = await compute(CryptoService.computePinHashFast, {
-          'pin': pin,
-          'salt': localSalt,
-        });
-
-        final isValid = computedHash == localHash;
-
-        if (isValid) {
-          isOptimisticSuccess = true;
-          debugPrint(
-            '✅ [Verify] Optimistic Local Check PASSED (World-Class Speed)',
-          );
-        } else {
-          debugPrint('❌ [Verify] Optimistic Local Check FAILED');
-          // If local hash exists but fails, it's a WRONG PIN.
-          throw Exception('Invalid PIN (Local)');
+      if (_cachedPinKey != null) {
+        // ⚡ Warm path: reuse derived key from memory (~0ms)
+        final encB64 = await _secureStorage.read(_kPinEncryptedToken);
+        if (encB64 != null) {
+          await _cryptoService.decryptPinToken(_cachedPinKey!, base64Decode(encB64));
+          debugPrint('✅ [PIN] Local token verified (warm cache).');
         }
       } else {
-        debugPrint(
-          '⚠️ [Verify] No local hash found. Skipping optimistic check.',
-        );
+        // Cold path: parallel read salt + token, derive key (~10ms)
+        final results = await Future.wait([
+          _secureStorage.read(_kPinEncryptedToken),
+          _secureStorage.read(_kPinTokenSalt),
+        ]);
+        final encB64 = results[0];
+        final saltB64 = results[1];
+
+        if (encB64 != null && saltB64 != null) {
+          final keyBytes = await compute(CryptoService.derivePinKey, {
+            'pin': pin,
+            'salt': base64Decode(saltB64),
+          });
+          await _cryptoService.decryptPinToken(keyBytes, base64Decode(encB64));
+          _cachedPinKey = keyBytes;
+          debugPrint('✅ [PIN] Local token verified (cold path).');
+        } else {
+          debugPrint('⚠️ [PIN] No local token — proceeding to server-only path.');
+        }
       }
     } catch (e) {
-      if (e.toString().contains('Invalid PIN')) rethrow;
-      debugPrint('⚠️ [Verify] Local check error: $e');
+      // GCM auth failure = wrong PIN. Increment counter and block network call.
+      final next = attempts + 1;
+      await _secureStorage.write(_kPinAttemptCount, next.toString());
+      _cachedPinKey = null;
+      debugPrint('❌ [PIN] Wrong PIN — attempt $next/$_kMaxLocalAttempts.');
+      throw Exception('Incorrect PIN');
     }
 
-    if (isOptimisticSuccess) {
-      // 🚀 Return immediately! But verify on server in background.
-      _backgroundServerVerify(pin);
-      return;
-    }
-
-    // 🐢 2. Fallback: Server Verification
-    await _withDeviceSelfHealing(() async {
-      final headers = await generateSignatureHeaders(pin);
-      await _remoteDataSource.verifyPin(pin, headers: headers);
-
-      // If we reached here, Server said OK. Self-Heal local hash.
-      await _updateLocalPinHash(pin);
-    });
-  }
-
-  Future<void> _backgroundServerVerify(String pin) async {
-    try {
+    // ── Server gate (payment only) ────────────────────────────────────────────
+    // For app unlock, local AES-256-GCM is sufficient — skip the ~500ms Argon2id
+    // server call. For payment confirmation, always hit the server.
+    if (serverVerify) {
       await _withDeviceSelfHealing(() async {
         final headers = await generateSignatureHeaders(pin);
         await _remoteDataSource.verifyPin(pin, headers: headers);
+
+        await Future.wait([
+          _secureStorage.write(_kPinAttemptCount, '0'),
+          if (_cachedPinKey == null) _persistLocalPinToken(pin),
+        ]);
       });
-      debugPrint('✅ [Background-Verify] Server confirmed PIN.');
-    } catch (e) {
-      debugPrint('❌ [Background-Verify] Server REJECTED PIN (Sync Issue!): $e');
-      // 🛡️ SECURITY: Wipe local cached PIN keys to prevent further optimistic bypasses
-      await clearAllPinData();
+    } else {
+      // Local-only path: reset attempt counter on success
+      await _secureStorage.write(_kPinAttemptCount, '0');
     }
   }
 
@@ -370,14 +394,14 @@ class SecurityRepositoryImpl implements SecurityRepository {
     required String newPin,
   }) async {
     await _withDeviceSelfHealing(() async {
-      final headers = await generateSignatureHeaders(newPin);
+      final headers = await generateSignatureHeaders(oldPin);
       await _remoteDataSource.changePin(
         oldPin: oldPin,
         newPin: newPin,
         headers: headers,
       );
-      // Update local hash ONLY after server confirms change
-      await _updateLocalPinHash(newPin);
+      // Update local token ONLY after server confirms change
+      await _persistLocalPinToken(newPin);
     });
   }
 
@@ -436,14 +460,22 @@ class SecurityRepositoryImpl implements SecurityRepository {
 
   @override
   Future<void> clearAllPinData() async {
-    // Clear cached in-memory
-    _cachedLocalHash = null;
-    _cachedLocalSalt = null;
+    // Clear in-memory caches
+    _cachedPinKey = null;
+    _cachedDeviceId = null;
+    _cachedIsHardware = null;
+    _cachedKeyPair = null;
 
-    // Remove persisted PIN data (hash, salt, cache flag)
-    await _secureStorage.delete(_kLocalPinHashKey);
-    await _secureStorage.delete(_kLocalPinSaltKey);
-    await _secureStorage.delete(_kHasPinCacheKey);
+    // Remove all PIN-related Keychain entries
+    await Future.wait([
+      _secureStorage.delete(_kPinEncryptedToken),
+      _secureStorage.delete(_kPinTokenSalt),
+      _secureStorage.delete(_kPinAttemptCount),
+      _secureStorage.delete(_kHasPinCacheKey),
+      // Legacy cleanup
+      _secureStorage.delete(_kLegacyPinHashKey),
+      _secureStorage.delete(_kLegacyPinSaltKey),
+    ]);
 
     debugPrint('🔒 [SecurityRepo] clearAllPinData: Local PIN data wiped.');
   }
@@ -452,16 +484,23 @@ class SecurityRepositoryImpl implements SecurityRepository {
   Future<void> clearSecurityData() async {
     // 1. Wipe Memory Cache
     _devicesCache = null;
-    _cachedLocalHash = null;
-    _cachedLocalSalt = null;
+    _cachedPinKey = null;
+    _cachedDeviceId = null;
+    _cachedIsHardware = null;
+    _cachedKeyPair = null;
 
     // 2. Clear Disk Cache (Specifically the non-binding ones)
     // We keep device_binding_id/seed because it usually persists across logout
     // unless the user wants a full factory reset.
-    await _secureStorage.delete(_kHasPinCacheKey);
-    await _secureStorage.delete(_kLocalPinHashKey);
-    await _secureStorage.delete(_kLocalPinSaltKey);
-    await _secureStorage.delete(_kDevicesCacheKey);
+    await Future.wait([
+      _secureStorage.delete(_kHasPinCacheKey),
+      _secureStorage.delete(_kPinEncryptedToken),
+      _secureStorage.delete(_kPinTokenSalt),
+      _secureStorage.delete(_kPinAttemptCount),
+      _secureStorage.delete(_kLegacyPinHashKey),
+      _secureStorage.delete(_kLegacyPinSaltKey),
+      _secureStorage.delete(_kDevicesCacheKey),
+    ]);
 
     debugPrint('🔒 [SecurityRepo] Hard-Clear: Sensitive data wiped.');
   }

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:frontend/core/l10n/generated/app_localizations.dart';
 import 'package:frontend/core/theme/app_theme.dart';
+import 'package:frontend/features/kyc/presentation/kyc_intro_view.dart';
 import 'package:frontend/features/kyc/presentation/kyc_webview_screen.dart';
 import 'package:frontend/features/kyc/presentation/sumsub_kyc_cubit.dart';
+import 'package:go_router/go_router.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 
 class KycScreen extends StatefulWidget {
@@ -14,12 +17,6 @@ class KycScreen extends StatefulWidget {
 }
 
 class _KycScreenState extends State<KycScreen> {
-  @override
-  void initState() {
-    super.initState();
-    context.read<SumsubKycCubit>().initKyc();
-  }
-
   Future<void> _openKycWebView(String kycUrl) async {
     await Navigator.of(context).push<bool>(
       MaterialPageRoute(
@@ -40,6 +37,7 @@ class _KycScreenState extends State<KycScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -47,11 +45,11 @@ class _KycScreenState extends State<KycScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new),
+          icon: Icon(PhosphorIcons.caretLeft),
           onPressed: () => Navigator.of(context).pop(false),
         ),
         title: Text(
-          'Identity Verification',
+          l10n.kycAppBarTitle,
           style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
       ),
@@ -61,10 +59,15 @@ class _KycScreenState extends State<KycScreen> {
             _openKycWebView(state.kycUrl);
           }
           if (state is KycVerified) {
-            Navigator.of(context).pop(true);
+            context.pop(true);
           }
         },
         builder: (context, state) {
+          if (state is KycInitial) {
+            return KycIntroView(
+              onGetStarted: () => context.read<SumsubKycCubit>().initKyc(),
+            );
+          }
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
@@ -72,11 +75,11 @@ class _KycScreenState extends State<KycScreen> {
               children: [
                 _buildIcon(state),
                 const SizedBox(height: 32),
-                _buildTitle(state, theme),
+                _buildTitle(state, theme, l10n),
                 const SizedBox(height: 12),
-                _buildSubtitle(state, theme),
+                _buildSubtitle(state, theme, l10n),
                 const SizedBox(height: 40),
-                _buildAction(context, state),
+                _buildAction(context, state, l10n),
               ],
             ),
           );
@@ -87,50 +90,50 @@ class _KycScreenState extends State<KycScreen> {
 
   Widget _buildIcon(KycState state) {
     if (state is KycVerified) {
-      return Icon(PhosphorIcons.shieldCheck, color: Colors.green.shade400, size: 80)
+      return Icon(PhosphorIcons.shieldCheck, color: AppTheme.successGreen, size: 80)
           .animate()
           .scale(begin: const Offset(0.5, 0.5), duration: 400.ms, curve: Curves.elasticOut);
     }
     if (state is KycFailed) {
-      return Icon(PhosphorIcons.shieldWarning, color: Colors.red.shade400, size: 80);
+      return Icon(PhosphorIcons.shieldWarning, color: AppTheme.errorRed, size: 80);
     }
     return Icon(PhosphorIcons.shield, color: AppTheme.primaryTeal, size: 80)
         .animate(onPlay: (c) => c.repeat())
         .shimmer(duration: 2.seconds, color: AppTheme.accentGold.withValues(alpha: 0.4));
   }
 
-  String _titleFor(KycState state) {
-    if (state is KycLoading) return 'Preparing Verification...';
-    if (state is KycUrlReady) return 'Opening Verification...';
-    if (state is KycAwaitingResult) return 'Verification In Progress';
-    if (state is KycPolling) return 'Checking Your Status...';
-    if (state is KycVerified) return 'Verification Complete';
-    if (state is KycFailed) return 'Verification Issue';
-    return 'Identity Verification';
+  String _titleFor(KycState state, AppLocalizations l10n) {
+    if (state is KycLoading) return l10n.kycStatusPreparing;
+    if (state is KycUrlReady) return l10n.kycStatusOpening;
+    if (state is KycAwaitingResult) return l10n.kycStatusInProgress;
+    if (state is KycPolling) return l10n.kycStatusChecking;
+    if (state is KycVerified) return l10n.kycStatusComplete;
+    if (state is KycFailed) return l10n.kycStatusIssue;
+    return l10n.kycAppBarTitle;
   }
 
-  Widget _buildTitle(KycState state, ThemeData theme) {
+  Widget _buildTitle(KycState state, ThemeData theme, AppLocalizations l10n) {
     return Text(
-      _titleFor(state),
+      _titleFor(state, l10n),
       textAlign: TextAlign.center,
       style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
     );
   }
 
-  Widget _buildSubtitle(KycState state, ThemeData theme) {
+  Widget _buildSubtitle(KycState state, ThemeData theme, AppLocalizations l10n) {
     final String text;
     if (state is KycLoading || state is KycUrlReady) {
-      text = 'Setting up your secure verification session...';
+      text = l10n.kycMessageSettingUp;
     } else if (state is KycPolling) {
-      text = 'Waiting for your verification result. This usually takes a few seconds.';
+      text = l10n.kycMessageWaiting;
     } else if (state is KycAwaitingResult) {
-      text = 'Your verification is being processed. We\'ll update your status automatically once complete.';
+      text = l10n.kycMessageAwaitingResult;
     } else if (state is KycVerified) {
-      text = 'Your identity has been verified successfully.';
+      text = l10n.kycMessageVerified;
     } else if (state is KycFailed) {
       text = state.reason;
     } else {
-      text = 'Please follow the instructions to verify your identity and unlock all features.';
+      text = l10n.kycMessageDefault;
     }
 
     return Text(
@@ -138,14 +141,14 @@ class _KycScreenState extends State<KycScreen> {
       textAlign: TextAlign.center,
       style: theme.textTheme.bodyMedium?.copyWith(
         color: state is KycFailed
-            ? Colors.red.shade400
+            ? AppTheme.errorRedText
             : theme.colorScheme.onSurface.withValues(alpha: 0.65),
         height: 1.5,
       ),
     );
   }
 
-  Widget _buildAction(BuildContext context, KycState state) {
+  Widget _buildAction(BuildContext context, KycState state, AppLocalizations l10n) {
     if (state is KycLoading || state is KycUrlReady || state is KycPolling) {
       return const CircularProgressIndicator();
     }
@@ -156,7 +159,7 @@ class _KycScreenState extends State<KycScreen> {
           const SizedBox(height: 20),
           TextButton(
             onPressed: () => context.read<SumsubKycCubit>().initKyc(),
-            child: const Text('Re-open Verification'),
+            child: Text(l10n.kycReopenVerification),
           ),
         ],
       );
@@ -174,13 +177,13 @@ class _KycScreenState extends State<KycScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               ),
-              child: const Text('Try Again', style: TextStyle(fontWeight: FontWeight.w600)),
+              child: Text(l10n.kycTryAgain, style: const TextStyle(fontWeight: FontWeight.w600)),
             ),
           ),
           const SizedBox(height: 12),
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Do This Later'),
+            child: Text(l10n.kycDoThisLater),
           ),
         ],
       );

@@ -9,7 +9,12 @@ import 'package:frontend/core/l10n/generated/app_localizations.dart';
 import 'package:frontend/core/widgets/premium_scanner_overlay.dart';
 import 'package:frontend/features/payment/data/qr_aggregator_service.dart';
 import 'package:frontend/core/widgets/kyc/unified_payment_sheet.dart';
+import 'package:frontend/core/widgets/kyc/kyc_required_sheet.dart';
+import 'package:frontend/core/network/api_service.dart';
+import 'package:frontend/features/dashboard/presentation/dashboard_controller.dart';
 import 'package:frontend/core/utils/pay_notify.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SCAN PAGE v2 — Redesigned from first principles
@@ -42,22 +47,9 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
   bool _isProcessing = false;
   bool _hasCameraError = false;
 
-  final TextEditingController _testInputController = TextEditingController();
-
-  static const List<String> _testQrs = [
-    "00020101021230820016A000000677010112011501055360926419902150000022000755960320461131666018170000005303764540580.855802TH5918TESCO LOTUS CO LTD62120708461131666304BC28",
-    "00020101021130580016A00000067701011201150994002378766900210DONATION0203010530376454043.005802TH5930UNITED NATIONS CHILDREN S FUND6304266C",
-    "00020101021130670016A0000006770101120115010556103866388021012345678900310112233445553037645406103.005802TH5925CPF RESTAURANT AND FOOD C6304AB1D",
-    "00020101021130700016A0000006770101120115010556001059500021300011100011120310081909761453037645406104.005802TH5921SMART WASH 24 COMPANY6304108C",
-    "00020101021230820016A0000006770101120115010753600037405021500000220066077703204611316260181X00000053037645406178.225802TH5918LIM TREND EMPORIUM6212070846113162630427E5",
-    "00020101021230820016A0000006770101120115010753600037401021500000220100001503204611316460181300000053037645406201.785802TH5907S HOTEL621207084611316463043CCF",
-    "00020101021230820016A000000677010112011501075360003740502150000022005548220320461131616018260000005303764540870000.005802TH5918LIM TREND EMPORIUM6212070846113161630484BE"
-  ];
-
   @override
   void dispose() {
     _cameraController.dispose();
-    _testInputController.dispose();
     super.dispose();
   }
 
@@ -131,6 +123,16 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
       return;
     }
 
+    // ── KYC GATE ────────────────────────────────────────────────────────────
+    // Block unverified users at the moment of payment instead of letting the
+    // request fail at settlement. If the user is not VERIFIED, show a sheet that
+    // routes them into the KYC flow; only continue into payment once they verify.
+    final canProceed = await _ensureKycVerified();
+    if (!mounted || !canProceed) {
+      if (mounted) _resumeScanning();
+      return;
+    }
+
     final result = await showModalBottomSheet<bool>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -146,6 +148,51 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
       }
       _resumeScanning();
     }
+  }
+
+  /// Returns `true` if the user may proceed into the payment flow.
+  ///
+  /// Reads KYC status from the already-fetched DashboardController state when
+  /// available (no extra network round-trip); otherwise falls back to a fresh
+  /// fetch. Any status other than 'VERIFIED' (case-insensitive) triggers the
+  /// verification gate sheet, which routes to the `/kyc` flow.
+  Future<bool> _ensureKycVerified() async {
+    // Always start with the dashboard's cached value for zero-latency check.
+    String? cachedStatus;
+    try {
+      cachedStatus = context.read<DashboardController>().state.kycTier;
+    } catch (_) {}
+
+    // Cache is authoritative only when it's already VERIFIED — avoids
+    // a network round-trip on every scan for verified users.
+    if (cachedStatus?.toUpperCase() == 'VERIFIED') return true;
+
+    // Otherwise, fresh-fetch to get the true current status.
+    try {
+      final data = await ApiService.getKycStatus();
+      final freshStatus = (data['kyc_status'] as String?)?.toUpperCase();
+      if (freshStatus == 'VERIFIED') return true;
+    } catch (e) {
+      // Fail-open: backend still rejects unverified users at settlement.
+      debugPrint('⚠️ [ScanPage] KYC status fetch failed, allowing through: $e');
+      return true;
+    }
+
+    // Not verified — present the gate.
+    if (!mounted) return false;
+    final wantsToVerify = await KycRequiredSheet.show(context);
+    if (wantsToVerify != true || !mounted) return false;
+
+    final verified = await context.push<bool>('/kyc');
+
+    // Refresh dashboard so subsequent scans don't re-gate a now-verified user.
+    if (verified == true && mounted) {
+      try {
+        context.read<DashboardController>().refresh();
+      } catch (_) {}
+    }
+
+    return verified == true;
   }
 
   // ── BUILD ────────────────────────────────────────────────────────────────────
@@ -210,81 +257,6 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
 
                   const SizedBox(height: 12),
 
-                  // 🧪 Simulator Bypass Panel
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _testInputController,
-                                keyboardType: TextInputType.number,
-                                style: const TextStyle(color: Colors.white, fontSize: 13),
-                                decoration: InputDecoration(
-                                  hintText: 'Enter 1-7 to bypass...',
-                                  hintStyle: TextStyle(color: Colors.white54, fontSize: 13),
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  filled: true,
-                                  fillColor: Colors.white.withValues(alpha: 0.08),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
-                                  ),
-                                ),
-                                onChanged: (value) {
-                                  final num = int.tryParse(value.trim());
-                                  if (num != null && num >= 1 && num <= 7) {
-                                    _testInputController.clear();
-                                    _handleCode(_testQrs[num - 1]);
-                                  }
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: List.generate(7, (index) {
-                              final labels = [
-                                "1.Tesco", "2.Unicef", "3.CPF", "4.Smart", "5.Lim(S)", "6.Hotel", "7.Lim(E)"
-                              ];
-                              return Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                                child: ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppTheme.primaryTeal.withValues(alpha: 0.8),
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    minimumSize: Size.zero,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                  ),
-                                  onPressed: () {
-                                    _handleCode(_testQrs[index]);
-                                  },
-                                  child: Text(
-                                    labels[index],
-                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                              );
-                            }),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
 
                   const SizedBox(height: 16),
 

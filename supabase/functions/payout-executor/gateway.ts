@@ -150,7 +150,11 @@ export class MockGateway implements IPayoutGateway {
 
 /**
  * Gateway Factory
- * Returns the appropriate gateway based on environment
+ * Returns the appropriate gateway based on environment.
+ *
+ * NOTE: Real gateway implementations (SQRIL, SCB, 2C2P) belong in the Go backend,
+ * not here. This factory exists for mock/dev use only — production payout goes
+ * through Go backend → SQRIL via /payout/promptpay.
  */
 export function createGateway(): IPayoutGateway {
   const gatewayType = Deno.env.get('PAYOUT_GATEWAY') || 'MOCK';

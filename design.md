@@ -1,258 +1,121 @@
-นี่คือเอกสาร `design.md` ฉบับสมบูรณ์ที่รวบรวมทั้ง **Design System (Tokens, Components, Screens)** และ **Typography Rationale (การวิเคราะห์และตัดสินใจเลือกฟอนต์)** ไว้ในไฟล์เดียว 
-
-เอกสารนี้ถูกโครงสร้างแบบ **Declarative & Context-Engineered** เพื่อให้ AI Code Generator (เช่น Cursor, Copilot, Claude, GPT-4) สามารถอ่านและแปลงเป็น Flutter UI Code, Theme Data และ Widget Tree ได้ทันทีโดยไม่สับสนครับ
-
-คุณสามารถ Copy โค้ดด้านล่างไปบันทึกเป็นไฟล์ `design.md` ได้เลยครับ
-
-```markdown
-# Paycif Design System & Visual Specifications v1.0
-**Product:** Cross-border PromptPay payment orchestrator (Tourist App)
-**Target Framework:** Flutter (iOS + Android)
-**Design Paradigm:** Declarative, Token-Driven, Outdoor-Optimized Fintech
-**Context Engineering Note:** This document is structured for direct parsing by LLMs/Code Generators. Design tokens are provided in JSON. Component specs follow a strict property-state-variant model. UX research, user flows, and business logic are intentionally excluded to maintain strict UI/Visual scope.
+<!-- SEED: re-run /impeccable document once the new visual system has real code (theme, components) to capture actual tokens. This file replaces the prior design.md and design-system/paycif/MASTER.md, both of which are retired as of this seed — do not merge values from them. -->
 
 ---
-
-## 1. Design Philosophy & Typography Strategy
-
-### 1.1 Core Principles
-- **Warm Precision:** Approachable interface with deliberate, weighted typography for financial moments.
-- **Outdoor-First:** Designed for 400+ nit screens in direct sunlight. High contrast, generous spacing, 48dp minimum touch targets.
-- **Optimistic Speed:** Mask network latency (3-5s card auth) with immediate visual feedback. UI transitions before backend confirms.
-- **Merchant-Zero:** Tourist app must work seamlessly with existing PromptPay QR infrastructure without confusing the merchant.
-
-### 1.2 Typography Strategy: The IBM Plex Sans Decision
-**Selected Typeface:** `IBM Plex Sans` (UI/Body) + `IBM Plex Sans Thai` (Thai Fallback)
-**Rejected Alternative:** `DM Sans` + `DM Serif Display`
-
-**Rationale for Context Engineers & Developers:**
-While `DM Serif Display` offers superior "emotional weight" for financial numerals, **IBM Plex Sans** was selected as the optimal choice for Paycif based on the following constraints:
-1. **Multi-language & SE Asia Context:** IBM Plex natively supports Thai (Loopless/Looped) and CJK. Paycif operates in Thailand; merchant names and localized UI elements require robust Thai rendering without relying on disjointed system fallbacks.
-2. **Outdoor Legibility:** IBM Plex Sans maintains consistent stroke weight and stable contrast in direct sunlight/glare, whereas DM Sans's low-contrast design can blur at small sizes outdoors.
-3. **Development Simplicity:** A single, comprehensive font family reduces CSS/Theme complexity and prevents font-flickering (FOUT) during multi-language loads.
-
-**Injecting "Distinctive Elements" (Compensating for Sans-Serif Neutrality):**
-To prevent the UI from feeling "generic corporate" and to give financial amounts the psychological weight that a Serif font would provide, we enforce the following strict typographic treatments:
-- **Amount Treatment:** Payment amounts *must* use `Bold` (700) weight + increased `letter-spacing` (1.5px) + `primary.900` color. 
-- **Tabular Numerals:** Enable `tnum` (tabular numbers) font feature for all financial figures to ensure perfect vertical alignment in receipts and lists.
-- **Gold Accents:** Use `accent.500` (Gold) strictly for value indicators (FX rates, success states) to inject premium "Warm Precision" into the neutral sans-serif canvas.
-
+name: Paycif
+description: Cross-border PromptPay payment orchestration for tourists — trustworthy fintech, not a crypto app.
+colors:
+  navy-primary: "[to be resolved during implementation]"
+  neutral-bg: "[to be resolved during implementation]"
+  neutral-surface: "[to be resolved during implementation]"
+  ink: "[to be resolved during implementation]"
+typography:
+  display:
+    fontFamily: "[technical/geometric single sans — font to be chosen at implementation]"
+  body:
+    fontFamily: "[same family as display]"
 ---
 
-## 2. Design Tokens (Global Variables)
+# Design System: Paycif
 
-### 2.1 Color System
-Optimized for high outdoor visibility and low-light environments.
+## 1. Overview
 
-```json
-{
-  "colors": {
-    "primary": {
-      "50": "#E6F7F5", "100": "#B3E8E1", "200": "#80D9CD", "300": "#4DCAB9",
-      "400": "#26BFA9", "500": "#00A896", "600": "#008F7F", "700": "#007669",
-      "800": "#005D53", "900": "#028090"
-    },
-    "accent": {
-      "50": "#FEF6E0", "100": "#FDECC1", "200": "#FCE3A2", "300": "#FBD983",
-      "400": "#FAD064", "500": "#F4B41A", "600": "#D49A00", "700": "#B48100",
-      "800": "#946900", "900": "#745100"
-    },
-    "semantic": {
-      "success": { "light": "#D1FAE5", "default": "#10B981", "dark": "#047857" },
-      "error": { "light": "#FEE2E2", "default": "#EF4444", "dark": "#B91C1C" },
-      "warning": { "light": "#FEF3C7", "default": "#F59E0B", "dark": "#D97706" }
-    },
-    "surface": {
-      "canvas": "#F8FAFC", "default": "#FFFFFF", "elevated": "#FFFFFF",
-      "overlay": "rgba(15, 23, 42, 0.6)", "scrim": "rgba(0, 0, 0, 0.5)"
-    },
-    "text": {
-      "primary": "#0F172A", "secondary": "#64748B", "tertiary": "#94A3B8",
-      "inverse": "#FFFFFF", "disabled": "#CBD5E1"
-    },
-    "border": { "default": "#E2E8F0", "focus": "#00A896", "error": "#EF4444" }
-  }
-}
-```
+**Creative North Star: "The Quiet Exchange Counter"**
 
-### 2.2 Typography System
-```json
-{
-  "typography": {
-    "fontFamily": {
-      "primary": "IBM Plex Sans",
-      "thai": "IBM Plex Sans Thai",
-      "fallback": "SF Pro Display, Roboto, Noto Sans, sans-serif"
-    },
-    "scale": {
-      "display": { "size": 48, "weight": "Bold", "lineHeight": 1.2, "letterSpacing": 1.5, "usage": "Payment amounts" },
-      "h1": { "size": 32, "weight": "SemiBold", "lineHeight": 1.3, "letterSpacing": -0.3, "usage": "Receipt totals" },
-      "h2": { "size": 24, "weight": "SemiBold", "lineHeight": 1.3, "letterSpacing": -0.2, "usage": "Section headers" },
-      "h3": { "size": 20, "weight": "Medium", "lineHeight": 1.4, "letterSpacing": 0, "usage": "Card stats" },
-      "bodyLg": { "size": 16, "weight": "Regular", "lineHeight": 1.5, "letterSpacing": 0, "usage": "Body text (min outdoor size)" },
-      "body": { "size": 14, "weight": "Regular", "lineHeight": 1.5, "letterSpacing": 0, "usage": "Labels" },
-      "caption": { "size": 12, "weight": "Medium", "lineHeight": 1.4, "letterSpacing": 0.2, "usage": "Metadata" }
-    },
-    "fontFeatures": {
-      "amounts": "tnum",
-      "body": "calt, liga"
-    }
-  }
-}
-```
+Paycif's interface should feel like Wise or Revolut handed a tourist their receipt at a Thai counter — calm, numerate, and unmistakably not a crypto wallet. The stablecoin leg of the payment (on-ramp → USDC → off-ramp → PromptPay, per [PRODUCT.md](PRODUCT.md)) is infrastructure, not identity; nothing on screen should read as "crypto app," and nothing should imply Paycif itself holds or moves the user's money (Paycif orchestrates licensed partners only — see [CLAUDE.md](CLAUDE.md) §5). Apple Pay / Apple Wallet is the secondary reference for restraint and material honesty: flat, high-contrast, no unnecessary chrome.
 
-### 2.3 Spacing, Radii, Elevation & Motion
-```json
-{
-  "spacing": { "grid": 4, "tokens": { "xs": 4, "sm": 8, "md": 12, "lg": 16, "xl": 24, "2xl": 32, "3xl": 48 } },
-  "radii": { "sm": 8, "md": 12, "lg": 16, "xl": 24, "full": 9999 },
-  "elevation": {
-    "sm": "0 1px 2px rgba(15,23,42,0.05)",
-    "md": "0 4px 6px -1px rgba(15,23,42,0.1)",
-    "lg": "0 10px 15px -3px rgba(15,23,42,0.1)"
-  },
-  "motion": {
-    "duration": { "instant": 100, "fast": 200, "normal": 300, "deliberate": 700 },
-    "easing": { "standard": "cubic-bezier(0.4, 0.0, 0.2, 1)", "decelerate": "cubic-bezier(0.0, 0.0, 0.2, 1)" }
-  }
-}
-```
+This system explicitly rejects: Thai government-form-style banking UI (dense, dated, low contrast), and crypto/DeFi visual language (neon gradients, glassmorphism-as-default, wallet-address-forward layouts, gradient text).
 
----
+**Key Characteristics:**
+- Tinted neutral canvas, one navy accent used sparingly (≤10% of any screen)
+- Single geometric/technical sans across the whole type scale, no serif, no display font swap
+- Flat by default; elevation only appears as a direct response to interaction
+- Restrained motion — transitions mark state changes, nothing choreographed or decorative
+- Financial figures (amount, FX rate, fee) carry more visual weight than any other element on screen
 
-## 3. Component Library
+## 2. Colors
 
-### 3.1. Buttons (`PaycifButton`)
-| Property | Type | Default / Variants |
-| :--- | :--- | :--- |
-| `variant` | Enum | `primary` (Teal 500), `secondary` (Outline), `accent` (Gold 500), `ghost` |
-| `size` | Enum | `md` (H: 48px), `lg` (H: 56px - *Thumb Zone optimized*) |
-| `state` | Enum | `idle`, `loading` (Spinner, disables tap), `disabled` (Opacity 0.5) |
-| `typography` | String | `bodyLg`, `weight: SemiBold` |
-| `borderRadius`| Double | `radii.full` (Pill shape) |
+Restrained strategy: a cool, barely-tinted neutral scale carries the canvas; a single deep navy accent is reserved for primary actions, focus states, and financial emphasis. No secondary or tertiary color role — this is deliberately a two-role palette (Primary + Neutral), not a fabricated three-color system.
 
-### 3.2. Transaction Card (`FxBreakdownCard`)
-Used to display transparent FX rates and fees.
-- **Container:** `surface.elevated`, `radii.lg`, `elevation.md`, `padding.xl`.
-- **Layout:** Column.
-  - Row 1: "Amount" (`body`, `text.secondary`) | "1,000 THB" (`h2`, `text.primary`).
-  - Divider: `height: 1px`, `color: border.default`.
-  - Row 2: "FX Rate" (`caption`) | "1 USD = 36.5 THB" (`body`, `accent.500`, `SemiBold`).
-  - Row 3: "Network Fee" (`caption`) | "0.50 USD" (`body`).
-  - Row 4: "Total" (`h1`, `primary.900`) | "27.50 USD" (`display`, `primary.500`, `Bold`, `tnum`).
+### Primary
+- **Deep Navy** (`[to be resolved during implementation]`, anchor family: deep blue/navy in the Wise/Revolut register): primary buttons, active nav state, focus rings, links. Reserved — should not appear as a background fill of more than one region per screen.
 
-### 3.3. Bottom Sheet (`ActionSheet`)
-- **Behavior:** Draggable, snaps to 50% and 100% height. Backdrop: `surface.scrim`.
-- **Handle:** `width: 40px`, `height: 4px`, `radii.full`, `color: text.tertiary`, centered top margin `spacing.sm`.
-- **Header:** `h2` aligned left, Close Icon (X) aligned right.
+### Neutral
+- **Canvas** (`[to be resolved during implementation]`, near-white with a cool tint, not warm/cream): app background.
+- **Surface** (`[to be resolved during implementation]`): cards, sheets, elevated containers — one step off canvas, not a hard white-on-grey jump.
+- **Ink** (`[to be resolved during implementation]`): primary text. Must hit ≥4.5:1 against Canvas and Surface — do not default to a light/muted gray for body copy.
+- **Muted ink** (`[to be resolved during implementation]`): secondary/metadata text only, still ≥4.5:1 against its background.
+- **Border** (`[to be resolved during implementation]`): dividers, input strokes, card edges.
 
-### 3.4. QR Scanner Overlay (`ScannerOverlay`)
-- **Background:** Full-screen Camera Preview.
-- **Overlay:** `surface.overlay` with transparent cutout (280x280dp, centered).
-- **Targeting Brackets:** 4x L-shapes at cutout corners. **Color:** `accent.500` (Gold), **Stroke:** 4px.
-- **Top Safe Area:** Back button (Left), Flash/Torch Toggle (Right - *Critical for low-light*).
-- **Bottom Safe Area:** Container (`surface.default`, top `radii.lg`) with "Enter Merchant ID Manually" text button.
+### Named Rules
+**The One Accent Rule.** Navy appears on ≤10% of any given screen's surface area. Its rarity is what makes it read as an action, not decoration.
+**The No-Custody-Color Rule.** No color or fill is used in a way that implies a live balance or held funds belonging to Paycif — see [PRODUCT.md](PRODUCT.md) principle 2. Balances and rates are always framed as pass-through information, never as "your money sitting here."
 
----
+## 3. Typography
 
-## 4. Screen Layout Specifications
+**Display Font:** [single geometric/technical sans, family to be chosen at implementation — e.g. Inter or IBM Plex Sans family; no serif]
+**Body Font:** same family as Display — one typeface across the whole hierarchy, weight does the differentiating work.
 
-### 4.1. Transaction Review (`ReviewScreen`)
-*Context: Needs immediate trust and clarity before committing funds.*
-- **App Bar:** Transparent, Title: "Review Payment".
-- **Body (Scrollable):**
-  - **Merchant Header:** Avatar (Circle, `primary.50` bg with initials), Name (`h2`), Location (`caption`).
-  - **Amount Display:** `display` typography, centered, `primary.900`.
-  - **FX Breakdown Card:** (See 3.2).
-  - **Payment Method Selector:** Chips for Apple Pay / Google Pay / Card.
-- **Bottom Action Bar (Pinned):** `PaycifButton` (Variant: `primary`, Size: `lg`). Text: "Pay [Amount]".
+**Character:** Precise and unshowy. No font pairing, no personality font for headlines — the numbers and layout carry the "premium" feeling, not a display typeface.
 
-### 4.2. Processing & Success (`StatusScreen`)
-*Context: Optimistic UI to mask network latency (3-5s).*
-- **Processing State:** Full screen `surface.default`. Center: Custom `CircularProgressIndicator` (Teal/Gold gradient). Text: "Securing transaction...".
-- **Success State:** 
-  - Animation: Subtle scale-in of Success Checkmark (Lottie).
-  - Header: "Payment Successful" (`h1`, `success.default`).
-  - Receipt Card: Mimics physical receipt. Includes QR code for merchant verification.
-  - Action: "Done" button (`primary`, full width).
+### Hierarchy
+- **Display** (Bold/700, large, tight line-height, tabular numerals enabled): payment amount and FX rate only — the single most-looked-at element on any screen.
+- **Headline** (SemiBold/600): screen titles, receipt totals.
+- **Title** (Medium/500): section headers, card titles.
+- **Body** (Regular/400, 16px minimum): primary reading text, 65–75ch max where prose appears.
+- **Label** (Medium/500, small, slight positive letter-spacing): form labels, metadata, captions.
 
----
+### Named Rules
+**The Numbers-Are-the-Hero Rule.** Amount, FX rate, and fee always get more weight (via size/weight, never via color-as-decoration) than any surrounding chrome or copy.
 
-## 5. Visual States & Optimistic UI Rules
+## 4. Elevation
 
-| State | Visual Treatment | Flutter Implementation Note |
-| :--- | :--- | :--- |
-| **Loading (Skeleton)** | Shimmer effect using `primary.50` and `surface.canvas`. | Use `shimmer` package. Apply to `FxBreakdownCard` while fetching live rates. |
-| **Optimistic Success** | Immediate UI transition to Success Screen before backend webhook confirms. | Update local state immediately on button tap. Revert on WebSocket error. |
-| **Network Error** | Bottom Snackbar (Red background, White text). "Connection lost. Retry?" | Use `ScaffoldMessenger.showSnackBar`. Do not block main UI thread. |
-| **Low Signal** | Top Banner (Gold background, Dark text). "Weak signal - Transaction queued" | Persistent banner below App Bar if `ConnectivityResult.none`. |
+Flat by default — the Apple Pay / Apple Wallet reference means depth is conveyed through spacing and the Canvas/Surface tonal step, not drop shadows. Shadows exist only as a direct response to interaction state (a card lifting on press, a sheet appearing over content), never as ambient decoration on static elements.
 
----
+### Shadow Vocabulary
+- **Interaction-lift** (`[value to be resolved at implementation, subtle: short blur radius, low opacity]`): applied only on press/active states for tappable cards.
+- **Sheet-overlay** (`[value to be resolved at implementation]`): modal sheets and dialogs only.
 
-## 6. Accessibility & Localization Constraints
+### Named Rules
+**The Flat-at-Rest Rule.** No card, button, or container carries a shadow while idle. Shadows appear only as a direct response to touch.
 
-### 6.1. Contrast & Outdoor Visibility
-- **WCAG AAA Compliance:** All text on `primary.500` must be `text.inverse` (White). Contrast ratio > 7:1.
-- **Outdoor Mode:** If ambient light sensor detects high lux, automatically increase font weight to `SemiBold` and boost border widths by `1px`.
+## 5. Components
 
-### 6.2. Multi-language UI (i18n)
-- **Primary:** English (LTR).
-- **Secondary:** Chinese, Japanese, Korean, Thai.
-- **Thai Fallback Strategy:** Use `IBM Plex Sans Thai` (Loopless variant preferred for modern UI). Fallback to `Noto Sans Thai` if glyphs are missing.
-- **Dynamic Type:** UI must support OS-level font scaling up to `1.5x`. Use `FittedBox` for fixed-width amount displays to prevent overflow.
-- **Number Formatting:** Use `intl` package. (THB: `฿1,000.00`, JPY: `¥4,100` no decimals).
+### Buttons
+- **Shape:** rounded corners, moderate radius (not full-pill, not sharp-square) — to be fixed at implementation, consistent across all button sizes.
+- **Primary:** Navy fill, white text, Bold label, generous horizontal padding, ≥48dp touch target (outdoor/one-handed use per [PRODUCT.md](PRODUCT.md)).
+- **Secondary/Ghost:** Ink-colored outline or text-only, no fill — reserved for lower-emphasis actions (cancel, back).
+- **Hover/Focus:** state changes via opacity/border shift and a visible focus ring in Navy, transition duration short (restrained motion) — no scale/bounce.
 
----
+### Cards / Containers
+- **Corner Style:** same radius family as buttons, consistent scale.
+- **Background:** Surface tone, not pure white-on-white with canvas.
+- **Shadow Strategy:** flat at rest; Interaction-lift shadow only when the card is tappable and pressed.
+- **Border:** thin Border-token hairline where cards sit directly on Canvas without a shadow to separate them.
+- **Internal Padding:** generous — this is a payment app read outdoors, not a dense data table.
 
-## 7. Flutter Architecture Mapping (For Code Generation)
+### Inputs / Fields
+- **Style:** Border-token stroke, Surface background, same radius family.
+- **Focus:** Navy border shift + visible focus ring, no glow/blur effect.
+- **Error:** semantic red (retained from prior token set as a placeholder — reconfirm exact value at implementation), never conveyed by color alone — pair with icon + text.
 
-When generating the UI code, map the tokens to the following Flutter structure:
+### Amount Display (signature component)
+The single most important visual element in the app. Bold weight, Display-scale size, tabular numerals (`tnum` feature) for perfect alignment in receipts/lists, Ink color (not Navy — Navy is reserved for actions, not display of neutral financial fact). Never uses gradient text or decorative treatment.
 
-```dart
-// theme/paycif_theme.dart
-import 'package:flutter/material.dart';
+### Navigation
+- Bottom tab bar (mobile-native pattern) or platform-standard nav; active state indicated by Navy icon/label, inactive by Muted ink. No color-only differentiation — active state also gets a weight or fill change for colorblind users.
 
-ThemeData paycifTheme = ThemeData(
-  useMaterial3: true,
-  colorScheme: ColorScheme.light(
-    primary: Color(0xFF00A896),
-    secondary: Color(0xFFF4B41A),
-    surface: Color(0xFFFFFFFF),
-    background: Color(0xFFF8FAFC),
-  ),
-  fontFamily: 'IBM Plex Sans',
-  textTheme: TextTheme(
-    displayLarge: TextStyle(
-      fontSize: 48,
-      fontWeight: FontWeight.bold,
-      letterSpacing: 1.5, // Distinctive Element: Wide tracking for amounts
-      height: 1.2,
-      fontFeatures: [FontFeature.tabularFigures()], // Distinctive Element: tnum
-      color: Color(0xFF028090), // primary.900
-    ),
-    bodyLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.w400, height: 1.5),
-  ),
-  elevatedButtonTheme: ElevatedButtonThemeData(
-    style: ElevatedButton.styleFrom(
-      minimumSize: Size(double.infinity, 56),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9999)),
-      backgroundColor: Color(0xFF00A896),
-      foregroundColor: Colors.white,
-    ),
-  ),
-);
-```
+## 6. Do's and Don'ts
 
-### Folder Structure
-```text
-lib/
-├── theme/          # paycif_theme.dart, tokens.dart
-├── components/     # buttons/, cards/, inputs/, sheets/, feedback/
-├── screens/        # home, scan, review, success, history
-└── utils/          # formatters.dart (intl), haptics.dart
-```
-```
+### Do:
+- **Do** use tabular numerals and bold weight for every payment amount, FX rate, and fee display.
+- **Do** keep Navy to ≤10% of any screen's surface area — reserve it for actions and financial emphasis, not decoration.
+- **Do** maintain ≥4.5:1 contrast for all body and label text, including "muted" secondary text.
+- **Do** keep motion restrained: transitions on state change only, no choreographed entrances.
+- **Do** design every balance/rate display as pass-through information, never as a Paycif-held balance.
 
-### คำแนะนำเพิ่มเติมสำหรับการนำไปใช้งาน (Context Engineering Workflow)
-1. **การป้อนให้ AI (Prompting):** เมื่อคุณใช้ Cursor หรือ Copilot ให้ Copy ไฟล์ `design.md` นี้ใส่ใน `.cursorrules` หรือแนบเป็น Context (`@design.md`) แล้วสั่งว่า *"Generate the `FxBreakdownCard` widget based on the design system specs, ensuring the tabular figures and letter-spacing for the total amount are applied exactly as defined."* AI จะเขียนโค้ดที่แม่นยำระดับ Production-ready ให้ทันที
-2. **Font Assets:** อย่าลืมเพิ่ม `IBM Plex Sans` และ `IBM Plex Sans Thai` เข้าไปใน `pubspec.yaml` และตั้งค่า `fontFamilyFallback` ใน Flutter ให้เรียบร้อยเพื่อให้รองรับภาษาไทยอย่างสมบูรณ์ครับ
+### Don't:
+- **Don't** use gradient text, glassmorphism-as-default, or neon accents — this is explicitly rejected per PRODUCT.md's crypto/DeFi anti-reference.
+- **Don't** design UI that resembles traditional Thai bank apps (dense forms, dated iconography, low-contrast government-style layouts) — the other named anti-reference from PRODUCT.md.
+- **Don't** apply a drop shadow to any static, at-rest element — flat by default, per the Flat-at-Rest Rule.
+- **Don't** use a serif or second display typeface anywhere; one geometric/technical sans carries the entire hierarchy.
+- **Don't** use side-stripe borders, tiny uppercase eyebrows, or numbered section markers as default scaffolding — general anti-slop bans apply project-wide.

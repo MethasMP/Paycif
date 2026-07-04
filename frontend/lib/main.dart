@@ -18,7 +18,6 @@ import 'package:provider/provider.dart';
 import 'package:frontend/features/dashboard/presentation/dashboard_controller.dart';
 import 'package:frontend/features/payment/presentation/payment_controller.dart';
 import 'package:frontend/features/dashboard/data/dashboard_repository.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:frontend/core/network/push_notification_service.dart';
@@ -33,20 +32,40 @@ import 'package:frontend/features/security/presentation/logic/security_controlle
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: ".env");
   await ApiService.initHostOverride();
 
-  final supabaseUrl = dotenv.env['SUPABASE_URL'];
-  final supabaseKey = dotenv.env['SUPABASE_ANON_KEY'];
+  const supabaseUrlEnv = String.fromEnvironment('SUPABASE_URL');
+  const supabaseKeyEnv = String.fromEnvironment('SUPABASE_ANON_KEY');
 
-  final parsedUrl = supabaseUrl != null ? Uri.tryParse(supabaseUrl) : null;
-  if (supabaseUrl == null || parsedUrl == null || !parsedUrl.isAbsolute) {
+  // 🔌 Fallback to default local development credentials if not specified in environment
+  final String supabaseUrlRaw = supabaseUrlEnv.isNotEmpty 
+      ? supabaseUrlEnv 
+      : 'http://127.0.0.1:54321';
+  final String supabaseKey = supabaseKeyEnv.isNotEmpty 
+      ? supabaseKeyEnv 
+      : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+
+  final supabaseUrl = ApiService.resolveLocalHost(supabaseUrlRaw);
+
+  final parsedUrl = supabaseUrl.isNotEmpty ? Uri.tryParse(supabaseUrl) : null;
+  if (supabaseUrl.isEmpty || parsedUrl == null || !parsedUrl.isAbsolute) {
     throw Exception(
       '🚨 FATAL ERROR: Malformed or missing SUPABASE_URL in .env. Checking this prevents the "WebSocket 500" crash.',
     );
   }
 
-  await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey ?? '');
+  // 🛡️ Realtime Stability Fix: Explicit RealtimeClientOptions prevent premature
+  // WebSocket disconnects (channel error 1002) on mobile networks with brief
+  // interruptions. eventsPerSecond: 10 documents the intended rate-limit and
+  // shields against future SDK default changes that could break reconnect logic.
+  await Supabase.initialize(
+    url: supabaseUrl,
+    publishableKey: supabaseKey,
+    realtimeClientOptions: const RealtimeClientOptions(
+      eventsPerSecond: 10,
+      // logLevel: RealtimeLogLevel.info, // enable only for debug
+    ),
+  );
 
   // 🛡️ Firebase Initialization (Required for Push Notifications)
   try {
@@ -74,12 +93,12 @@ Future<void> main() async {
   // 🛡️ World-Class Diagnostic: Project Environment Audit
   // Log truncated URL and Key prefix to detect environment mismatches without leaking secrets.
   final projectRef = Uri.parse(supabaseUrl).host.split('.').first;
-  final keyPrefix = (supabaseKey ?? '').length > 10
-      ? (supabaseKey ?? '').substring(0, 10)
+  final keyPrefix = supabaseKey.length > 10
+      ? supabaseKey.substring(0, 10)
       : 'INVALID';
   debugPrint('🚀 [Environment] Project: $projectRef');
   debugPrint('🚀 [Environment] Key Prefix: $keyPrefix...');
-  debugPrint('🚀 [Environment] Backend: ${dotenv.env['BACKEND_URL']}');
+  debugPrint('🚀 [Environment] Backend: ${const String.fromEnvironment('BACKEND_URL')}');
 
   // 10x Performance: Establish early connection to backend
   ApiService.prewarmConnection().ignore();

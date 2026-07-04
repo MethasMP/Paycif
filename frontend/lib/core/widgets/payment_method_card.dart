@@ -2,6 +2,7 @@ import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:frontend/core/theme/app_theme.dart';
+import 'package:frontend/core/l10n/generated/app_localizations.dart';
 
 /// ─────────────────────────────────────────────────────────────────────────────
 /// PAYMENT METHOD CARD
@@ -50,9 +51,7 @@ class PaymentMethodCard extends StatelessWidget {
           border: Border.all(
             color: isSelected
                 ? AppTheme.primaryColor(context)
-                : (isDark
-                      ? Colors.white10
-                      : Colors.grey.withValues(alpha: 0.15)),
+                : (isDark ? Colors.white10 : AppTheme.borderGrey),
             width: isSelected ? 2 : 1,
           ),
           boxShadow: isSelected
@@ -118,9 +117,9 @@ class PaymentMethodCard extends StatelessWidget {
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
-                            'Default',
+                            AppLocalizations.of(context)!.commonDefault,
                             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                  color: AppTheme.successGreen,
+                                  color: AppTheme.successGreenText,
                                   fontSize: 10,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -134,7 +133,7 @@ class PaymentMethodCard extends StatelessWidget {
                     Text(
                       subtitle!,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: isDark ? Colors.grey[400] : Colors.grey[600],
+                            color: AppTheme.textSecondaryColor(context),
                           ),
                     ),
                   ],
@@ -166,7 +165,7 @@ class PaymentMethodCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: isDark ? Colors.white24 : Colors.grey[300]!,
+                    color: isDark ? Colors.white24 : AppTheme.borderGrey,
                     width: 2,
                   ),
                 ),

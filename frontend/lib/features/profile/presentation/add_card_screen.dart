@@ -223,7 +223,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
                               _loadingMessage = 'Securing card data...';
                             });
                             try {
-                              throw Exception('Card binding is temporarily disabled. Moving to Coinflow.');
+                              throw Exception('card_binding_temporarily_disabled');
                             } catch (e) {
                               if (!mounted || !context.mounted) return;
                               setState(() {

@@ -55,13 +55,19 @@ func (s *FXService) CalculateDynamicQuote(ctx context.Context, targetAmountUSD f
 	targetCrypto := decimal.NewFromFloat(targetAmountUSD)
 
 	// Add ACH Network Fee (in Crypto) to target before converting to Fiat
-	networkFee, _ := decimal.NewFromString(achQuote.NetworkFee)
+	networkFee, err := decimal.NewFromString(achQuote.NetworkFee)
+	if err != nil {
+		return nil, fmt.Errorf("invalid network fee from ACH: %w", err)
+	}
 	totalCryptoNeeded := targetCrypto.Add(networkFee)
 
 	baseFiatAmount := totalCryptoNeeded.Mul(price)
 
 	// Add ACH RampFee
-	rampFee, _ := decimal.NewFromString(achQuote.RampFee)
+	rampFee, err := decimal.NewFromString(achQuote.RampFee)
+	if err != nil {
+		return nil, fmt.Errorf("invalid ramp fee from ACH: %w", err)
+	}
 	baseFiatAmount = baseFiatAmount.Add(rampFee)
 
 	// 4. Calculate Paycif Platform Fee (Our Dynamic Corridor Spread)
@@ -92,7 +98,10 @@ func (s *FXService) ConvertToBase(ctx context.Context, amount int64, currency st
 		resp, err := s.GRPCClient.Convert(ctx, currency, "THB", amount, "srv-req")
 		if err == nil && resp.Success {
 			// Success!
-			rate, _ := decimal.NewFromString(resp.RateUsed)
+			rate, err := decimal.NewFromString(resp.RateUsed)
+			if err != nil {
+				return 0, decimal.Zero, fmt.Errorf("invalid decimal rate from Rust FX Engine: %w", err)
+			}
 			return resp.ConvertedAmount, rate, nil
 		}
 		// If failed, log and fall back to DB
@@ -121,7 +130,7 @@ func (s *FXService) ConvertToBase(ctx context.Context, amount int64, currency st
 	return baseAmountDec.IntPart(), rate, nil
 }
 
-// GetLimits returns the daily limit status from Rust FX Engine or dummy Fallback
+// GetLimits returns the daily limit status from Rust FX Engine
 func (s *FXService) GetLimits(ctx context.Context, userID, currency string) (map[string]interface{}, error) {
 	// 1. Try Rust FX Engine
 	if s.GRPCClient != nil {
@@ -134,16 +143,10 @@ func (s *FXService) GetLimits(ctx context.Context, userID, currency string) (map
 				"max_transaction_amount": resp.MaxTransactionAmount,
 			}, nil
 		}
-		log.Printf("⚠️ Rust Limit Check unreachable or failed: %v. Returning fallback.", err)
+		return nil, fmt.Errorf("failed to fetch daily limits: %w", err)
 	}
 
-	// 2. Fallback: Return dummy limits since topups are deprecated in Pay-per-use model
-	return map[string]interface{}{
-		"max_daily_amount":       20000.0,
-		"remaining_daily_amount": 20000.0,
-		"current_daily_total":    0.0,
-		"max_transaction_amount": 20000.0,
-	}, nil
+	return nil, fmt.Errorf("Rust FX Engine client not initialized")
 }
 
 // PreValidateTransfer checks signature and limits via Rust FX Engine

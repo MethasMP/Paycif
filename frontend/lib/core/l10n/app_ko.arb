@@ -6,7 +6,6 @@
   "navPayment": "결제",
   "navProfile": "프로필",
   "navScan": "스캔",
-
   "profileTitle": "프로필 설정",
   "passportLabel": "PASSPORT",
   "accountSecurity": "계정 보안",
@@ -23,7 +22,6 @@
   "contactSupport": "지원팀 문의",
   "signOut": "로그아웃",
   "version": "버전",
-
   "paymentStatus": "결제 상태",
   "paymentReady": "준비 완료",
   "paymentReliable": "신뢰할 수 있음",
@@ -34,7 +32,6 @@
   "paymentEmptyDesc": "결제 수단을 추가하면 모든 거래에 대해 최적의 옵션을 자동으로 선택해 드립니다.",
   "paymentChangeMethod": "결제 수단 변경 (필요 시)",
   "paymentHideOptions": "다른 옵션 숨기기",
-
   "sheetAddPayment": "결제 수단 추가",
   "sheetCreditCard": "신용/직불 카드",
   "sheetCreditCardDesc": "Visa, Mastercard, JCB, Amex",
@@ -42,7 +39,6 @@
   "sheetTopUpDesc": "은행 이체 또는 PromptPay 이용",
   "sheetDigitalWallet": "디지털 지갑 연결",
   "sheetDigitalWalletDesc": "PayPal, Alipay, WeChat Pay",
-
   "commonEnabled": "활성화",
   "commonDisabled": "비활성화",
   "commonSuccess": "성공",
@@ -64,7 +60,6 @@
   "commonContinue": "계속",
   "commonNext": "다음",
   "commonConfirm": "확인",
-
   "homeTopUp": "충전",
   "homeInfo": "정보",
   "homeMore": "더보기",
@@ -75,12 +70,17 @@
   "homePaycifPremier": "Paycif PREMIER",
   "homeRecentTransactions": "최근 거래",
   "homeViewAll": "모두 보기",
+  "homeQuickActions": "빠른 작업",
+  "homeActionCards": "카드",
+  "homeActionRates": "환율",
+  "homeNoRecentTransactions": "최근 거래가 없습니다",
+  "homeFxLocked": "고정됨",
+  "homeFxUnavailable": "실시간 환율을 이용할 수 없습니다",
+  "homeFxRate": "실시간 환율: 1 USD ≈ {rate} THB",
   "homeNoTransactions": "거래 내역이 없습니다",
   "homeNoTransactionsDesc": "카드를 사용하기 시작하면 금융 활동 내역이 여기에 표시됩니다.",
-
   "historyTitle": "활동 내역",
   "historyNoActivity": "활동 내역 없음",
-
   "scanTitle": "QR 스캔",
   "scanErrorCamera": "카메라 오류",
   "scanGuideTitle": "Thai QR 결제 가이드",
@@ -92,7 +92,6 @@
   "scanGuideCurrencyDesc": "바트화와 USD 가격을 동시에 제공합니다.",
   "scanPaymentSuccess": "결제 성공!",
   "scanNoQrFound": "QR 코드를 찾을 수 없습니다",
-
   "topUpTitle": "잔액 충전",
   "topUpAmountLabel": "충전 금액",
   "topUpEnterAmount": "금액을 입력해 주세요",
@@ -160,7 +159,6 @@
       }
     }
   },
-
   "cardTitle": "카드 추가",
   "cardNumber": "카드 번호",
   "cardInvalidNumber": "유효하지 않은 카드 번호입니다",
@@ -180,27 +178,23 @@
   "cardPreviewHolder": "CARD HOLDER",
   "cardPreviewExpires": "EXPIRES",
   "cardAddBtn": "카드 추가",
-
   "confirmTitle": "결제 확인",
   "confirmBestOption": "최적 옵션",
   "confirmEnterAmount": "금액 입력",
   "confirmTotalPayment": "총 결제 금액",
   "confirmPaymentSuccess": "결제 완료",
   "confirmMyWallet": "내 지갑",
-
   "walletZeroFees": "수수료 무료",
   "walletInstantTransfer": "즉시 종료",
   "walletReliablePayment": "안전 결제",
   "walletPaymentMethod": "결제 수단",
-
   "scanUnknownRecipient": "알 수 없는 수신자",
-
   "profileGuestUser": "게스트 사용자",
   "noInternetTitle": "연결 없음",
   "noInternetMessage": "인터넷 연결 상태를 확인해 주세요",
   "noInternetRetry": "재시도",
   "splashLoading": "서비스에 연결 중...",
-
+  "splashTagline": "안전함. 간편함. 글로벌.",
   "paymentSuccessTitle": "결제 성공!",
   "payReviewTitle": "결제 확인",
   "payAmountLabel": "금액",
@@ -217,6 +211,23 @@
   "payCrossBorderDisclaimer": "* 카드 발급사가 해외 결제 수수료를 부과할 수 있습니다.",
   "payMethodPayPerUse": "건별 결제",
   "payNoMethodSelected": "선택된 결제 수단이 없습니다",
+  "paySecuredByPartner": "결제 파트너사가 보호합니다",
+  "payViaCardPartnerTitle": "카드로 결제",
+  "payViaCardPartnerSubtitle": "안전한 결제 화면으로 이동합니다. 카드 정보는 결제 파트너사가 관리하며 Paycif에는 저장되지 않습니다.",
+  "sendMoneyTitle": "송금하기",
+  "amountLookingUpRecipient": "조회 중...",
+  "amountInputLabel": "입력 금액",
+  "amountApproxUsdLabel": "≈ {amount} USD",
+  "amountRateLockedNotice": "환율이 고정되었습니다. {percent}% 수수료가 포함됩니다.",
+  "paymentSettingsTitle": "결제 설정",
+  "paymentSettingsHeroLabel": "안전한 카드 보관함",
+  "paymentSettingsSectionTitle": "결제 수단 통합 관리",
+  "paymentSettingsDescription": "저장된 신용/체크카드, Apple Pay, Google Pay, 계좌 이체 및 선호 통화(법정/암호화폐)를 한 곳에서 안전하게 관리하세요.",
+  "paymentSettingsManageCta": "결제 환경설정 관리",
+  "paymentSettingsSetupCta": "결제 수단 설정",
+  "paymentSettingsFootnote": "결제 정보는 암호화되어 결제 파트너사가 안전하게 관리합니다. Paycif는 카드 정보를 저장하지 않습니다.",
+  "paymentSettingsOpenFailed": "결제 위젯을 열 수 없습니다. 다시 시도해 주세요.",
+  "paymentSettingsWebviewTitle": "결제 수단 관리",
   "successAppBarTitle": "전자 영수증",
   "successVerifiedBadge": "Paycif 네트워크에서 인증됨",
   "successFromLabel": "보낸 사람",
@@ -224,6 +235,7 @@
   "successYourWallet": "내 지갑",
   "successMerchantLabel": "가맹점",
   "successRefIdLabel": "참조 ID",
+  "successVerifiedLabel": "인증됨",
   "successBackToHome": "홈으로 돌아가기",
   "successSaveToGallery": "갤러리에 저장",
   "commonSomethingWentWrong": "문제가 발생했습니다.",
@@ -236,7 +248,6 @@
   "confirmPaymentFailed": "결제 실패",
   "commonOk": "확인",
   "commonValidationFailed": "강조 표시된 필드를 확인하십시오.",
-  "commonForgotPin": "PIN을 잊으셨나요?",
   "errorCardInvalid": "카드 정보가 올바르지 않습니다. 확인 후 다시 시도하십시오.",
   "errorInsufficientFunds": "계좌에 잔액이 부족합니다.",
   "errorProcessingFailed": "결제를 처리할 수 없습니다. 나중에 다시 시도하십시오.",
@@ -257,7 +268,6 @@
       }
     }
   },
-  "paymentSettingsTitle": "결제 설정",
   "paymentPayWithApple": "Apple Pay로 결제",
   "paymentPayWith": "{method}(으)로 결제",
   "@paymentPayWith": {
@@ -328,24 +338,24 @@
   "topUpNameOnCard": "카드 소유자 이름",
   "topUpPayNow": "지금 결제",
   "topUpTestCardHint": "테스트 카드: 4242 4242... (미래의 날짜)",
-
   "biometricLabel": "생체 인증",
   "biometricSettingsUpdated": "생체 인증 설정이 업데이트되었습니다",
   "biometricNotAvailable": "이 기기에서는 생체 인증을 사용할 수 없습니다",
   "biometricNotEnrolled": "등록된 생체 정보가 없습니다. 기기 설정에서 등록해주세요.",
   "biometricConfirmManage": "생체 인증 설정을 관리하려면 확인하세요",
-
+  "biometricPinPrompt": "계속하려면 PIN을 확인하세요.",
+  "profileVerifiedBadge": "인증된 계정",
+  "profileKycRequiredTitle": "신원 확인이 필요합니다",
+  "profileKycRequiredMessage": "신원을 확인하면 한도가 늘어나고 계정이 더 안전해집니다.",
+  "profileVerifyNowCta": "지금 확인하기",
   "kycStatusVerified": "인증됨",
   "kycStatusPending": "확인 중",
   "kycStatusUnverified": "미인증",
-
   "aboutApp": "앱 정보",
   "termsOfService": "이용약관",
   "privacyPolicy": "개인정보 처리방침",
-
   "signOutConfirmTitle": "로그아웃",
   "signOutConfirmMessage": "로그아웃 하시겠습니까?",
-
   "helpSearchHint": "도움말 검색...",
   "helpNoResults": "결과를 찾을 수 없습니다",
   "helpStillNeedHelp": "아직 도움이 필요하신가요?",
@@ -374,7 +384,6 @@
   "helpCardA1": "Visa, Mastercard, JCB, American Express를 지원합니다.",
   "helpCardQ2": "저장된 카드를 삭제하려면?",
   "helpCardA2": "결제 > 카드를 왼쪽으로 스와이프하거나 메뉴 아이콘 > 삭제를 선택하세요.",
-
   "supportHeaderTitle": "언제든 도와드리겠습니다",
   "supportHeaderSubtitle": "보통 2시간 내에 응답합니다",
   "supportSelectCategory": "어떤 도움이 필요하신가요?",
@@ -390,7 +399,6 @@
   "supportSubmit": "요청 제출",
   "supportTicketSubmitted": "지원 티켓이 접수되었습니다. 24시간 내에 응답 드리겠습니다.",
   "supportAlternativeContact": "또는 직접 연락하세요",
-
   "termsLastUpdated": "최종 업데이트: 2026년 1월",
   "termsSection1Title": "1. 이용약관 동의",
   "termsSection1Content": "Paycif 서비스를 이용하시면 본 이용약관에 동의하신 것으로 간주됩니다.",
@@ -405,7 +413,6 @@
   "termsSection6Title": "6. 준거법",
   "termsSection6Content": "본 약관은 태국 법률의 적용을 받습니다. 분쟁은 방콕에서 중재를 통해 해결됩니다.",
   "termsContact": "약관에 관한 문의: legal@paycif.com",
-
   "privacyLastUpdated": "최종 업데이트: 2026년 1월",
   "privacyHighlightsTitle": "개인정보 보호 요약",
   "privacyHighlight1": "개인 데이터를 제3자에게 판매하지 않습니다",
@@ -435,5 +442,33 @@
   "notificationTransactionAlertsDesc": "송금, 수신 및 충전 알림.",
   "notificationUpdates": "업데이트",
   "notificationNewsPromotions": "뉴스 및 프로모션",
-  "notificationNewsPromotionsDesc": "독점 혜택 및 기능 업데이트."
+  "notificationNewsPromotionsDesc": "독점 혜택 및 기능 업데이트.",
+  "loginMagicLinkSent": "매직 로그인 링크를 보냈습니다! 받은 편지함을 확인하세요.",
+  "loginHeroTagline": "어디서나 즉시 결제하세요.",
+  "loginContinueWithGoogle": "Google로 계속하기",
+  "loginContinueWithApple": "Apple로 계속하기",
+  "loginEmailHint": "이메일 주소",
+  "loginEmailRequired": "이메일을 입력해주세요",
+  "loginEmailInvalid": "유효한 이메일 주소를 입력해주세요",
+  "loginContinueButton": "계속",
+  "loginBankGradeSecurity": "은행 수준의 보안",
+  "loginUseEmailInstead": "이메일로 계속 →",
+  "kycAppBarTitle": "본인 인증",
+  "kycStatusPreparing": "인증을 준비하는 중...",
+  "kycStatusOpening": "인증 화면을 여는 중...",
+  "kycStatusInProgress": "인증 진행 중",
+  "kycStatusChecking": "상태를 확인하는 중...",
+  "kycStatusComplete": "인증 완료",
+  "kycStatusIssue": "인증에 문제가 있습니다",
+  "kycMessageSettingUp": "안전한 인증 세션을 준비하는 중입니다...",
+  "kycMessageWaiting": "인증 결과를 기다리는 중입니다. 보통 몇 초 정도 걸립니다.",
+  "kycMessageVerified": "신원 인증이 완료되었습니다.",
+  "kycMessageDefault": "모든 기능을 이용하려면 안내에 따라 본인 인증을 진행해주세요.",
+  "kycReopenVerification": "인증 다시 열기",
+  "kycTryAgain": "다시 시도",
+  "kycDoThisLater": "나중에 하기",
+  "devicesRevokeSuccess": "기기가 해지되었습니다",
+  "devicesRevokeFailed": "기기 해지에 실패했습니다",
+  "profileSignOutCriticalError": "로그아웃 중 심각한 오류가 발생했습니다. 앱을 강제 종료해주세요.",
+  "kycMessageAwaitingResult": "인증을 처리하는 중입니다. 완료되면 상태가 자동으로 업데이트됩니다."
 }

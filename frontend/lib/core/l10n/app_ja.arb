@@ -6,7 +6,6 @@
   "navPayment": "支払い",
   "navProfile": "プロフィール",
   "navScan": "スキャン",
-
   "profileTitle": "マイプロフィール",
   "passportLabel": "PASSPORT",
   "accountSecurity": "アカウントセキュリティ",
@@ -23,7 +22,6 @@
   "contactSupport": "サポートに連絡",
   "signOut": "サインアウト",
   "version": "バージョン",
-
   "paymentStatus": "支払いステータス",
   "paymentReady": "準備完了",
   "paymentReliable": "信頼",
@@ -34,7 +32,6 @@
   "paymentEmptyDesc": "支払い方法を追加すると、すべての取引に最適なオプションが自動的に選択されます。",
   "paymentChangeMethod": "方法を変更（必要な場合）",
   "paymentHideOptions": "他のオプションを非表示",
-
   "sheetAddPayment": "支払い方法の追加",
   "sheetCreditCard": "クレジットカード・デビットカード",
   "sheetCreditCardDesc": "Visa, Mastercard, JCB, Amex",
@@ -42,7 +39,6 @@
   "sheetTopUpDesc": "銀行振込またはPromptPay",
   "sheetDigitalWallet": "デジタルウォレット連携",
   "sheetDigitalWalletDesc": "PayPal, Alipay, WeChat Pay",
-
   "commonEnabled": "有効",
   "commonDisabled": "無効",
   "commonSuccess": "成功",
@@ -65,7 +61,6 @@
   "commonContinue": "続行",
   "commonNext": "次へ",
   "commonConfirm": "確認",
-
   "homeTopUp": "入金",
   "homeInfo": "情報",
   "homeMore": "もっと見る",
@@ -76,12 +71,17 @@
   "homePaycifPremier": "Paycif PREMIER",
   "homeRecentTransactions": "最近の取引",
   "homeViewAll": "すべて表示",
+  "homeQuickActions": "クイックアクション",
+  "homeActionCards": "カード",
+  "homeActionRates": "レート",
+  "homeNoRecentTransactions": "最近の取引はありません",
+  "homeFxLocked": "確定済み",
+  "homeFxUnavailable": "リアルタイム為替レートは利用できません",
+  "homeFxRate": "リアルタイム為替: 1 USD ≈ {rate} THB",
   "homeNoTransactions": "取引履歴がありません",
   "homeNoTransactionsDesc": "カードの使用を開始すると、ここに取引活動が表示されます。",
-
   "historyTitle": "アクティビティ",
   "historyNoActivity": "アクティビティなし",
-
   "scanTitle": "QRスキャン",
   "scanErrorCamera": "カメラエラー",
   "scanGuideTitle": "Thai QR 決済ガイド",
@@ -93,7 +93,6 @@
   "scanGuideCurrencyDesc": "バーツと米ドルの両方で算出・表示されます。",
   "scanPaymentSuccess": "支払い完了",
   "scanNoQrFound": "QRコードが見つかりません",
-
   "topUpTitle": "残高チャージ",
   "topUpAmountLabel": "チャージ金額",
   "topUpEnterAmount": "金額を入力してください",
@@ -161,7 +160,6 @@
       }
     }
   },
-
   "cardTitle": "カード追加",
   "cardNumber": "カード番号",
   "cardInvalidNumber": "無効なカード番号です",
@@ -181,27 +179,23 @@
   "cardPreviewHolder": "CARD HOLDER",
   "cardPreviewExpires": "EXPIRES",
   "cardAddBtn": "カードを追加",
-
   "confirmTitle": "支払い確認",
   "confirmBestOption": "最適な選択肢",
   "confirmEnterAmount": "金額を入力",
   "confirmTotalPayment": "合計支払い額",
   "confirmPaymentSuccess": "お支払い完了",
   "confirmMyWallet": "マイウォレット",
-
   "walletZeroFees": "手数料ゼロ",
   "walletInstantTransfer": "即時送金",
   "walletReliablePayment": "安全な支払い",
   "walletPaymentMethod": "支払い方法",
-
   "scanUnknownRecipient": "不明な受取人",
-
   "profileGuestUser": "ゲストユーザー",
   "noInternetTitle": "オフライン",
   "noInternetMessage": "インターネット接続を確認してください",
   "noInternetRetry": "再試行",
   "splashLoading": "サーバーに接続中...",
-
+  "splashTagline": "安全。シンプル。グローバル。",
   "paymentSuccessTitle": "支払いが成功しました！",
   "payReviewTitle": "支払いを確認",
   "payAmountLabel": "金額",
@@ -218,6 +212,23 @@
   "payCrossBorderDisclaimer": "※カード発行会社により海外手数料が適用される場合があります。",
   "payMethodPayPerUse": "都度払い",
   "payNoMethodSelected": "支払い方法が選択されていません",
+  "paySecuredByPartner": "決済パートナーによって保護されています",
+  "payViaCardPartnerTitle": "カードで支払う",
+  "payViaCardPartnerSubtitle": "安全な決済画面に移動します。カード情報は決済パートナーが管理し、Paycifには保存されません。",
+  "sendMoneyTitle": "送金する",
+  "amountLookingUpRecipient": "検索中...",
+  "amountInputLabel": "入力金額",
+  "amountApproxUsdLabel": "≈ {amount} USD",
+  "amountRateLockedNotice": "レートは固定されています。{percent}%の手数料を含みます。",
+  "paymentSettingsTitle": "支払い設定",
+  "paymentSettingsHeroLabel": "安全なカード保管庫",
+  "paymentSettingsSectionTitle": "支払い方法をまとめて管理",
+  "paymentSettingsDescription": "保存済みのクレジット/デビットカード、Apple Pay、Google Pay、銀行振込、優先通貨（法定通貨/暗号資産）を安全に一括管理できます。",
+  "paymentSettingsManageCta": "支払い設定を管理",
+  "paymentSettingsSetupCta": "支払い方法を設定",
+  "paymentSettingsFootnote": "お支払い情報は暗号化され、決済パートナーによって安全に管理されます。Paycifはカード情報を保存しません。",
+  "paymentSettingsOpenFailed": "決済ウィジェットを開けませんでした。もう一度お試しください。",
+  "paymentSettingsWebviewTitle": "支払い方法の管理",
   "successAppBarTitle": "電子レシート",
   "successVerifiedBadge": "Paycifネットワークで認証済み",
   "successFromLabel": "送金元",
@@ -225,6 +236,7 @@
   "successYourWallet": "マイウォレット",
   "successMerchantLabel": "加盟店",
   "successRefIdLabel": "参照ID",
+  "successVerifiedLabel": "認証済み",
   "successBackToHome": "ホームに戻る",
   "successSaveToGallery": "ギャラリーに保存",
   "commonSomethingWentWrong": "問題が発生しました。",
@@ -256,7 +268,6 @@
       }
     }
   },
-  "paymentSettingsTitle": "支払い設定",
   "paymentPayWithApple": "Apple Payで支払う",
   "paymentPayWith": "{method}で支払う",
   "@paymentPayWith": {
@@ -327,24 +338,24 @@
   "topUpNameOnCard": "カード名義",
   "topUpPayNow": "今すぐ支払う",
   "topUpTestCardHint": "テストカード: 4242 4242... (未来の日付)",
-
   "biometricLabel": "生体認証",
   "biometricSettingsUpdated": "生体認証設定を更新しました",
   "biometricNotAvailable": "このデバイスでは生体認証を利用できません",
   "biometricNotEnrolled": "生体認証が登録されていません。デバイス設定で登録してください。",
   "biometricConfirmManage": "生体認証設定を管理するには確認してください",
-
+  "biometricPinPrompt": "続行するにはPINを確認してください。",
+  "profileVerifiedBadge": "認証済みアカウント",
+  "profileKycRequiredTitle": "本人確認が必要です",
+  "profileKycRequiredMessage": "本人確認を行うと、利用限度額が引き上げられ、アカウントの安全性が向上します。",
+  "profileVerifyNowCta": "今すぐ確認",
   "kycStatusVerified": "認証済み",
   "kycStatusPending": "確認中",
   "kycStatusUnverified": "未認証",
-
   "aboutApp": "アプリについて",
   "termsOfService": "利用規約",
   "privacyPolicy": "プライバシーポリシー",
-
   "signOutConfirmTitle": "サインアウト",
   "signOutConfirmMessage": "サインアウトしますか？",
-
   "helpSearchHint": "ヘルプを検索...",
   "helpNoResults": "結果が見つかりません",
   "helpStillNeedHelp": "まだお困りですか？",
@@ -373,7 +384,6 @@
   "helpCardA1": "Visa、Mastercard、JCB、American Expressに対応しています。",
   "helpCardQ2": "保存したカードを削除するには？",
   "helpCardA2": "支払い > カードを左スワイプまたはメニューアイコン > 削除を選択してください。",
-
   "supportHeaderTitle": "いつでもお手伝いします",
   "supportHeaderSubtitle": "通常2時間以内に返信します",
   "supportSelectCategory": "どのようなお問い合わせですか？",
@@ -389,7 +399,6 @@
   "supportSubmit": "送信する",
   "supportTicketSubmitted": "サポートチケットを送信しました。24時間以内に返信します。",
   "supportAlternativeContact": "または直接ご連絡ください",
-
   "termsLastUpdated": "最終更新：2026年1月",
   "termsSection1Title": "1. 利用規約への同意",
   "termsSection1Content": "Paycifサービスをご利用いただくことで、本利用規約に同意したものとみなされます。",
@@ -404,7 +413,6 @@
   "termsSection6Title": "6. 準拠法",
   "termsSection6Content": "本規約はタイ王国の法律に準拠します。紛争はバンコクでの仲裁により解決されます。",
   "termsContact": "規約に関するお問い合わせ：legal@paycif.com",
-
   "privacyLastUpdated": "最終更新：2026年1月",
   "privacyHighlightsTitle": "プライバシーの要点",
   "privacyHighlight1": "個人データを第三者に販売することはありません",
@@ -434,5 +442,33 @@
   "notificationTransactionAlertsDesc": "送金、受取、およびチャージ通知。",
   "notificationUpdates": "アップデート",
   "notificationNewsPromotions": "ニュース＆プロモーション",
-  "notificationNewsPromotionsDesc": "限定オファーと機能アップデート。"
+  "notificationNewsPromotionsDesc": "限定オファーと機能アップデート。",
+  "loginMagicLinkSent": "マジックリンクを送信しました。受信トレイをご確認ください。",
+  "loginHeroTagline": "どこでも、瞬時に支払う。",
+  "loginContinueWithGoogle": "Googleで続ける",
+  "loginContinueWithApple": "Appleで続ける",
+  "loginEmailHint": "メールアドレス",
+  "loginEmailRequired": "メールアドレスを入力してください",
+  "loginEmailInvalid": "有効なメールアドレスを入力してください",
+  "loginContinueButton": "続ける",
+  "loginBankGradeSecurity": "銀行レベルのセキュリティ",
+  "loginUseEmailInstead": "代わりにメールを使う →",
+  "kycAppBarTitle": "本人確認",
+  "kycStatusPreparing": "確認を準備しています...",
+  "kycStatusOpening": "確認画面を開いています...",
+  "kycStatusInProgress": "確認中",
+  "kycStatusChecking": "状況を確認しています...",
+  "kycStatusComplete": "確認が完了しました",
+  "kycStatusIssue": "確認に問題があります",
+  "kycMessageSettingUp": "安全な確認セッションを準備しています...",
+  "kycMessageWaiting": "確認結果をお待ちください。通常は数秒で完了します。",
+  "kycMessageVerified": "本人確認が正常に完了しました。",
+  "kycMessageDefault": "本人確認を行い、すべての機能を利用できるようにしてください。",
+  "kycReopenVerification": "確認をもう一度開く",
+  "kycTryAgain": "もう一度試す",
+  "kycDoThisLater": "後で行う",
+  "devicesRevokeSuccess": "デバイスを取り消しました",
+  "devicesRevokeFailed": "デバイスの取り消しに失敗しました",
+  "profileSignOutCriticalError": "サインアウト中に重大なエラーが発生しました。アプリを強制終了してください。",
+  "kycMessageAwaitingResult": "本人確認を処理しています。完了次第、自動的にステータスが更新されます。"
 }

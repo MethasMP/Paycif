@@ -89,7 +89,7 @@ serve(async (req) => {
 
     if (bindError) {
       console.error('[BindDevice] DB Insert Error:', bindError);
-      return jsonError('Failed to bind device', 500);
+      return jsonError('Failed to bind device: ' + bindError.message, 500);
     }
 
     // 4. Audit Log (Black Box)

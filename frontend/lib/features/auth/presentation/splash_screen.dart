@@ -120,34 +120,30 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Paycif Logo (Shield)
+            // Paycif Logo (Shield) — flat-at-rest: solid fill, no glow, no gradient
             Container(
-                  width: 120,
-                  height: 120,
+                  width: 96,
+                  height: 96,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppTheme.accentGold, AppTheme.accentGoldDark],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    color: AppTheme.primaryColor(context),
                     shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppTheme.accentGold.withValues(alpha: 0.3),
-                        blurRadius: 30,
-                        spreadRadius: 10,
-                      ),
-                    ],
                   ),
-                  child: const Icon(
+                  child: Icon(
                     PhosphorIcons.shield,
-                    size: 60,
-                    color: Colors.white,
+                    size: 48,
+                    color: theme.brightness == Brightness.dark
+                        ? AppTheme.darkTextOnDark
+                        : AppTheme.lightTextOnDark,
                   ),
                 )
                 .animate()
-                .fadeIn(duration: 800.ms)
-                .scale(duration: 600.ms, curve: Curves.elasticOut),
+                .fadeIn(duration: 500.ms)
+                .scale(
+                  begin: const Offset(0.9, 0.9),
+                  end: const Offset(1, 1),
+                  duration: 400.ms,
+                  curve: Curves.easeOutCubic,
+                ),
 
             const SizedBox(height: 32),
 
@@ -167,7 +163,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
             // Tagline
             Text(
-              'Secure. Simple. Global.',
+              AppLocalizations.of(context)?.splashTagline ?? 'Secure. Simple. Global.',
               style: theme.textTheme.bodyLarge?.copyWith(
                 color: AppTheme.textSecondaryColor(context),
                 letterSpacing: 2.0,

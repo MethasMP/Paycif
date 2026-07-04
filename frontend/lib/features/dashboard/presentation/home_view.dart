@@ -66,16 +66,15 @@ class _HomeViewState extends State<HomeView> {
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 4),
                             child: Text(
-                              "QUICK ACTIONS",
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                letterSpacing: 1.5,
-                                fontWeight: FontWeight.bold,
-                                color: isDark ? Colors.white54 : AppTheme.textSecondary,
+                              l10n.homeQuickActions,
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.textSecondaryColor(context),
                               ),
                             ),
                           ),
                           const SizedBox(height: 12),
-                          _buildQuickActionsDock(context),
+                          _buildQuickActionsDock(context, l10n),
                           const SizedBox(height: 32),
                           
                           // Recent Transactions
@@ -94,25 +93,29 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
-  Widget _buildQuickActionsDock(BuildContext context) {
+  Widget _buildQuickActionsDock(BuildContext context, AppLocalizations l10n) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        _QuickActionButton(
-          label: "Cards",
-          icon: PhosphorIconsRegular.creditCard,
-          onTap: () {
-            HapticFeedback.lightImpact();
-            context.push('/payment_settings');
-          },
+        Expanded(
+          child: _QuickActionCard(
+            label: l10n.homeActionCards,
+            icon: PhosphorIconsRegular.creditCard,
+            onTap: () {
+              HapticFeedback.lightImpact();
+              context.push('/payment_settings');
+            },
+          ),
         ),
-        _QuickActionButton(
-          label: "Rates",
-          icon: PhosphorIconsRegular.chartLineUp,
-          onTap: () {
-            HapticFeedback.lightImpact();
-            context.push('/history');
-          },
+        const SizedBox(width: 12),
+        Expanded(
+          child: _QuickActionCard(
+            label: l10n.homeActionRates,
+            icon: PhosphorIconsRegular.chartLineUp,
+            onTap: () {
+              HapticFeedback.lightImpact();
+              context.push('/history');
+            },
+          ),
         ),
       ],
     );
@@ -121,6 +124,7 @@ class _HomeViewState extends State<HomeView> {
   // --- Transaction Container Card ---
   Widget _buildTransactionContainer(List<Transaction> transactions) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
     if (transactions.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 4),
@@ -131,13 +135,13 @@ class _HomeViewState extends State<HomeView> {
             Icon(
               PhosphorIconsRegular.clock,
               size: 18,
-              color: isDark ? Colors.white38 : Colors.black38,
+              color: AppTheme.textSecondaryColor(context),
             ),
             const SizedBox(width: 8),
             Text(
-              "No recent transactions",
+              l10n.homeNoRecentTransactions,
               style: TextStyle(
-                color: isDark ? Colors.white38 : Colors.black38,
+                color: AppTheme.textSecondaryColor(context),
                 fontSize: 14,
                 fontWeight: FontWeight.w400,
                 letterSpacing: 0.2,
@@ -152,7 +156,7 @@ class _HomeViewState extends State<HomeView> {
 
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF141A18) : Colors.white,
+        color: isDark ? AppTheme.darkTheme.cardColor : Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: isDark ? Colors.white.withValues(alpha: 0.05) : AppTheme.borderGrey,
@@ -170,7 +174,7 @@ class _HomeViewState extends State<HomeView> {
         physics: const NeverScrollableScrollPhysics(),
         itemCount: itemCount,
         separatorBuilder: (context, index) => Divider(
-          color: isDark ? Colors.white12 : const Color(0xFFF1F1EF),
+          color: isDark ? Colors.white12 : AppTheme.borderGrey,
           height: 1,
           indent: 16,
           endIndent: 16,
@@ -187,17 +191,6 @@ class _HomeViewState extends State<HomeView> {
     return AppBar(
       backgroundColor: Colors.transparent,
       elevation: 0,
-      leading: Padding(
-        padding: const EdgeInsets.only(left: 8.0),
-        child: IconButton(
-          icon: Icon(
-            PhosphorIconsRegular.bell,
-            size: 22.0,
-            color: AppTheme.textPrimaryColor(context),
-          ),
-          onPressed: () {},
-        ),
-      ),
       title: Text(
         AppLocalizations.of(context)!.appTitle,
         style: theme.appBarTheme.titleTextStyle?.copyWith(
@@ -256,7 +249,7 @@ class _HomeViewState extends State<HomeView> {
                 Text(
                   l10n.homeViewAll,
                   style: theme.textTheme.labelLarge?.copyWith(
-                    color: AppTheme.accentGold,
+                    color: AppTheme.accentGoldDark,
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                   ),
@@ -264,7 +257,7 @@ class _HomeViewState extends State<HomeView> {
                 const SizedBox(width: 2),
                 const Icon(
                   PhosphorIconsBold.caretRight,
-                  color: AppTheme.accentGold,
+                  color: AppTheme.accentGoldDark,
                   size: 14,
                 ),
               ],
@@ -345,15 +338,15 @@ class _LiveFxBannerState extends State<_LiveFxBanner> {
           Icon(
             PhosphorIconsRegular.lockSimple,
             size: 13,
-            color: AppTheme.primaryTeal,
+            color: AppTheme.primaryTealDark,
           ),
           const SizedBox(width: 4),
           Text(
-            "Locked",
+            AppLocalizations.of(context)!.homeFxLocked,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               fontSize: 10,
               fontWeight: FontWeight.bold,
-              color: AppTheme.primaryTeal,
+              color: AppTheme.primaryTealDark,
             ),
           ),
         ],
@@ -381,11 +374,13 @@ class _LiveFxBannerState extends State<_LiveFxBanner> {
           .fadeOut(duration: 600.ms);
     }
 
+    final l10n = AppLocalizations.of(context)!;
+
     if (_rate == null) {
-      return Text("Live FX rates unavailable", style: style);
+      return Text(l10n.homeFxUnavailable, style: style);
     }
 
-    return Text("Live FX: 1 USD ≈ ${_rate!.toStringAsFixed(2)} THB", style: style);
+    return Text(l10n.homeFxRate(_rate!.toStringAsFixed(2)), style: style);
   }
 }
 
@@ -446,23 +441,23 @@ class _PulseDotState extends State<_PulseDot> with SingleTickerProviderStateMixi
   }
 }
 
-// --- Custom Animated Quick Action Button with Press Feedback ---
-class _QuickActionButton extends StatefulWidget {
+// --- Custom Animated Quick Action Card with Press Feedback ---
+class _QuickActionCard extends StatefulWidget {
   final String label;
   final IconData icon;
   final VoidCallback onTap;
 
-  const _QuickActionButton({
+  const _QuickActionCard({
     required this.label,
     required this.icon,
     required this.onTap,
   });
 
   @override
-  State<_QuickActionButton> createState() => _QuickActionButtonState();
+  State<_QuickActionCard> createState() => _QuickActionCardState();
 }
 
-class _QuickActionButtonState extends State<_QuickActionButton> with SingleTickerProviderStateMixin {
+class _QuickActionCardState extends State<_QuickActionCard> with SingleTickerProviderStateMixin {
   late AnimationController _animController;
   late Animation<double> _scaleAnimation;
 
@@ -473,7 +468,7 @@ class _QuickActionButtonState extends State<_QuickActionButton> with SingleTicke
       vsync: this,
       duration: const Duration(milliseconds: 100),
     );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.92).animate(
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.96).animate(
       CurvedAnimation(parent: _animController, curve: Curves.easeInOut),
     );
   }
@@ -500,17 +495,11 @@ class _QuickActionButtonState extends State<_QuickActionButton> with SingleTicke
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    final Color buttonBg = isDark ? Colors.white.withValues(alpha: 0.04) : Colors.white;
 
-    final Color iconColor = isDark ? Colors.white : AppTheme.textPrimaryColor(context);
-
+    final Color cardBg = isDark ? AppTheme.darkTheme.cardColor : Colors.white;
+    final Color iconBg = isDark ? Colors.white.withValues(alpha: 0.06) : AppTheme.primaryTealLight;
+    final Color iconColor = isDark ? AppTheme.primaryColor(context) : AppTheme.primaryTealDark;
     final Color labelColor = isDark ? Colors.white.withValues(alpha: 0.87) : AppTheme.textPrimaryColor(context);
-
-    final Border border = Border.all(
-      color: isDark ? Colors.white.withValues(alpha: 0.08) : AppTheme.borderGrey,
-      width: 1,
-    );
 
     return GestureDetector(
       onTapDown: _handleTapDown,
@@ -521,40 +510,48 @@ class _QuickActionButtonState extends State<_QuickActionButton> with SingleTicke
         child: Semantics(
           button: true,
           label: widget.label,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: buttonBg,
-                  shape: BoxShape.circle,
-                  border: border,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.03),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isDark ? Colors.white.withValues(alpha: 0.05) : AppTheme.borderGrey,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
+                  blurRadius: 16,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: iconBg,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(widget.icon, color: iconColor, size: 20),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    widget.label,
+                    style: GoogleFonts.ibmPlexSans(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: labelColor,
                     ),
-                  ],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-                child: Icon(
-                  widget.icon,
-                  color: iconColor,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                widget.label,
-                style: GoogleFonts.ibmPlexSans(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: labelColor,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

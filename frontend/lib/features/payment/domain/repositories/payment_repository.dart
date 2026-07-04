@@ -15,4 +15,22 @@ abstract class IPaymentRepository {
     required String idempotencyKey,
     String? sqrilTxId,
   });
+
+  /// Creates a PayoutIntent on the backend and returns the AlchemyPay checkout
+  /// URL plus the intent ID for status polling.
+  Future<({String webUrl, String intentId})> createOnRampIntent({
+    required int amountSatang,
+    required String sqrilTxId,
+    required String promptPayId,
+    required String recipientName,
+    required String fiatCurrency,
+    String? billerId,
+    String? reference1,
+    String? reference2,
+    String? email,
+  });
+
+  /// Polls backend for the current status of a PayoutIntent.
+  /// Returns status string: PENDING | COMPLETED | FAILED | ACH_FAILED | PAYMENT_SUCCESS_PAYOUT_PENDING
+  Future<String> getIntentStatus(String intentId);
 }

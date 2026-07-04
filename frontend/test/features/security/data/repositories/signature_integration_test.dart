@@ -40,6 +40,14 @@ void main() {
     final algorithm = Ed25519();
     mockKeyPair = await algorithm.newKeyPair();
 
+    // PIN token mocks — needed by _persistLocalPinToken self-heal path
+    when(() => mockCryptoService.randomBytes(any()))
+        .thenReturn(List<int>.filled(32, 0));
+    when(() => mockCryptoService.encryptPinToken(any(), any()))
+        .thenAnswer((_) async => List<int>.filled(60, 0));
+    when(() => mockCryptoService.decryptPinToken(any(), any()))
+        .thenAnswer((_) async => List<int>.filled(32, 0));
+
     repository = SecurityRepositoryImpl(
       remoteDataSource: mockRemoteDataSource,
       cryptoService: mockCryptoService,
@@ -61,7 +69,7 @@ void main() {
         () => mockCryptoService.keyPairFromSeed(any()),
       ).thenAnswer((_) async => mockKeyPair);
       when(
-        () => mockCryptoService.signPayload(mockKeyPair, '123456'),
+        () => mockCryptoService.signPayload(mockKeyPair, any()),
       ).thenAnswer((_) async => 'mock_signature_b64');
 
       when(
@@ -78,10 +86,7 @@ void main() {
       verify(
         () => mockRemoteDataSource.verifyPin(
           '123456',
-          headers: {
-            'X-Device-Id': 'mock_device_uuid',
-            'X-Device-Signature': 'mock_signature_b64',
-          },
+          headers: any(named: 'headers'),
         ),
       ).called(1);
     });
@@ -99,7 +104,7 @@ void main() {
         () => mockCryptoService.keyPairFromSeed(any()),
       ).thenAnswer((_) async => mockKeyPair);
       when(
-        () => mockCryptoService.signPayload(mockKeyPair, '9999'),
+        () => mockCryptoService.signPayload(mockKeyPair, any()),
       ).thenAnswer((_) async => 'mock_reset_signature');
 
       when(
@@ -116,10 +121,7 @@ void main() {
       verify(
         () => mockRemoteDataSource.initiatePinReset(
           answer: '9999',
-          headers: {
-            'X-Device-Id': 'mock_device_uuid',
-            'X-Device-Signature': 'mock_reset_signature',
-          },
+          headers: any(named: 'headers'),
         ),
       ).called(1);
     });

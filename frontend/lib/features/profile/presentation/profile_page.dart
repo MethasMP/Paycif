@@ -1,5 +1,6 @@
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:frontend/core/utils/pay_notify.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -170,6 +171,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
       // 5. Hard Navigation Reset
       if (mounted) {
+        HapticFeedback.mediumImpact();
         context.go('/login');
       }
     } catch (e) {
@@ -178,7 +180,7 @@ class _ProfilePageState extends State<ProfilePage> {
         Navigator.pop(context); // Close loading
         PayNotify.error(
           context,
-          'Critical error during sign out. Please force close app.',
+          AppLocalizations.of(context)!.profileSignOutCriticalError,
         );
       }
     }
@@ -204,7 +206,7 @@ class _ProfilePageState extends State<ProfilePage> {
             },
             child: Text(
               l10n.signOut,
-              style: const TextStyle(color: Colors.redAccent),
+              style: const TextStyle(color: AppTheme.errorRedText),
             ),
           ),
         ],
@@ -274,10 +276,30 @@ class _ProfilePageState extends State<ProfilePage> {
     final String email = _profile?['email'] ?? user?.email ?? '';
     final String fullName = _profile?['full_name'] ?? _profile?['username'] ?? user?.userMetadata?['full_name'] ?? 'User';
 
+    final canPop = Navigator.of(context).canPop();
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(l10n.profileTitle),
+        leading: canPop
+            ? IconButton(
+                icon: Icon(
+                  PhosphorIcons.caretLeft,
+                  color: AppTheme.textPrimaryColor(context),
+                  size: 24,
+                ),
+                onPressed: () => Navigator.of(context).pop(),
+              )
+            : (GoRouterState.of(context).uri.path == '/profile'
+                ? IconButton(
+                    icon: Icon(
+                      PhosphorIcons.house,
+                      color: AppTheme.textPrimaryColor(context),
+                      size: 24,
+                    ),
+                    onPressed: () => context.go('/main'),
+                  )
+                : null),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -287,6 +309,8 @@ class _ProfilePageState extends State<ProfilePage> {
             const SizedBox(height: 16),
 
             // ─── USER PROFILE CARD HEADER ────────────────────────
+            // Flat-at-Rest: separation comes from the border + tonal step off
+            // canvas, never an idle shadow (design.md §4).
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -296,16 +320,9 @@ class _ProfilePageState extends State<ProfilePage> {
                 borderRadius: BorderRadius.circular(24),
                 border: Border.all(
                   color: theme.brightness == Brightness.dark
-                      ? Colors.white.withValues(alpha: 0.05)
-                      : Colors.grey.withValues(alpha: 0.1),
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : AppTheme.borderGrey,
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
               ),
               child: Row(
                 children: [
@@ -317,11 +334,11 @@ class _ProfilePageState extends State<ProfilePage> {
                       shape: BoxShape.circle,
                       color: theme.brightness == Brightness.dark
                           ? Colors.white.withValues(alpha: 0.05)
-                          : Colors.black.withValues(alpha: 0.05),
+                          : AppTheme.primaryTealLight,
                       border: Border.all(
                         color: theme.brightness == Brightness.dark
                             ? Colors.white.withValues(alpha: 0.1)
-                            : Colors.black.withValues(alpha: 0.1),
+                            : AppTheme.primaryTeal.withValues(alpha: 0.12),
                         width: 1.5,
                       ),
                     ),
@@ -333,13 +350,13 @@ class _ProfilePageState extends State<ProfilePage> {
                               errorBuilder: (context, error, stackTrace) => Icon(
                                 PhosphorIcons.user,
                                 size: 28,
-                                color: Theme.of(context).iconTheme.color,
+                                color: AppTheme.primaryColor(context),
                               ),
                             )
                           : Icon(
                               PhosphorIcons.user,
                               size: 28,
-                              color: Theme.of(context).iconTheme.color,
+                              color: AppTheme.primaryColor(context),
                             ),
                     ),
                   ),
@@ -382,9 +399,9 @@ class _ProfilePageState extends State<ProfilePage> {
                                 const Icon(PhosphorIcons.shieldCheck, size: 14, color: AppTheme.successGreen),
                                 const SizedBox(width: 4),
                                 Text(
-                                  'Verified Account',
+                                  l10n.profileVerifiedBadge,
                                   style: theme.textTheme.labelSmall?.copyWith(
-                                    color: AppTheme.successGreen,
+                                    color: AppTheme.signalGreen,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -407,40 +424,34 @@ class _ProfilePageState extends State<ProfilePage> {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: theme.brightness == Brightness.dark
-                      ? const Color(0xFF241800)
-                      : Colors.amber.shade50.withValues(alpha: 0.8),
+                      ? AppTheme.stateWarningSubtleDark
+                      : AppTheme.stateWarningSubtleLight,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: theme.brightness == Brightness.dark
-                        ? Colors.amber.shade800.withValues(alpha: 0.25)
-                        : Colors.amber.shade200,
-                  ),
+                  border: Border.all(color: AppTheme.stateWarning.withValues(alpha: 0.25)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        Icon(PhosphorIcons.warningCircle, color: Colors.amber.shade700, size: 20),
+                        const Icon(PhosphorIcons.warningCircle, color: AppTheme.stateWarning, size: 20),
                         const SizedBox(width: 8),
-                        Text(
-                          'Identity Verification Required',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: theme.brightness == Brightness.dark
-                                ? Colors.amber.shade200
-                                : Colors.amber.shade900,
+                        Expanded(
+                          child: Text(
+                            l10n.profileKycRequiredTitle,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.stateWarning,
+                            ),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Verify your identity to unlock higher limits and secure your account.',
+                      l10n.profileKycRequiredMessage,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.brightness == Brightness.dark
-                            ? Colors.amber.shade200.withValues(alpha: 0.8)
-                            : Colors.amber.shade800,
+                        color: AppTheme.textSecondaryColor(context),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -453,14 +464,14 @@ class _ProfilePageState extends State<ProfilePage> {
                           if (verified == true && mounted) _fetchProfile();
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.accentGold,
-                          foregroundColor: AppTheme.accentGoldDark,
+                          backgroundColor: AppTheme.primaryTeal,
+                          foregroundColor: Colors.white,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: const Text('Verify Now', style: TextStyle(fontWeight: FontWeight.bold)),
+                        child: Text(l10n.profileVerifyNowCta, style: const TextStyle(fontWeight: FontWeight.bold)),
                       ),
                     ),
                   ],
@@ -608,8 +619,8 @@ class _ProfilePageState extends State<ProfilePage> {
                   icon: const Icon(PhosphorIcons.signOut, size: 20),
                   label: Text(l10n.signOut),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red.shade50.withValues(alpha: theme.brightness == Brightness.dark ? 0.08 : 0.8),
-                    foregroundColor: Colors.redAccent,
+                    backgroundColor: AppTheme.errorRed.withValues(alpha: theme.brightness == Brightness.dark ? 0.12 : 0.1),
+                    foregroundColor: AppTheme.errorRedText,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 32,
@@ -618,7 +629,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                       side: theme.brightness == Brightness.dark
-                          ? BorderSide(color: Colors.redAccent.withValues(alpha: 0.2))
+                          ? BorderSide(color: AppTheme.errorRed.withValues(alpha: 0.2))
                           : BorderSide.none,
                     ),
                   ),
@@ -631,7 +642,7 @@ class _ProfilePageState extends State<ProfilePage> {
             Center(
               child: Text(
                 '${l10n.version} 2.0.0 (Build 42)',
-                style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
+                style: theme.textTheme.bodySmall?.copyWith(color: AppTheme.textSecondaryColor(context)),
               ),
             ),
             const SizedBox(height: 120),
@@ -660,16 +671,9 @@ class _ProfilePageState extends State<ProfilePage> {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: isDark
-              ? Colors.white.withValues(alpha: 0.05)
-              : Colors.grey.withValues(alpha: 0.1),
+              ? Colors.white.withValues(alpha: 0.08)
+              : AppTheme.borderGrey,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
       ),
       child: Material(
         color: Theme.of(context).cardColor,
@@ -712,10 +716,12 @@ class _ProfilePageState extends State<ProfilePage> {
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Colors.white.withValues(alpha: 0.06)
+              : AppTheme.primaryTealLight,
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(icon, size: 24, color: Theme.of(context).iconTheme.color),
+        child: Icon(icon, size: 24, color: AppTheme.primaryColor(context)),
       ),
       title: Text(
         title,
@@ -734,7 +740,7 @@ class _ProfilePageState extends State<ProfilePage> {
           : null,
       trailing:
           trailing ??
-          Icon(PhosphorIcons.caretRight, color: Colors.grey, size: 20),
+          Icon(PhosphorIcons.caretRight, color: AppTheme.textSecondaryColor(context), size: 20),
     );
   }
 
@@ -746,13 +752,15 @@ class _ProfilePageState extends State<ProfilePage> {
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Colors.white.withValues(alpha: 0.06)
+              : AppTheme.primaryTealLight,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(
           PhosphorIcons.fingerprint,
           size: 24,
-          color: Theme.of(context).iconTheme.color,
+          color: AppTheme.primaryColor(context),
         ),
       ),
       title: Text(
@@ -768,7 +776,7 @@ class _ProfilePageState extends State<ProfilePage> {
               width: 50,
               child: LinearProgressIndicator(
                 backgroundColor: Colors.transparent,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                valueColor: AlwaysStoppedAnimation<Color>(AppTheme.textSecondaryColor(context)),
                 minHeight: 1,
               ),
             )
@@ -787,7 +795,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   height: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                    valueColor: AlwaysStoppedAnimation<Color>(AppTheme.textSecondaryColor(context)),
                   ),
                 ),
               ),
@@ -835,6 +843,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
         if (!mounted) return;
 
+        HapticFeedback.lightImpact();
         PayNotify.success(context, l10n.biometricSettingsUpdated);
       } catch (e) {
         if (!mounted) return;
@@ -868,7 +877,7 @@ class _ProfilePageState extends State<ProfilePage> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey.withValues(alpha: 0.3),
+                color: AppTheme.borderGrey,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -883,7 +892,7 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
             SizedBox(height: 8),
             Text(
-              'Please verify your PIN to continue.',
+              l10n.biometricPinPrompt,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppTheme.textSecondaryColor(context),
                   ),

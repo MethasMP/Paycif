@@ -1,194 +1,166 @@
-// ============================================================================
-// CHANGE-PIN - Supabase Edge Function
-// ============================================================================
-// Securely updates the user's PIN by verifying the *Old PIN* first.
-// Prevents unauthorized overwrites (e.g. from a stolen JWT).
-//
-// Protocol:
-// 1. Verify Request & Auth
-// 2. Fetch stored hash from `private.user_auth_secrets`
-// 3. Verify `old_pin` against stored hash (Argon2id)
-// 4. Hash `new_pin` (Argon2id)
-// 5. Update `private.user_auth_secrets`
-// ============================================================================
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
-import { argon2id } from 'https://esm.sh/hash-wasm@4.12.0';
+import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
+import * as ed from 'https://esm.sh/@noble/ed25519@2.0.0';
+import { p256 } from 'https://esm.sh/@noble/curves@1.2.0/p256';
+import { sha512 } from 'https://esm.sh/@noble/hashes@1.3.1/sha512';
 
-const corsHeaders = {
+ed.etc.sha512Sync = (...msgs: Uint8Array[]) => sha512(ed.etc.concatBytes(...msgs));
+
+const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-device-id, x-device-signature, x-nonce',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
+const MAX_MINUTE_DRIFT = 2;
+
+serve(async (req: Request): Promise<Response> => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
 
   try {
-    // 1. Auth & Input Validation
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const db = createSupabase();
 
-    const adminClient = createClient(supabaseUrl, supabaseServiceKey);
+    // 1. JWT auth
+    const auth = req.headers.get('Authorization');
+    if (!auth) return err('Missing auth', 401);
+    const { data: { user }, error: authErr } = await db.auth.getUser(auth.replace(/^Bearer /i, ''));
+    if (authErr || !user) return err('Unauthorized', 401);
 
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) throw new Error('Missing Authorization header');
+    // 2. Required headers
+    const deviceId = req.headers.get('x-device-id');
+    const signature = req.headers.get('x-device-signature');
+    const nonce = req.headers.get('x-nonce');
+    if (!deviceId || !signature || !nonce) return err('Device authorization missing', 401);
 
-    // Validate Token (User Context)
-    const jwt = authHeader.replace(/^Bearer\s+/i, '');
-    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
+    // 3. Body
+    const { old_pin, new_pin } = await req.json().catch(() => ({}));
+    if (!old_pin || typeof old_pin !== 'string' || old_pin.length !== 6 || !/^\d+$/.test(old_pin))
+      return err('old_pin must be an 8-digit number', 400);
+    if (!new_pin || typeof new_pin !== 'string' || new_pin.length !== 6 || !/^\d+$/.test(new_pin))
+      return err('new_pin must be an 8-digit number', 400);
+    if (old_pin === new_pin) return err('New PIN must differ from current PIN.', 400);
 
-    const { data: { user }, error: authError } = await userClient.auth.getUser(jwt);
+    // 4. Load auth context
+    const ctx = await fetchContext(db, user.id, deviceId);
+    if (!ctx) return err('PIN not set up. Please set up your PIN first.', 404);
+    if (!ctx.public_key || !ctx.is_device_active) return err('Device not recognized', 401);
 
-    if (authError || !user) {
-      console.error('[ChangePin] Auth Failed:', authError);
-      throw new Error('Unauthorized: ' + (authError?.message || 'Invalid Token'));
+    // 5. Lockout check
+    if (ctx.locked_until && new Date(ctx.locked_until) > new Date()) {
+      const secs = Math.ceil((new Date(ctx.locked_until).getTime() - Date.now()) / 1000);
+      const levelMsg = ctx.lockout_level >= 3
+        ? 'Account permanently locked. Please use Forgot PIN to recover.'
+        : `Account locked. Try again in ${secs} seconds.`;
+      return new Response(
+        JSON.stringify({ success: false, error: levelMsg, locked_until: ctx.locked_until, lockout_level: ctx.lockout_level }),
+        { status: 423, headers: { ...CORS, 'Content-Type': 'application/json', 'Retry-After': secs.toString() } },
+      );
     }
 
-    const { old_pin, new_pin } = await req.json();
-
-    if (!old_pin || !new_pin || old_pin.length !== 6 || new_pin.length !== 6) {
-      return jsonError('Invalid PIN format. Both must be 6 digits.', 400);
+    // 6. Timestamp window validation
+    const clientMinute = parseInt(req.headers.get('x-timestamp-bucket') ?? '0', 10);
+    const serverMinute = Math.floor(Date.now() / 60000);
+    if (Math.abs(serverMinute - clientMinute) > MAX_MINUTE_DRIFT) {
+      return err('Request timestamp expired. Please try again.', 401);
     }
 
-    if (old_pin === new_pin) {
-      return jsonError('New PIN must be different from current PIN.', 400);
-    }
-
-    // 2. Fetch Stored Hash (via Secure RPC)
-    const { data: secretData, error: fetchError } = await adminClient.rpc(
-      'get_user_auth_secret',
-      { p_user_id: user.id },
-    );
-
-    if (fetchError || !secretData?.pin_hash) {
-      console.error('[ChangePin] Secret fetch error:', fetchError);
-      return jsonError('PIN not set or system error.', 404);
-    }
-
-    // 3. Verify Old PIN
-    // Manual Verification Logic for hash-wasm (since we don't have a simple verify fn readily imported):
-    // 1. Parse `secretData.pin_hash`
-    const storedHash = secretData.pin_hash;
-    const parts = storedHash.split('$');
-    if (parts.length !== 6) return jsonError('Stored hash format error', 500);
-
-    // parts[0] = empty, [1]=argon2id, [2]=v=19, [3]=m=...,t=...,p=..., [4]=salt, [5]=hash
-    const params = parts[3];
-    const saltB64 = parts[4];
-
-    // Extract numeric params
-    const m = parseInt(params.match(/m=(\d+)/)?.[1] || '65536');
-    const t = parseInt(params.match(/t=(\d+)/)?.[1] || '3');
-    const p = parseInt(params.match(/p=(\d+)/)?.[1] || '4');
-
-    // Decode salt (It's base64 without padding usually in PHC, but let's check standard)
-    // hash-wasm setup used `outputType: 'encoded'`.
-    // We need to pass the raw salt bytes to `argon2id` to reproduce the hash.
-    //
-    // Wait, implementing a secure parser in Deno from scratch is risky.
-    // Is there a `dneobcrypt` equivalent for Argon2?
-    // `https://deno.land/x/argon2@v0.1.0/mod.ts` ?
-    // Let's try to stick to `npm:hash-wasm` but be very careful.
-    //
-    // Actually, `simonw/argon2` or similar?
-    // Let's just re-hash with the *exact* same logic if we can assume constant params.
-    // BUT params might change (we tuned them recently!).
-    // SO we MUST parse.
-
-    // Let's use a simpler approach:
-    // Since we are the only writer (setup-pin and change-pin), we know how we stored it.
-    // We stored it using `argon2id` with outputType 'encoded'.
-
-    // ... On second thought, implementing the parser is error-prone.
-    // Let's assume for now we can use a library `npm:argon2-browser` or just `id128`.
-    //
-    // Let's try `import { verify } from 'https://deno.land/x/argon2@v0.1.0/mod.ts'`? No, that's native binding probably.
-    //
-    // Let's go with the parser I mocked mentally. It's standard PHC.
-    // OR... does hash-wasm have a verify method? Checking docs... NO.
-
-    // Re-hash with the SAME salt and params to verify.
-    // We assume the stored hash used the same params (m=32768, t=2, p=4).
-    // Ideally, we would parse these from the hash string, but for MVP/consistent environment:
-    const saltBytes = base64Decode(saltB64);
-
-    const checkHashString = await argon2id({
-      password: old_pin,
-      salt: saltBytes,
-      parallelism: p,
-      iterations: t,
-      memorySize: m, // m is already in correct unit (KB) if parsed from PHC string
-      hashLength: 32, // standard
-      outputType: 'encoded',
-    });
-
-    // Compare the FULL strings
-    if (checkHashString !== storedHash) {
-      // Add artificial delay to prevent timing attacks?
-      // Argon2 is already slow, but yes.
-      return jsonError('Incorrect old PIN', 401);
-    }
-
-    // 4. Hash New PIN
-    // Use optimized params: 32MB / 2 Iterations (from Chat History)
-    const newSalt = new Uint8Array(16);
-    crypto.getRandomValues(newSalt);
-
-    const newPinHash = await argon2id({
-      password: new_pin,
-      salt: newSalt,
-      parallelism: 1,
-      iterations: 1,
-      memorySize: 16384, // 16MB
-      hashLength: 32,
-      outputType: 'encoded',
-    });
-
-    // 5. Update Record (via Secure RPC)
-    const { error: updateError } = await adminClient.rpc('setup_user_pin', {
+    // 7. Nonce consumption (atomic, replay-proof)
+    const { data: nonceOk, error: nonceErr } = await db.rpc('consume_nonce', {
+      p_nonce: nonce,
       p_user_id: user.id,
-      p_pin_hash: newPinHash,
+      p_window_seconds: 120,
     });
+    if (nonceErr || !nonceOk) return err('Request already used or expired. Please try again.', 401);
 
-    if (updateError) {
-      console.error('[ChangePin] Update error:', updateError);
-      throw updateError;
+    // 8. Signature verification — payload: "PIN:NONCE:MINUTE_BUCKET" (using old_pin)
+    const sigPayload = `${old_pin}:${nonce}:${clientMinute}`;
+    const sigOk = await verifySignature(signature, sigPayload, ctx.public_key);
+    if (!sigOk) {
+      await recordFailure(db, user.id, deviceId, ctx.failed_attempts);
+      return err('Invalid PIN.', 401);
     }
 
-    return new Response(
-      JSON.stringify({ success: true }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-    );
-  } catch (err: unknown) {
-    console.error(err);
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return jsonError(message, 500);
+    // 9. Verify old PIN hash in DB (hash never leaves Postgres)
+    const { data: pinOk, error: pinErr } = await db.rpc('verify_pin_hash', {
+      p_user_id: user.id,
+      p_pin: old_pin,
+    });
+    if (pinErr) { console.error('[change-pin] verify DB error:', pinErr); return err('Internal error', 500); }
+
+    if (!pinOk) {
+      await recordFailure(db, user.id, deviceId, ctx.failed_attempts);
+      const newFailed = (ctx.failed_attempts || 0) + 1;
+      const remaining = Math.max(0, 3 - (newFailed % 3));
+      return err(`Incorrect current PIN. ${remaining > 0 ? remaining + ' attempts before lockout.' : 'Account locked.'}`, 401);
+    }
+
+    // 10. Hash and store new PIN in DB via Argon2id (pgsodium)
+    const { error: setupErr } = await db.rpc('setup_user_pin_v2', {
+      p_user_id: user.id,
+      p_pin: new_pin,
+    });
+    if (setupErr) { console.error('[change-pin] setup DB error:', setupErr); return err('Failed to update PIN.', 500); }
+
+    // 11. Reset failure counters on success
+    await db.rpc('update_user_auth_result', {
+      p_user_id: user.id, p_device_id: deviceId,
+      p_failed_attempts: 0, p_locked_until: null, p_reset_counters: true,
+    });
+
+    return ok({ success: true });
+
+  } catch (e: unknown) {
+    console.error('[change-pin] fatal:', e);
+    return err(`Internal error: ${e instanceof Error ? e.message : String(e)}`, 500);
   }
 });
 
-function jsonError(message: string, status: number): Response {
-  return new Response(
-    JSON.stringify({ error: message }),
-    { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-  );
+function createSupabase(): SupabaseClient {
+  const url = Deno.env.get('SUPABASE_URL');
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!url || !key) throw new Error('Server config missing');
+  return createClient(url, key);
 }
 
-// Minimal Base64 Decoder for Salt Extraction
-function base64Decode(str: string): Uint8Array {
-  // Add padding if needed
-  const padding = '='.repeat((4 - (str.length % 4)) % 4);
-  const base64 = (str + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const raw = atob(base64);
-  const result = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i++) {
-    result[i] = raw.charCodeAt(i);
-  }
-  return result;
+interface AuthContext {
+  failed_attempts: number; locked_until: string | null;
+  lockout_level: number; public_key: string | null; is_device_active: boolean;
+}
+
+async function fetchContext(db: SupabaseClient, userId: string, deviceId: string): Promise<AuthContext | null> {
+  const { data, error } = await db.rpc('get_user_auth_context', { p_user_id: userId, p_device_id: deviceId });
+  if (error) throw new Error(`DB: ${error.message}`);
+  return data ?? null;
+}
+
+async function recordFailure(db: SupabaseClient, userId: string, deviceId: string, currentFailed: number) {
+  const newFailed = (currentFailed || 0) + 1;
+  await db.rpc('update_user_auth_result', {
+    p_user_id: userId, p_device_id: deviceId,
+    p_failed_attempts: newFailed, p_locked_until: null, p_reset_counters: false,
+  });
+}
+
+async function verifySignature(sigB64: string, payload: string, pubKeyB64: string): Promise<boolean> {
+  try {
+    const sig = fromB64(sigB64);
+    const pub = fromB64(pubKeyB64);
+    const msg = new TextEncoder().encode(payload);
+    if (pub.length === 32) return await ed.verify(sig, msg, pub);
+    if (pub.length === 33 || pub.length === 65) return p256.verify(sig, msg, pub);
+    return false;
+  } catch { return false; }
+}
+
+function fromB64(s: string): Uint8Array {
+  const p = s + '='.repeat((4 - s.length % 4) % 4);
+  const r = atob(p.replace(/-/g, '+').replace(/_/g, '/'));
+  return new Uint8Array([...r].map(c => c.charCodeAt(0)));
+}
+
+function ok(b: unknown): Response {
+  return new Response(JSON.stringify(b), { status: 200, headers: { ...CORS, 'Content-Type': 'application/json' } });
+}
+function err(m: string, s: number): Response {
+  return new Response(JSON.stringify({ success: false, error: m }), { status: s, headers: { ...CORS, 'Content-Type': 'application/json' } });
 }

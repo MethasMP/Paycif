@@ -80,11 +80,10 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     try {
       // Removed ensureDeviceBinding() here to prevent unexpected Biometric prompts.
       // Device binding should only happen explicitly via settings or during onboarding.
-      await Future.wait([
-        _apiService.getUserProfile(),
-        _apiService.getSavedCards(),
-      ]);
-    } catch (_) {}
+      await _apiService.getUserProfile();
+    } catch (e) {
+      debugPrint('⚠️ [MainScreen] Prewarm cache failed: $e');
+    }
   }
 
   List<Widget> get _screens => [
@@ -115,8 +114,8 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
 
   Widget _buildTabItem(int index, IconData unselectedIcon, IconData selectedIcon, String label, double width) {
     final isSelected = _selectedIndex == index;
-    final activeColor = AppTheme.primaryTeal;
-    final inactiveColor = AppTheme.textSecondary;
+    final activeColor = AppTheme.primaryColor(context);
+    final inactiveColor = AppTheme.textSecondaryColor(context);
     final color = isSelected ? activeColor : inactiveColor;
 
     return SizedBox(
@@ -139,7 +138,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                   child: AnimatedScale(
                     scale: isSelected ? 1.05 : 1.0,
                     duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeOutBack,
+                    curve: Curves.easeOutQuint,
                     child: Icon(
                       isSelected ? selectedIcon : unselectedIcon,
                       color: color,
@@ -241,14 +240,14 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                   // 2. Sliding Dot Indicator
                   AnimatedPositioned(
                     duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeOutBack,
+                    curve: Curves.easeOutQuint,
                     left: dotLeft,
                     bottom: 6.0,
                     child: Container(
                       width: _dotWidth,
                       height: 4.0,
                       decoration: BoxDecoration(
-                        color: AppTheme.primaryTeal,
+                        color: AppTheme.primaryColor(context),
                         borderRadius: BorderRadius.circular(2.0),
                       ),
                     ),

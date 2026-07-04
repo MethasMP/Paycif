@@ -64,13 +64,13 @@ class _LinkedDevicesView extends StatelessWidget {
           Icon(
             PhosphorIcons.devices,
             size: 64,
-            color: Colors.grey.withValues(alpha: 0.5),
+            color: AppTheme.textSecondaryColor(context).withValues(alpha: 0.5),
           ),
           SizedBox(height: 16),
           Text(
             'No active devices found',
             style: TextStyle(
-              color: Colors.grey.withValues(alpha: 0.8),
+              color: AppTheme.textSecondaryColor(context).withValues(alpha: 0.8),
               fontSize: 16,
             ),
           ),
@@ -108,7 +108,7 @@ class _LinkedDevicesView extends StatelessWidget {
         padding: const EdgeInsets.only(right: 24),
         alignment: Alignment.centerRight,
         decoration: BoxDecoration(
-          color: Colors.red.withValues(alpha: 0.9),
+          color: AppTheme.errorRed.withValues(alpha: 0.9),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Icon(PhosphorIcons.trash, color: Colors.white, size: 28),
@@ -132,7 +132,7 @@ class _LinkedDevicesView extends StatelessWidget {
                     onPressed: () => Navigator.pop(context, true),
                     child: const Text(
                       'Revoke',
-                      style: TextStyle(color: Colors.red),
+                      style: TextStyle(color: AppTheme.errorRedText),
                     ),
                   ),
                 ],
@@ -147,12 +147,12 @@ class _LinkedDevicesView extends StatelessWidget {
             // Force Logout logic
             context.go('/login');
           } else if (context.mounted) {
-            PayNotify.success(context, 'Device revoked successfully');
+            PayNotify.success(context, l10n.devicesRevokeSuccess);
           }
         } catch (e) {
           // If error occurs, state might be desync, but controller reloads usually
           if (context.mounted) {
-            PayNotify.error(context, 'Failed to revoke device');
+            PayNotify.error(context, l10n.devicesRevokeFailed);
           }
         }
       },
@@ -165,7 +165,7 @@ class _LinkedDevicesView extends StatelessWidget {
                   color: AppTheme.successGreen.withValues(alpha: 0.5),
                   width: 1.5,
                 )
-              : Border.all(color: Colors.grey.withValues(alpha: 0.1)),
+              : Border.all(color: AppTheme.borderGrey),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.03),
@@ -191,7 +191,7 @@ class _LinkedDevicesView extends StatelessWidget {
               ),
               child: Icon(
                 platformIcon,
-                color: isCurrent ? AppTheme.successGreen : Colors.grey,
+                color: isCurrent ? AppTheme.successGreen : AppTheme.textSecondaryColor(context),
               ),
             ),
             title: Text(
@@ -227,7 +227,7 @@ class _LinkedDevicesView extends StatelessWidget {
                     : Text(
                         'Active ${controller.formatLastActive(lastActive)}',
                         style: TextStyle(
-                          color: Colors.grey.withValues(alpha: 0.8),
+                          color: AppTheme.textSecondaryColor(context).withValues(alpha: 0.8),
                           fontSize: 13,
                         ),
                       ),

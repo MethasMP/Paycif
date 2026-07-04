@@ -6,7 +6,6 @@
   "navPayment": "支付",
   "navProfile": "我的",
   "navScan": "扫码",
-
   "profileTitle": "个人资料",
   "passportLabel": "PASSPORT",
   "accountSecurity": "账户安全",
@@ -23,7 +22,6 @@
   "contactSupport": "联系客服",
   "signOut": "退出登录",
   "version": "版本",
-
   "paymentStatus": "支付状态",
   "paymentReady": "就绪",
   "paymentReliable": "可靠",
@@ -34,7 +32,6 @@
   "paymentEmptyDesc": "添加支付方式后，系统将为您自动选择最佳支付选项。",
   "paymentChangeMethod": "更改方式（如有需要）",
   "paymentHideOptions": "隐藏其他选项",
-
   "sheetAddPayment": "添加支付方式",
   "sheetCreditCard": "信用卡或借记卡",
   "sheetCreditCardDesc": "Visa, Mastercard, JCB, Amex",
@@ -42,7 +39,6 @@
   "sheetTopUpDesc": "通过银行转账或 PromptPay",
   "sheetDigitalWallet": "连接电子钱包",
   "sheetDigitalWalletDesc": "PayPal, Alipay, WeChat Pay",
-
   "commonEnabled": "已启用",
   "commonDisabled": "已禁用",
   "commonSuccess": "成功",
@@ -64,7 +60,6 @@
   "commonContinue": "继续",
   "commonNext": "下一步",
   "commonConfirm": "确认",
-
   "homeTopUp": "充值",
   "homeInfo": "信息",
   "homeMore": "更多",
@@ -75,12 +70,17 @@
   "homePaycifPremier": "Paycif PREMIER",
   "homeRecentTransactions": "最近交易",
   "homeViewAll": "查看全部",
+  "homeQuickActions": "快捷操作",
+  "homeActionCards": "银行卡",
+  "homeActionRates": "汇率",
+  "homeNoRecentTransactions": "暂无最近交易",
+  "homeFxLocked": "已锁定",
+  "homeFxUnavailable": "实时汇率暂不可用",
+  "homeFxRate": "实时汇率：1 美元 ≈ {rate} 泰铢",
   "homeNoTransactions": "暂无交易记录",
   "homeNoTransactionsDesc": "开始使用卡片后，您的交易活动将显示在此处。",
-
   "historyTitle": "交易记录",
   "historyNoActivity": "暂无活动",
-
   "scanTitle": "扫码支付",
   "scanErrorCamera": "相机错误",
   "scanGuideTitle": "Thai QR 支付指南",
@@ -92,7 +92,6 @@
   "scanGuideCurrencyDesc": "我们同时显示泰铢和美元的价格。",
   "scanPaymentSuccess": "支付成功！",
   "scanNoQrFound": "未发现二维码",
-
   "topUpTitle": "账户充值",
   "topUpAmountLabel": "充值金额",
   "topUpEnterAmount": "请输入金额",
@@ -160,7 +159,6 @@
       }
     }
   },
-
   "cardTitle": "添加新卡",
   "cardNumber": "卡号",
   "cardInvalidNumber": "卡号无效",
@@ -180,27 +178,23 @@
   "cardPreviewHolder": "CARD HOLDER",
   "cardPreviewExpires": "EXPIRES",
   "cardAddBtn": "添加卡片",
-
   "confirmTitle": "确认支付",
   "confirmBestOption": "最佳选项",
   "confirmEnterAmount": "输入金额",
   "confirmTotalPayment": "支付总额",
   "confirmPaymentSuccess": "支付成功",
   "confirmMyWallet": "我的钱包",
-
   "walletZeroFees": "零手续费",
   "walletInstantTransfer": "即时转账",
   "walletReliablePayment": "安全支付",
   "walletPaymentMethod": "支付方式",
-
   "scanUnknownRecipient": "未知收款人",
-
   "profileGuestUser": "游客用户",
   "noInternetTitle": "无网络连接",
   "noInternetMessage": "请检查您的网络设置",
   "noInternetRetry": "重试",
   "splashLoading": "正在连接服务...",
-
+  "splashTagline": "安全、简单、全球通用。",
   "paymentSuccessTitle": "支付成功！",
   "payReviewTitle": "确认付款",
   "payAmountLabel": "金额",
@@ -217,6 +211,23 @@
   "payCrossBorderDisclaimer": "* 您的发卡行可能会收取跨境手续费。",
   "payMethodPayPerUse": "按次付款",
   "payNoMethodSelected": "未选择付款方式",
+  "paySecuredByPartner": "由我们的收单合作方保障安全",
+  "payViaCardPartnerTitle": "使用银行卡支付",
+  "payViaCardPartnerSubtitle": "您将被带至安全的结账页面。支付凭证由合作方保管，Paycif 不会存储。",
+  "sendMoneyTitle": "转账",
+  "amountLookingUpRecipient": "查找中...",
+  "amountInputLabel": "输入金额",
+  "amountApproxUsdLabel": "≈ {amount} 美元",
+  "amountRateLockedNotice": "汇率已锁定，含 {percent}% 手续费。",
+  "paymentSettingsTitle": "支付设置",
+  "paymentSettingsHeroLabel": "安全卡片保险库",
+  "paymentSettingsSectionTitle": "一站式支付管理",
+  "paymentSettingsDescription": "在一处安全管理您已保存的信用卡/借记卡、Apple Pay、Google Pay、银行转账及偏好的法币/加密货币。",
+  "paymentSettingsManageCta": "管理支付偏好",
+  "paymentSettingsSetupCta": "设置支付方式",
+  "paymentSettingsFootnote": "您的支付信息经过加密，并由我们的收单合作方安全管理。Paycif 不会存储您的卡片信息。",
+  "paymentSettingsOpenFailed": "无法打开支付组件，请重试。",
+  "paymentSettingsWebviewTitle": "管理支付方式",
   "successAppBarTitle": "电子收据",
   "successVerifiedBadge": "已通过 Paycif 网络验证",
   "successFromLabel": "付款方",
@@ -224,6 +235,7 @@
   "successYourWallet": "我的钱包",
   "successMerchantLabel": "商户",
   "successRefIdLabel": "参考编号",
+  "successVerifiedLabel": "已验证",
   "successBackToHome": "返回首页",
   "successSaveToGallery": "保存到相册",
   "commonSomethingWentWrong": "出错了。",
@@ -236,7 +248,6 @@
   "confirmPaymentFailed": "支付失败",
   "commonOk": "确定",
   "commonValidationFailed": "请检查高亮显示的字段。",
-  "commonForgotPin": "忘记 PIN 码？",
   "errorCardInvalid": "卡片信息有误，请核对后重试。",
   "errorInsufficientFunds": "余额不足。",
   "errorProcessingFailed": "无法处理此笔付款，请稍后重试。",
@@ -257,7 +268,6 @@
       }
     }
   },
-  "paymentSettingsTitle": "支付设置",
   "paymentPayWithApple": "使用 Apple Pay 支付",
   "paymentPayWith": "使用 {method} 支付",
   "@paymentPayWith": {
@@ -328,24 +338,24 @@
   "topUpNameOnCard": "持卡人姓名",
   "topUpPayNow": "立即支付",
   "topUpTestCardHint": "测试卡：4242 4242... (任何未来日期)",
-
   "biometricLabel": "生物识别",
   "biometricSettingsUpdated": "生物识别设置已更新",
   "biometricNotAvailable": "此设备不支持生物识别",
   "biometricNotEnrolled": "未注册生物识别。请在设备设置中进行设置。",
   "biometricConfirmManage": "请确认以管理生物识别设置",
-
+  "biometricPinPrompt": "请验证您的 PIN 以继续。",
+  "profileVerifiedBadge": "已验证账户",
+  "profileKycRequiredTitle": "需要身份验证",
+  "profileKycRequiredMessage": "验证身份以解锁更高额度并保护您的账户。",
+  "profileVerifyNowCta": "立即验证",
   "kycStatusVerified": "已验证",
   "kycStatusPending": "待验证",
   "kycStatusUnverified": "未验证",
-
   "aboutApp": "关于",
   "termsOfService": "服务条款",
   "privacyPolicy": "隐私政策",
-
   "signOutConfirmTitle": "退出登录",
   "signOutConfirmMessage": "确定要退出登录吗？",
-
   "helpSearchHint": "搜索帮助...",
   "helpNoResults": "未找到结果",
   "helpStillNeedHelp": "还需要帮助？",
@@ -374,7 +384,6 @@
   "helpCardA1": "我们支持Visa、Mastercard、JCB和American Express。",
   "helpCardQ2": "如何删除已保存的卡片？",
   "helpCardA2": "前往支付 > 向左滑动卡片或点击菜单图标 > 删除。",
-
   "supportHeaderTitle": "我们随时为您服务",
   "supportHeaderSubtitle": "通常在2小时内回复",
   "supportSelectCategory": "您需要什么帮助？",
@@ -390,7 +399,6 @@
   "supportSubmit": "提交请求",
   "supportTicketSubmitted": "支持工单已提交。我们将在24小时内回复。",
   "supportAlternativeContact": "或直接联系我们",
-
   "termsLastUpdated": "最后更新：2026年1月",
   "termsSection1Title": "1. 接受条款",
   "termsSection1Content": "使用Paycif服务即表示您同意受本服务条款的约束。",
@@ -405,7 +413,6 @@
   "termsSection6Title": "6. 适用法律",
   "termsSection6Content": "本条款受泰国法律管辖。任何争议应通过在曼谷的仲裁解决。",
   "termsContact": "条款相关问题请联系：legal@paycif.com",
-
   "privacyLastUpdated": "最后更新：2026年1月",
   "privacyHighlightsTitle": "隐私保护要点",
   "privacyHighlight1": "我们绝不会将您的个人数据出售给第三方",
@@ -435,5 +442,33 @@
   "notificationTransactionAlertsDesc": "发送、接收和充值通知。",
   "notificationUpdates": "更新",
   "notificationNewsPromotions": "新闻与推广",
-  "notificationNewsPromotionsDesc": "独家优惠和功能更新。"
+  "notificationNewsPromotionsDesc": "独家优惠和功能更新。",
+  "loginMagicLinkSent": "登录链接已发送！请查看您的收件箱。",
+  "loginHeroTagline": "随时随地，即时支付。",
+  "loginContinueWithGoogle": "使用 Google 继续",
+  "loginContinueWithApple": "使用 Apple 继续",
+  "loginEmailHint": "电子邮件地址",
+  "loginEmailRequired": "请输入电子邮件地址",
+  "loginEmailInvalid": "请输入有效的电子邮件地址",
+  "loginContinueButton": "继续",
+  "loginBankGradeSecurity": "银行级安全保障",
+  "loginUseEmailInstead": "改用邮箱 →",
+  "kycAppBarTitle": "身份验证",
+  "kycStatusPreparing": "正在准备验证...",
+  "kycStatusOpening": "正在打开验证...",
+  "kycStatusInProgress": "验证进行中",
+  "kycStatusChecking": "正在检查您的状态...",
+  "kycStatusComplete": "验证完成",
+  "kycStatusIssue": "验证出现问题",
+  "kycMessageSettingUp": "正在设置您的安全验证会话...",
+  "kycMessageWaiting": "正在等待验证结果，通常只需几秒钟。",
+  "kycMessageVerified": "您的身份已成功验证。",
+  "kycMessageDefault": "请按照说明验证您的身份以解锁所有功能。",
+  "kycReopenVerification": "重新打开验证",
+  "kycTryAgain": "重试",
+  "kycDoThisLater": "稍后再说",
+  "devicesRevokeSuccess": "设备已解除授权",
+  "devicesRevokeFailed": "解除设备授权失败",
+  "profileSignOutCriticalError": "退出登录时发生严重错误，请强制关闭应用。",
+  "kycMessageAwaitingResult": "您的验证正在处理中，完成后系统会自动更新您的状态。"
 }

@@ -1,63 +1,39 @@
 import 'package:flutter/foundation.dart';
 import 'package:frontend/core/network/api_service.dart';
-import 'package:frontend/features/profile/domain/saved_card.dart';
-import 'package:frontend/core/models/user_profile.dart';
-import 'package:frontend/features/security/data/datasources/secure_storage_service.dart';
-import 'dart:convert';
 
-/// 💎 PAYMENT CONTROLLER (World-Class Reactive Sync)
-/// Centralized state management for Payment Methods.
-/// Guarantees that changing a preference in one screen (e.g. TopUp)
-/// reflects IMMEDIATELY across all other screens (e.g. Payment Settings).
+/// Centralized state for ACH on-ramp preferences.
+/// Stores only non-sensitive pre-fill data (last-used fiat/crypto/network)
+/// and the ACH accessToken for skip-email-verify flow.
+/// Card credentials are owned entirely by AlchemyPay — not stored here.
 class PaymentController extends ChangeNotifier {
   final ApiService _apiService = ApiService();
-  final SecureStorageService _storage = SecureStorageService();
 
-  static const _kCardsCacheKey = 'cache_payment_cards';
-  static const _kPrefCacheKey = 'cache_payment_pref';
-
-  List<SavedCard> _savedCards = [];
-  String? _preferredMethodId;
-  String? _preferredMethodType;
+  String _lastUsedFiat = 'USD';
+  String _lastUsedCrypto = 'USDC';
+  String _lastUsedNetwork = 'BASE'; // Base network: Paycif pool wallet lives on Base
+  bool _hasValidAchToken = false;
   bool _isLoading = false;
 
-  // Getters
-  List<SavedCard> get savedCards => _savedCards;
-  String? get preferredMethodId => _preferredMethodId;
-  String? get preferredMethodType => _preferredMethodType;
+  String get lastUsedFiat => _lastUsedFiat;
+  String get lastUsedCrypto => _lastUsedCrypto;
+  String get lastUsedNetwork => _lastUsedNetwork;
+  bool get hasValidAchToken => _hasValidAchToken;
   bool get isLoading => _isLoading;
 
-  /// 🌐 FETCH DATA
-  /// Refreshes both profile (for preference) and cards list.
   Future<void> fetchData({bool silent = false}) async {
-    // ⚡ [Fast-Path] Warm up from Cache immediately
-    if (_savedCards.isEmpty) {
-      await _loadCache();
+    if (!silent) {
+      _isLoading = true;
+      notifyListeners();
     }
 
-    if (!silent && _savedCards.isEmpty) _isLoading = true;
-    if (!silent) notifyListeners();
-
     try {
-      final results = await Future.wait([
-        _apiService.getUserProfile(),
-        _apiService.getSavedCards(forceRefresh: false),
-      ]);
-
-      final profile = results[0] as UserProfile?;
-      _savedCards = results[1] as List<SavedCard>;
-
+      final profile = await _apiService.getUserProfile();
       if (profile != null) {
-        _preferredMethodId = profile.preferredPaymentMethodId;
-        _preferredMethodType = profile.preferredPaymentMethodType;
+        _lastUsedFiat = profile.lastUsedFiat ?? 'USD';
+        _lastUsedCrypto = profile.lastUsedCrypto ?? 'USDC';
+        _lastUsedNetwork = profile.lastUsedNetwork ?? 'BASE';
+        _hasValidAchToken = profile.hasValidAchToken;
       }
-
-      // 📡 [Side-Effect] Persist Ground Truth to Disk
-      _saveCache().ignore();
-
-      debugPrint(
-        '✅ PaymentController: Data Refreshed. Pref=$_preferredMethodId',
-      );
     } catch (e) {
       debugPrint('❌ PaymentController Error: $e');
     } finally {
@@ -66,89 +42,40 @@ class PaymentController extends ChangeNotifier {
     }
   }
 
-  Future<void> _loadCache() async {
+  /// Called from PaymentSettingsScreen when user changes preferred currency.
+  Future<void> updatePreferences({String? fiat}) async {
+    if (fiat != null) _lastUsedFiat = fiat;
+    notifyListeners();
     try {
-      final cardsJson = await _storage.read(_kCardsCacheKey);
-      final prefJson = await _storage.read(_kPrefCacheKey);
-
-      if (cardsJson != null) {
-        final List<dynamic> decoded = jsonDecode(cardsJson) as List<dynamic>;
-        _savedCards = decoded.map((i) => SavedCard.fromJson(i as Map<String, dynamic>)).toList();
-      }
-
-      if (prefJson != null) {
-        final pref = jsonDecode(prefJson) as Map<String, dynamic>;
-        _preferredMethodId = pref['id'] as String?;
-        _preferredMethodType = pref['type'] as String?;
-      }
-
-      if (_savedCards.isNotEmpty) notifyListeners();
+      await _apiService.updateAchPreferences(
+        fiat: _lastUsedFiat,
+        crypto: _lastUsedCrypto,
+        network: _lastUsedNetwork,
+      );
     } catch (e) {
-      debugPrint('⚠️ [Payment] Cache load error: $e');
+      debugPrint('❌ PaymentController: failed to persist preference: $e');
     }
   }
 
-  Future<void> _saveCache() async {
-    _storage
-        .write(
-          _kCardsCacheKey,
-          jsonEncode(_savedCards.map((c) => c.toJson()).toList()),
-        )
-        .ignore();
-    _storage
-        .write(
-          _kPrefCacheKey,
-          jsonEncode({'id': _preferredMethodId, 'type': _preferredMethodType}),
-        )
-        .ignore();
-  }
-
-  /// 🔗 UPDATE PREFERENCE (Instant Sync)
-  /// Updates cache and database. Notifies listeners immediately.
-  Future<void> updatePreference(String methodId, String methodType) async {
-    // 1. Optimistic UI: Update local state immediately
-    _preferredMethodId = methodId;
-    _preferredMethodType = methodType;
+  /// Called after a successful ACH on-ramp to persist the user's last choices.
+  Future<void> updateLastUsed({
+    required String fiat,
+    required String crypto,
+    required String network,
+  }) async {
+    _lastUsedFiat = fiat;
+    _lastUsedCrypto = crypto;
+    _lastUsedNetwork = network;
     notifyListeners();
 
     try {
-      // 2. Persist to DB
-      await _apiService.updatePaymentPreference(methodId, methodType);
-      debugPrint('✅ PaymentController: Preference Persisted=$methodId');
+      await _apiService.updateAchPreferences(
+        fiat: fiat,
+        crypto: crypto,
+        network: network,
+      );
     } catch (e) {
-      debugPrint('❌ PaymentController Preference Error: $e');
-      rethrow;
-    }
-  }
-
-  /// 💳 ADD CARD
-  Future<void> addCard(String token) async {
-    _isLoading = true;
-    notifyListeners();
-    try {
-      await _apiService.saveCard(token);
-      await fetchData(silent: true);
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  /// 🗑️ DELETE CARD
-  Future<void> deleteCard(String cardId) async {
-    try {
-      await _apiService.deleteCard(cardId);
-      // Optimistic update
-      _savedCards.removeWhere((c) => c.id == cardId);
-      if (_preferredMethodId == cardId) {
-        _preferredMethodId = null;
-        _preferredMethodType = null;
-      }
-      notifyListeners();
-    } catch (e) {
-      debugPrint('❌ PaymentController Delete Error: $e');
-      fetchData(silent: true); // Re-sync on error
-      rethrow;
+      debugPrint('❌ PaymentController: failed to persist ACH preferences: $e');
     }
   }
 }

@@ -1,28 +1,29 @@
+import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:local_auth/local_auth.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 import 'package:frontend/core/theme/app_theme.dart';
-
 import 'package:frontend/features/payment/presentation/logic/payment_cubit.dart';
 import 'package:frontend/features/payment/presentation/logic/payment_state.dart';
 import 'package:frontend/features/security/domain/repositories/security_repository.dart';
-import 'package:frontend/features/payment/domain/entities/payment_breakdown.dart';
 import 'package:frontend/features/payment/data/repositories/payment_repository_impl.dart';
 import 'package:frontend/core/network/api_service.dart';
-import 'package:frontend/features/payment/data/qr_aggregator_service.dart';
+import 'package:frontend/core/l10n/generated/app_localizations.dart';
 import 'package:frontend/core/widgets/paycif_amount_text.dart';
 import 'package:frontend/core/widgets/paycif_icon_container.dart';
 import 'package:frontend/core/widgets/virtual_keypad.dart';
 import 'package:frontend/core/widgets/kyc/swipe_to_pay_slider.dart';
-import 'package:frontend/features/security/presentation/widgets/pin_entry_widget.dart';
+import 'package:frontend/features/payment/data/qr_aggregator_service.dart';
+import 'package:frontend/features/payment/domain/entities/payment_breakdown.dart';
 import 'package:frontend/features/dashboard/presentation/dashboard_controller.dart';
 import 'package:go_router/go_router.dart';
 
-enum UnifiedSheetStep { amountInput, preview, pinInput, processing, success, failure }
+enum UnifiedSheetStep { amountInput, preview, polling, success, failure }
 
 class UnifiedPaymentSheet extends StatefulWidget {
   final PaymentContext payContext;
@@ -34,8 +35,6 @@ class UnifiedPaymentSheet extends StatefulWidget {
 }
 
 class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
-  final LocalAuthentication _auth = LocalAuthentication();
-  bool _biometricReady = false;
   late UnifiedSheetStep _step;
   final TextEditingController _amountController = TextEditingController();
 
@@ -51,16 +50,7 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
     _step = hasAmount ? UnifiedSheetStep.preview : UnifiedSheetStep.amountInput;
     _customAmount = widget.payContext.amount ?? 0.0;
     _amountController.text = hasAmount ? _customAmount.toStringAsFixed(2) : '';
-    
-    _prewarmBiometric();
     _lookupRecipientName();
-  }
-
-  Future<void> _prewarmBiometric() async {
-    try {
-      final ready = await _auth.canCheckBiometrics;
-      if (mounted) setState(() => _biometricReady = ready);
-    } catch (_) {}
   }
 
   Future<void> _lookupRecipientName() async {
@@ -75,7 +65,8 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
           _isLookingUp = false;
         });
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('⚠️ [PaymentSheet] Failed to look up recipient name: $e');
       if (mounted) setState(() => _isLookingUp = false);
     }
   }
@@ -87,7 +78,8 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
     return widget.payContext.title;
   }
 
-  PaymentBreakdown get _breakdown => PaymentBreakdown(amountTHB: _customAmount);
+  PaymentBreakdown get _localBreakdown => PaymentBreakdown(amountTHB: _customAmount);
+
   double get _feeUSD {
     try {
       final state = context.read<PaymentCubit>().state;
@@ -95,7 +87,7 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
         return state.feeUSD!;
       }
     } catch (_) {}
-    return _breakdown.feeUSD;
+    return _localBreakdown.feeUSD;
   }
 
   double get _totalUSD {
@@ -105,7 +97,7 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
         return state.totalUSD!;
       }
     } catch (_) {}
-    return _breakdown.totalUSD;
+    return _localBreakdown.totalUSD;
   }
 
   double get _exchangeRate {
@@ -119,25 +111,12 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
   }
 
   bool get _canGoBack {
-    if (_step == UnifiedSheetStep.preview && (widget.payContext.amount ?? 0) == 0) {
-      return true;
-    }
-    if (_step == UnifiedSheetStep.pinInput) {
-      return true;
-    }
-    return false;
+    return _step == UnifiedSheetStep.preview && (widget.payContext.amount ?? 0) == 0;
   }
 
   void _handleBackPress() {
     if (_step == UnifiedSheetStep.preview) {
-      setState(() {
-        _step = UnifiedSheetStep.amountInput;
-      });
-    } else if (_step == UnifiedSheetStep.pinInput) {
-      setState(() {
-        _isAuthenticating = false;
-        _step = UnifiedSheetStep.preview;
-      });
+      setState(() => _step = UnifiedSheetStep.amountInput);
     }
   }
 
@@ -187,48 +166,45 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
     });
   }
 
-  bool _isAuthenticating = false;
+  bool _isInitiating = false;
 
-  Future<void> _authenticateAndPay(PaymentCubit cubit) async {
-    if (_isAuthenticating) return;
-    setState(() => _isAuthenticating = true);
+  Future<void> _initiateOnRamp(PaymentCubit cubit) async {
+    if (_isInitiating) return;
+    _isInitiating = true;
 
-    bool authenticated = false;
-    if (_biometricReady) {
-      try {
-        final double totalUSD = _totalUSD;
-        authenticated = await _auth.authenticate(
-          localizedReason: 'Confirm payment of \$${totalUSD.toStringAsFixed(2)} USD (฿${_customAmount.toStringAsFixed(2)})',
-          biometricOnly: true,
-        );
-      } catch (_) {}
-    }
-
-    if (authenticated) {
-      await Future.delayed(const Duration(milliseconds: 300));
-      if (mounted) {
-        setState(() {
-          _step = UnifiedSheetStep.processing;
-          _isAuthenticating = false;
-        });
-        _executePayment(cubit);
-      }
-    } else {
-      // Fallback to internal PIN keyboard inside bottom sheet
-      setState(() {
-        _step = UnifiedSheetStep.pinInput;
-      });
+    try {
+      cubit.initiateOnRamp(
+        promptPayId: widget.payContext.accountId ?? '',
+        recipientName: _displayName,
+        fiatCurrency: 'USD',
+        billerId: widget.payContext.billerId,
+        reference1: widget.payContext.reference1,
+        reference2: widget.payContext.reference2,
+      );
+    } finally {
+      _isInitiating = false;
     }
   }
 
-  void _executePayment(PaymentCubit cubit) {
-    cubit.pay(
-      recipientPromptPayId: widget.payContext.accountId,
-      recipientName: _displayName,
-      billerId: widget.payContext.billerId,
-      reference1: widget.payContext.reference1,
-      reference2: widget.payContext.reference2,
-    );
+  /// Opens the AlchemyPay checkout URL.
+  /// iOS: in-app WebView (required for Apple Pay camera access)
+  /// Android: external browser (required for Google Pay popup)
+  Future<void> _launchCheckout(String webUrl, String intentId, PaymentCubit cubit) async {
+    final uri = Uri.parse(webUrl);
+
+    if (Platform.isIOS) {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => _AchCheckoutPage(uri: uri),
+        ),
+      );
+      // User returned from WebView (via paycif:// redirect or close button)
+      if (mounted) cubit.pollForCompletion(intentId);
+    } else {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      // Android: start polling immediately since we can't intercept browser close
+      if (mounted) cubit.pollForCompletion(intentId);
+    }
   }
 
   void _handleSuccess(BuildContext context) {
@@ -256,9 +232,7 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
       child: BlocConsumer<PaymentCubit, PaymentState>(
         listener: (context, state) {
           if (state is PaymentSuccess) {
-            // Close the unified payment sheet
             Navigator.of(context).pop();
-            // Navigate to the full-screen Premium Trust e-Slip
             context.push('/payment_success', extra: {
               'transactionId': state.transactionId,
               'amount': _customAmount,
@@ -270,8 +244,10 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
               _step = UnifiedSheetStep.failure;
               _failureMessage = state.errorMessage;
             });
-          } else if (state is PaymentProcessing) {
-            setState(() => _step = UnifiedSheetStep.processing);
+          } else if (state is PaymentOnRampReady) {
+            _launchCheckout(state.webUrl, state.intentId, context.read<PaymentCubit>());
+          } else if (state is PaymentPolling) {
+            setState(() => _step = UnifiedSheetStep.polling);
           }
         },
         builder: (context, state) {
@@ -338,8 +314,8 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Header / Recipient View (Shown in input, PIN, and failure steps; inline in preview)
-                  if (_step == UnifiedSheetStep.amountInput || _step == UnifiedSheetStep.pinInput || _step == UnifiedSheetStep.failure) ...[
+                  // Header / Recipient View (Shown in input and failure steps; inline in preview)
+                  if (_step == UnifiedSheetStep.amountInput || _step == UnifiedSheetStep.failure) ...[
                     _buildRecipientCard(isDark),
                     const SizedBox(height: 20),
                   ],
@@ -423,10 +399,8 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
         return _buildAmountInputView(cubit);
       case UnifiedSheetStep.preview:
         return _buildPreviewView(cubit, isDark);
-      case UnifiedSheetStep.pinInput:
-        return _buildPinInputView(cubit);
-      case UnifiedSheetStep.processing:
-        return _buildProcessingView();
+      case UnifiedSheetStep.polling:
+        return _buildPollingView();
       case UnifiedSheetStep.success:
         return _buildSuccessReceiptView(isDark);
       case UnifiedSheetStep.failure:
@@ -474,16 +448,14 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
 
   Widget _buildPreviewView(PaymentCubit cubit, bool isDark) {
     final double amountTHB = _customAmount;
-    final double balance = (cubit.state is PaymentReady) ? (cubit.state as PaymentReady).balance : 0.0;
-    // Premium fallback if balance is not populated yet
-    final String displayBalance = balance > 0 ? "\$${balance.toStringAsFixed(2)} USDC" : "\$150.00 USDC";
+    // Platform-aware payment method label
+    final String payMethodLabel = Platform.isIOS ? 'Apple Pay / Card' : 'Google Pay / Card';
+    final IconData payMethodIcon = Platform.isIOS ? PhosphorIcons.appleLogo : PhosphorIcons.googleLogo;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Center(
-          child: PaycifAmountText(amount: amountTHB, isLarge: true),
-        ),
+        Center(child: PaycifAmountText(amount: amountTHB, isLarge: true)),
         const SizedBox(height: 4),
         Center(
           child: Text(
@@ -493,15 +465,11 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
         ),
         const SizedBox(height: 24),
 
-        // ─── SOURCE OF FUNDS (FROM / จาก) ───
+        // ─── PAYMENT METHOD (FROM) ───
         Text(
-          "FROM / จาก",
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.0,
-            color: isDark ? Colors.white60 : Colors.black54,
-          ),
+          "PAY WITH / จ่ายด้วย",
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.0,
+              color: isDark ? Colors.white60 : Colors.black54),
         ),
         const SizedBox(height: 6),
         Container(
@@ -518,37 +486,31 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppTheme.accentGold.withValues(alpha: 0.1),
+                  color: AppTheme.primaryTeal.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(PhosphorIcons.wallet, color: AppTheme.accentGold, size: 20),
+                child: Icon(payMethodIcon, color: AppTheme.primaryTeal, size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      "USDC Wallet (Base Network)",
-                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                    ),
-                    Text(
-                      "Balance: $displayBalance",
-                      style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
-                    ),
+                    Text(payMethodLabel,
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                    Text(AppLocalizations.of(context)!.paySecuredByPartner,
+                        style: TextStyle(color: AppTheme.textSecondaryColor(context), fontSize: 12)),
                   ],
                 ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: Colors.teal.withValues(alpha: 0.1),
+                  color: AppTheme.accentGold.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Text(
-                  "Active",
-                  style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold, fontSize: 11),
-                ),
+                child: const Text('Pay per use',
+                    style: TextStyle(color: AppTheme.accentGold, fontWeight: FontWeight.bold, fontSize: 11)),
               ),
             ],
           ),
@@ -563,37 +525,26 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
               color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.02),
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              PhosphorIcons.arrowDown,
-              size: 14,
-              color: isDark ? Colors.white54 : Colors.black54,
-            ),
+            child: Icon(PhosphorIcons.arrowDown, size: 14,
+                color: isDark ? Colors.white54 : Colors.black54),
           ),
         ),
 
-        // ─── RECIPIENT (TO / ถึง) ───
+        // ─── RECIPIENT (TO) ───
         Text(
           "TO / ถึง",
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.0,
-            color: isDark ? Colors.white60 : Colors.black54,
-          ),
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.0,
+              color: isDark ? Colors.white60 : Colors.black54),
         ),
         const SizedBox(height: 6),
         _buildRecipientCard(isDark),
         const SizedBox(height: 20),
 
-        // ─── TRANSACTION DETAILS & FEES ───
+        // ─── FEE BREAKDOWN ───
         Text(
-          "PAYMENT FLOW / รายละเอียดการโอน",
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.0,
-            color: isDark ? Colors.white60 : Colors.black54,
-          ),
+          "BREAKDOWN / รายละเอียดค่าใช้จ่าย",
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.0,
+              color: isDark ? Colors.white60 : Colors.black54),
         ),
         const SizedBox(height: 8),
         Container(
@@ -607,16 +558,15 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
           ),
           child: Column(
             children: [
-              _buildBreakdownRow("Total Debited (USD)", "\$${_totalUSD.toStringAsFixed(2)} USD"),
-              const Divider(height: 16, thickness: 0.5, color: Colors.grey),
               _buildBreakdownRow("Exchange Rate", "1 USD ≈ ${_exchangeRate.toStringAsFixed(2)} THB"),
               const SizedBox(height: 8),
-              _buildBreakdownRow("Base Amount (THB)", "฿${amountTHB.toStringAsFixed(2)}"),
+              _buildBreakdownRow("Amount (THB)", "฿${amountTHB.toStringAsFixed(2)}"),
               const SizedBox(height: 8),
-              _buildBreakdownRow("Convenience Fee (3.5%)", "\$${_feeUSD.toStringAsFixed(2)} USD"),
-              
-              if (widget.payContext.billerId != null || 
-                  widget.payContext.reference1 != null || 
+              _buildBreakdownRow("Convenience Fee", "\$${_feeUSD.toStringAsFixed(2)} USD"),
+              const Divider(height: 16, thickness: 0.5, color: Colors.grey),
+              _buildBreakdownRow("Total Charged (USD)", "\$${_totalUSD.toStringAsFixed(2)} USD"),
+              if (widget.payContext.billerId != null ||
+                  widget.payContext.reference1 != null ||
                   widget.payContext.reference2 != null) ...[
                 const Divider(height: 16, thickness: 0.5, color: Colors.grey),
                 if (widget.payContext.billerId != null) ...[
@@ -635,9 +585,8 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
         ),
         const SizedBox(height: 24),
 
-        // Swipe to confirm
         SwipeToPaySlider(
-          onSwipeComplete: () => _authenticateAndPay(cubit),
+          onSwipeComplete: () => _initiateOnRamp(cubit),
           text: "Swipe to Pay",
         ),
         const SizedBox(height: 12),
@@ -655,31 +604,7 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
     );
   }
 
-  Widget _buildPinInputView(PaymentCubit cubit) {
-    return Container(
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.55),
-      child: SingleChildScrollView(
-        child: Column(
-          children: [
-            const Text(
-              'Enter PIN to pay',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.grey),
-            ),
-            const SizedBox(height: 16),
-            PinEntryWidget(
-              isSetupMode: false,
-              onSuccess: (pin) {
-                setState(() => _step = UnifiedSheetStep.processing);
-                _executePayment(cubit);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildProcessingView() {
+  Widget _buildPollingView() {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 48),
       child: const Column(
@@ -694,8 +619,13 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
           ),
           SizedBox(height: 24),
           Text(
-            'Processing Payment...',
+            'Confirming payment...',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 0.2),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'This usually takes a few seconds.',
+            style: TextStyle(fontSize: 13, color: Colors.grey),
           ),
         ],
       ),
@@ -783,12 +713,10 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
       children: [
         Text(label, style: const TextStyle(color: Colors.grey, fontSize: 13)),
         Flexible(
-          child: Text(
-            value,
-            textAlign: TextAlign.right,
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-            overflow: TextOverflow.ellipsis,
-          ),
+          child: Text(value,
+              textAlign: TextAlign.right,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+              overflow: TextOverflow.ellipsis),
         ),
       ],
     );
@@ -849,6 +777,60 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
               ],
             ],
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// In-app WebView for AlchemyPay checkout (iOS only).
+/// Intercepts paycif:// deep-link redirect to detect when the user completes payment.
+class _AchCheckoutPage extends StatefulWidget {
+  final Uri uri;
+
+  const _AchCheckoutPage({required this.uri});
+
+  @override
+  State<_AchCheckoutPage> createState() => _AchCheckoutPageState();
+}
+
+class _AchCheckoutPageState extends State<_AchCheckoutPage> {
+  late final WebViewController _controller;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(NavigationDelegate(
+        onPageStarted: (_) => setState(() => _loading = true),
+        onPageFinished: (_) => setState(() => _loading = false),
+        onNavigationRequest: (req) {
+          if (req.url.startsWith('paycif://')) {
+            Navigator.of(context).pop(req.url);
+            return NavigationDecision.prevent;
+          }
+          return NavigationDecision.navigate;
+        },
+      ))
+      ..loadRequest(widget.uri);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Complete Payment'),
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+      body: Stack(
+        children: [
+          WebViewWidget(controller: _controller),
+          if (_loading) const Center(child: CircularProgressIndicator()),
         ],
       ),
     );

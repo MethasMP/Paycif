@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:frontend/core/network/api_service.dart';
 
@@ -57,9 +58,10 @@ class SumsubKycCubit extends Cubit<KycState> {
       }
 
       emit(KycUrlReady(kycUrl));
-    } catch (e) {
+    } catch (e, st) {
       if (isClosed) return;
-      emit(KycFailed(e.toString()));
+      _logError('initKyc failed', e, st);
+      emit(KycFailed(_friendlyErrorMessage()));
     }
   }
 
@@ -78,13 +80,18 @@ class SumsubKycCubit extends Cubit<KycState> {
       final kycStatus = (statusData['kyc_status'] as String? ?? '').toUpperCase();
       if (kycStatus == 'VERIFIED') {
         emit(KycVerified());
+      } else if (kycStatus == 'REJECTED') {
+        emit(KycFailed(_messageForStatus(kycStatus)));
+      } else if (kycStatus == 'PENDING_RESUBMISSION') {
+        emit(KycFailed(_messageForStatus(kycStatus)));
       } else {
         // Not verified yet — show awaiting state (webhook will update later)
         emit(KycAwaitingResult());
       }
-    } catch (e) {
+    } catch (e, st) {
       if (isClosed) return;
-      emit(KycFailed(e.toString()));
+      _logError('_checkCurrentStatus failed', e, st);
+      emit(KycFailed(_friendlyErrorMessage()));
     }
   }
 
@@ -108,22 +115,64 @@ class SumsubKycCubit extends Cubit<KycState> {
           emit(KycVerified());
           return;
         }
+        // Permanent rejection — not retryable.
         if (kycStatus == 'REJECTED') {
           _pollTimer?.cancel();
-          emit(KycFailed('Verification was rejected. Please contact support.'));
+          emit(KycFailed(_messageForStatus(kycStatus)));
           return;
         }
-      } catch (_) {
-        // Transient network error — keep polling
+        // Some details couldn't be verified, but the user can re-submit.
+        // The "Try Again" button on KycFailed re-runs initKyc().
+        if (kycStatus == 'PENDING_RESUBMISSION') {
+          _pollTimer?.cancel();
+          emit(KycFailed(_messageForStatus(kycStatus)));
+          return;
+        }
+      } catch (e) {
+        // Transient network error — keep polling, but record it for debugging.
+        debugPrint('[KYC] poll attempt $_pollAttempts hit a transient error: $e');
       }
 
       if (_pollAttempts >= _maxPollAttempts) {
         _pollTimer?.cancel();
         if (!isClosed) {
-          emit(KycFailed('Verification is taking longer than expected. We\'ll notify you when it\'s done.'));
+          // Honest, actionable copy: there is no real push-notification on
+          // completion, so don't promise one. Verification is still running;
+          // the user can safely leave and check again later via "Try Again".
+          emit(KycFailed(
+            'Your verification is still being processed. '
+            'You can safely close this and check again in a few minutes.',
+          ));
         }
       }
     });
+  }
+
+  /// Maps a backend KYC status string into short, calm, non-technical copy.
+  String _messageForStatus(String status) {
+    switch (status) {
+      case 'PENDING_RESUBMISSION':
+        return 'Some details couldn\'t be verified. Please try again.';
+      case 'REJECTED':
+        return 'We weren\'t able to verify your identity. '
+            'Please reach out to our support team for help.';
+      default:
+        return _friendlyErrorMessage();
+    }
+  }
+
+  /// Generic, user-safe message for unexpected exceptions. The technical
+  /// detail is logged via [_logError] — never surfaced to the user.
+  String _friendlyErrorMessage() {
+    return 'Something went wrong while verifying your identity. '
+        'Please check your connection and try again.';
+  }
+
+  /// Logs the raw error and stack trace for debugging without exposing them
+  /// to the user-facing UI.
+  void _logError(String context, Object error, StackTrace stackTrace) {
+    debugPrint('[KYC] $context: $error');
+    debugPrint('[KYC] $stackTrace');
   }
 
   @override

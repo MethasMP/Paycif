@@ -31,7 +31,7 @@ class PaymentSuccessScreen extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
-      backgroundColor: AppTheme.primaryTeal,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -43,15 +43,15 @@ class PaymentSuccessScreen extends StatelessWidget {
                   const SizedBox(width: 48),
                   Text(
                     l10n.successAppBarTitle,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: AppTheme.textPrimaryColor(context),
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 1.0,
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(PhosphorIcons.x, color: Colors.white),
+                    icon: Icon(PhosphorIcons.x, color: AppTheme.textPrimaryColor(context)),
                     onPressed: () => _navigateToHome(context),
                   ),
                 ],
@@ -79,11 +79,11 @@ class PaymentSuccessScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   TextButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(PhosphorIcons.downloadSimple, color: Colors.white, size: 20),
+                    onPressed: null,
+                    icon: Icon(PhosphorIcons.downloadSimple, color: AppTheme.textSecondaryColor(context), size: 20),
                     label: Text(
                       l10n.successSaveToGallery,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 14),
+                      style: TextStyle(color: AppTheme.textSecondaryColor(context), fontWeight: FontWeight.w500, fontSize: 14),
                     ),
                   )
                 ],
@@ -127,11 +127,11 @@ class PaymentSuccessScreen extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 12),
             decoration: BoxDecoration(
-              color: isDark ? Colors.black.withValues(alpha: 0.25) : AppTheme.primaryTealLight,
+              color: isDark ? AppTheme.signalGreenSubtleDark : AppTheme.signalGreenSubtleLight,
               borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
               border: Border(
                 bottom: BorderSide(
-                  color: isDark ? Colors.white.withValues(alpha: 0.05) : AppTheme.primaryTealLight,
+                  color: isDark ? AppTheme.signalGreenSubtleDark : AppTheme.signalGreenSubtleLight,
                   width: 1,
                 ),
               ),
@@ -141,14 +141,14 @@ class PaymentSuccessScreen extends StatelessWidget {
               children: [
                 const Icon(
                   PhosphorIcons.shieldCheckFill,
-                  color: AppTheme.primaryTeal,
+                  color: AppTheme.signalGreen,
                   size: 18,
                 ),
                 const SizedBox(width: 8),
                 Text(
                   l10n.successVerifiedBadge,
-                  style: TextStyle(
-                    color: isDark ? AppTheme.primaryColor(context) : AppTheme.primaryTeal,
+                  style: const TextStyle(
+                    color: AppTheme.signalGreen,
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 0.5,
@@ -168,10 +168,10 @@ class PaymentSuccessScreen extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: AppTheme.primaryTeal.withValues(alpha: 0.1),
+                          color: AppTheme.signalGreen.withValues(alpha: 0.1),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(PhosphorIcons.check, color: AppTheme.primaryTeal, size: 32),
+                        child: const Icon(PhosphorIcons.check, color: AppTheme.signalGreen, size: 32),
                       ),
                       const SizedBox(height: 10),
                       PaycifText(
@@ -229,7 +229,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                       RichText(
                         text: TextSpan(
                           style: TextStyle(
-                            color: isDark ? AppTheme.primaryColor(context) : AppTheme.primaryTeal,
+                            color: textColor,
                             fontFamily: Theme.of(context).textTheme.displayMedium?.fontFamily,
                             fontFeatures: const [FontFeature.tabularFigures()],
                           ),
@@ -267,7 +267,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Ref ID',
+                              l10n.successRefIdLabel,
                               style: TextStyle(color: textMuted, fontSize: 12, fontWeight: FontWeight.w500),
                             ),
                             const SizedBox(height: 4),
@@ -284,12 +284,12 @@ class PaymentSuccessScreen extends StatelessWidget {
                             const SizedBox(height: 8),
                             Row(
                               children: [
-                                const Icon(PhosphorIcons.checkCircleFill, color: AppTheme.primaryTeal, size: 16),
+                                const Icon(PhosphorIcons.checkCircleFill, color: AppTheme.signalGreen, size: 16),
                                 const SizedBox(width: 4),
                                 Text(
-                                  'Verified',
-                                  style: TextStyle(
-                                    color: AppTheme.primaryTeal,
+                                  l10n.successVerifiedLabel,
+                                  style: const TextStyle(
+                                    color: AppTheme.signalGreen,
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
                                   ),

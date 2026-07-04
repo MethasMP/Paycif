@@ -24,7 +24,7 @@ func TestSqrilProvider_DecodeQR(t *testing.T) {
 		assert.NotEmpty(t, authHeader)
 
 		// Parse body
-		var body map[string]string
+		var body map[string]interface{}
 		err := json.NewDecoder(r.Body).Decode(&body)
 		assert.NoError(t, err)
 		assert.Equal(t, "raw_qr_payload", body["qr_string"])
@@ -50,8 +50,8 @@ func TestSqrilProvider_DecodeQR(t *testing.T) {
 	}))
 	defer server.Close()
 
-	// 2. Initialize provider
-	provider := usecase.NewSqrilProvider(server.URL, "client_id", "client_secret")
+	// 2. Initialize provider (passing nil as DB)
+	provider := usecase.NewSqrilProvider(server.URL, "client_id", "client_secret", nil)
 
 	// 3. Invoke DecodeQR
 	resp, err := provider.DecodeQR(context.Background(), "raw_qr_payload", "cust_123", "partner_tx_999")
@@ -93,8 +93,8 @@ func TestSqrilProvider_GetQuotation(t *testing.T) {
 	}))
 	defer server.Close()
 
-	// 2. Initialize provider
-	provider := usecase.NewSqrilProvider(server.URL, "client_id", "client_secret")
+	// 2. Initialize provider (passing nil as DB)
+	provider := usecase.NewSqrilProvider(server.URL, "client_id", "client_secret", nil)
 
 	// 3. Invoke GetQuotation
 	resp, err := provider.GetQuotation(context.Background(), "tx_sqril_123456", "cust_123", 25000)

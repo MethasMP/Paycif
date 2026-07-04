@@ -8,13 +8,16 @@ class DashboardRepository {
 
   DashboardRepository(this._client);
 
+  // Repository-level channel state — persists across stream lifecycle
+  RealtimeChannel? _channel;
+  String? _activeProfileId;
+
   Stream<AuthState> get authStream => _client.auth.onAuthStateChange;
 
   /// Fetches transactions using Supabase Realtime postgres_changes.
   /// Falls back to a one-time query on channel error so the stream never goes silent.
   Stream<List<Transaction>> fetchTransactions(String profileId) {
     final controller = StreamController<List<Transaction>>.broadcast();
-    RealtimeChannel? channel;
 
     Future<void> fetchAndEmit() async {
       if (controller.isClosed) return;
@@ -35,10 +38,30 @@ class DashboardRepository {
       }
     }
 
-    void subscribe() {
-      channel?.unsubscribe();
+    Future<void> subscribe() async {
+      // Guard: skip if already subscribed to the same profileId
+      if (_activeProfileId == profileId && _channel != null) {
+        debugPrint('📡 [DashboardRepository] Already subscribed to profile $profileId — skipping.');
+        await fetchAndEmit();
+        return;
+      }
 
-      channel = _client
+      // Await previous channel cleanup before creating a new one
+      if (_channel != null) {
+        try {
+          await _channel!.unsubscribe();
+          // Small delay to allow server-side channel cleanup to complete
+          await Future.delayed(const Duration(milliseconds: 100));
+        } catch (e) {
+          debugPrint('⚠️ [DashboardRepository] Error unsubscribing previous channel: $e');
+        }
+        _channel = null;
+        _activeProfileId = null;
+      }
+
+      _activeProfileId = profileId;
+
+      _channel = _client
           .channel('transactions_profile_$profileId')
           .onPostgresChanges(
             event: PostgresChangeEvent.all,
@@ -60,10 +83,11 @@ class DashboardRepository {
               fetchAndEmit();
             } else if (status == RealtimeSubscribeStatus.channelError ||
                 status == RealtimeSubscribeStatus.timedOut) {
-              debugPrint('⚠️ [DashboardRepository] Channel error ($status): $error. Falling back to one-time query.');
+              debugPrint(
+                  '⚠️ [DashboardRepository] Channel error ($status): $error. Falling back to one-time query.');
               fetchAndEmit();
             } else if (status == RealtimeSubscribeStatus.closed) {
-              // 'closed' is expected when unsubscribing/switching screens, no need to query again or log
+              // 'closed' is expected when unsubscribing/switching screens — no action needed
             }
           });
     }
@@ -74,10 +98,17 @@ class DashboardRepository {
     };
 
     // Clean up when the stream is no longer listened to
-    controller.onCancel = () {
-      channel?.unsubscribe();
-      channel = null;
-      if (!controller.isClosed) controller.close();
+    controller.onCancel = () async {
+      try {
+        await _channel?.unsubscribe();
+        await Future.delayed(const Duration(milliseconds: 100));
+      } catch (e) {
+        debugPrint('⚠️ [DashboardRepository] Error during onCancel unsubscribe: $e');
+      } finally {
+        _channel = null;
+        _activeProfileId = null;
+        if (!controller.isClosed) controller.close();
+      }
     };
 
     return controller.stream;

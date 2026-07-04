@@ -168,7 +168,7 @@ func (h *TransferHandler) HandleGetLimits(c *gin.Context) {
 		"max_daily_baht":           limits["max_daily_amount"],
 		"current_total_baht":       limits["current_daily_total"],
 		"remaining_limit_baht":     limits["remaining_daily_amount"],
-		"min_per_transaction_baht": float64(usecase.MinTransactionAmount) / 100,
+		"min_per_transaction_baht": 500.0,
 	}
 
 	c.JSON(http.StatusOK, response)

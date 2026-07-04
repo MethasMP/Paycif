@@ -1,15 +1,12 @@
-import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:frontend/features/security/presentation/logic/security_controller.dart';
 import 'package:frontend/features/security/presentation/widgets/pin_entry_widget.dart';
-import 'package:frontend/features/dashboard/presentation/main_screen.dart';
-import 'package:frontend/core/widgets/paycif_icon_container.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 
 import 'package:frontend/features/security/presentation/pages/recovery_screen.dart';
@@ -98,17 +95,7 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
 
   void _onUnlockSuccess() {
     context.read<SecurityController>().recordBiometricVerificationSuccess();
-    // 🛡️ World-Class Navigation: Smooth Fade to Home
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            const MainScreen(),
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return FadeTransition(opacity: animation, child: child);
-        },
-        transitionDuration: const Duration(milliseconds: 800),
-      ),
-    );
+    context.go('/main');
   }
 
   Future<Map<String, dynamic>> _getBiometricStatus() async {
@@ -131,74 +118,20 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
     return Scaffold(
       backgroundColor: isDark ? AppTheme.darkTheme.scaffoldBackgroundColor : Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              const SizedBox(height: 60),
+        child: FutureBuilder<Map<String, dynamic>>(
+          future: _biometricStatusFuture,
+          builder: (context, snapshot) {
+            final data = snapshot.data;
+            final enabled = data?['enabled'] ?? false;
+            final profile = data?['profile'] as BiometricProfile?;
 
-              // 🛡️ Premium Identity Header
-              Center(
-                child: Column(
-                  children: [
-                    PaycifIconContainer(
-                      icon: PhosphorIcons.shieldCheck,
-                    ).animate().scale(
-                      duration: 600.ms,
-                      curve: Curves.elasticOut,
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    Text(
-                      'Unlock Paycif',
-                      style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: -0.5,
-                            color: AppTheme.textPrimaryColor(context),
-                          ),
-                    )
-                    .animate()
-                    .fadeIn(delay: 200.ms)
-                    .slideY(begin: 0.2, end: 0),
-
-                    const SizedBox(height: 8),
-
-                    Text(
-                      'Verify your identity to continue',
-                      style: TextStyle(
-                        color: isDark ? Colors.white38 : Colors.grey.shade500,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w400,
-                        letterSpacing: 0.1,
-                      ),
-                    ).animate().fadeIn(delay: 400.ms),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 48),
-
-              // 🔢 PIN Keypad with integrated biometrics key
-              FutureBuilder<Map<String, dynamic>>(
-                future: _biometricStatusFuture,
-                builder: (context, snapshot) {
-                  final data = snapshot.data;
-                  final enabled = data?['enabled'] ?? false;
-                  final profile = data?['profile'] as BiometricProfile?;
-
-                  return PinEntryWidget(
-                    showLabel: false,
-                    onSuccess: (_) => _onUnlockSuccess(),
-                    onForgotPin: () => _handleForgotPin(context),
-                    biometricIcon: enabled ? profile?.bioIcon : null,
-                    onBiometricPressed: enabled ? _tryBiometricUnlock : null,
-                  );
-                },
-              ).animate().fadeIn(delay: 500.ms),
-
-              const SizedBox(height: 40),
-            ],
-          ),
+            return PinEntryWidget(
+              onSuccess: (_) => _onUnlockSuccess(),
+              onForgotPin: () => _handleForgotPin(context),
+              biometricIcon: enabled ? profile?.bioIcon : null,
+              onBiometricPressed: enabled ? _tryBiometricUnlock : null,
+            );
+          },
         ),
       ),
     );

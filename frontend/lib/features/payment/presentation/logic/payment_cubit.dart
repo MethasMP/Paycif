@@ -111,6 +111,108 @@ class PaymentCubit extends Cubit<PaymentState> {
     }
   }
 
+  /// Pay-per-use on-ramp: creates a PayoutIntent on the backend, which returns
+  /// an AlchemyPay checkout URL. Flutter opens that URL; when the user completes
+  /// payment, the backend webhook fires → SQRIL off-ramp → PromptPay.
+  Future<void> initiateOnRamp({
+    required String promptPayId,
+    required String recipientName,
+    required String fiatCurrency,
+    String? billerId,
+    String? reference1,
+    String? reference2,
+    String? email,
+  }) async {
+    final currentState = state;
+    if (currentState is! PaymentReady) return;
+
+    emit(PaymentProcessing(method: currentState.method));
+
+    try {
+      final amountSatang = (currentState.amount * 100).toInt();
+      final sqrilTxId = currentState.sqrilTxId ?? '';
+
+      final result = await _paymentRepository.createOnRampIntent(
+        amountSatang: amountSatang,
+        sqrilTxId: sqrilTxId,
+        promptPayId: promptPayId,
+        recipientName: recipientName,
+        fiatCurrency: fiatCurrency,
+        billerId: billerId,
+        reference1: reference1,
+        reference2: reference2,
+        email: email,
+      );
+
+      if (isClosed) return;
+
+      emit(PaymentOnRampReady(
+        webUrl: result.webUrl,
+        intentId: result.intentId,
+        method: currentState.method,
+      ));
+    } catch (e) {
+      if (isClosed) return;
+      emit(PaymentFailure(
+        errorMessage: e.toString().replaceAll('Exception: ', ''),
+        failedMethod: currentState.method,
+      ));
+    }
+  }
+
+  /// Polls backend for intent completion. Call this after the AlchemyPay
+  /// checkout closes (redirect/deep-link) to detect success or failure.
+  Future<void> pollForCompletion(String intentId) async {
+    emit(PaymentPolling(intentId: intentId));
+
+    const maxAttempts = 45; // 45 × 2s = 90s max
+    for (var i = 0; i < maxAttempts; i++) {
+      if (isClosed) return;
+      await Future.delayed(const Duration(seconds: 2));
+      if (isClosed) return;
+
+      try {
+        final status = await _paymentRepository.getIntentStatus(intentId);
+
+        if (status == 'COMPLETED') {
+          emit(PaymentSuccess(
+            transactionId: intentId,
+            senderName: 'Card Payment',
+            remainingBalance: 0.0,
+          ));
+          return;
+        }
+
+        if (status == 'FAILED' || status == 'ACH_FAILED') {
+          emit(PaymentFailure(
+            errorMessage: 'Payment did not complete. Please try again.',
+            failedMethod: const PaymentMethod(
+              id: 'pay_per_use',
+              type: PaymentMethodType.wallet,
+              title: 'Pay per use',
+            ),
+          ));
+          return;
+        }
+        // PENDING / PAYMENT_SUCCESS_PAYOUT_PENDING → keep polling
+      } catch (_) {
+        // Network blip — keep polling
+      }
+    }
+
+    // Timeout: payment may still succeed via webhook. Show neutral message.
+    if (!isClosed) {
+      emit(PaymentFailure(
+        errorMessage: 'Payment is being confirmed. Check your transaction history in a moment.',
+        failedMethod: const PaymentMethod(
+          id: 'pay_per_use',
+          type: PaymentMethodType.wallet,
+          title: 'Pay per use',
+        ),
+      ));
+    }
+  }
+
   Future<void> pay({
     String? recipientPromptPayId,
     required String recipientName,

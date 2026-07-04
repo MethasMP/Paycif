@@ -8,7 +8,6 @@ class AnalyticsObserver extends NavigatorObserver {
     super.didPush(route, previousRoute);
     if (route.settings.name != null) {
       debugPrint('📊 [Analytics] Screen Viewed: ${route.settings.name}');
-      // TODO: Integrate with real analytics service (e.g. Firebase Analytics, Mixpanel, PostHog)
     }
   }
 

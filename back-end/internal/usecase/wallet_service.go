@@ -18,10 +18,7 @@ import (
 	"github.com/sony/gobreaker"
 )
 
-const (
-	MaxTransactionAmount = 500000 // ฿5,000.00
-	MinTransactionAmount = 50000  // ฿500.00
-)
+
 
 var (
 	ErrLimitExceeded       = errors.New("kyc verification limit exceeded")
@@ -218,14 +215,18 @@ type PayoutResponse struct {
 // isSerializationFailure reports whether err is a Postgres serialization
 // failure (SQLSTATE 40001), which is retryable under SERIALIZABLE isolation.
 func isSerializationFailure(err error) bool {
-	var pgErr *pgconn.PgError
-	return errors.As(err, &pgErr) && pgErr.Code == "40001"
+	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
+		return pgErr.Code == "40001"
+	}
+	return false
 }
 
 // isDeadlockFailure reports whether err is a Postgres deadlock error (SQLSTATE 40P01).
 func isDeadlockFailure(err error) bool {
-	var pgErr *pgconn.PgError
-	return errors.As(err, &pgErr) && pgErr.Code == "40P01"
+	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
+		return pgErr.Code == "40P01"
+	}
+	return false
 }
 
 // payoutReservation holds the result of the fast reservation transaction (Phase 1).
@@ -244,8 +245,26 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 	if req.Amount <= 0 {
 		return nil, errors.New("amount must be positive")
 	}
-	if req.Amount > MaxTransactionAmount {
-		return nil, fmt.Errorf("%w: amount exceeds single transaction limit of %.2f", ErrLimitExceeded, float64(MaxTransactionAmount)/100)
+	// 🛡️ Strict limits enforcement via FX Engine (No Yes-Man Fallback)
+	limits, err := s.FX.GetLimits(ctx, req.UserID.String(), "THB")
+	if err != nil {
+		return nil, fmt.Errorf("%w: unable to fetch dynamic transaction limits", ErrLimitExceeded)
+	}
+
+	maxTxAmountFloat, ok := limits["max_transaction_amount"].(float64)
+	if !ok || maxTxAmountFloat <= 0 {
+		return nil, fmt.Errorf("%w: invalid limit configuration received from engine", ErrLimitExceeded)
+	}
+
+	maxTxAmountSatang := int64(maxTxAmountFloat * 100)
+	minTxAmountSatang := int64(500 * 100) // Business requirement minimum
+
+	if req.Amount < minTxAmountSatang {
+		return nil, fmt.Errorf("amount must be at least 500.00 THB")
+	}
+
+	if req.Amount > maxTxAmountSatang {
+		return nil, fmt.Errorf("%w: amount exceeds single transaction limit of %.2f", ErrLimitExceeded, maxTxAmountFloat)
 	}
 
 	// 🛡️ Pre-flight Check: Circuit Breaker State (Yonisomanasikara L0 gate)
@@ -255,7 +274,7 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 
 	// Get the user's full name without any row lock
 	var senderFullName string
-	err := s.DB.QueryRowContext(ctx, "SELECT full_name FROM profiles WHERE id = $1", req.UserID).Scan(&senderFullName)
+	err = s.DB.QueryRowContext(ctx, "SELECT full_name FROM profiles WHERE id = $1", req.UserID).Scan(&senderFullName)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, errors.New("profile not found")
@@ -340,169 +359,7 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 	}, nil
 }
 
-// reservePayout validates the request and, if all checks pass, atomically
-// inserts a PENDING transaction + debiting ledger entry that reserves the
-// funds. Returns (nil reservation, non-nil response, nil err) if the
-// idempotency key was already processed/in-flight.
-func (s *WalletService) reservePayout(ctx context.Context, req PayoutRequest) (*payoutReservation, *PayoutResponse, error) {
-	tx, err := s.DB.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer tx.Rollback()
 
-	// 1. Lock profile row (Mutex for this specific user's wallet)
-	var senderFullName string
-	err = tx.QueryRowContext(ctx, `
-		SELECT full_name FROM profiles WHERE id = $1 FOR UPDATE
-	`, req.UserID).Scan(&senderFullName)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil, errors.New("profile not found")
-		}
-		return nil, nil, fmt.Errorf("failed to fetch profile: %w", err)
-	}
-
-	// 2. Check Idempotency (has this payout already been completed or is it in-flight?)
-	var existingID uuid.UUID
-	var existingStatus string
-	err = tx.QueryRowContext(ctx, "SELECT id, settlement_status FROM transactions WHERE reference_id = $1", req.IdempotencyKey).Scan(&existingID, &existingStatus)
-	if err == nil {
-		if existingStatus == "PENDING" {
-			return nil, nil, fmt.Errorf("a payout for this reference is already in progress, please retry shortly")
-		}
-		return nil, &PayoutResponse{
-			TransactionID: existingID.String(),
-			Status:        "already_processed",
-			Message:       "This payout was already processed",
-			SenderName:    senderFullName,
-			NewBalance:    0,
-		}, nil
-	} else if !errors.Is(err, sql.ErrNoRows) {
-		return nil, nil, fmt.Errorf("error checking idempotency: %w", err)
-	}
-
-	// 4. Calculate actual balance
-	var currentBalance int64
-	err = tx.QueryRowContext(ctx, `
-		SELECT COALESCE(SUM(amount), 0) FROM ledger_entries WHERE profile_id = $1
-	`, req.UserID).Scan(&currentBalance)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to calculate current balance: %w", err)
-	}
-
-	// Enforce balance sufficiency
-	if currentBalance < req.Amount {
-		return nil, nil, fmt.Errorf("insufficient balance: %.2f THB available", float64(currentBalance)/100)
-	}
-
-	newBalance := currentBalance - req.Amount
-
-	// 5. Reserve funds: insert PENDING transaction + debiting ledger entry.
-	newTxID := uuid.New()
-	description := fmt.Sprintf("PromptPay to %s (%s)", req.RecipientName, req.PromptPayID)
-	metadata, err := json.Marshal(map[string]string{
-		"promptpay_id":   req.PromptPayID,
-		"recipient_name": req.RecipientName,
-	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to encode metadata: %w", err)
-	}
-
-	_, err = tx.ExecContext(ctx, `
-		INSERT INTO transactions (id, reference_id, description, settlement_status, metadata, profile_id, amount, type, status)
-		VALUES ($1, $2, $3, 'PENDING', $4, $5, $6, 'PAYOUT', 'PENDING')
-	`, newTxID, req.IdempotencyKey, description, metadata, req.UserID, req.Amount)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to insert transaction: %w", err)
-	}
-
-	_, err = tx.ExecContext(ctx, `
-		INSERT INTO ledger_entries (id, transaction_id, profile_id, amount, balance_after, base_currency_amount, home_currency_amount)
-		VALUES ($1, $2, $3, $4, $5, $4, $4)
-	`, uuid.New(), newTxID, req.UserID, -req.Amount, newBalance)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create ledger entry: %w", err)
-	}
-
-	payoutPayload, err := json.Marshal(map[string]interface{}{
-		"transaction_id": newTxID.String(),
-		"promptpay_id":   req.PromptPayID,
-		"recipient_name": req.RecipientName,
-		"amount":         req.Amount,
-		"sqril_tx_id":    req.SqrilTxID,
-		"customer_id":    "cust_paycif_" + req.UserID.String(),
-	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to marshal outbox payload: %w", err)
-	}
-
-	_, err = tx.ExecContext(ctx, `
-		INSERT INTO transaction_outbox (id, transaction_id, event_type, payload, status, created_at)
-		VALUES ($1, $2, 'PROMPTPAY_PAYOUT', $3, 'PENDING', NOW())
-	`, uuid.New(), newTxID, string(payoutPayload))
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to insert outbox event: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, nil, fmt.Errorf("failed to commit reservation: %w", err)
-	}
-
-	return &payoutReservation{
-		TransactionID:  newTxID,
-		SenderFullName: senderFullName,
-		NewBalance:     newBalance,
-	}, nil, nil
-}
-
-// releasePayoutReservation removes a PENDING reservation (transaction + its
-// ledger entry, via ON DELETE CASCADE) after SQRIL fails to execute the payout,
-// restoring the reserved funds to the user's available balance.
-func (s *WalletService) releasePayoutReservation(ctx context.Context, transactionID uuid.UUID) error {
-	tx, err := s.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to begin release transaction: %w", err)
-	}
-	defer tx.Rollback()
-
-	if _, err := tx.ExecContext(ctx, "DELETE FROM transactions WHERE id = $1 AND settlement_status = 'PENDING'", transactionID); err != nil {
-		return fmt.Errorf("failed to delete reserved transaction: %w", err)
-	}
-
-	return tx.Commit()
-}
-
-// finalizePayoutReservation marks a PENDING reservation as settled with the
-// provider's final status and metadata.
-func (s *WalletService) finalizePayoutReservation(ctx context.Context, transactionID uuid.UUID, finalStatus, externalID string, req PayoutRequest) error {
-	providerMetadata, err := json.Marshal(map[string]string{
-		"sqril_tx_id": req.SqrilTxID,
-		"external_id": externalID,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to encode provider metadata: %w", err)
-	}
-
-	settlementStatus := "PENDING"
-	switch finalStatus {
-	case "SUCCESS":
-		settlementStatus = "SETTLED"
-	case "FAILED":
-		settlementStatus = "FAILED"
-	}
-
-	_, err = s.DB.ExecContext(ctx, `
-		UPDATE transactions
-		SET settlement_status = $1::settlement_status_enum, status = $2, provider_metadata = $3
-		WHERE id = $4
-	`, settlementStatus, finalStatus, providerMetadata, transactionID)
-	if err != nil {
-		return fmt.Errorf("failed to finalize transaction: %w", err)
-	}
-
-	return nil
-}
 
 // EnsureUserAccount checks if a profile exists for the user, creating it if missing.
 func (s *WalletService) EnsureUserAccount(ctx context.Context, userID uuid.UUID) error {

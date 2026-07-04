@@ -72,7 +72,7 @@ func (s *KYCService) RegisterOnRampCustomer(ctx context.Context, req RegisterOnR
 	_, err = s.DB.ExecContext(ctx, `
 		UPDATE public.profiles
 		SET kyc_status = CASE
-				WHEN kyc_status = 'UNVERIFIED' OR kyc_status IS NULL THEN 'PENDING_ONRAMP_VERIFICATION'
+				WHEN kyc_status = 'UNVERIFIED' OR kyc_status = 'PENDING' OR kyc_status IS NULL THEN 'PENDING_ONRAMP_VERIFICATION'
 				ELSE kyc_status
 			END,
 			external_customer_id = COALESCE(external_customer_id, $2),
@@ -101,11 +101,13 @@ func (s *KYCService) GetOnRampKycStatus(ctx context.Context, userID uuid.UUID) (
 	var updatedAt time.Time
 	var verifiedAt sql.NullTime
 
+	var email string
 	err := s.DB.QueryRowContext(ctx, `
-		SELECT COALESCE(kyc_status, 'UNVERIFIED'), COALESCE(kyc_tier, 'tier0'), COALESCE(updated_at, NOW()), verified_at
-		FROM public.profiles
-		WHERE id = $1
-	`, userID).Scan(&kycStatus, &kycTier, &updatedAt, &verifiedAt)
+		SELECT COALESCE(p.kyc_status, 'UNVERIFIED'), COALESCE(p.kyc_tier, 'tier0'), COALESCE(p.updated_at, NOW()), p.verified_at, a.email
+		FROM public.profiles p
+		JOIN auth.users a ON p.id = a.id
+		WHERE p.id = $1
+	`, userID).Scan(&kycStatus, &kycTier, &updatedAt, &verifiedAt, &email)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -122,6 +124,39 @@ func (s *KYCService) GetOnRampKycStatus(ctx context.Context, userID uuid.UUID) (
 	var confirmedAt *time.Time
 	if verifiedAt.Valid {
 		confirmedAt = &verifiedAt.Time
+	}
+
+	// Active Status Polling from Alchemy Pay if stuck in PENDING
+	if (kycStatus == "PENDING_ONRAMP_VERIFICATION" || kycStatus == "PENDING") && s.KYCClient != nil {
+		statusResult, pollErr := s.KYCClient.GetKycStatus(ctx, email, "1", "sumsub")
+		if pollErr == nil && statusResult != nil {
+			newStatus := AchKycStatusToInternal(statusResult.KycStatus)
+			if newStatus != kycStatus {
+				// Update database with the latest resolved status
+				if _, dbErr := s.DB.ExecContext(ctx, `
+					UPDATE public.profiles
+					SET kyc_status = $2,
+						verified_at = CASE WHEN $2 = 'VERIFIED' THEN NOW() ELSE verified_at END,
+						updated_at = NOW()
+					WHERE id = $1
+				`, userID, newStatus); dbErr != nil {
+					return nil, fmt.Errorf("failed to update profile kyc_status: %w", dbErr)
+				}
+				kycStatus = newStatus
+				if newStatus == "VERIFIED" {
+					now := time.Now()
+					confirmedAt = &now
+				}
+			}
+		}
+	}
+
+	// Graceful fallback for empty values
+	if kycStatus == "" {
+		kycStatus = "UNVERIFIED"
+	}
+	if kycTier == "" {
+		kycTier = "tier0"
 	}
 
 	return &OnRampKycStatus{

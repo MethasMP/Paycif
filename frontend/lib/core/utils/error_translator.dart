@@ -33,6 +33,7 @@ class ErrorTranslator {
     // 2. Connectivity Errors
     if (msg.contains('socketexception') ||
         msg.contains('connection failed') ||
+        msg.contains('name resolution failed') ||
         msg.contains('network_error')) {
       return l10n.errorConnectionFailed;
     }

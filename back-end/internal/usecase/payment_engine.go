@@ -82,23 +82,7 @@ func (e *PaymentEngine) GetProvider(name string) (PaymentProvider, bool) {
 	return p, ok
 }
 
-// --- Implementation Stubs for Omise and Wise ---
-
-// OmiseProvider implements PaymentProvider for Omise.
-type OmiseProvider struct {
-	APIKey string
-}
-
-func (o *OmiseProvider) GetName() string { return "omise" }
-func (o *OmiseProvider) Payout(ctx context.Context, amount int64, currency string, recipientID string, recipientName string, reference string, providerTxID string, customerID string) (*PayoutResult, error) {
-	// Mock implementation
-	log.Printf("[Omise] Processing payout of %d %s to %s", amount, currency, recipientID)
-	return &PayoutResult{
-		ExternalID: "omise_tx_123",
-		Status:     "SUCCESS",
-		RawMessage: "Processed via Omise Mock API",
-	}, nil
-}
+// --- Implementation Stubs for Wise ---
 
 // WiseProvider implements PaymentProvider for Wise.
 type WiseProvider struct {

@@ -25,6 +25,36 @@ class PaymentRepositoryImpl implements IPaymentRepository {
   }
 
   @override
+  Future<({String webUrl, String intentId})> createOnRampIntent({
+    required int amountSatang,
+    required String sqrilTxId,
+    required String promptPayId,
+    required String recipientName,
+    required String fiatCurrency,
+    String? billerId,
+    String? reference1,
+    String? reference2,
+    String? email,
+  }) async {
+    return _apiService.initiateOnRampPayment(
+      amountSatang: amountSatang,
+      sqrilTxId: sqrilTxId,
+      promptPayId: promptPayId,
+      recipientName: recipientName,
+      fiatCurrency: fiatCurrency,
+      billerId: billerId,
+      reference1: reference1,
+      reference2: reference2,
+      email: email,
+    );
+  }
+
+  @override
+  Future<String> getIntentStatus(String intentId) async {
+    return _apiService.getIntentStatus(intentId);
+  }
+
+  @override
   Future<String> payToPromptPay({
     required int amountInSatang,
     required String recipientName,

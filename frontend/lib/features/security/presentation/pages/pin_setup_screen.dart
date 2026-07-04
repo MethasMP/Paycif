@@ -1,10 +1,9 @@
-import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:frontend/features/security/presentation/logic/security_controller.dart';
 import 'package:frontend/features/security/presentation/widgets/pin_entry_widget.dart';
-import 'package:frontend/core/widgets/paycif_icon_container.dart';
 import 'package:go_router/go_router.dart';
+
 
 
 import 'package:shared_preferences/shared_preferences.dart';
@@ -18,86 +17,46 @@ class PinSetupScreen extends StatefulWidget {
 }
 
 class _PinSetupScreenState extends State<PinSetupScreen> {
-  bool _isProcessing = false;
+  late Future<BiometricProfile> _biometricProfileFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _biometricProfileFuture =
+        context.read<SecurityController>().getBiometricProfile();
+  }
 
   void _onPinSuccess(String pin) async {
-    setState(() => _isProcessing = true);
-    
     final securityController = context.read<SecurityController>();
-    
-    try {
-      await securityController.setupPin(pin);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save PIN: $e')),
-        );
-        setState(() => _isProcessing = false);
-      }
-      return;
-    }
 
-    final biometricProfile = await securityController.getBiometricProfile();
-
+    // Biometric profile is already pre-fetched — this resolves instantly.
+    final biometricProfile = await _biometricProfileFuture;
     if (!mounted) return;
 
     if (biometricProfile.availableTypes.isNotEmpty) {
-      // Ask user if they want to enable biometrics
+      final bioName = biometricProfile.bioName;
       final wantsBiometrics = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
-        builder: (BuildContext context) {
-          final bioName = biometricProfile.bioName;
-          
-          return AlertDialog(
-            title: Text('Enable $bioName?'),
-            content: Text('Use $bioName to unlock Paycif faster and more securely.'),
-            actions: [
-              OutlinedButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Not Now'),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: Text('Enable $bioName'),
-              ),
-            ],
-          );
-        },
+        builder: (context) => AlertDialog(
+          title: Text('Enable $bioName?'),
+          content: Text('Use $bioName to unlock Paycif faster and more securely.'),
+          actions: [
+            OutlinedButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Not Now'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text('Enable $bioName'),
+            ),
+          ],
+        ),
       );
 
-      if (wantsBiometrics == true && mounted) {
-        try {
-          // 1. Save biometric state locally
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setBool('biometric_enabled', true);
-
-          // 2. Sync biometric state to server database
-          try {
-            final supabase = Supabase.instance.client;
-            final user = supabase.auth.currentUser;
-            if (user != null) {
-              await supabase
-                  .from('profiles')
-                  .update({
-                    'biometric_enabled': true,
-                    'updated_at': DateTime.now().toIso8601String(),
-                  })
-                  .eq('id', user.id);
-            }
-          } catch (dbErr) {
-            debugPrint('⚠️ Failed to sync biometric policy: $dbErr');
-          }
-
-          // 3. Bind device using hardware key (will use biometric_enabled = true check)
-          await securityController.bindDevice();
-        } catch (e) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Failed to enable biometrics. You can enable it later in Settings.')),
-            );
-          }
-        }
+      if (wantsBiometrics == true) {
+        // Fire-and-forget — don't block navigation on biometric setup.
+        _enableBiometricsInBackground(securityController);
       }
     }
 
@@ -106,46 +65,39 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
     }
   }
 
+  void _enableBiometricsInBackground(SecurityController securityController) {
+    () async {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('biometric_enabled', true);
+
+        final supabase = Supabase.instance.client;
+        final user = supabase.auth.currentUser;
+        if (user != null) {
+          await supabase
+              .from('profiles')
+              .update({
+                'biometric_enabled': true,
+                'updated_at': DateTime.now().toIso8601String(),
+              })
+              .eq('id', user.id);
+        }
+
+        await securityController.bindDevice();
+      } catch (e) {
+        debugPrint('⚠️ Background biometric setup failed: $e');
+      }
+    }();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              SizedBox(height: 40),
-              PaycifIconContainer(icon: PhosphorIcons.lock),
-              SizedBox(height: 24),
-              Text(
-                'Create a Secure PIN',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 8),
-              Text(
-                'This PIN will be used to protect your account and approve transactions.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).textTheme.bodySmall?.color,
-                    ),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 40),
-              Expanded(
-                child: _isProcessing
-                    ? Center(child: CircularProgressIndicator())
-                    : PinEntryWidget(
-                        isSetupMode: true,
-                        showLabel: true,
-                        onSuccess: _onPinSuccess,
-                      ),
-              ),
-            ],
-          ),
+        child: PinEntryWidget(
+          isSetupMode: true,
+          onSuccess: _onPinSuccess,
         ),
       ),
     );

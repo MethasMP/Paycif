@@ -1,12 +1,22 @@
 // ============================================================================
 // PAYOUT-EXECUTOR - Supabase Edge Function
 // ============================================================================
-// This is the "Hand" that executes payout requests.
+// ⚠️  DEPRECATED — DO NOT USE IN PRODUCTION
 //
-// Flow:
+// This function is superseded by the Go backend `/payout/promptpay` endpoint.
+// The gateway here is MockGateway only (calls webhook.site) — no real payment
+// integration exists in this function.
+//
+// Real payout flow: Flutter → Go backend (/payout/promptpay) → SQRIL → PromptPay
+//
+// This file is kept as reference only. Set env var PAYOUT_EXECUTOR_DISABLED=true
+// to hard-disable this function and return HTTP 410 Gone.
+// ============================================================================
+//
+// Original flow (mock only):
 // 1. Receive request from Flutter
 // 2. Call RPC process_payout_request (atomic balance deduction)
-// 3. Execute gateway payout (mock/real)
+// 3. Execute MockGateway payout (webhook.site only)
 // 4. Update transaction status based on result
 // ============================================================================
 
@@ -112,6 +122,17 @@ async function handlePayoutRequest(request: Request): Promise<Response> {
   // Handle CORS preflight
   if (request.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
+  }
+
+  // DEPRECATED: hard-disable guard
+  if (Deno.env.get('PAYOUT_EXECUTOR_DISABLED') === 'true') {
+    return new Response(
+      JSON.stringify({
+        error: 'This endpoint is deprecated. Use the Go backend /payout/promptpay endpoint.',
+        deprecated: true,
+      }),
+      { status: 410, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    );
   }
 
   // Only accept POST

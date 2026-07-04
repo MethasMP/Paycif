@@ -16,8 +16,10 @@ import (
 )
 
 const (
-	achProdURL    = "https://openapi.alchemypay.org"
-	achSandboxURL = "https://openapi-test.alchemypay.org"
+	achProdURL        = "https://openapi.alchemypay.org"
+	achSandboxURL     = "https://openapi-test.alchemypay.org"
+	achPageProdURL    = "https://ramp.alchemypay.org"
+	achPageSandboxURL = "https://ramptest.alchemypay.org"
 )
 
 var achHTTPClient = &http.Client{
@@ -31,17 +33,72 @@ var achHTTPClient = &http.Client{
 
 // AlchemyPayAdapter is the on-ramp provider backed by Alchemy Pay.
 type AlchemyPayAdapter struct {
-	appID     string
-	appSecret string
-	baseURL   string
+	appID       string
+	appSecret   string
+	baseURL     string
+	pageBaseURL string
 }
 
 func NewAlchemyPayAdapter(appID, appSecret string, sandbox bool) *AlchemyPayAdapter {
 	base := achProdURL
+	pageBase := achPageProdURL
 	if sandbox {
 		base = achSandboxURL
+		pageBase = achPageSandboxURL
 	}
-	return &AlchemyPayAdapter{appID: appID, appSecret: appSecret, baseURL: base}
+	return &AlchemyPayAdapter{appID: appID, appSecret: appSecret, baseURL: base, pageBaseURL: pageBase}
+}
+
+// GenerateManageURL builds a signed AlchemyPay Page Integration URL.
+// Used by the Payment Settings screen so users can add/manage saved cards
+// and digital wallets (Apple Pay, Google Pay) inside AlchemyPay's H5 widget.
+// When token is provided the user skips email verification — payment methods
+// saved in a previous session are pre-loaded.
+func (a *AlchemyPayAdapter) GenerateManageURL(merchantOrderNo, token, callbackURL, redirectURL string) string {
+	ts := fmt.Sprintf("%d", time.Now().UnixMilli())
+
+	params := map[string]string{
+		"appId":           a.appID,
+		"timestamp":       ts,
+		"merchantOrderNo": merchantOrderNo,
+		"crypto":          "USDC",
+		"network":         "BASE",
+		"showTable":       "buy",
+	}
+	if token != "" {
+		params["token"] = token
+	}
+	if callbackURL != "" {
+		params["callbackUrl"] = callbackURL
+	}
+	if redirectURL != "" {
+		params["redirectUrl"] = redirectURL
+	}
+
+	// Sort params alphabetically, build query string
+	keys := make([]string, 0, len(params))
+	for k := range params {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	parts := make([]string, 0, len(keys))
+	for _, k := range keys {
+		if params[k] != "" {
+			parts = append(parts, k+"="+params[k])
+		}
+	}
+	queryString := strings.Join(parts, "&")
+
+	// Page Integration signature: timestamp + GET + /index/rampPageBuy?<sorted_params>
+	requestPath := "/index/rampPageBuy?" + queryString
+	signInput := ts + "GET" + requestPath
+
+	mac := hmac.New(sha256.New, []byte(a.appSecret))
+	mac.Write([]byte(signInput))
+	sig := url.QueryEscape(base64.StdEncoding.EncodeToString(mac.Sum(nil)))
+
+	return fmt.Sprintf("%s?%s&sign=%s", a.pageBaseURL, queryString, sig)
 }
 
 // sign builds the HMAC-SHA256 signature required by ACH.
@@ -157,6 +214,119 @@ func (a *AlchemyPayAdapter) GetQuote(ctx context.Context, fiatAmount, fiatCurren
 		RampFee:      model.RampFee,
 		Price:        model.Price,
 	}, nil
+}
+
+// --- GetToken (skip-email-verify) ---
+
+type GetTokenResult struct {
+	AccessToken string
+	UserID      string // ACH internal encrypted user ID
+}
+
+// GetToken exchanges the user's email for a 10-day ACH accessToken.
+// The token is passed as the `token` param in the ACH widget URL so users
+// skip the email verification step entirely.
+// Prerequisite: the user's email must already be verified on Paycif's side.
+func (a *AlchemyPayAdapter) GetToken(ctx context.Context, email string) (*GetTokenResult, error) {
+	timestamp := fmt.Sprintf("%d", time.Now().UnixMilli())
+	path := "/open/api/v4/merchant/getToken"
+	body := fmt.Sprintf(`{"email":%q}`, email)
+
+	mac := hmac.New(sha256.New, []byte(a.appSecret))
+	mac.Write([]byte(timestamp + "POST" + path + body))
+	sig := base64.StdEncoding.EncodeToString(mac.Sum(nil))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, a.baseURL+path, strings.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("ACH getToken build error: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("appid", a.appID)
+	req.Header.Set("timestamp", timestamp)
+	req.Header.Set("sign", sig)
+
+	var resp achResponse
+	if err := a.do(req, &resp); err != nil {
+		return nil, err
+	}
+	if !resp.ok() {
+		return nil, fmt.Errorf("ACH getToken error %s: %s", resp.Code, resp.Msg)
+	}
+
+	var model struct {
+		ID          string `json:"id"`
+		AccessToken string `json:"accessToken"`
+	}
+	if err := json.Unmarshal(resp.Model, &model); err != nil {
+		return nil, fmt.Errorf("ACH getToken parse error: %w", err)
+	}
+	return &GetTokenResult{AccessToken: model.AccessToken, UserID: model.ID}, nil
+}
+
+// --- FiatList (payment methods + fees by country) ---
+
+type FiatPaymentMethod struct {
+	Currency    string  `json:"currency"`
+	Country     string  `json:"country"`
+	CountryName string  `json:"country_name"`
+	PayWayCode  string  `json:"pay_way_code"`
+	PayWayName  string  `json:"pay_way_name"`
+	FixedFee    float64 `json:"fixed_fee"`
+	FeeRate     float64 `json:"fee_rate"`
+	PayMin      float64 `json:"pay_min"`
+	PayMax      float64 `json:"pay_max"`
+}
+
+// FiatList returns all supported fiat currencies and their payment methods.
+// Pass side="BUY" for on-ramp (default). Filter by country client-side.
+func (a *AlchemyPayAdapter) FiatList(ctx context.Context, side string) ([]FiatPaymentMethod, error) {
+	if side == "" {
+		side = "BUY"
+	}
+	params := map[string]string{
+		"appId": a.appID,
+		"type":  side,
+	}
+	params["sign"] = a.sign(params)
+
+	var resp achResponse
+	if err := a.get(ctx, "/open/api/v4/merchant/fiat/list", params, &resp); err != nil {
+		return nil, err
+	}
+	if !resp.ok() {
+		return nil, fmt.Errorf("ACH fiat list error %s: %s", resp.Code, resp.Msg)
+	}
+
+	var models []struct {
+		Currency    string  `json:"currency"`
+		Country     string  `json:"country"`
+		CountryName string  `json:"countryName"`
+		PayWayCode  string  `json:"payWayCode"`
+		PayWayName  string  `json:"payWayName"`
+		FixedFee    float64 `json:"fixedFee"`
+		FeeRate     float64 `json:"feeRate"`
+		PayMin      float64 `json:"payMin"`
+		PayMax      float64 `json:"payMax"`
+	}
+	if err := json.Unmarshal(resp.Model, &models); err != nil {
+		return nil, fmt.Errorf("ACH fiat list parse error: %w", err)
+	}
+
+	out := make([]FiatPaymentMethod, len(models))
+	for i, m := range models {
+		out[i] = FiatPaymentMethod{
+			Currency:    m.Currency,
+			Country:     m.Country,
+			CountryName: m.CountryName,
+			PayWayCode:  m.PayWayCode,
+			PayWayName:  m.PayWayName,
+			FixedFee:    m.FixedFee,
+			FeeRate:     m.FeeRate,
+			PayMin:      m.PayMin,
+			PayMax:      m.PayMax,
+		}
+	}
+	return out, nil
 }
 
 // --- CreateOrder ---

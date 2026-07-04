@@ -9,6 +9,7 @@ import 'package:frontend/core/widgets/paycif_amount_text.dart';
 import 'package:frontend/features/payment/domain/entities/payment_breakdown.dart';
 import 'package:go_router/go_router.dart';
 import 'package:frontend/core/theme/app_theme.dart';
+import 'package:frontend/core/widgets/paycif_button.dart';
 
 class AmountEntryScreen extends StatefulWidget {
   final EMFData data;
@@ -124,7 +125,7 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
           icon: Icon(PhosphorIcons.caretLeft, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('Send Money'),
+        title: Text(l10n.sendMoneyTitle),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
@@ -196,12 +197,12 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
                         height: 14,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.grey[400],
+                          color: AppTheme.textSecondaryColor(context),
                         ),
                       ),
                       SizedBox(width: 8),
                       Text(
-                        'Looking up...',
+                        AppLocalizations.of(context)!.amountLookingUpRecipient,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               color: AppTheme.textSecondaryColor(context),
                             ),
@@ -254,7 +255,7 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
     return Column(
       children: [
         Text(
-          'Input Amount',
+          AppLocalizations.of(context)!.amountInputLabel,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: AppTheme.textSecondaryColor(context),
                 letterSpacing: 1.2,
@@ -269,7 +270,7 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
         if (amountTHB > 0) ...[
           const SizedBox(height: 8),
           Text(
-            '≈ \$${totalUSD.toStringAsFixed(2)} USD',
+            AppLocalizations.of(context)!.amountApproxUsdLabel(totalUSD.toStringAsFixed(2)),
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                   color: AppTheme.textSecondaryColor(context),
@@ -279,7 +280,7 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: AppTheme.primaryTealLight,
+              color: isDark ? AppTheme.stateInfoSubtleDark : AppTheme.stateInfoSubtleLight,
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
@@ -288,13 +289,15 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
                 const Icon(
                   PhosphorIconsRegular.info,
                   size: 14,
-                  color: AppTheme.primaryTeal,
+                  color: AppTheme.stateInfo,
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  'Rate locked. Includes 3.5% convenience fee.',
+                  AppLocalizations.of(context)!.amountRateLockedNotice(
+                    (breakdown.convenienceFeePercentage * 100).toStringAsFixed(1),
+                  ),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.primaryTeal,
+                        color: AppTheme.stateInfo,
                         fontWeight: FontWeight.w600,
                       ),
                 ),
@@ -333,19 +336,12 @@ class _AmountEntryScreenState extends State<AmountEntryScreen> {
 
     return SizedBox(
       width: double.infinity,
-      height: 64,
-      child: ElevatedButton(
-        onPressed: (_isProcessing || !hasAmount) ? null : _onNext,
-        child: _isProcessing
-            ? SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2,
-                ),
-              )
-            : const Text('Review Payment'),
+      child: PaycifButton(
+        text: l10n.payReviewTitle,
+        isLoading: _isProcessing,
+        onPressed: !hasAmount ? null : _onNext,
+        variant: PaycifButtonVariant.primary,
+        size: PaycifButtonSize.lg,
       ),
     );
   }

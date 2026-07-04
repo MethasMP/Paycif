@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:frontend/features/security/presentation/logic/security_controller.dart';
 import 'package:frontend/core/utils/error_translator.dart';
@@ -214,7 +215,7 @@ class _RecoveryScreenState extends State<RecoveryScreen>
               child: Icon(
                 PhosphorIcons.caretLeft,
                 size: 20,
-                color: isDark ? const Color(0xFFF5F5F5) : const Color(0xFF111111),
+                color: AppTheme.textPrimaryColor(context),
               ),
             ),
           ),
@@ -252,7 +253,7 @@ class _RecoveryScreenState extends State<RecoveryScreen>
             fontWeight: FontWeight.w600,
             letterSpacing: -0.8,
             height: 1.1,
-            color: isDark ? const Color(0xFFF5F5F5) : const Color(0xFF111111),
+            color: AppTheme.textPrimaryColor(context),
           ),
         )
         .animate()
@@ -267,7 +268,7 @@ class _RecoveryScreenState extends State<RecoveryScreen>
           style: TextStyle(
             fontSize: 15,
             height: 1.55,
-            color: isDark ? Colors.white.withValues(alpha: 0.45) : const Color(0xFF666664),
+            color: AppTheme.textSecondaryColor(context),
           ),
         )
         .animate()
@@ -322,12 +323,12 @@ class _RecoveryScreenState extends State<RecoveryScreen>
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
                 color: _hasError
-                    ? Colors.red.withValues(alpha: 0.5)
+                    ? AppTheme.errorRed.withValues(alpha: 0.5)
                     : (_digits.isNotEmpty
                         ? primary.withValues(alpha: 0.35)
                         : (isDark
                             ? Colors.white.withValues(alpha: 0.07)
-                            : const Color(0xFFE5E5E3))),
+                            : AppTheme.borderGrey)),
                 width: 1.5,
               ),
               boxShadow: [
@@ -363,7 +364,7 @@ class _RecoveryScreenState extends State<RecoveryScreen>
                     children: [
                       Icon(PhosphorIcons.warningCircle,
                           size: 14,
-                          color: isDark ? Colors.red.shade300 : Colors.red.shade600),
+                          color: AppTheme.errorRedText),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
@@ -373,7 +374,7 @@ class _RecoveryScreenState extends State<RecoveryScreen>
                           ),
                           style: TextStyle(
                             fontSize: 12.5,
-                            color: isDark ? Colors.red.shade300 : Colors.red.shade600,
+                            color: AppTheme.errorRedText,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -408,14 +409,14 @@ class _RecoveryScreenState extends State<RecoveryScreen>
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: _hasError
-              ? Colors.red.withValues(alpha: 0.4)
+              ? AppTheme.errorRed.withValues(alpha: 0.4)
               : (isFilled
                   ? primary.withValues(alpha: 0.5)
                   : (isActive
                       ? primary.withValues(alpha: 0.25)
                       : (isDark
                           ? Colors.white.withValues(alpha: 0.05)
-                          : const Color(0xFFE5E5E3)))),
+                          : AppTheme.borderGrey))),
           width: isFilled ? 1.5 : 1.0,
         ),
       ),
@@ -427,7 +428,7 @@ class _RecoveryScreenState extends State<RecoveryScreen>
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: _hasError
-                      ? Colors.red.shade400
+                      ? AppTheme.errorRed
                       : primary,
                   boxShadow: [
                     if (!_hasError)
@@ -493,7 +494,7 @@ class _RecoveryScreenState extends State<RecoveryScreen>
             child: Icon(
               PhosphorIcons.backspace,
               size: 24,
-              color: isDark ? Colors.white54 : const Color(0xFF666664),
+              color: AppTheme.textSecondaryColor(context),
             ),
           );
         }
@@ -506,7 +507,7 @@ class _RecoveryScreenState extends State<RecoveryScreen>
               fontSize: 28,
               fontWeight: FontWeight.w400,
               letterSpacing: 0.5,
-              color: isDark ? const Color(0xFFF5F5F5) : const Color(0xFF111111),
+              color: AppTheme.textPrimaryColor(context),
             ),
           ),
         );
@@ -598,7 +599,7 @@ class _LockedState extends StatelessWidget {
                   child: Icon(
                     PhosphorIcons.caretLeft,
                     size: 20,
-                    color: isDark ? const Color(0xFFF5F5F5) : const Color(0xFF111111),
+                    color: AppTheme.textPrimaryColor(context),
                   ),
                 ),
               ),
@@ -613,13 +614,13 @@ class _LockedState extends StatelessWidget {
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: const Color(0xFFF79009).withValues(alpha: 0.12),
+              color: AppTheme.warningAmber.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(24),
             ),
             child: const Icon(
               PhosphorIcons.lockSimple,
               size: 36,
-              color: Color(0xFFF79009),
+              color: AppTheme.warningAmber,
             ),
           )
           .animate()
@@ -633,7 +634,7 @@ class _LockedState extends StatelessWidget {
             style: Theme.of(context).textTheme.headlineLarge?.copyWith(
               fontWeight: FontWeight.w600,
               letterSpacing: -0.5,
-              color: isDark ? const Color(0xFFF5F5F5) : const Color(0xFF111111),
+              color: AppTheme.textPrimaryColor(context),
             ),
           )
           .animate()
@@ -654,7 +655,7 @@ class _LockedState extends StatelessWidget {
                 height: 1.6,
                 color: isDark
                     ? Colors.white.withValues(alpha: 0.45)
-                    : const Color(0xFF666664),
+                    : AppTheme.textSecondaryColor(context),
               ),
             ),
           )
@@ -669,7 +670,7 @@ class _LockedState extends StatelessWidget {
             child: TextButton(
               onPressed: () => Navigator.pop(context),
               style: TextButton.styleFrom(
-                foregroundColor: isDark ? const Color(0xFF2BBF9E) : const Color(0xFF0F6E56),
+                foregroundColor: isDark ? AppTheme.darkTheme.primaryColor : AppTheme.primaryTealDark,
                 padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
               ),
               child: const Text(
@@ -742,13 +743,13 @@ class _VerifiedSheet extends StatelessWidget {
               width: 72,
               height: 72,
               decoration: BoxDecoration(
-                color: const Color(0xFF2BBF9E).withValues(alpha: 0.15),
+                color: AppTheme.primaryTeal.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 PhosphorIcons.checkCircle,
                 size: 36,
-                color: Color(0xFF2BBF9E),
+                color: AppTheme.primaryTeal,
               ),
             )
             .animate()
@@ -761,7 +762,7 @@ class _VerifiedSheet extends StatelessWidget {
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.w600,
                 letterSpacing: -0.4,
-                color: isDark ? const Color(0xFFF5F5F5) : const Color(0xFF111111),
+                color: AppTheme.textPrimaryColor(context),
               ),
             )
             .animate()
@@ -777,7 +778,7 @@ class _VerifiedSheet extends StatelessWidget {
                 height: 1.55,
                 color: isDark
                     ? Colors.white.withValues(alpha: 0.45)
-                    : const Color(0xFF666664),
+                    : AppTheme.textSecondaryColor(context),
               ),
             )
             .animate()
@@ -790,10 +791,7 @@ class _VerifiedSheet extends StatelessWidget {
               width: double.infinity,
               height: 58,
               child: ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop(); // Close sheet
-                  Navigator.of(context).pop(); // Back (triggers PIN setup flow)
-                },
+                onPressed: () => context.go('/pin_setup'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: isDark
                       ? AppTheme.accentGoldDisabled

@@ -16,7 +16,6 @@ import 'package:frontend/features/payment/presentation/logic/payment_state.dart'
 import 'package:frontend/features/security/domain/repositories/security_repository.dart';
 import 'package:frontend/features/payment/presentation/widgets/fx_breakdown_card.dart';
 import 'package:frontend/core/widgets/paycif_button.dart';
-import 'package:frontend/features/profile/domain/saved_card.dart';
 import 'package:frontend/core/l10n/generated/app_localizations.dart';
 
 class PayScreen extends StatefulWidget {
@@ -44,27 +43,12 @@ class PayScreen extends StatefulWidget {
 class _PayScreenState extends State<PayScreen> {
   final LocalAuthentication _auth = LocalAuthentication();
   bool _biometricReady = false;
-  SavedCard? _selectedCard;
-  bool _loadingCard = true;
+  final bool _loadingCard = false;
 
   @override
   void initState() {
     super.initState();
     _prewarmBiometric();
-    _loadPaymentMethod();
-  }
-
-  Future<void> _loadPaymentMethod() async {
-    try {
-      final cards = await ApiService().getSavedCards();
-      if (!mounted) return;
-      setState(() {
-        _selectedCard = cards.isNotEmpty ? cards.first : null;
-        _loadingCard = false;
-      });
-    } catch (_) {
-      if (mounted) setState(() => _loadingCard = false);
-    }
   }
 
   Future<void> _prewarmBiometric() async {
@@ -107,6 +91,7 @@ class _PayScreenState extends State<PayScreen> {
         ),
         child: PinEntryWidget(
           isSetupMode: false,
+          serverVerify: true,
           onSuccess: (pin) {
             Navigator.pop(bottomSheetContext);
             _executePayment(cubit);
@@ -146,13 +131,13 @@ class _PayScreenState extends State<PayScreen> {
           backgroundColor: Colors.transparent,
           elevation: 0,
           leading: IconButton(
-            icon: Icon(PhosphorIcons.x, color: isDark ? Colors.white : AppTheme.textPrimary),
+            icon: Icon(PhosphorIcons.x, color: AppTheme.textPrimaryColor(context)),
             onPressed: () => Navigator.pop(context),
           ),
           title: Text(
             l10n.payReviewTitle,
             style: theme.appBarTheme.titleTextStyle?.copyWith(
-              color: isDark ? Colors.white : AppTheme.textPrimary,
+              color: AppTheme.textPrimaryColor(context),
             ),
           ),
         ),
@@ -259,22 +244,21 @@ class _PayScreenState extends State<PayScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _selectedCard != null ? l10n.payMethodPayPerUse : l10n.payNoMethodSelected,
+                        l10n.payMethodPayPerUse,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      if (_selectedCard != null)
-                        Text(
-                          '${_selectedCard!.brand} •••• ${_selectedCard!.lastDigits}',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: Colors.grey,
-                          ),
+                      Text(
+                        l10n.paySecuredByPartner,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppTheme.textSecondaryColor(context),
                         ),
+                      ),
                     ],
                   ),
           ),
-          if (!_loadingCard && _selectedCard != null)
+          if (!_loadingCard)
             const Icon(PhosphorIcons.checkCircle, color: AppTheme.successGreen),
         ],
       ),

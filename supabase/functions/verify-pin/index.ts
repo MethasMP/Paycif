@@ -1,441 +1,154 @@
-// ============================================================================
-// VERIFY-PIN - Supabase Edge Function
-// ============================================================================
-// Server Authority for PIN verification.
-// Implements strict Server-Side Lockout to prevent client-side bypass.
-// ============================================================================
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
+import * as ed from 'https://esm.sh/@noble/ed25519@2.0.0';
+import { p256 } from 'https://esm.sh/@noble/curves@1.2.0/p256';
+import { sha512 } from 'https://esm.sh/@noble/hashes@1.3.1/sha512';
 
-import { serve } from 'std/server';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { argon2id } from 'hash-wasm';
-import { decode as decodeBase64 } from 'std/encoding/base64';
-import * as ed from '@noble/ed25519';
-import { p256 } from '@noble/curves/p256';
-import { sha512 } from '@noble/hashes/sha512';
+ed.etc.sha512Sync = (...msgs: Uint8Array[]) => sha512(ed.etc.concatBytes(...msgs));
 
-// Configure SHA-512 for @noble/ed25519 v2
-ed.etc.sha512Sync = (...messages: Uint8Array[]) => sha512(ed.etc.concatBytes(...messages));
-
-const CORS_HEADERS = {
+const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-device-id, x-device-signature, x-nonce',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-// ----------------------------------------------------------------------------
-// Domain Types & Interfaces
-// ----------------------------------------------------------------------------
+const MAX_MINUTE_DRIFT = 2;
 
-interface UserAuthContext {
-  pin_hash: string;
-  failed_attempts: number;
-  locked_until: string | null;
-  public_key: string | null;
-  is_device_active: boolean;
-}
-
-interface RequestCredentials {
-  pin: string;
-  deviceId: string;
-  signature: string;
-  accessToken: string;
-}
-
-// ----------------------------------------------------------------------------
-// Custom Domain Exceptions
-// ----------------------------------------------------------------------------
-
-abstract class HttpException extends Error {
-  abstract readonly statusCode: number;
-  constructor(message: string) {
-    super(message);
-    Object.setPrototypeOf(this, new.target.prototype);
-  }
-}
-
-class ValidationException extends HttpException {
-  readonly statusCode = 400;
-}
-
-class AuthenticationException extends HttpException {
-  readonly statusCode = 401;
-}
-
-class LockoutException extends HttpException {
-  readonly statusCode = 423;
-  readonly lockedUntil: string;
-
-  constructor(message: string, lockedUntil: string) {
-    super(message);
-    this.lockedUntil = lockedUntil;
-  }
-}
-
-class DatabaseException extends HttpException {
-  readonly statusCode = 500;
-}
-
-// ----------------------------------------------------------------------------
-// Main Server Handler
-// ----------------------------------------------------------------------------
-
-serve(async (request: Request): Promise<Response> => {
-  if (request.method === 'OPTIONS') {
-    return new Response('ok', { headers: CORS_HEADERS });
-  }
+serve(async (req: Request): Promise<Response> => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
 
   try {
-    return await handleVerifyPinRequest(request);
-  } catch (error: unknown) {
-    return buildErrorResponse(error);
+    const db = createSupabase();
+
+    // 1. JWT auth
+    const auth = req.headers.get('Authorization');
+    if (!auth) return err('Missing auth', 401);
+    const { data: { user }, error: authErr } = await db.auth.getUser(auth.replace(/^Bearer /i, ''));
+    if (authErr || !user) return err('Unauthorized', 401);
+
+    // 2. Required headers
+    const deviceId = req.headers.get('x-device-id');
+    const signature = req.headers.get('x-device-signature');
+    const nonce = req.headers.get('x-nonce');
+    if (!deviceId || !signature || !nonce) return err('Device authorization missing', 401);
+
+    // 3. Body
+    const { pin } = await req.json().catch(() => ({}));
+    if (!pin || typeof pin !== 'string') return err('PIN required', 400);
+
+    // 4. Load auth context
+    const ctx = await fetchContext(db, user.id, deviceId);
+    if (!ctx) return err('PIN not set up. Please set up your PIN first.', 404);
+    if (!ctx.public_key || !ctx.is_device_active) return err('Device not recognized', 401);
+
+    // 5. Lockout check
+    if (ctx.locked_until && new Date(ctx.locked_until) > new Date()) {
+      const secs = Math.ceil((new Date(ctx.locked_until).getTime() - Date.now()) / 1000);
+      const levelMsg = ctx.lockout_level >= 3
+        ? 'Account permanently locked. Please use Forgot PIN to recover.'
+        : `Account locked. Try again in ${secs} seconds.`;
+      return new Response(
+        JSON.stringify({ success: false, error: levelMsg, locked_until: ctx.locked_until, lockout_level: ctx.lockout_level }),
+        { status: 423, headers: { ...CORS, 'Content-Type': 'application/json', 'Retry-After': secs.toString() } },
+      );
+    }
+
+    // 6. Timestamp window validation
+    const clientMinute = parseInt(req.headers.get('x-timestamp-bucket') ?? '0', 10);
+    const serverMinute = Math.floor(Date.now() / 60000);
+    if (Math.abs(serverMinute - clientMinute) > MAX_MINUTE_DRIFT) {
+      return err('Request timestamp expired. Please try again.', 401);
+    }
+
+    // 7. Nonce consumption (atomic, replay-proof)
+    const { data: nonceOk, error: nonceErr } = await db.rpc('consume_nonce', {
+      p_nonce: nonce,
+      p_user_id: user.id,
+      p_window_seconds: 120,
+    });
+    if (nonceErr || !nonceOk) return err('Request already used or expired. Please try again.', 401);
+
+    // 8. Signature verification — payload: "PIN:NONCE:MINUTE_BUCKET"
+    const sigPayload = `${pin}:${nonce}:${clientMinute}`;
+    const sigOk = await verifySignature(signature, sigPayload, ctx.public_key);
+    if (!sigOk) {
+      await recordFailure(db, user.id, deviceId, ctx.failed_attempts);
+      return err('Invalid PIN.', 401);
+    }
+
+    // 9. PIN hash verification (happens entirely in DB, hash never leaves Postgres)
+    const { data: pinOk, error: pinErr } = await db.rpc('verify_pin_hash', {
+      p_user_id: user.id,
+      p_pin: pin,
+    });
+    if (pinErr) { console.error('[verify-pin] DB error:', pinErr); return err('Internal error', 500); }
+
+    if (pinOk) {
+      await db.rpc('update_user_auth_result', {
+        p_user_id: user.id, p_device_id: deviceId,
+        p_failed_attempts: 0, p_locked_until: null, p_reset_counters: true,
+      });
+      return ok({ success: true });
+    }
+
+    // 10. Record failure + escalating lockout
+    await recordFailure(db, user.id, deviceId, ctx.failed_attempts);
+    const newFailed = (ctx.failed_attempts || 0) + 1;
+    const remaining = Math.max(0, 3 - (newFailed % 3));
+    return err(`Invalid PIN. ${remaining > 0 ? remaining + ' attempts before lockout.' : 'Account locked.'}`, 401);
+
+  } catch (e: unknown) {
+    console.error('[verify-pin] fatal:', e);
+    return err(`Internal error: ${e instanceof Error ? e.message : String(e)}`, 500);
   }
 });
 
-// ----------------------------------------------------------------------------
-// Request Coordinator
-// ----------------------------------------------------------------------------
-
-async function handleVerifyPinRequest(request: Request): Promise<Response> {
-  const credentials = await extractCredentials(request);
-  const supabase = createSupabaseServiceClient();
-  const userId = await authenticateUser(supabase, credentials.accessToken);
-  
-  const authContext = await fetchUserAuthContext(supabase, userId, credentials.deviceId);
-  validateLockStatus(authContext);
-
-  const verificationResult = await verifyCredentials(credentials, authContext);
-  if (verificationResult.isValid) {
-    await handleSuccess(supabase, userId, credentials.deviceId);
-    return buildSuccessResponse();
-  }
-
-  await handleFailure(supabase, userId, credentials.deviceId, authContext);
+function createSupabase(): SupabaseClient {
+  const url = Deno.env.get('SUPABASE_URL');
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!url || !key) throw new Error('Server config missing');
+  return createClient(url, key);
 }
 
-// ----------------------------------------------------------------------------
-// Extraction & Parsing
-// ----------------------------------------------------------------------------
-
-async function extractCredentials(request: Request): Promise<RequestCredentials> {
-  const accessToken = extractAuthorizationToken(request);
-  const deviceId = request.headers.get('x-device-id');
-  const signature = request.headers.get('x-device-signature');
-
-  if (!deviceId || !signature) {
-    throw new AuthenticationException('Device authorization missing');
-  }
-
-  const { pin } = await parseRequestBody(request);
-  if (!pin) {
-    throw new ValidationException('PIN required');
-  }
-
-  return { pin, deviceId, signature, accessToken };
+interface AuthContext {
+  pin_hash: string; failed_attempts: number; locked_until: string | null;
+  lockout_level: number; public_key: string | null; is_device_active: boolean;
 }
 
-function extractAuthorizationToken(request: Request): string {
-  const authorizationHeader = request.headers.get('Authorization');
-  if (!authorizationHeader) {
-    throw new AuthenticationException('Missing auth');
-  }
-  return authorizationHeader.replace('Bearer ', '');
+async function fetchContext(db: SupabaseClient, userId: string, deviceId: string): Promise<AuthContext | null> {
+  const { data, error } = await db.rpc('get_user_auth_context', { p_user_id: userId, p_device_id: deviceId });
+  if (error) throw new Error(`DB: ${error.message}`);
+  return data ?? null;
 }
 
-async function parseRequestBody(request: Request): Promise<{ pin?: string }> {
+async function recordFailure(db: SupabaseClient, userId: string, deviceId: string, currentFailed: number) {
+  const newFailed = (currentFailed || 0) + 1;
+  await db.rpc('update_user_auth_result', {
+    p_user_id: userId, p_device_id: deviceId,
+    p_failed_attempts: newFailed, p_locked_until: null, p_reset_counters: false,
+  });
+}
+
+async function verifySignature(sigB64: string, payload: string, pubKeyB64: string): Promise<boolean> {
   try {
-    return await request.json();
-  } catch {
-    throw new ValidationException('Invalid JSON payload');
-  }
-}
-
-// ----------------------------------------------------------------------------
-// Authentication & Database Integration
-// ----------------------------------------------------------------------------
-
-function createSupabaseServiceClient(): SupabaseClient {
-  const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new DatabaseException('Server configuration missing');
-  }
-  return createClient(supabaseUrl, supabaseServiceKey);
-}
-
-async function authenticateUser(supabase: SupabaseClient, accessToken: string): Promise<string> {
-  const { data: { user }, error } = await supabase.auth.getUser(accessToken);
-  if (error || !user) {
-    throw new AuthenticationException('Unauthorized');
-  }
-  return user.id;
-}
-
-async function fetchUserAuthContext(
-  supabase: SupabaseClient,
-  userId: string,
-  deviceId: string
-): Promise<UserAuthContext> {
-  const { data: authContext, error } = await supabase.rpc('get_user_auth_context', {
-    p_user_id: userId,
-    p_device_id: deviceId,
-  });
-
-  if (error) {
-    throw new DatabaseException(`System Error: ${error.message}`);
-  }
-  if (!authContext) {
-    throw new ValidationException('PIN not setup');
-  }
-  if (!authContext.public_key || !authContext.is_device_active) {
-    throw new AuthenticationException('Device not recognized');
-  }
-
-  return authContext as UserAuthContext;
-}
-
-// ----------------------------------------------------------------------------
-// Lockout Checks & Enforcement
-// ----------------------------------------------------------------------------
-
-function validateLockStatus(authContext: UserAuthContext): void {
-  if (!authContext.locked_until) {
-    return;
-  }
-
-  const lockedUntil = new Date(authContext.locked_until);
-  const now = new Date();
-  if (lockedUntil > now) {
-    const diffMs = lockedUntil.getTime() - now.getTime();
-    const diffSec = Math.ceil(diffMs / 1000);
-    throw new LockoutException(
-      `Account locked. Try again in ${diffSec} seconds.`,
-      authContext.locked_until
-    );
-  }
-}
-
-// ----------------------------------------------------------------------------
-// Cryptographic Verifications
-// ----------------------------------------------------------------------------
-
-interface VerificationOutcome {
-  isValid: boolean;
-}
-
-async function verifyCredentials(
-  credentials: RequestCredentials,
-  authContext: UserAuthContext
-): Promise<VerificationOutcome> {
-  const [isValidSignature, isValidPin] = await Promise.all([
-    verifySignature(credentials.signature, credentials.pin, authContext.public_key!),
-    verifyPinHash(authContext.pin_hash, credentials.pin),
-  ]);
-
-  return { isValid: isValidSignature && isValidPin };
-}
-
-async function verifySignature(
-  signatureBase64: string,
-  message: string,
-  publicKeyBase64: string
-): Promise<boolean> {
-  try {
-    const signature = decodeBase64(signatureBase64);
-    const publicKey = decodeBase64(publicKeyBase64);
-    const messageBytes = new TextEncoder().encode(message);
-
-    if (publicKey.length === 32) {
-      return await ed.verify(signature, messageBytes, publicKey);
-    }
-    if (publicKey.length === 33 || publicKey.length === 65) {
-      return p256.verify(signature, messageBytes, publicKey);
-    }
-
-    console.error(`[VerifyPin] Unsupported public key length: ${publicKey.length}`);
+    const sig = fromB64(sigB64);
+    const pub = fromB64(pubKeyB64);
+    const msg = new TextEncoder().encode(payload);
+    if (pub.length === 32) return await ed.verify(sig, msg, pub);
+    if (pub.length === 33 || pub.length === 65) return p256.verify(sig, msg, pub);
     return false;
-  } catch (error) {
-    console.error('[VerifyPin] Signature verification error:', error);
-    return false;
-  }
+  } catch { return false; }
 }
 
-async function verifyPinHash(phcString: string, pin: string): Promise<boolean> {
-  try {
-    const parts = phcString.split('$');
-    if (parts.length !== 6 || parts[1] !== 'argon2id') {
-      return false;
-    }
-
-    const params = parts[3];
-    const paramMap = parsePhcParams(params);
-    const memorySize = paramMap['m'];
-    const iterations = paramMap['t'];
-    const parallelism = paramMap['p'];
-
-    if (!memorySize || !iterations || !parallelism) {
-      return false;
-    }
-
-    const salt = decodeBase64Salt(parts[4]);
-    const computedHash = await argon2id({
-      password: pin,
-      salt: salt,
-      parallelism,
-      iterations,
-      memorySize,
-      hashLength: 32,
-      outputType: 'encoded',
-    });
-
-    return safeCompare(computedHash, phcString);
-  } catch (error) {
-    console.error('[VerifyPin] PIN verification error:', error);
-    return false;
-  }
+function fromB64(s: string): Uint8Array {
+  const p = s + '='.repeat((4 - s.length % 4) % 4);
+  const r = atob(p.replace(/-/g, '+').replace(/_/g, '/'));
+  return new Uint8Array([...r].map(c => c.charCodeAt(0)));
 }
 
-function parsePhcParams(params: string): Record<string, number> {
-  const paramMap: Record<string, number> = {};
-  params.split(',').forEach((param) => {
-    const parts = param.split('=');
-    if (parts.length === 2) {
-      paramMap[parts[0]] = parseInt(parts[1], 10);
-    }
-  });
-  return paramMap;
+function ok(b: unknown): Response {
+  return new Response(JSON.stringify(b), { status: 200, headers: { ...CORS, 'Content-Type': 'application/json' } });
 }
-
-function decodeBase64Salt(saltBase64: string): Uint8Array {
-  let paddedSalt = saltBase64;
-  while (paddedSalt.length % 4 !== 0) {
-    paddedSalt += '=';
-  }
-  return decodeBase64(paddedSalt);
-}
-
-function safeCompare(a: string, b: string): boolean {
-  if (a.length !== b.length) {
-    return false;
-  }
-  let result = 0;
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return result === 0;
-}
-
-// ----------------------------------------------------------------------------
-// Outcome Handlers
-// ----------------------------------------------------------------------------
-
-async function handleSuccess(
-  supabase: SupabaseClient,
-  userId: string,
-  deviceId: string
-): Promise<void> {
-  const { error } = await supabase.rpc('update_user_auth_result', {
-    p_user_id: userId,
-    p_device_id: deviceId,
-    p_failed_attempts: 0,
-    p_locked_until: null,
-    p_reset_counters: true,
-  });
-
-  if (error) {
-    console.error('[VerifyPin] Failed to update success result in database:', error);
-  }
-}
-
-async function handleFailure(
-  supabase: SupabaseClient,
-  userId: string,
-  deviceId: string,
-  authContext: UserAuthContext
-): Promise<never> {
-  const failedAttempts = (authContext.failed_attempts || 0) + 1;
-  const lockedUntil = calculateLockoutTime(failedAttempts);
-
-  const { error } = await supabase.rpc('update_user_auth_result', {
-    p_user_id: userId,
-    p_device_id: deviceId,
-    p_failed_attempts: failedAttempts,
-    p_locked_until: lockedUntil,
-    p_reset_counters: false,
-  });
-
-  if (error) {
-    console.error('[VerifyPin] Failed to update failure result in database:', error);
-  }
-
-  if (lockedUntil) {
-    throw new LockoutException(
-      'Too many attempts. Account locked for 5 minutes.',
-      lockedUntil
-    );
-  }
-
-  const remainingAttempts = Math.max(0, 3 - failedAttempts);
-  throw new AuthenticationException(
-    `Invalid PIN. ${remainingAttempts} attempts remaining.`
-  );
-}
-
-function calculateLockoutTime(failedAttempts: number): string | null {
-  const MAX_ATTEMPTS = 3;
-  const LOCK_DURATION_MS = 5 * 60 * 1000; // 5 minutes
-
-  if (failedAttempts >= MAX_ATTEMPTS) {
-    return new Date(Date.now() + LOCK_DURATION_MS).toISOString();
-  }
-  return null;
-}
-
-// ----------------------------------------------------------------------------
-// Response Builders
-// ----------------------------------------------------------------------------
-
-function buildSuccessResponse(): Response {
-  return new Response(
-    JSON.stringify({ success: true, message: 'Verified' }),
-    { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
-  );
-}
-
-function buildErrorResponse(error: unknown): Response {
-  if (error instanceof LockoutException) {
-    const diffMs = new Date(error.lockedUntil).getTime() - Date.now();
-    const diffSec = Math.max(0, Math.ceil(diffMs / 1000));
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message,
-        locked_until: error.lockedUntil,
-      }),
-      {
-        status: 423,
-        headers: {
-          ...CORS_HEADERS,
-          'Content-Type': 'application/json',
-          'Retry-After': diffSec.toString(),
-        },
-      }
-    );
-  }
-
-  if (error instanceof HttpException) {
-    return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      {
-        status: error.statusCode,
-        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-      }
-    );
-  }
-
-  const internalMessage = error instanceof Error ? error.message : String(error);
-  return new Response(
-    JSON.stringify({ success: false, error: `Internal Server Error: ${internalMessage}` }),
-    { status: 500, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
-  );
+function err(m: string, s: number): Response {
+  return new Response(JSON.stringify({ success: false, error: m }), { status: s, headers: { ...CORS, 'Content-Type': 'application/json' } });
 }

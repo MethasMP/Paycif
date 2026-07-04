@@ -30,6 +30,14 @@ ALTER TABLE public.profiles
 
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS kyc_status TEXT DEFAULT 'UNVERIFIED';
 
+-- Fix RBAC permission so authenticated users can update their own profile (RLS will restrict to own id)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    CREATE ROLE authenticated NOLOGIN;
+  END IF;
+END $$;
+GRANT UPDATE ON public.profiles TO authenticated;
+
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS external_customer_id TEXT UNIQUE;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS external_customer_type TEXT DEFAULT 'OMISE';
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS openfort_wallet_address TEXT;

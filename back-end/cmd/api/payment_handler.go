@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"paysif/internal/usecase"
 
@@ -23,6 +24,40 @@ type PaymentHandler struct {
 
 func NewPaymentHandler(svc *usecase.WalletService, ach *usecase.AlchemyPayAdapter, fx *usecase.FXService) *PaymentHandler {
 	return &PaymentHandler{Service: svc, ACH: ach, FX: fx}
+}
+
+// achNetwork returns the crypto network to use for ACH on-ramp.
+// Defaults to SOL (Solana) — fastest finality + lowest fees for USDC.
+// Override via ACH_NETWORK env var if SQRIL confirms a different deposit chain.
+func achNetwork() string {
+	if n := os.Getenv("ACH_NETWORK"); n != "" {
+		return n
+	}
+	return "SOL"
+}
+
+// achCallbackURL derives the on-ramp webhook URL from the incoming request host so the
+// service works on any port or host without configuration (ngrok, staging, prod, etc.).
+// Falls back to BASE_URL env var if the request context is unavailable.
+func achCallbackURL(c *gin.Context) string {
+	if c != nil {
+		scheme := "https"
+		if c.Request.TLS == nil && c.GetHeader("X-Forwarded-Proto") == "" {
+			scheme = "http"
+		} else if proto := c.GetHeader("X-Forwarded-Proto"); proto != "" {
+			scheme = proto
+		}
+		host := c.Request.Host
+		if host != "" {
+			return scheme + "://" + host + "/hooks/alchemypay"
+		}
+	}
+	// Fallback: explicit BASE_URL (useful for async contexts or worker processes)
+	baseURL := os.Getenv("BASE_URL")
+	if baseURL == "" {
+		log.Printf("WARNING: BASE_URL env var not set and no request context; on-ramp webhook will not reach us")
+	}
+	return strings.TrimRight(baseURL, "/") + "/hooks/alchemypay"
 }
 
 // --- Check Region ---
@@ -71,7 +106,7 @@ func (h *PaymentHandler) HandleGetQuote(c *gin.Context) {
 		return
 	}
 	sqril := prov.(*usecase.SqrilProvider)
-	
+
 	// Use a mock customer ID for quote
 	sqrilQuote, err := sqril.GetQuotation(c.Request.Context(), req.SqrilTxID, "quote_user", req.Amount)
 	if err != nil {
@@ -80,7 +115,7 @@ func (h *PaymentHandler) HandleGetQuote(c *gin.Context) {
 	}
 
 	// 2. Get Live ACH Price (using dummy 100 to get the rate)
-	achQuote, err := h.ACH.GetQuote(c.Request.Context(), "100", req.FiatCurrency, "USDC", "BASE")
+	achQuote, err := h.ACH.GetQuote(c.Request.Context(), "100", req.FiatCurrency, "USDC", achNetwork())
 	if err != nil {
 		log.Printf("ACH quote failed: %v", err)
 		c.JSON(http.StatusBadGateway, gin.H{"error": "Unable to fetch live rate. Please try again."})
@@ -104,7 +139,7 @@ func (h *PaymentHandler) HandleGetQuote(c *gin.Context) {
 		"crypto_target":       sqrilQuote.AmountUSD,
 		"fiat_currency":       req.FiatCurrency,
 		"crypto":              "USDC",
-		"network":             "BASE",
+		"network":             achNetwork(),
 	})
 }
 
@@ -171,7 +206,7 @@ func (h *PaymentHandler) HandleCreateIntent(c *gin.Context) {
 	}
 
 	// 2. Calculate Final Exact Fiat Amount dynamically
-	achQuote, err := h.ACH.GetQuote(c.Request.Context(), "100", req.FiatCurrency, "USDC", "BASE")
+	achQuote, err := h.ACH.GetQuote(c.Request.Context(), "100", req.FiatCurrency, "USDC", achNetwork())
 	if err != nil {
 		log.Printf("ACH quote failed: %v", err)
 		c.JSON(http.StatusBadGateway, gin.H{"error": "Unable to fetch live rate. Please try again."})
@@ -199,10 +234,10 @@ func (h *PaymentHandler) HandleCreateIntent(c *gin.Context) {
 		return
 	}
 
-	// 4. Call ACH to create the on-ramp order and get the checkout URL
-	poolAddress := os.Getenv("POOL_WALLET_ADDRESS") // SQRIL/partner-controlled USDC wallet
+	// 4. Call ACH to create the on-ramp order and get the checkout URL.
+	// callbackUrl is derived from BASE_URL so the provider can POST back to our webhook.
+	poolAddress := os.Getenv("POOL_WALLET_ADDRESS") // partner-controlled USDC wallet
 	redirectURL := os.Getenv("ACH_REDIRECT_URL")    // deep-link back to Paycif app after payment
-	webhookURL := os.Getenv("ACH_WEBHOOK_URL")      // our /hooks/alchemypay endpoint
 
 	fiatAmountStr := quoteDetails.TotalFiatAmount.StringFixed(2)
 	order, err := h.ACH.CreateOrder(c.Request.Context(), usecase.OnRampOrderParams{
@@ -210,11 +245,11 @@ func (h *PaymentHandler) HandleCreateIntent(c *gin.Context) {
 		FiatCurrency:    req.FiatCurrency,
 		FiatAmount:      fiatAmountStr,
 		Crypto:          "USDC",
-		Network:         "BASE",
+		Network:         achNetwork(),
 		Address:         poolAddress,
 		Email:           req.Email,
 		RedirectURL:     redirectURL,
-		CallbackURL:     webhookURL,
+		CallbackURL:     achCallbackURL(c),
 	})
 	if err != nil {
 		log.Printf("ACH create order failed for intent %s: %v", intentID, err)
@@ -229,6 +264,51 @@ func (h *PaymentHandler) HandleCreateIntent(c *gin.Context) {
 		"web_url":            order.WebURL, // Flutter opens this in a WebView/browser
 		"total_fiat_charged": fiatAmountStr,
 	})
+}
+
+// --- Create On-Ramp Order (lightweight, no SQRIL coupling) ---
+
+type CreateOnRampOrderRequest struct {
+	FiatAmount      string `json:"fiat_amount" binding:"required"`
+	FiatCurrency    string `json:"fiat_currency" binding:"required"`
+	Crypto          string `json:"crypto" binding:"required"`
+	Network         string `json:"network" binding:"required"`
+	Email           string `json:"email"`
+	MerchantOrderNo string `json:"merchant_order_no" binding:"required"`
+	RedirectURL     string `json:"redirect_url"`
+}
+
+// HandleCreateOnRampOrder creates an on-ramp order with the configured on-ramp provider.
+// It constructs the webhook callback URL from BASE_URL so the provider can notify us on completion.
+// This endpoint is intentionally decoupled from the full SQRIL quote flow — use it when the
+// caller already knows the fiat amount and just needs the checkout URL.
+func (h *PaymentHandler) HandleCreateOnRampOrder(c *gin.Context) {
+	var req CreateOnRampOrderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	poolAddress := os.Getenv("POOL_WALLET_ADDRESS") // partner-controlled USDC wallet
+
+	order, err := h.ACH.CreateOrder(c.Request.Context(), usecase.OnRampOrderParams{
+		MerchantOrderNo: req.MerchantOrderNo,
+		FiatCurrency:    req.FiatCurrency,
+		FiatAmount:      req.FiatAmount,
+		Crypto:          req.Crypto,
+		Network:         req.Network,
+		Address:         poolAddress,
+		Email:           req.Email,
+		RedirectURL:     req.RedirectURL,
+		CallbackURL:     achCallbackURL(c),
+	})
+	if err != nil {
+		log.Printf("on-ramp CreateOrder failed for order %s: %v", req.MerchantOrderNo, err)
+		c.JSON(http.StatusBadGateway, gin.H{"error": "On-ramp provider unavailable. Please try again."})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"web_url": order.WebURL})
 }
 
 // --- Webhook ---
@@ -246,6 +326,120 @@ type AlchemyPayWebhookPayload struct {
 	Network         string `json:"network"`
 	UserId          string `json:"userId"`
 	NewSignature    string `json:"newSignature"`
+}
+
+// HandleGetAchToken exchanges the authenticated user's email for a 10-day ACH accessToken.
+// Flutter passes this token to the ACH widget so users skip the email verification step.
+func (h *PaymentHandler) HandleGetAchToken(c *gin.Context) {
+	userIDStr, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	// Fetch email from profiles (auth.users email is mirrored there)
+	var email string
+	err := h.Service.DB.QueryRowContext(c.Request.Context(),
+		`SELECT email FROM auth.users WHERE id = $1`, userIDStr.(string),
+	).Scan(&email)
+	if err != nil || email == "" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not resolve user email"})
+		return
+	}
+
+	result, err := h.ACH.GetToken(c.Request.Context(), email)
+	if err != nil {
+		log.Printf("ACH getToken error: %v", err)
+		c.JSON(http.StatusBadGateway, gin.H{"error": "failed to get ACH token"})
+		return
+	}
+
+	// Persist token so Flutter can reuse for 10 days without re-fetching
+	_, _ = h.Service.DB.ExecContext(c.Request.Context(), `
+		UPDATE profiles
+		SET ach_user_token = $1, ach_token_expires_at = NOW() + INTERVAL '10 days'
+		WHERE id = $2
+	`, result.AccessToken, userIDStr.(string))
+
+	c.JSON(http.StatusOK, gin.H{
+		"access_token": result.AccessToken,
+		"expires_in":   864000, // 10 days in seconds
+	})
+}
+
+// HandleGetManageUrl generates a signed AlchemyPay Page Integration URL for managing
+// saved payment methods (cards, Apple Pay, Google Pay, bank transfer).
+// The ACH token is included so the user skips email verification and lands
+// directly in their AlchemyPay account with previously saved methods pre-loaded.
+func (h *PaymentHandler) HandleGetManageUrl(c *gin.Context) {
+	userIDStr, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	// Fetch cached ACH token from profile (valid 10 days)
+	var achToken string
+	_ = h.Service.DB.QueryRowContext(c.Request.Context(),
+		`SELECT COALESCE(ach_user_token, '') FROM profiles
+		 WHERE id = $1 AND ach_token_expires_at > NOW()`,
+		userIDStr.(string),
+	).Scan(&achToken)
+
+	// If no valid token, fetch a fresh one
+	if achToken == "" {
+		var email string
+		err := h.Service.DB.QueryRowContext(c.Request.Context(),
+			`SELECT email FROM auth.users WHERE id = $1`, userIDStr.(string),
+		).Scan(&email)
+		if err == nil && email != "" {
+			if result, err := h.ACH.GetToken(c.Request.Context(), email); err == nil {
+				achToken = result.AccessToken
+				_, _ = h.Service.DB.ExecContext(c.Request.Context(), `
+					UPDATE profiles SET ach_user_token = $1, ach_token_expires_at = NOW() + INTERVAL '10 days'
+					WHERE id = $2`, achToken, userIDStr.(string))
+			}
+		}
+	}
+
+	orderNo := fmt.Sprintf("manage-%s-%d", userIDStr.(string)[:8], time.Now().UnixMilli())
+	manageURL := h.ACH.GenerateManageURL(orderNo, achToken, "", "paycif://payment-settings")
+
+	c.JSON(http.StatusOK, gin.H{"url": manageURL})
+}
+
+// HandleFiatList returns ACH-supported fiat currencies and payment methods.
+// Flutter uses this for the fee preview screen before opening the ACH widget.
+// Results are cached in-process for 1 hour since the list rarely changes.
+var (
+	fiatListCache    []usecase.FiatPaymentMethod
+	fiatListCachedAt int64
+)
+
+const fiatListCacheTTL int64 = 3600
+
+func (h *PaymentHandler) HandleFiatList(c *gin.Context) {
+	now := time.Now().Unix()
+	if fiatListCache != nil && now-fiatListCachedAt < fiatListCacheTTL { //nolint:gosec
+		c.JSON(http.StatusOK, gin.H{"methods": fiatListCache})
+		return
+	}
+
+	methods, err := h.ACH.FiatList(c.Request.Context(), "BUY")
+	if err != nil {
+		log.Printf("ACH fiatList error: %v", err)
+		// Return stale cache if available rather than an error
+		if fiatListCache != nil {
+			c.JSON(http.StatusOK, gin.H{"methods": fiatListCache, "stale": true})
+			return
+		}
+		c.JSON(http.StatusBadGateway, gin.H{"error": "failed to fetch payment methods"})
+		return
+	}
+
+	fiatListCache = methods
+	fiatListCachedAt = now
+	c.JSON(http.StatusOK, gin.H{"methods": methods})
 }
 
 // HandleWebhook receives ACH payment events and triggers the SQRIL off-ramp on FINISHED.
@@ -328,4 +522,35 @@ func (h *PaymentHandler) HandleWebhook(c *gin.Context) {
 	_ = h.Service.UpdatePayoutIntentStatus(c.Request.Context(), intent.ID, "COMPLETED")
 	log.Printf("Payout complete for intent %s status=%s", intent.ID, payoutResp.Status)
 	c.JSON(http.StatusOK, gin.H{"status": "success"})
+}
+
+// HandleGetIntentStatus returns the current status of a PayoutIntent.
+// Flutter polls this after launching the AlchemyPay checkout to detect completion.
+func (h *PaymentHandler) HandleGetIntentStatus(c *gin.Context) {
+	intentIDStr := c.Param("id")
+	intentUUID, err := uuid.Parse(intentIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid intent id"})
+		return
+	}
+
+	userIDStr := c.GetString("user_id")
+	if userIDStr == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	intent, err := h.Service.GetPayoutIntent(c.Request.Context(), intentUUID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "intent not found"})
+		return
+	}
+
+	// Ensure the intent belongs to the requesting user
+	if intent.UserID.String() != userIDStr {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": intent.Status})
 }

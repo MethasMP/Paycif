@@ -22,6 +22,7 @@ func TestHandleDecodeQR_AllTestQRs(t *testing.T) {
 		"https://stg-api.sqril.io",
 		"mock-client-id",
 		"mock-client-secret",
+		nil,
 	)
 
 	paymentEngine := usecase.NewPaymentEngine("sqril")

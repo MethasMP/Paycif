@@ -38,51 +38,77 @@ Before you begin, ensure you have the following installed:
 
 Follow these steps to get the complete Paycif stack running on your local machine.
 
-### 1. Clone the Repository
-
+### Step 1: Clone the Repository
 ```bash
 git clone https://github.com/your-org/paycif.git
 cd paycif
 ```
 
-### 2. Database & Infrastructure Setup (Supabase)
+---
 
-We use the Supabase CLI to manage our local database environment and migrations.
+### Step 2: Start the Core Infrastructure (Required)
+Paycif relies on Supabase for essential cloud-native features like Authentication (Google Sign-In), Realtime WebSockets, and Edge Functions (e.g., PIN Cryptography).
+
+You **MUST** start the local Supabase stack before running the app.
 
 ```bash
-# Start local Supabase instance
+# 1. Start the complete Supabase local environment
 supabase start
 
-# Apply all migrations and seed data
+# 2. Apply the latest database structure (Migrations)
 supabase db push
 ```
+> [!IMPORTANT]
+> **Why do we need the Supabase CLI?**
+> Even if we run other backend parts via Docker, the Supabase CLI is the only official way to spin up the specialized Edge Runtime (Deno) and Auth services on your local machine.
 
-### 3. Backend Setup (Go)
+---
 
-The backend consists of an API Gateway and background microservices.
+### Step 3: Start the Go Backend Services
+The Go Backend handles business logic, queues, and API routes. You have two ways to start it, depending on your preference.
 
+#### Option A: The "Developer" Way (Make)
+Best if you have Go installed and want to edit code directly.
 ```bash
 cd back-end
-
-# Download Go modules
+cp .env.example .env
 go mod download
-
-# Start all Go services
-./start-all.sh
+make run
 ```
-*The API Gateway will be available at `http://localhost:8080`*
+*(When you're done, type `make stop` to cleanly shut down all services).*
 
-### 4. Frontend Setup (Flutter)
+#### Option B: The "No-Install" Way (Docker Compose)
+Best if you just want to run the backend without installing Go on your machine.
+```bash
+cd back-end
+cp .env.example .env
+docker-compose up -d
+```
+> [!NOTE]
+> The `docker-compose.yml` file builds all the Go microservices and connects them to Redis automatically. It does **not** replace Step 2 (Supabase).
+
+---
+
+### Step 4: Run the Mobile App (Flutter)
+Finally, start the frontend to interact with the system!
 
 ```bash
 cd frontend
-
-# Get Flutter packages
+cp .env.example .env
 flutter pub get
 
-# Run the app on your connected device or emulator
-flutter run
+# For iOS developers:
+cd ios && pod install --repo-update && cd ..
+
+# Run the app (injects .env at compile time)
+flutter run --dart-define-from-file=.env
 ```
+
+> [!TIP]
+> **Frontend Developer Gotchas**
+> 1. **Missing `.env` file:** The app will fail to compile or connect to backend services if it cannot find the `.env` file. Do not skip the `cp .env.example .env` step!
+> 2. **iOS Native Features:** Paycif uses advanced hardware features (NFC, FaceID/Biometrics, Camera). If you are building for iOS, you MUST run `pod install` in the `ios` folder. 
+> 3. **Simulator vs Physical Device:** Features like NFC scanning and deep Biometric signatures will not work on an iOS Simulator. It is highly recommended to test the app on a physical iPhone.
 
 ---
 

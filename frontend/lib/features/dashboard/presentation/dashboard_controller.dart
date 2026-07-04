@@ -51,9 +51,12 @@ class DashboardController extends Cubit<DashboardState> {
   StreamSubscription? _txSub;
   StreamSubscription? _connSub;
   StreamSubscription? _authSub;
-  Timer? _retryTimer;
-  int _retryCount = 0;
-  static const int _maxRetries = 5;
+
+  bool _isRefreshing = false;
+
+  /// Tracks the profileId currently subscribed to. Prevents double-subscribe
+  /// when init() is triggered multiple times by racing auth events.
+  String? _subscribedProfileId;
 
   DashboardController(this._repository, this._connectivity) : super(DashboardState()) {
     _listenToAuthChanges();
@@ -84,7 +87,6 @@ class DashboardController extends Cubit<DashboardState> {
 
   @override
   Future<void> close() {
-    _retryTimer?.cancel();
     _txSub?.cancel();
     _authSub?.cancel();
     _connSub?.cancel();
@@ -92,45 +94,70 @@ class DashboardController extends Cubit<DashboardState> {
   }
 
   void reset() {
-    _retryTimer?.cancel();
-    _retryCount = 0;
     _txSub?.cancel();
+    _subscribedProfileId = null;
     emit(DashboardState());
   }
 
-  void init() async {
-    final currentUser = Supabase.instance.client.auth.currentUser;
-    if (currentUser == null) return;
-
-    emit(state.copyWith(status: 'loading'));
-
+  Future<void> init() async {
+    if (_isRefreshing) return;
+    _isRefreshing = true;
     try {
-      String kycStatus = 'UNVERIFIED';
-      try {
-        final statusData = await ApiService.getKycStatus();
-        kycStatus = (statusData['kyc_status'] as String? ?? 'UNVERIFIED').toUpperCase();
-      } catch (_) {
-        // Non-fatal — dashboard loads even if KYC status fails
+      final currentUser = Supabase.instance.client.auth.currentUser;
+      if (currentUser == null) {
+        _isRefreshing = false;
+        return;
       }
-      if (isClosed) return;
 
-      emit(state.copyWith(
-        kycTier: kycStatus,
-        status: 'success',
-      ));
+      emit(state.copyWith(status: 'loading'));
 
-      _subscribeToTransactions(currentUser.id);
-      
+      try {
+        String kycStatus = 'UNVERIFIED';
+        try {
+          final statusData = await ApiService.getKycStatus();
+          kycStatus = (statusData['kyc_status'] as String? ?? 'UNVERIFIED').toUpperCase();
+        } catch (_) {
+          // Non-fatal — dashboard loads even if KYC status fails
+        }
+        if (isClosed) return;
+
+        emit(state.copyWith(
+          kycTier: kycStatus,
+          status: 'success',
+        ));
+
+        _subscribeToTransactions(currentUser.id);
+
+      } catch (e) {
+        if (!isClosed) {
+          emit(state.copyWith(status: 'error', errorMessage: e.toString()));
+        }
+      } finally {
+        _isRefreshing = false;
+      }
     } catch (e) {
-      if (isClosed) return;
-      emit(state.copyWith(status: 'error', errorMessage: e.toString()));
+      _isRefreshing = false;
+      if (!isClosed) {
+        emit(state.copyWith(status: 'error', errorMessage: e.toString()));
+      }
     }
   }
 
+  /// Subscribes to the transaction stream for [profileId].
+  ///
+  /// Guarded by [_subscribedProfileId]: if the same profileId is already
+  /// subscribed, this is a no-op. This prevents redundant stream rebuilds
+  /// when init() races with auth events.
   void _subscribeToTransactions(String profileId) {
-    _retryTimer?.cancel();
+    if (_subscribedProfileId == profileId) {
+      // Repository's _activeProfileId guard will handle de-duplication at the
+      // channel level, but we avoid rebuilding the stream pipeline entirely.
+      debugPrint('📡 [DashboardController] Already subscribed to profile $profileId — skipping.');
+      return;
+    }
+
     _txSub?.cancel();
-    _retryCount = 0;
+    _subscribedProfileId = profileId;
     _startListening(profileId);
   }
 
@@ -139,8 +166,6 @@ class DashboardController extends Cubit<DashboardState> {
 
     _txSub = _repository.fetchTransactions(profileId).listen(
       (transactions) {
-        // Reset retry counter on any successful data
-        _retryCount = 0;
         if (!isClosed) {
           emit(state.copyWith(
             transactions: transactions,
@@ -148,32 +173,23 @@ class DashboardController extends Cubit<DashboardState> {
           ));
         }
       },
-      onError: (e) {
-        debugPrint('⚠️ [Dashboard] Real-time Sync Error: $e');
+      onError: (e) async {
+        debugPrint('⚠️ [Dashboard] Real-time sync error: $e');
         if (isClosed) return;
 
-        // Fallback: one-time query so UI always has data
-        () async {
-          try {
-            final transactions = await _repository.getTransactionsOnce(profileId);
-            if (!isClosed) {
-              emit(state.copyWith(
-                transactions: transactions,
-                isTransactionsLoaded: true,
-              ));
-            }
-          } catch (_) {}
-        }();
-
-        // Exponential backoff retry (max _maxRetries times)
-        if (_retryCount < _maxRetries) {
-          final delay = Duration(seconds: (2 << _retryCount).clamp(2, 60)); // 2,4,8,16,32,60s
-          _retryCount++;
-          debugPrint('🔁 [Dashboard] Retrying real-time in ${delay.inSeconds}s (attempt $_retryCount/$_maxRetries)');
-          _retryTimer?.cancel();
-          _retryTimer = Timer(delay, () => _startListening(profileId));
-        } else {
-          debugPrint('⚠️ [Dashboard] Max retries reached. Staying in fallback (one-time query) mode.');
+        // The repository's channelError/timedOut handler already calls
+        // fetchAndEmit() internally. We do a single one-time query here as
+        // an immediate UI fallback — no retry loop or stream rebuild needed.
+        try {
+          final transactions = await _repository.getTransactionsOnce(profileId);
+          if (!isClosed) {
+            emit(state.copyWith(
+              transactions: transactions,
+              isTransactionsLoaded: true,
+            ));
+          }
+        } catch (err) {
+          debugPrint('⚠️ [Dashboard] Fallback transactions load failed: $err');
         }
       },
     );
@@ -183,12 +199,26 @@ class DashboardController extends Cubit<DashboardState> {
     init();
   }
 
+  /// Lightweight sync after a successful payment — avoids a full init()
+  /// (no KYC re-fetch, no stream rebuild). Just refreshes transaction data.
   void syncPaymentSuccess({
     required String transactionId,
     required double amount,
     required String recipientName,
     required double remainingBalance,
   }) {
-    refresh();
+    final profileId = Supabase.instance.client.auth.currentUser?.id;
+    if (profileId == null || isClosed) return;
+
+    _repository.getTransactionsOnce(profileId).then((transactions) {
+      if (!isClosed) {
+        emit(state.copyWith(
+          transactions: transactions,
+          isTransactionsLoaded: true,
+        ));
+      }
+    }).catchError((e) {
+      debugPrint('⚠️ [Dashboard] syncPaymentSuccess fallback failed: $e');
+    });
   }
 }

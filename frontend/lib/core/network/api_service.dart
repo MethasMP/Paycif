@@ -1,13 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
-import 'package:frontend/features/profile/domain/saved_card.dart';
 import 'package:frontend/core/models/user_profile.dart';
 import 'package:frontend/core/models/decoded_qr.dart';
 import 'package:frontend/core/models/quotation_model.dart';
@@ -58,7 +56,7 @@ class ApiService {
   static String? _customHostOverride;
 
   /// Helper to dynamically replace 'localhost' / '127.0.0.1' with '10.0.2.2' for Android Emulator.
-  static String _resolveLocalHost(String url) {
+  static String resolveLocalHost(String url) {
     if (url.contains('localhost') || url.contains('127.0.0.1')) {
       if (Platform.isAndroid) {
         return url.replaceAll('localhost', '10.0.2.2').replaceAll('127.0.0.1', '10.0.2.2');
@@ -72,7 +70,9 @@ class ApiService {
     try {
       final prefs = await SharedPreferences.getInstance();
       _customHostOverride = prefs.getString('custom_backend_url');
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('⚠️ [ApiService] Failed to initialize host override: $e');
+    }
   }
 
   /// Save and update custom host override
@@ -86,35 +86,39 @@ class ApiService {
         await prefs.setString('custom_backend_url', url.trim());
         _customHostOverride = url.trim();
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('⚠️ [ApiService] Failed to save host override: $e');
+    }
   }
 
   // 🚀 World-Class URL Management
   // Use: flutter run --dart-define=BACKEND_URL=http://192.168.1.XX:8080/api/v1
   static String get baseUrl {
+    String url = '';
     // 0. Try Custom Host Override (Run Anywhere developer feature)
     final hostOverride = _customHostOverride;
     if (hostOverride != null && hostOverride.isNotEmpty) {
-      return _resolveLocalHost(hostOverride);
-    }
-
-    // 1. Try Dart Define (The most flexible way)
-    const defineUrl = String.fromEnvironment('BACKEND_URL');
-    if (defineUrl.isNotEmpty) return _resolveLocalHost(defineUrl);
-
-    // 2. Try .env file
-    final prodUrl = dotenv.env['BACKEND_URL'];
-    if (prodUrl != null && prodUrl.isNotEmpty) {
-      return _resolveLocalHost(prodUrl);
-    }
-
-    // 3. Fallback logic for Local Development
-    if (Platform.isAndroid) {
-      return 'http://10.0.2.2:8080/api/v1';
+      url = hostOverride;
     } else {
-      // 🍎 On iOS Simulator/Device fallback
-      return 'http://localhost:8080/api/v1';
+      // 1. Try Dart Define (The most flexible way)
+      const defineUrl = String.fromEnvironment('BACKEND_URL');
+      if (defineUrl.isNotEmpty) {
+        url = defineUrl;
+      } else {
+        // 2. Fallback logic for Local Development
+        if (Platform.isAndroid) {
+          url = 'http://10.0.2.2:8080';
+        } else {
+          url = 'http://localhost:8080';
+        }
+      }
     }
+
+    url = resolveLocalHost(url);
+    if (!url.endsWith('/api/v1')) {
+      url = url.endsWith('/') ? '${url}api/v1' : '$url/api/v1';
+    }
+    return url;
   }
 
   /// ️ [Performance] Pre-warm Connection
@@ -195,10 +199,15 @@ class ApiService {
       return await invokeRaw(functionName, body: body, headers: headers);
     } on FunctionException catch (e) {
       // 3. Catch 401 (Unauthorized) specifically
-      // 🛡️ World-Class: Check if it's a REAL session error or a "Logical 401"
+      // Distinguish JWT-expired 401s from domain-logic 401s (wrong PIN, unbound
+      // device, etc.) — domain errors must not trigger a token refresh + retry.
+      final errorDetail = e.details?['error']?.toString() ?? '';
       final isLogicalError =
-          e.details?['error']?.toString().contains('Device not recognized') ??
-          false;
+          errorDetail.contains('Device not recognized') ||
+          errorDetail.contains('Invalid PIN') ||
+          errorDetail.contains('PIN not') ||
+          errorDetail.contains('Device not bound') ||
+          errorDetail.contains('Account locked');
 
       if (e.status == 401 && !isLogicalError) {
         debugPrint(
@@ -252,20 +261,23 @@ class ApiService {
     final jwt = token ?? client.auth.currentSession?.accessToken ?? '';
     final sanitizedJwt = jwt.trim().replaceAll('\n', '').replaceAll('\r', '');
 
-    final supabaseUrlBase = dotenv.env['SUPABASE_URL'] ?? '';
-    final supabaseUrl = supabaseUrlBase.endsWith('/')
-        ? supabaseUrlBase.substring(0, supabaseUrlBase.length - 1)
-        : supabaseUrlBase;
+    const supabaseUrlEnv = String.fromEnvironment('SUPABASE_URL');
+    final supabaseUrlBase = supabaseUrlEnv.isNotEmpty 
+        ? supabaseUrlEnv 
+        : 'http://127.0.0.1:54321';
+    final resolvedUrl = resolveLocalHost(supabaseUrlBase);
+    final supabaseUrl = resolvedUrl.endsWith('/')
+        ? resolvedUrl.substring(0, resolvedUrl.length - 1)
+        : resolvedUrl;
 
-    final supabaseKeyBase = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+    const supabaseKeyEnv = String.fromEnvironment('SUPABASE_ANON_KEY');
+    final supabaseKeyBase = supabaseKeyEnv.isNotEmpty 
+        ? supabaseKeyEnv 
+        : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
     final supabaseKey = supabaseKeyBase
         .trim()
         .replaceAll('\n', '')
         .replaceAll('\r', '');
-
-    if (supabaseUrl.isEmpty || supabaseKey.isEmpty) {
-      throw Exception('Missing SUPABASE_URL or SUPABASE_ANON_KEY in .env');
-    }
 
     // Construct URL manually to avoid any client internal logic
     // Format: https://[project-id].supabase.co/functions/v1/[function-name]
@@ -285,7 +297,7 @@ class ApiService {
       functionUrl,
       headers: finalHeaders,
       body: body != null ? jsonEncode(body) : null,
-    ).timeout(const Duration(seconds: 15));
+    ).timeout(const Duration(seconds: 30));
 
     debugPrint(
       '🌐 [RawInvoke] $functionName -> Status: ${response.statusCode}',
@@ -326,7 +338,7 @@ class ApiService {
     Future<http.Response> Function(Map<String, String> headers) request,
   ) async {
     final headers = await _getHeaders();
-    final response = await request(headers).timeout(const Duration(seconds: 15));
+    final response = await request(headers).timeout(const Duration(seconds: 30));
 
     if (response.statusCode == 401) {
       debugPrint("🚨 [Universal Interceptor] 401 detected. Recovery mode...");
@@ -336,7 +348,7 @@ class ApiService {
 
         // 2. Retry with pristine headers
         final freshHeaders = await _getHeaders();
-        final retryResponse = await request(freshHeaders).timeout(const Duration(seconds: 15));
+        final retryResponse = await request(freshHeaders).timeout(const Duration(seconds: 30));
 
         debugPrint(
           "✅ [Universal Interceptor] Recovery successful. Status: ${retryResponse.statusCode}",
@@ -360,7 +372,10 @@ class ApiService {
     final String token = session?.accessToken ?? '';
     final sanitizedJwt = token.trim().replaceAll('\n', '').replaceAll('\r', '');
 
-    final supabaseKey = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+    const supabaseKeyEnv = String.fromEnvironment('SUPABASE_ANON_KEY');
+    final supabaseKey = supabaseKeyEnv.isNotEmpty 
+        ? supabaseKeyEnv 
+        : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
     final sanitizedApiKey = supabaseKey
         .trim()
         .replaceAll('\n', '').replaceAll('\r', '');
@@ -457,12 +472,10 @@ class ApiService {
 
       final response = await Supabase.instance.client
           .from('profiles')
-          .select('preferred_payment_method_id, preferred_payment_method_type')
+          .select(
+              'last_used_fiat, last_used_crypto, last_used_network, ach_user_token, ach_token_expires_at')
           .eq('id', user.id)
           .single();
-
-      _cachedPreferredMethodId = response['preferred_payment_method_id'];
-      _cachedPreferredMethodType = response['preferred_payment_method_type'];
 
       final profileObj = UserProfile.fromJson(response);
       _profileCompleter?.complete(profileObj);
@@ -476,35 +489,6 @@ class ApiService {
     }
   }
 
-  // Update Preferred Payment Method
-  Future<void> updatePaymentPreference(
-    String methodId,
-    String methodType,
-  ) async {
-    // 1. Update local cache IMMEDIATELY for instant UI feedback
-    _cachedPreferredMethodId = methodId;
-    _cachedPreferredMethodType = methodType;
-    debugPrint(
-      '⚡ Instant Sync: Payment preference cached: $methodId ($methodType)',
-    );
-
-    try {
-      final user = Supabase.instance.client.auth.currentUser;
-      if (user == null) return;
-
-      await Supabase.instance.client
-          .from('profiles')
-          .update({
-            'preferred_payment_method_id': methodId,
-            'preferred_payment_method_type': methodType,
-          })
-          .eq('id', user.id);
-
-      debugPrint('✅ Payment preference persisted to DB: $methodId');
-    } catch (e) {
-      debugPrint('Error updating payment preference: $e');
-    }
-  }
 
   // Get Wallet Balance
   // Example use in standard calls:
@@ -741,7 +725,7 @@ class ApiService {
           .select()
           .eq('profile_id', profileId)
           .order('created_at', ascending: false)
-          .limit(20);
+          .limit(50);
       final list = response as List<dynamic>;
       return list.map((e) => Transaction.fromJson(e as Map<String, dynamic>)).toList();
     } catch (e) {
@@ -895,148 +879,101 @@ class ApiService {
   }
 
   // ============================================================================
-  // Get Saved Cards (calls get-saved-cards Edge Function)
-  // Implements in-memory caching ("Frontend Redis-like experience")
+  // ACH On-Ramp Preferences
+  // Non-sensitive pre-fill data only — card credentials live in AlchemyPay.
   // ============================================================================
-  static List<SavedCard>? _cachedSavedCards;
-  static String? _cachedPreferredMethodId;
-  static String? _cachedPreferredMethodType;
-
-  // 🛡️ Double-Fetch Protection
-  static Completer<List<SavedCard>>? _cardsCompleter;
   static Completer<UserProfile?>? _profileCompleter;
-
-  // Get Cached Cards (Manual Access)
-  static List<SavedCard>? getCachedCards() => _cachedSavedCards;
-
-  // Get Cached Preferred Method (Manual Access)
-  static String? getCachedPreferredMethodId() => _cachedPreferredMethodId;
-  static String? getCachedPreferredMethodType() => _cachedPreferredMethodType;
 
   /// Clears all static caches. Call this on logout or account switch.
   static void clearStaticCache() {
-    _cachedSavedCards = null;
-    _cachedPreferredMethodId = null;
-    _cachedPreferredMethodType = null;
+    _profileCompleter = null;
     debugPrint('🧹 ApiService static cache cleared.');
   }
 
-  Future<List<SavedCard>> getSavedCards({bool forceRefresh = false}) async {
-    // 1. Return cached data if available and not forced to refresh
-    final cachedCards = _cachedSavedCards;
-    if (cachedCards != null && !forceRefresh) {
-      debugPrint('🚀 Using cached saved cards (Instant Load)');
-      return cachedCards;
+  /// Fetches a fresh 10-day ACH accessToken from the Go backend.
+  /// Returns null on failure — caller falls back to opening widget without token.
+  Future<String?> fetchAchToken() async {
+    try {
+      final response = await _safeRequest(
+        (headers) => http.get(
+          Uri.parse('$baseUrl/onramp/token'),
+          headers: headers,
+        ),
+      );
+      
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        return body['access_token'] as String?;
+      } else {
+        debugPrint('❌ fetchAchToken failed with status ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('❌ fetchAchToken error: $e');
     }
+    return null;
+  }
 
-    // 2. 🔒 MUTEX: If a fetch is already running, wait for it.
-    final completer = _cardsCompleter;
-    if (completer != null) {
-      debugPrint('⏳ [ApiService] Waiting for concurrent Card Fetch...');
-      return await completer.future;
+  /// Returns a signed AlchemyPay Page Integration URL for managing saved payment methods.
+  /// Backend embeds the ACH token so the user lands directly in their account.
+  Future<String?> fetchManageUrl() async {
+    try {
+      final response = await _safeRequest(
+        (headers) => http.get(
+          Uri.parse('$baseUrl/onramp/manage-url'),
+          headers: headers,
+        ),
+      );
+      
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        return body['url'] as String?;
+      } else {
+        debugPrint('❌ fetchManageUrl failed with status ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('❌ fetchManageUrl error: $e');
     }
+    return null;
+  }
 
-    // 3. Start new fetch
-    _cardsCompleter = Completer<List<SavedCard>>();
+  /// Returns ACH-supported fiat payment methods (1-hour server cache).
+  Future<List<Map<String, dynamic>>> fetchFiatMethods() async {
+    try {
+      final response = await _safeRequest(
+        (headers) => http.get(
+          Uri.parse('$baseUrl/onramp/fiat-methods'),
+          headers: headers,
+        ),
+      );
+      
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        final list = body['methods'] as List<dynamic>? ?? [];
+        return list.cast<Map<String, dynamic>>();
+      } else {
+        debugPrint('❌ fetchFiatMethods failed with status ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('❌ fetchFiatMethods error: $e');
+    }
+    return [];
+  }
 
+  /// Persists the user's last-used fiat/crypto/network to the profiles table.
+  Future<void> updateAchPreferences({
+    required String fiat,
+    required String crypto,
+    required String network,
+  }) async {
     final supabase = Supabase.instance.client;
     final user = supabase.auth.currentUser;
+    if (user == null) return;
 
-    if (user == null) {
-      _cardsCompleter?.complete([]);
-      _cardsCompleter = null;
-      return [];
-    }
-
-    try {
-      debugPrint('🌐 Fetching saved cards from Edge Function...');
-      // 🛡️ Use Robust Invoker
-      final response = await ApiService.invokeEdgeFunction('get-saved-cards');
-
-      if (response.status != 200) {
-        debugPrint('Failed to get saved cards: ${response.status}');
-        _cardsCompleter?.complete([]);
-        return [];
-      }
-
-      final data = response.data as Map<String, dynamic>;
-      final cardsData = data['cards'] as List<dynamic>? ?? [];
-
-      // 🚀 10/10 Performance: Map to models in background isolate
-      final cards = await compute(_mapSavedCards, cardsData);
-
-      // Update Cache
-      _cachedSavedCards = cards;
-      _cardsCompleter?.complete(cards);
-      return cards;
-    } catch (e) {
-      debugPrint('Error getting saved cards: $e');
-      _cardsCompleter?.completeError(e);
-      return [];
-    } finally {
-      _cardsCompleter = null; // 🔓 Unlock
-    }
-  }
-
-  // Global static helper for Card Isolate mapping
-  static List<SavedCard> _mapSavedCards(dynamic data) {
-    if (data is! List) return [];
-    return data
-        .map((json) => SavedCard.fromJson(json as Map<String, dynamic>))
-        .toList();
-  }
-
-  // Save Card
-  Future<void> saveCard(String token) async {
-    try {
-      debugPrint('💳 Saving new card with token: $token');
-      // 🛡️ Use Robust Invoker
-      final response = await ApiService.invokeEdgeFunction(
-        'manage-payment-methods',
-        body: {'action': 'add-card', 'token': token},
-      );
-
-      if (response.status != 200) {
-        final errorData = response.data as Map<String, dynamic>?;
-        final errorMessage = errorData?['message'] ?? 'Failed to save card';
-        throw Exception(errorMessage);
-      }
-
-      // Clear cache to force refresh on next getSavedCards call
-      _cachedSavedCards = null;
-      debugPrint('✅ Card saved successfully (Cache cleared)');
-    } catch (e) {
-      debugPrint('❌ Save card error: $e');
-      rethrow;
-    }
-  }
-
-  // Delete Card
-  Future<void> deleteCard(String cardId) async {
-    try {
-      debugPrint('🗑️ Deleting card: $cardId');
-      // 🛡️ Use Robust Invoker
-      final response = await ApiService.invokeEdgeFunction(
-        'manage-payment-methods',
-        body: {'action': 'delete-card', 'card_id': cardId},
-      );
-
-      if (response.status != 200) {
-        final errorData = response.data as Map<String, dynamic>?;
-        final errorMessage = errorData?['message'] ?? 'Failed to delete card';
-        throw Exception(errorMessage);
-      }
-
-      // 2. Optimistic Update: Update cache directly instead of clearing it
-      final cachedCards = _cachedSavedCards;
-      if (cachedCards != null) {
-        cachedCards.removeWhere((card) => card.id == cardId);
-      }
-      debugPrint('✅ Card deleted successfully (Cache Updated)');
-    } catch (e) {
-      debugPrint('❌ Delete card error: $e');
-      rethrow;
-    }
+    await supabase.from('profiles').update({
+      'last_used_fiat': fiat,
+      'last_used_crypto': crypto,
+      'last_used_network': network,
+    }).eq('id', user.id);
   }
 
   // 🛡️ User-Friendly Error Mapper
@@ -1113,6 +1050,77 @@ class ApiService {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
     throw Exception('Failed to fetch KYC status: ${response.body}');
+  }
+
+  /// Creates a PayoutIntent and returns the AlchemyPay checkout URL + intent ID.
+  /// This is the entry point for the pay-per-use on-ramp flow.
+  Future<({String webUrl, String intentId})> initiateOnRampPayment({
+    required int amountSatang,
+    required String sqrilTxId,
+    required String promptPayId,
+    required String recipientName,
+    required String fiatCurrency,
+    String? billerId,
+    String? reference1,
+    String? reference2,
+    String? email,
+  }) async {
+    final response = await _safeRequest(
+      (headers) => http.post(
+        Uri.parse('$baseUrl/payments/create-intent'),
+        headers: headers,
+        body: jsonEncode({
+          'amount': amountSatang,
+          'fiat_currency': fiatCurrency,
+          'promptpay_id': promptPayId,
+          'recipient_name': recipientName,
+          'sqril_tx_id': sqrilTxId,
+          'corridor_type': 'CARD',
+          // ignore: use_null_aware_elements
+          if (billerId != null) 'biller_id': billerId,
+          // ignore: use_null_aware_elements
+          if (reference1 != null) 'reference1': reference1,
+          // ignore: use_null_aware_elements
+          if (reference2 != null) 'reference2': reference2,
+          // ignore: use_null_aware_elements
+          if (email != null) 'email': email,
+        }),
+      ),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final webUrl = data['web_url'] as String?;
+      final intentId = data['intent_id'] as String?;
+      if (webUrl == null || intentId == null) {
+        throw Exception('Invalid response from payment server');
+      }
+      return (webUrl: webUrl, intentId: intentId);
+    }
+
+    String errorMsg = 'Payment initiation failed';
+    try {
+      final err = jsonDecode(response.body) as Map<String, dynamic>;
+      errorMsg = err['error'] as String? ?? errorMsg;
+    } catch (_) {}
+    throw Exception(errorMsg);
+  }
+
+  /// Polls the status of a PayoutIntent.
+  /// Returns: PENDING | COMPLETED | FAILED | ACH_FAILED | PAYMENT_SUCCESS_PAYOUT_PENDING
+  Future<String> getIntentStatus(String intentId) async {
+    final response = await _safeRequest(
+      (headers) => http.get(
+        Uri.parse('$baseUrl/payments/intent/$intentId/status'),
+        headers: headers,
+      ),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      return data['status'] as String? ?? 'PENDING';
+    }
+    throw Exception('Failed to get intent status');
   }
 }
 

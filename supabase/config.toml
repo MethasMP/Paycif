@@ -21,3 +21,10 @@ verify_jwt = false
 
 [functions.initiate-pin-reset]
 verify_jwt = false
+
+[auth.external.google]
+enabled = true
+client_id = "985333032452-5d4lf6j704jag2vpjaq8rth6i44vn1cq.apps.googleusercontent.com"
+secret = "dummy-secret-for-local-dev"
+redirect_uri = ""
+skip_nonce_check = true

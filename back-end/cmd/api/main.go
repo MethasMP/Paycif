@@ -94,11 +94,11 @@ func main() {
 		sqrilBaseURL,
 		os.Getenv("SQRIL_CLIENT_ID"),
 		os.Getenv("SQRIL_CLIENT_SECRET"),
+		repository.DB,
 	)
 
 	paymentEngine := usecase.NewPaymentEngine("sqril") // Default to SQRIL
 	paymentEngine.RegisterProvider(sqrilProvider)
-	paymentEngine.RegisterProvider(&usecase.OmiseProvider{APIKey: os.Getenv("OMISE_API_KEY")})
 	paymentEngine.RegisterProvider(&usecase.WiseProvider{Token: os.Getenv("WISE_API_TOKEN")})
 
 	// Pass AuditService to WalletService
@@ -163,7 +163,12 @@ func main() {
 		// On-Ramp Routes (Protected)
 		v1.GET("/onramp/check-region", paymentHandler.HandleCheckRegion)
 		v1.POST("/onramp/quote", paymentHandler.HandleGetQuote)
+		v1.POST("/onramp/create", paymentHandler.HandleCreateOnRampOrder)
+		v1.GET("/onramp/token", paymentHandler.HandleGetAchToken)
+		v1.GET("/onramp/fiat-methods", paymentHandler.HandleFiatList)
+		v1.GET("/onramp/manage-url", paymentHandler.HandleGetManageUrl)
 		v1.POST("/payments/create-intent", paymentHandler.HandleCreateIntent)
+		v1.GET("/payments/intent/:id/status", paymentHandler.HandleGetIntentStatus)
 
 		// Payout Routes (Wallet -> External)
 		v1.POST("/payout/promptpay", payoutHandler.HandlePromptPayPayout)
@@ -177,6 +182,7 @@ func main() {
 
 	// Webhooks (Public)
 	r.POST("/hooks/alchemypay", paymentHandler.HandleWebhook)
+	r.POST("/hooks/sqril", payoutHandler.HandleSqrilWebhook)
 
 	// SEO (Search Engine Optimization)
 	r.GET("/robots.txt", func(c *gin.Context) {

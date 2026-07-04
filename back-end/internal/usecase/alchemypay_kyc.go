@@ -131,9 +131,12 @@ type AchKycStatusResult struct {
 	Country     string
 }
 
-// RegisterUser calls /open/api/user/core/register and returns the KYC verification URL.
-// code 2002 ("User registered") is treated as a non-error — caller should query status separately.
 func (c *AlchemyPayKYCClient) RegisterUser(ctx context.Context, email, kycPlatform, kycType, callbackURL, redirectURL string) (string, error) {
+	// 🧪 Developer Mock Mode: If using mock keys, return empty URL to simulate instant auto-verification bypass
+	if c.appKey == "mock-alchemy-app-id" || c.secretKey == "mock-alchemy-app-secret" || c.merchantNo == "mock-alchemy-app-secret" {
+		return "", nil
+	}
+
 	payload := map[string]string{
 		"merchantNo":  c.merchantNo,
 		"email":       email,
@@ -171,6 +174,19 @@ func (c *AlchemyPayKYCClient) RegisterUser(ctx context.Context, email, kycPlatfo
 // GetKycStatus calls /open/api/user/core/getKycStatusInfo.
 // Returns nil result (no error) when the user is not yet registered.
 func (c *AlchemyPayKYCClient) GetKycStatus(ctx context.Context, email, kycType, kycPlatform string) (*AchKycStatusResult, error) {
+	// 🧪 Developer Mock Mode: If using mock keys, mock successful verification status
+	if c.appKey == "mock-alchemy-app-id" || c.secretKey == "mock-alchemy-app-secret" {
+		return &AchKycStatusResult{
+			UserNo:      "mock-userno-123",
+			KycStatus:   AchKycApproved,
+			KycLevel:    1,
+			ApplicantID: "mock-applicant-123",
+			FirstName:   "John",
+			LastName:    "Doe",
+			Country:     "TH",
+		}, nil
+	}
+
 	body, err := c.doRequest(ctx, http.MethodPost, achKYCStatusPath, map[string]string{
 		"email":       email,
 		"kycType":     kycType,
@@ -265,4 +281,46 @@ type AchWebhookPayload struct {
 	ValidUntil      string `json:"validUntil"`
 	ApplicantID     string `json:"applicantId"`
 	KycFailJson     string `json:"kycFailJson"`
+}
+
+// AchUserInfoResult holds detailed user info from Alchemy Pay.
+type AchUserInfoResult struct {
+	UserNum             string                   `json:"userNum"`
+	DocumentInfoList    []map[string]interface{} `json:"documentInfoList"`
+	AddressInfoList     []map[string]interface{} `json:"addressInfoList"`
+	NameHistoryInfoList []map[string]interface{} `json:"nameHistoryInfoList"`
+	ExtendInfoList      []map[string]interface{} `json:"extendInfoList"`
+}
+
+// QueryUserInfo calls /open/api/user/core/queryUserInfo
+func (c *AlchemyPayKYCClient) QueryUserInfo(ctx context.Context, userNum string) (*AchUserInfoResult, error) {
+	payload := map[string]string{
+		"userNum":    userNum,
+		"merchantNo": c.merchantNo,
+	}
+	body, err := c.doRequest(ctx, http.MethodPost, achKYCUserInfoPath, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	var env achEnvelope
+	if err := json.Unmarshal(body, &env); err != nil {
+		return nil, fmt.Errorf("parse query user info response: %w", err)
+	}
+
+	if !env.Success {
+		return nil, fmt.Errorf("alchemy pay query user info: %s (code %v)", env.Msg, env.Code)
+	}
+
+	if env.Model == nil {
+		return nil, nil
+	}
+
+	modelBytes, _ := json.Marshal(env.Model)
+	var result AchUserInfoResult
+	if err := json.Unmarshal(modelBytes, &result); err != nil {
+		return nil, fmt.Errorf("parse model user info: %w", err)
+	}
+
+	return &result, nil
 }

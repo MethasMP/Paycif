@@ -1,11 +1,30 @@
 class UserProfile {
-  final String? preferredPaymentMethodId;
-  final String? preferredPaymentMethodType;
+  final String? lastUsedFiat;
+  final String? lastUsedCrypto;
+  final String? lastUsedNetwork;
+  final String? achUserToken;
+  final DateTime? achTokenExpiresAt;
 
-  UserProfile({this.preferredPaymentMethodId, this.preferredPaymentMethodType});
+  UserProfile({
+    this.lastUsedFiat,
+    this.lastUsedCrypto,
+    this.lastUsedNetwork,
+    this.achUserToken,
+    this.achTokenExpiresAt,
+  });
 
   factory UserProfile.fromJson(Map<String, dynamic> json) => UserProfile(
-    preferredPaymentMethodId: json['preferred_payment_method_id'] as String?,
-    preferredPaymentMethodType: json['preferred_payment_method_type'] as String?,
-  );
+        lastUsedFiat: json['last_used_fiat'] as String?,
+        lastUsedCrypto: json['last_used_crypto'] as String?,
+        lastUsedNetwork: json['last_used_network'] as String?,
+        achUserToken: json['ach_user_token'] as String?,
+        achTokenExpiresAt: json['ach_token_expires_at'] != null
+            ? DateTime.parse(json['ach_token_expires_at'] as String)
+            : null,
+      );
+
+  bool get hasValidAchToken =>
+      achUserToken != null &&
+      achTokenExpiresAt != null &&
+      achTokenExpiresAt!.isAfter(DateTime.now());
 }
