@@ -3,10 +3,11 @@ package usecase
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
+
+	"github.com/bytedance/sonic"
+
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -164,13 +165,20 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 	// 2. Record Transaction
 	newTxID := uuid.New()
 	description := "Pay per use: " + merchant
-	// Performance: Using manual string construction for JSON instead of fmt.Sprintf
-	providerMetadata := `{"provider": "alchemypay", "merchant": ` + strconv.Quote(merchant) + `, "amount": ` + strconv.FormatFloat(amount, 'f', -1, 64) + `}`
+	// Performance: Using high-performance sonic.Marshal instead of fmt.Sprintf or standard json
+	providerMetadata, err := sonic.Marshal(map[string]interface{}{
+		"provider": "alchemypay",
+		"merchant": merchant,
+		"amount":   amount,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal provider metadata: %w", err)
+	}
 
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO transactions (id, profile_id, reference_id, amount, description, settlement_status, gateway_fee, provider_metadata, created_at)
 		VALUES ($1, $2, $3, $4, $5, 'SETTLED', 0, $6, NOW())
-	`, newTxID, userID, referenceID, int64(amount*100), description, providerMetadata)
+	`, newTxID, userID, referenceID, int64(amount*100), description, string(providerMetadata))
 	if err != nil {
 		return fmt.Errorf("failed to insert transaction: %w", err)
 	}
@@ -185,13 +193,21 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 	}
 
 	// 4. Write to Outbox for async processing
-	// Performance: Using manual string construction for JSON instead of fmt.Sprintf
-	payloadStr := `{"transaction_id": "` + newTxID.String() + `", "amount": ` + strconv.FormatFloat(amount, 'f', -1, 64) + `, "user_id": "` + userID.String() + `", "merchant": ` + strconv.Quote(merchant) + `}`
+	// Performance: Using high-performance sonic.Marshal instead of fmt.Sprintf or standard json
+	payloadBytes, err := sonic.Marshal(map[string]interface{}{
+		"transaction_id": newTxID.String(),
+		"amount":         amount,
+		"user_id":        userID.String(),
+		"merchant":       merchant,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal outbox payload: %w", err)
+	}
 
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO transaction_outbox (id, transaction_id, event_type, payload, status, created_at)
 		VALUES ($1, $2, 'PAYMENT_COMPLETED', $3, 'PENDING', NOW())
-	`, uuid.New(), newTxID, payloadStr)
+	`, uuid.New(), newTxID, string(payloadBytes))
 	if err != nil {
 		return fmt.Errorf("failed to write to outbox: %w", err)
 	}
@@ -291,7 +307,7 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 	newTxID := uuid.New()
 	// Performance: Using concatenation instead of fmt.Sprintf for description
 	description := "PromptPay to " + req.RecipientName + " (" + req.PromptPayID + ")"
-	metadata, err := json.Marshal(map[string]string{
+	metadata, err := sonic.Marshal(map[string]string{
 		"promptpay_id":   req.PromptPayID,
 		"recipient_name": req.RecipientName,
 	})
@@ -299,7 +315,7 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 		return nil, fmt.Errorf("failed to encode metadata: %w", err)
 	}
 
-	payoutPayload, err := json.Marshal(map[string]interface{}{
+	payoutPayload, err := sonic.Marshal(map[string]interface{}{
 		"transaction_id": newTxID.String(),
 		"promptpay_id":   req.PromptPayID,
 		"recipient_name": req.RecipientName,
