@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -107,7 +108,8 @@ type ExchangeRateResponse struct {
 
 // GetExchangeRate retrieves the latest rate for a currency pair.
 func (s *WalletService) GetExchangeRate(ctx context.Context, fromCurr, toCurr string) (*ExchangeRateResponse, error) {
-	cacheKey := fmt.Sprintf("rate:%s:%s", fromCurr, toCurr)
+	// Performance: Using concatenation instead of fmt.Sprintf for cache key
+	cacheKey := "rate:" + fromCurr + ":" + toCurr
 
 	if val, ok := s.localRateCache.Load(cacheKey); ok {
 		item := val.(localCacheItem)
@@ -162,11 +164,13 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 	// 2. Record Transaction
 	newTxID := uuid.New()
 	description := "Pay per use: " + merchant
+	// Performance: Using manual string construction for JSON instead of fmt.Sprintf
+	providerMetadata := `{"provider": "alchemypay", "merchant": ` + strconv.Quote(merchant) + `, "amount": ` + strconv.FormatFloat(amount, 'f', -1, 64) + `}`
+
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO transactions (id, profile_id, reference_id, amount, description, settlement_status, gateway_fee, provider_metadata, created_at)
 		VALUES ($1, $2, $3, $4, $5, 'SETTLED', 0, $6, NOW())
-	`, newTxID, userID, referenceID, int64(amount*100), description,
-		fmt.Sprintf(`{"provider": "alchemypay", "merchant": "%s", "amount": %f}`, merchant, amount))
+	`, newTxID, userID, referenceID, int64(amount*100), description, providerMetadata)
 	if err != nil {
 		return fmt.Errorf("failed to insert transaction: %w", err)
 	}
@@ -181,7 +185,9 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 	}
 
 	// 4. Write to Outbox for async processing
-	payloadStr := fmt.Sprintf(`{"transaction_id": "%s", "amount": %f, "user_id": "%s", "merchant": "%s"}`, newTxID, amount, userID, merchant)
+	// Performance: Using manual string construction for JSON instead of fmt.Sprintf
+	payloadStr := `{"transaction_id": "` + newTxID.String() + `", "amount": ` + strconv.FormatFloat(amount, 'f', -1, 64) + `, "user_id": "` + userID.String() + `", "merchant": ` + strconv.Quote(merchant) + `}`
+
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO transaction_outbox (id, transaction_id, event_type, payload, status, created_at)
 		VALUES ($1, $2, 'PAYMENT_COMPLETED', $3, 'PENDING', NOW())
@@ -283,7 +289,8 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 	}
 
 	newTxID := uuid.New()
-	description := fmt.Sprintf("PromptPay to %s (%s)", req.RecipientName, req.PromptPayID)
+	// Performance: Using concatenation instead of fmt.Sprintf for description
+	description := "PromptPay to " + req.RecipientName + " (" + req.PromptPayID + ")"
 	metadata, err := json.Marshal(map[string]string{
 		"promptpay_id":   req.PromptPayID,
 		"recipient_name": req.RecipientName,
