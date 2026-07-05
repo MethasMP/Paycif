@@ -3,7 +3,9 @@ package usecase
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
+
+	"github.com/bytedance/sonic"
+
 	"errors"
 	"fmt"
 	"strings"
@@ -14,7 +16,6 @@ import (
 	"paysif/internal/infrastructure/logger"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/sony/gobreaker"
 )
 
@@ -107,7 +108,8 @@ type ExchangeRateResponse struct {
 
 // GetExchangeRate retrieves the latest rate for a currency pair.
 func (s *WalletService) GetExchangeRate(ctx context.Context, fromCurr, toCurr string) (*ExchangeRateResponse, error) {
-	cacheKey := fmt.Sprintf("rate:%s:%s", fromCurr, toCurr)
+	// Performance: Using concatenation instead of fmt.Sprintf for cache key
+	cacheKey := "rate:" + fromCurr + ":" + toCurr
 
 	if val, ok := s.localRateCache.Load(cacheKey); ok {
 		item := val.(localCacheItem)
@@ -162,11 +164,20 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 	// 2. Record Transaction
 	newTxID := uuid.New()
 	description := "Pay per use: " + merchant
+	// Performance: Using high-performance sonic.Marshal instead of fmt.Sprintf or standard json
+	providerMetadata, err := sonic.Marshal(map[string]interface{}{
+		"provider": "alchemypay",
+		"merchant": merchant,
+		"amount":   amount,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal provider metadata: %w", err)
+	}
+
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO transactions (id, profile_id, reference_id, amount, description, settlement_status, gateway_fee, provider_metadata, created_at)
 		VALUES ($1, $2, $3, $4, $5, 'SETTLED', 0, $6, NOW())
-	`, newTxID, userID, referenceID, int64(amount*100), description,
-		fmt.Sprintf(`{"provider": "alchemypay", "merchant": "%s", "amount": %f}`, merchant, amount))
+	`, newTxID, userID, referenceID, int64(amount*100), description, string(providerMetadata))
 	if err != nil {
 		return fmt.Errorf("failed to insert transaction: %w", err)
 	}
@@ -181,11 +192,21 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 	}
 
 	// 4. Write to Outbox for async processing
-	payloadStr := fmt.Sprintf(`{"transaction_id": "%s", "amount": %f, "user_id": "%s", "merchant": "%s"}`, newTxID, amount, userID, merchant)
+	// Performance: Using high-performance sonic.Marshal instead of fmt.Sprintf or standard json
+	payloadBytes, err := sonic.Marshal(map[string]interface{}{
+		"transaction_id": newTxID.String(),
+		"amount":         amount,
+		"user_id":        userID.String(),
+		"merchant":       merchant,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal outbox payload: %w", err)
+	}
+
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO transaction_outbox (id, transaction_id, event_type, payload, status, created_at)
 		VALUES ($1, $2, 'PAYMENT_COMPLETED', $3, 'PENDING', NOW())
-	`, uuid.New(), newTxID, payloadStr)
+	`, uuid.New(), newTxID, string(payloadBytes))
 	if err != nil {
 		return fmt.Errorf("failed to write to outbox: %w", err)
 	}
@@ -210,30 +231,6 @@ type PayoutResponse struct {
 	Message       string `json:"message"`
 	SenderName    string `json:"sender_name"`
 	NewBalance    int64  `json:"new_balance"`
-}
-
-// isSerializationFailure reports whether err is a Postgres serialization
-// failure (SQLSTATE 40001), which is retryable under SERIALIZABLE isolation.
-func isSerializationFailure(err error) bool {
-	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
-		return pgErr.Code == "40001"
-	}
-	return false
-}
-
-// isDeadlockFailure reports whether err is a Postgres deadlock error (SQLSTATE 40P01).
-func isDeadlockFailure(err error) bool {
-	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
-		return pgErr.Code == "40P01"
-	}
-	return false
-}
-
-// payoutReservation holds the result of the fast reservation transaction (Phase 1).
-type payoutReservation struct {
-	TransactionID  uuid.UUID
-	SenderFullName string
-	NewBalance     int64
 }
 
 // PayoutToPromptPay processes a PromptPay payout.
@@ -283,8 +280,9 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 	}
 
 	newTxID := uuid.New()
-	description := fmt.Sprintf("PromptPay to %s (%s)", req.RecipientName, req.PromptPayID)
-	metadata, err := json.Marshal(map[string]string{
+	// Performance: Using concatenation instead of fmt.Sprintf for description
+	description := "PromptPay to " + req.RecipientName + " (" + req.PromptPayID + ")"
+	metadata, err := sonic.Marshal(map[string]string{
 		"promptpay_id":   req.PromptPayID,
 		"recipient_name": req.RecipientName,
 	})
@@ -292,7 +290,7 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 		return nil, fmt.Errorf("failed to encode metadata: %w", err)
 	}
 
-	payoutPayload, err := json.Marshal(map[string]interface{}{
+	payoutPayload, err := sonic.Marshal(map[string]interface{}{
 		"transaction_id": newTxID.String(),
 		"promptpay_id":   req.PromptPayID,
 		"recipient_name": req.RecipientName,

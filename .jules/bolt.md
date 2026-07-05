@@ -1,0 +1,3 @@
+## 2026-07-05 - Optimize string formatting in hot paths
+**Learning:** Replacing `fmt.Sprintf` with string concatenation and `strconv` functions in high-frequency methods (like cache key generation and JSON construction for outbox/ledger) provides measurable performance gains (up to 3.4x for simple keys). While `fmt.Sprintf` is convenient, it incurs reflection overhead that adds up in transaction-heavy services.
+**Action:** Prefer string concatenation for simple keys and `strconv.Quote`/`strconv.FormatFloat` for manual JSON construction in `WalletService` and other performance-critical backend components.

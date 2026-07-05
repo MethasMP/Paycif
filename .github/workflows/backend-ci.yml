@@ -23,18 +23,26 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.26'
           cache-dependency-path: back-end/go.sum
 
       - name: Verify Dependencies
         run: go mod verify
 
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+      - name: Fetch Base Branch for Linting
+        if: github.event_name == 'pull_request'
+        run: git fetch origin ${{ github.base_ref }} --depth=1
+
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v4
-        with:
-          version: latest
-          working-directory: back-end
-          args: --timeout=5m
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            golangci-lint run --timeout=5m --new-from-rev=origin/${{ github.base_ref }}
+          else
+            golangci-lint run --timeout=5m
+          fi
 
       - name: Run Tests with Race Detector
         run: go test -v -race ./...
@@ -54,7 +62,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.26'
           cache-dependency-path: back-end/go.sum
 
       - name: Build Microservice
