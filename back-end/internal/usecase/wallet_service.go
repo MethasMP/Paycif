@@ -5,7 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strconv"
+
+	"github.com/bytedance/sonic"
 	"strings"
 	"sync"
 	"time"
@@ -153,8 +154,15 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 	// We use ON CONFLICT (reference_id) DO NOTHING to maintain atomic idempotency.
 	newTxID := uuid.New()
 	description := "Pay per use: " + merchant
-	// Manual JSON construction (~1.7x faster than fmt.Sprintf) with safe quoting
-	providerMetadata := `{"provider": "alchemypay", "merchant": ` + strconv.Quote(merchant) + `, "amount": ` + strconv.FormatFloat(amount, 'f', -1, 64) + `}`
+	// Optimization: Use sonic for high-performance JSON encoding (~2-4x faster than standard library)
+	providerMetadata, err := sonic.MarshalString(map[string]interface{}{
+		"provider": "alchemypay",
+		"merchant": merchant,
+		"amount":   amount,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal provider metadata: %w", err)
+	}
 
 	res, err := tx.ExecContext(ctx, `
 		INSERT INTO transactions (id, profile_id, reference_id, amount, description, settlement_status, gateway_fee, provider_metadata, created_at)
@@ -185,8 +193,16 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 	}
 
 	// 4. Write to Outbox for async processing
-	// Optimization: Manual JSON construction (~2.2x faster than fmt.Sprintf)
-	payloadStr := `{"transaction_id": "` + newTxID.String() + `", "amount": ` + strconv.FormatFloat(amount, 'f', -1, 64) + `, "user_id": "` + userID.String() + `", "merchant": ` + strconv.Quote(merchant) + `}`
+	// Optimization: Use sonic for high-performance JSON encoding
+	payloadStr, err := sonic.MarshalString(map[string]interface{}{
+		"transaction_id": newTxID.String(),
+		"amount":         amount,
+		"user_id":        userID.String(),
+		"merchant":       merchant,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal outbox payload: %w", err)
+	}
 
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO transaction_outbox (id, transaction_id, event_type, payload, status, created_at)
@@ -292,17 +308,27 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 	// Optimization: Use string concatenation (~2x faster than fmt.Sprintf)
 	description := "PromptPay to " + req.RecipientName + " (" + req.PromptPayID + ")"
 
-	// Optimization: Manual JSON construction to minimize latency in the 1ms hot path.
-	metadata := `{"promptpay_id": ` + strconv.Quote(req.PromptPayID) + `, "recipient_name": ` + strconv.Quote(req.RecipientName) + `}`
+	// Optimization: Use sonic for high-performance JSON encoding to minimize latency in the 1ms hot path.
+	metadata, err := sonic.MarshalString(map[string]string{
+		"promptpay_id":   req.PromptPayID,
+		"recipient_name": req.RecipientName,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode metadata: %w", err)
+	}
 
-	// Optimization: Manual JSON construction to minimize latency (~2.5x faster than json.Marshal)
-	payoutPayload := `{"transaction_id": "` + newTxID.String() +
-		`", "promptpay_id": ` + strconv.Quote(req.PromptPayID) +
-		`, "recipient_name": ` + strconv.Quote(req.RecipientName) +
-		`, "amount": ` + strconv.FormatInt(req.Amount, 10) +
-		`, "sqril_tx_id": ` + strconv.Quote(req.SqrilTxID) +
-		`, "customer_id": "cust_paycif_` + req.UserID.String() +
-		`", "user_id": "` + req.UserID.String() + `"}`
+	payoutPayload, err := sonic.MarshalString(map[string]interface{}{
+		"transaction_id": newTxID.String(),
+		"promptpay_id":   req.PromptPayID,
+		"recipient_name": req.RecipientName,
+		"amount":         req.Amount,
+		"sqril_tx_id":    req.SqrilTxID,
+		"customer_id":    "cust_paycif_" + req.UserID.String(),
+		"user_id":        req.UserID.String(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal outbox payload: %w", err)
+	}
 
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
