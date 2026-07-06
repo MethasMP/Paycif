@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -108,8 +107,7 @@ type ExchangeRateResponse struct {
 
 // GetExchangeRate retrieves the latest rate for a currency pair.
 func (s *WalletService) GetExchangeRate(ctx context.Context, fromCurr, toCurr string) (*ExchangeRateResponse, error) {
-	// Optimization: Use string concatenation instead of fmt.Sprintf for cache key (~3.4x faster)
-	cacheKey := "rate:" + fromCurr + ":" + toCurr
+	cacheKey := fmt.Sprintf("rate:%s:%s", fromCurr, toCurr)
 
 	if val, ok := s.localRateCache.Load(cacheKey); ok {
 		item := val.(localCacheItem)
@@ -153,10 +151,15 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 	// 1. Record Transaction with Atomic Idempotency
 	// Optimization: Use ON CONFLICT DO NOTHING to eliminate redundant SELECT EXISTS roundtrip
 	newTxID := uuid.New()
-	// Optimization: Use string concatenation instead of fmt.Sprintf (~2x faster)
 	description := "Pay per use: " + merchant
-	// Optimization: Use manual JSON construction for performance (~1.5x faster)
-	metadata := `{"provider": "alchemypay", "merchant": ` + strconv.Quote(merchant) + `, "amount": ` + strconv.FormatFloat(amount, 'f', -1, 64) + `}`
+	metadata, err := json.Marshal(map[string]interface{}{
+		"provider": "alchemypay",
+		"merchant": merchant,
+		"amount":   amount,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal metadata: %w", err)
+	}
 	result, err := tx.ExecContext(ctx, `
 		INSERT INTO transactions (id, profile_id, reference_id, amount, description, settlement_status, gateway_fee, provider_metadata, created_at)
 		VALUES ($1, $2, $3, $4, $5, 'SETTLED', 0, $6, NOW())
@@ -186,12 +189,19 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 	}
 
 	// 4. Write to Outbox for async processing
-	// Optimization: Use manual JSON construction for outbox payload (~1.5x faster)
-	payloadStr := `{"transaction_id": "` + newTxID.String() + `", "amount": ` + strconv.FormatFloat(amount, 'f', -1, 64) + `, "user_id": "` + userID.String() + `", "merchant": ` + strconv.Quote(merchant) + `}`
+	payload, err := json.Marshal(map[string]interface{}{
+		"transaction_id": newTxID,
+		"amount":         amount,
+		"user_id":        userID,
+		"merchant":       merchant,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal outbox payload: %w", err)
+	}
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO transaction_outbox (id, transaction_id, event_type, payload, status, created_at)
 		VALUES ($1, $2, 'PAYMENT_COMPLETED', $3, 'PENDING', NOW())
-	`, uuid.New(), newTxID, payloadStr)
+	`, uuid.New(), newTxID, payload)
 	if err != nil {
 		return fmt.Errorf("failed to write to outbox: %w", err)
 	}
