@@ -6,3 +6,7 @@
 ## 2026-07-06 - [Performance vs Maintainability: Using Sonic]
 **Learning:** While manual JSON construction is slightly faster, using `github.com/bytedance/sonic` (already a dependency) provides a better balance of performance (~3x faster than stdlib) and maintainability, avoiding error-prone string manipulation.
 **Action:** Use `sonic.MarshalString` for high-performance paths when standard `json.Marshal` is a bottleneck, rather than manual string concatenation.
+
+## 2026-07-06 - [Atomic Idempotency for Performance]
+**Learning:** Consolidating `SELECT EXISTS` and `INSERT` into a single `INSERT ... ON CONFLICT DO NOTHING` is a high-impact optimization for distributed systems, reducing database roundtrips and locking windows.
+**Action:** Always prefer atomic upserts or `ON CONFLICT` for idempotency logic in hot paths.

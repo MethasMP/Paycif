@@ -5,9 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/bytedance/sonic"
-	"strings"
 	"sync"
 	"time"
 
@@ -108,8 +108,7 @@ type ExchangeRateResponse struct {
 
 // GetExchangeRate retrieves the latest rate for a currency pair.
 func (s *WalletService) GetExchangeRate(ctx context.Context, fromCurr, toCurr string) (*ExchangeRateResponse, error) {
-	// Optimization: Use string concatenation for hot-path cache key generation (~3.5x faster than fmt.Sprintf)
-	cacheKey := "rate:" + fromCurr + ":" + toCurr
+	cacheKey := fmt.Sprintf("rate:%s:%s", fromCurr, toCurr)
 
 	if val, ok := s.localRateCache.Load(cacheKey); ok {
 		item := val.(localCacheItem)
@@ -154,7 +153,7 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 	// We use ON CONFLICT (reference_id) DO NOTHING to maintain atomic idempotency.
 	newTxID := uuid.New()
 	description := "Pay per use: " + merchant
-	// Optimization: Use sonic for high-performance JSON encoding (~2-4x faster than standard library)
+	// Optimization: Use sonic for high-performance JSON encoding
 	providerMetadata, err := sonic.MarshalString(map[string]interface{}{
 		"provider": "alchemypay",
 		"merchant": merchant,
@@ -305,10 +304,8 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 	}
 
 	newTxID := uuid.New()
-	// Optimization: Use string concatenation (~2x faster than fmt.Sprintf)
 	description := "PromptPay to " + req.RecipientName + " (" + req.PromptPayID + ")"
-
-	// Optimization: Use sonic for high-performance JSON encoding to minimize latency in the 1ms hot path.
+	// Optimization: Use sonic for high-performance JSON encoding
 	metadata, err := sonic.MarshalString(map[string]string{
 		"promptpay_id":   req.PromptPayID,
 		"recipient_name": req.RecipientName,
@@ -366,7 +363,7 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO transaction_outbox (id, transaction_id, event_type, payload, status, created_at)
 		VALUES ($1, $2, 'PAYOUT_REQUESTED', $3, 'PENDING', NOW())
-	`, uuid.New(), newTxID, payoutPayload)
+	`, uuid.New(), newTxID, string(payoutPayload))
 	if err != nil {
 		return nil, fmt.Errorf("failed to insert outbox event: %w", err)
 	}
