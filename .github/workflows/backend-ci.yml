@@ -21,6 +21,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch Base Branch
+        if: github.event_name == 'pull_request'
+        run: git fetch origin ${{ github.base_ref }}
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -36,7 +42,7 @@ jobs:
         with:
           version: latest
           working-directory: back-end
-          args: --timeout=5m
+          args: --timeout=5m --new-from-rev=origin/${{ github.base_ref }}
           install-mode: goinstall
 
       - name: Run Tests with Race Detector
