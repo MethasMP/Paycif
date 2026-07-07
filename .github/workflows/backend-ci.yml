@@ -19,22 +19,38 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        run: git fetch origin ${{ github.base_ref }}:origin/${{ github.base_ref }}
+        if: github.event_name == 'pull_request'
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.26'
           cache-dependency-path: back-end/go.sum
 
       - name: Verify Dependencies
         run: go mod verify
 
+      - name: Download Dependencies
+        run: go mod download
+
+      - name: Tidy Dependencies
+        run: go mod tidy
+
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v4
-        with:
-          version: latest
-          working-directory: back-end
-          args: --timeout=5m
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            GOWORK=off $(go env GOPATH)/bin/golangci-lint run --timeout=5m --new-from-rev=origin/${{ github.base_ref }}
+          else
+            GOWORK=off $(go env GOPATH)/bin/golangci-lint run --timeout=5m
+          fi
 
       - name: Run Tests with Race Detector
         run: go test -v -race ./...
@@ -50,11 +66,17 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        run: git fetch origin ${{ github.base_ref }}:origin/${{ github.base_ref }}
+        if: github.event_name == 'pull_request'
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.26'
           cache-dependency-path: back-end/go.sum
 
       - name: Build Microservice
