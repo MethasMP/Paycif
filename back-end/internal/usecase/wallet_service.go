@@ -146,29 +146,37 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
-	// 1. Idempotency check
-	var exists bool
-	err = tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM transactions WHERE reference_id = $1)", referenceID).Scan(&exists)
-	if err != nil {
-		return err
-	}
-	if exists {
-		logger.WithContext(ctx).Info("Payment already processed", "reference_id", referenceID)
-		return nil
-	}
-
-	// 2. Record Transaction
+	// 1. Record Transaction with Atomic Idempotency
+	// Optimization: Use ON CONFLICT DO NOTHING to eliminate redundant SELECT EXISTS roundtrip
 	newTxID := uuid.New()
 	description := "Pay per use: " + merchant
-	_, err = tx.ExecContext(ctx, `
+	metadata, err := json.Marshal(map[string]interface{}{
+		"provider": "alchemypay",
+		"merchant": merchant,
+		"amount":   amount,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal metadata: %w", err)
+	}
+	result, err := tx.ExecContext(ctx, `
 		INSERT INTO transactions (id, profile_id, reference_id, amount, description, settlement_status, gateway_fee, provider_metadata, created_at)
 		VALUES ($1, $2, $3, $4, $5, 'SETTLED', 0, $6, NOW())
-	`, newTxID, userID, referenceID, int64(amount*100), description,
-		fmt.Sprintf(`{"provider": "alchemypay", "merchant": "%s", "amount": %f}`, merchant, amount))
+		ON CONFLICT (reference_id) DO NOTHING
+	`, newTxID, userID, referenceID, int64(amount*100), description, metadata)
 	if err != nil {
 		return fmt.Errorf("failed to insert transaction: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		logger.WithContext(ctx).Info("Payment already processed (idempotent return)", "reference_id", referenceID)
+		return nil
 	}
 
 	// 3. Create Ledger Entry
@@ -181,11 +189,19 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 	}
 
 	// 4. Write to Outbox for async processing
-	payloadStr := fmt.Sprintf(`{"transaction_id": "%s", "amount": %f, "user_id": "%s", "merchant": "%s"}`, newTxID, amount, userID, merchant)
+	payload, err := json.Marshal(map[string]interface{}{
+		"transaction_id": newTxID,
+		"amount":         amount,
+		"user_id":        userID,
+		"merchant":       merchant,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal outbox payload: %w", err)
+	}
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO transaction_outbox (id, transaction_id, event_type, payload, status, created_at)
 		VALUES ($1, $2, 'PAYMENT_COMPLETED', $3, 'PENDING', NOW())
-	`, uuid.New(), newTxID, payloadStr)
+	`, uuid.New(), newTxID, payload)
 	if err != nil {
 		return fmt.Errorf("failed to write to outbox: %w", err)
 	}
@@ -309,7 +325,7 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 	if err != nil {
 		return nil, fmt.Errorf("failed to start write transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Check Idempotency (has this payout already been completed or is it in-flight?)
 	var existingID uuid.UUID
