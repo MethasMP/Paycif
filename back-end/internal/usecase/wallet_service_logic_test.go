@@ -29,7 +29,7 @@ func TestWalletService_GetExchangeRate_Cache_Internal(t *testing.T) {
 	resp := &ExchangeRateResponse{FromCurrency: "USD", ToCurrency: "THB", ProviderRate: 35.0}
 	s.localRateCache.Store("rate:USD:THB", localCacheItem{Response: resp, ExpiresAt: time.Now().Add(time.Hour)})
 
-	got, err := s.GetExchangeRate(nil, "USD", "THB")
+	got, err := s.GetExchangeRate(context.Background(), "USD", "THB")
 	assert.NoError(t, err)
 	assert.Equal(t, resp, got)
 }
