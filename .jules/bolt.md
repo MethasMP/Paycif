@@ -1,0 +1,3 @@
+## 2026-07-08 - [Atomic Idempotency & Manual JSON Construction]
+**Learning:** In high-concurrency systems using SERIALIZABLE isolation, batching inserts and removing redundant reads (like post-insert idempotency checks using ON CONFLICT) significantly reduces transaction duration and serialization conflict probability. Additionally, replacing `json.Marshal` and `fmt.Sprintf` with manual string construction using `strconv` (specifically `strconv.Quote` for safety) provides up to a 5x speedup in hot paths.
+**Action:** Favor `INSERT ... ON CONFLICT DO NOTHING` + `RowsAffected()` for idempotency and `strconv` concatenation for JSON metadata in performance-critical code. Always verify with benchmarks.

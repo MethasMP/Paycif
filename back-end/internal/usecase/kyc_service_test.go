@@ -78,11 +78,11 @@ func TestKYC_EndToEndFlow(t *testing.T) {
 	// 0. Create dummy User and Profile (Required by Foreign Key and queries)
 	_, err = db.Exec("INSERT INTO auth.users (id, email) VALUES ($1, $2)", userID, email)
 	require.NoError(t, err)
-	defer db.Exec("DELETE FROM auth.users WHERE id = $1", userID)
+	defer func() { _, _ = db.Exec("DELETE FROM auth.users WHERE id = $1", userID) }()
 
 	_, err = db.Exec("INSERT INTO profiles (id, username, full_name) VALUES ($1, $2, $3)", userID, "testuser_"+userID.String()[:8], "Test User")
 	require.NoError(t, err)
-	defer db.Exec("DELETE FROM profiles WHERE id = $1", userID)
+	defer func() { _, _ = db.Exec("DELETE FROM profiles WHERE id = $1", userID) }()
 
 	// --- PHASE 1: Register OnRamp Customer ---
 	t.Run("Phase 1: Register OnRamp Customer", func(t *testing.T) {
