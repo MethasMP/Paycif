@@ -31,14 +31,16 @@ jobs:
       - name: Verify Dependencies
         run: go mod verify
 
+      - name: Fetch base branch
+        run: git fetch origin ${{ github.base_ref }}
+
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v4
         with:
           version: latest
           working-directory: back-end
-          args: --timeout=5m
+          args: --timeout=5m --new-from-rev=origin/${{ github.base_ref }}
           install-mode: goinstall
-          only-new-issues: true
 
       - name: Run Tests with Race Detector
         run: go test -v -race ./...
