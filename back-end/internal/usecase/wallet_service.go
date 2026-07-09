@@ -14,7 +14,6 @@ import (
 	"paysif/internal/infrastructure/logger"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/sony/gobreaker"
 )
 
@@ -229,30 +228,6 @@ type PayoutResponse struct {
 	Message       string `json:"message"`
 	SenderName    string `json:"sender_name"`
 	NewBalance    int64  `json:"new_balance"`
-}
-
-// isSerializationFailure reports whether err is a Postgres serialization
-// failure (SQLSTATE 40001), which is retryable under SERIALIZABLE isolation.
-func isSerializationFailure(err error) bool {
-	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
-		return pgErr.Code == "40001"
-	}
-	return false
-}
-
-// isDeadlockFailure reports whether err is a Postgres deadlock error (SQLSTATE 40P01).
-func isDeadlockFailure(err error) bool {
-	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
-		return pgErr.Code == "40P01"
-	}
-	return false
-}
-
-// payoutReservation holds the result of the fast reservation transaction (Phase 1).
-type payoutReservation struct {
-	TransactionID  uuid.UUID
-	SenderFullName string
-	NewBalance     int64
 }
 
 // PayoutToPromptPay processes a PromptPay payout.
