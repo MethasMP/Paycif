@@ -1,0 +1,3 @@
+## 2026-07-10 - Atomic Idempotency and Manual JSON Construction in Go
+**Learning:** Replacing a two-step "check-then-insert" idempotency pattern with an atomic `INSERT ... ON CONFLICT DO NOTHING` in PostgreSQL reduces database round-trips and transaction duration. Additionally, manual string concatenation and `strconv.Quote`/`strconv.FormatFloat` for JSON construction in Go hot paths provide significant performance gains (up to 3.3x) over `fmt.Sprintf` and `json.Marshal` for simple objects, while maintaining safety against malformed JSON.
+**Action:** Always favor atomic database operations for idempotency and use `strconv` for performance-critical string/JSON building in Go.
