@@ -1,0 +1,3 @@
+## 2026-07-13 - Atomic Idempotency and String Optimization
+**Learning:** Using `INSERT ... ON CONFLICT (reference_id) DO NOTHING` and checking `RowsAffected()` is significantly more efficient than a separate `SELECT EXISTS` check, as it reduces database roundtrips. Manual JSON construction with `strconv` provides performance gains in benchmarks but may be rejected in code reviews in favor of maintainability (`fmt.Sprintf` or `encoding/json`).
+**Action:** Prioritize atomic database operations for idempotency. Use string concatenation for simple keys/descriptions where readability is preserved, but stick to standard JSON tools unless extreme performance is required.
