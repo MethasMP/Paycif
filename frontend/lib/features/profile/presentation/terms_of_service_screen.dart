@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:frontend/core/l10n/generated/app_localizations.dart';
 import 'package:frontend/core/widgets/paycif_text.dart';
 import 'package:frontend/core/theme/app_theme.dart';
+import 'package:frontend/core/widgets/app_icon.dart';
 
 class TermsOfServiceScreen extends StatelessWidget {
   const TermsOfServiceScreen({super.key});
@@ -40,10 +41,10 @@ class TermsOfServiceScreen extends StatelessWidget {
                       color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(
+                    child: AppIcon(
                       PhosphorIcons.fileText,
                       color: Colors.white,
-                      size: 28,
+                      size: AppIconSize.lg,
                     ),
                   ),
                   SizedBox(width: 16),
@@ -123,7 +124,7 @@ class TermsOfServiceScreen extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Icon(
+                  AppIcon(
                     PhosphorIcons.info,
                     color: isDark ? Colors.white54 : Colors.black45,
                   ),

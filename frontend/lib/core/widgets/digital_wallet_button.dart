@@ -2,6 +2,7 @@ import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:frontend/core/theme/app_theme.dart';
+import 'package:frontend/core/widgets/app_icon.dart';
 
 /// ─────────────────────────────────────────────────────────────────────────────
 /// DIGITAL WALLET BUTTON
@@ -89,9 +90,9 @@ class DigitalWalletButton extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
+                      AppIcon(
                         PhosphorIcons.checkCircle,
-                        size: 12,
+                        size: AppIconSize.xs,
                         color: AppTheme.successGreen,
                       ),
                       SizedBox(width: 4),
@@ -155,7 +156,7 @@ class DigitalWalletButton extends StatelessWidget {
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(PhosphorIcons.appleLogo, color: Colors.white, size: 24),
+            AppIcon(PhosphorIcons.appleLogo, color: Colors.white, size: AppIconSize.md),
             SizedBox(width: 2),
           ],
         );

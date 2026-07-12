@@ -23,7 +23,6 @@ import 'package:frontend/features/profile/presentation/help_center_screen.dart';
 import 'package:frontend/features/profile/presentation/contact_support_screen.dart';
 import 'package:frontend/features/transactions/presentation/transaction_detail_screen.dart';
 import 'package:frontend/features/transactions/domain/transaction.dart';
-import 'package:frontend/features/payment/presentation/pages/pay_screen.dart';
 import 'package:frontend/features/payment/presentation/pages/payment_success_screen.dart';
 
 // Import other screens here as we migrate them...
@@ -139,21 +138,6 @@ final GoRouter appRouter = GoRouter(
       },
     ),
     GoRoute(
-      path: '/pay',
-      name: 'pay',
-      builder: (context, state) {
-        final params = state.extra as Map<String, dynamic>? ?? {};
-        return PayScreen(
-          amount: params['amount'] ?? 0.0,
-          merchantName: params['merchantName'] ?? '',
-          promptPayId: params['promptPayId'],
-          billerId: params['billerId'],
-          reference1: params['reference1'],
-          reference2: params['reference2'],
-        );
-      },
-    ),
-    GoRoute(
       path: '/payment_success',
       name: 'payment_success',
       builder: (context, state) {
@@ -161,6 +145,7 @@ final GoRouter appRouter = GoRouter(
         return PaymentSuccessScreen(
           transactionId: params['transactionId'] ?? '',
           amount: params['amount'] ?? 0.0,
+          totalUsd: params['totalUsd'],
           recipientName: params['recipientName'] ?? '',
           promptPayId: params['promptPayId'],
         );

@@ -5,46 +5,46 @@ class AppTheme {
   // ─── Design System v2 Color Tokens ───
 
   // Light Mode Surface & Border
-  static const Color lightSurfaceBase = Color(0xFFFAFAF9);
+  static const Color lightSurfaceBase = Color(0xFFF8F9FC); // Ice-White consensus
   static const Color lightSurfaceCard = Color(0xFFFFFFFF);
-  static const Color lightSurfaceSunken = Color(0xFFF3F2ED);
-  static const Color lightBorderHairline = Color(0xFFE4E2DA);
+  static const Color lightSurfaceSunken = Color(0xFFF1F3F9);
+  static const Color lightBorderHairline = Color(0xFFE2E5F0);
 
   // Light Mode Text (Grayscale only)
-  static const Color lightTextPrimary = Color(0xFF0D0D0D);
-  static const Color lightTextSecondary = Color(0xFF5C5C57);
-  static const Color lightTextTertiary = Color(0xFF8A8A84);
-  static const Color lightTextDisabled = Color(0xFFC4C2B8);
-  static const Color lightTextOnDark = Color(0xFFFAFAF9);
+  static const Color lightTextPrimary = Color(0xFF0A0E1A); // Align text with dark slate tone
+  static const Color lightTextSecondary = Color(0xFF5E6577);
+  static const Color lightTextTertiary = Color(0xFF8D94A6);
+  static const Color lightTextDisabled = Color(0xFFC3C7D4);
+  static const Color lightTextOnDark = Color(0xFFF8F9FC);
 
   // Dark Mode Surface & Border
-  static const Color darkSurfaceBase = Color(0xFF0A0A09);
-  static const Color darkSurfaceCard = Color(0xFF1C1C1E);
-  static const Color darkSurfaceSunken = Color(0xFF2C2C2E);
-  static const Color darkBorderHairline = Color(0xFF3A3A3C);
+  static const Color darkSurfaceBase = Color(0xFF0A0E1A); // Deep Navy-Slate consensus
+  static const Color darkSurfaceCard = Color(0xFF121829);
+  static const Color darkSurfaceSunken = Color(0xFF1A2138);
+  static const Color darkBorderHairline = Color(0xFF242C44);
 
   // Dark Mode Text (Grayscale only)
-  static const Color darkTextPrimary = Color(0xFFFAFAF9);
-  static const Color darkTextSecondary = Color(0xFFA9A9A3);
-  static const Color darkTextTertiary = Color(0xFF8E8E93);
-  static const Color darkTextDisabled = Color(0xFF48484A);
-  static const Color darkTextOnDark = Color(0xFF0D0D0D);
+  static const Color darkTextPrimary = Color(0xFFF8F9FC);
+  static const Color darkTextSecondary = Color(0xFFA6ACBE);
+  static const Color darkTextTertiary = Color(0xFF7D8498);
+  static const Color darkTextDisabled = Color(0xFF3F465B);
+  static const Color darkTextOnDark = Color(0xFF0A0E1A);
 
-  // Action Buttons
-  static const Color lightActionPrimary = Color(0xFF0D0D0D);
-  static const Color lightActionPrimaryPress = Color(0xFF262626);
-  static const Color darkActionPrimary = Color(0xFFFAFAF9);
-  static const Color darkActionPrimaryPress = Color(0xFFE5E5EA);
+  // Action Buttons — Grayscale Action Ink carries CTAs/focus states; everything else stays grayscale
+  static const Color lightActionPrimary = Color(0xFF0A0E1A);
+  static const Color lightActionPrimaryPress = Color(0xFF1E2538);
+  static const Color darkActionPrimary = Color(0xFFF8F9FC);
+  static const Color darkActionPrimaryPress = Color(0xFFE2E4EB);
 
   // Brand Signal (Success / Confirm Only)
-  static const Color signalGreen = Color(0xFF00C48C);
-  static const Color signalGreenSubtleLight = Color(0xFFE3F9F1);
-  static const Color signalGreenSubtleDark = Color(0xFF0E3F30);
+  static const Color signalGreen = Color(0xFF10B981); // Emerald Green consensus
+  static const Color signalGreenSubtleLight = Color(0xFFECFDF5);
+  static const Color signalGreenSubtleDark = Color(0xFF064E3B);
 
   // Semantic States (Warning, Error, Info)
-  static const Color stateError = Color(0xFFE5484D);
-  static const Color stateErrorSubtleLight = Color(0xFFFDEDEE);
-  static const Color stateErrorSubtleDark = Color(0xFF4C1D1F);
+  static const Color stateError = Color(0xFFFF5A5F); // Cyber-Coral consensus
+  static const Color stateErrorSubtleLight = Color(0xFFFFF1F2);
+  static const Color stateErrorSubtleDark = Color(0xFF4C0519);
 
   static const Color stateWarning = Color(0xFFC9963A); // Gold survives only as warning
   static const Color stateWarningSubtleLight = Color(0xFFFBF3E7);
@@ -55,13 +55,13 @@ class AppTheme {
   static const Color stateInfoSubtleDark = Color(0xFF19324C);
 
   // Fallbacks kept for backwards compatibility with call-sites
-  static const Color primaryTeal = lightActionPrimary;
-  static const Color primaryTealDark = lightActionPrimaryPress;
-  static const Color primaryTealLight = lightSurfaceSunken;
+  static const Color primaryTeal = Color(0xFF00A896); // Flat Teal-Cyan consensus
+  static const Color primaryTealDark = Color(0xFF008B7B);
+  static const Color primaryTealLight = Color(0xFFE0F2F1);
   static const Color primaryTealDeep = lightActionPrimary;
-  static const Color accentGold = lightActionPrimary;
+  static const Color accentGold = stateWarning; // restored as a real gold accent, not an alias to teal
   static const Color accentGoldDisabled = lightTextDisabled;
-  static const Color accentGoldDark = lightTextOnDark;
+  static const Color accentGoldDark = lightTextPrimary; // dark ink for legible text on the gold surface
   static const Color successGreen = signalGreen;
   static const Color errorRed = stateError;
   static const Color errorRedText = stateError;
@@ -87,6 +87,22 @@ class AppTheme {
   static Color primaryColor(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark ? darkActionPrimary : lightActionPrimary;
 
+  // --type-amount — reserved for money figures only (rate ticker, payment
+  // confirmation, transaction hero amounts): one weight heavier and tighter-tracked
+  // than --type-display, so the number itself reads as the most confident mark
+  // on the screen. Not for list-row amounts or any other numeral.
+  static TextStyle amountTextStyle(BuildContext context, {Color? color}) {
+    final base = Theme.of(context).textTheme.displayLarge;
+    return (base ?? const TextStyle()).copyWith(
+      fontSize: 40,
+      fontWeight: FontWeight.w800,
+      letterSpacing: -0.8,
+      height: 1.05,
+      color: color ?? base?.color,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+  }
+
   // ─── Spacing and Radius Tokens ───
   static const double space1 = 4.0;
   static const double space2 = 8.0;
@@ -103,10 +119,13 @@ class AppTheme {
   // ─── Typography & TextTheme ───
 
   static TextTheme _buildTextTheme(ThemeData base, Color textCol) {
-    final String? thaiFontFamily = GoogleFonts.ibmPlexSansThai().fontFamily;
+    final String? thaiFontFamily = GoogleFonts.notoSansThai().fontFamily;
     final thaiFallback = thaiFontFamily != null ? [thaiFontFamily] : <String>[];
 
-    // Primary font is Inter, falls back to IBM Plex Sans Thai for Thai script.
+    // Primary font is Inter, falls back to Noto Sans Thai for Thai script.
+    // Noto Sans Thai is metric-matched to Noto Sans (Latin) by the same foundry,
+    // which sits closer to Inter's x-height/aperture than IBM Plex Sans Thai does —
+    // less baseline/x-height seam where Thai merchant names sit next to Inter amounts.
     final baseStyle = GoogleFonts.inter().copyWith(
       color: textCol,
       fontFamilyFallback: thaiFallback,
@@ -457,5 +476,14 @@ class AppTheme {
         space: 1.0,
       ),
     );
+  }
+
+  /// Returns `true` if backdrop blurs and heavy graphics filters should be enabled.
+  /// Disables blurs if system-level 'Reduce Motion' or 'Disable Animations' is active.
+  static bool shouldEnableBlur(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    if (mediaQuery.accessibleNavigation) return false;
+    if (mediaQuery.disableAnimations) return false;
+    return true;
   }
 }

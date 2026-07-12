@@ -8,49 +8,23 @@ class PaycifIconContainer extends StatelessWidget {
   const PaycifIconContainer({
     super.key,
     required this.icon,
-    this.size = 28.0, // Slightly larger for premium visibility
+    this.size = 28.0,
   });
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    // Premium adaptive styling
-    final Color backgroundColor = isDark
-        ? Theme.of(context).colorScheme.surface // Deep surface background
-        : AppTheme.primaryTealLight; // Soft teal tint #E1F5EE
-        
-    final Color borderColor = isDark
-        ? AppTheme.accentGoldDisabled.withValues(alpha: 0.15) // Subtle gold border in dark mode
-        : AppTheme.primaryTeal.withValues(alpha: 0.2); // Teal stroke in light mode
-        
-    final Color iconColor = isDark
-        ? AppTheme.accentGoldDisabled // Gold accent icon in dark mode
-        : AppTheme.primaryTeal; // Teal icon in light mode
+    final Color tint = AppTheme.primaryColor(context);
 
     return Container(
-      padding: const EdgeInsets.all(16), // Extra padding for breathing room
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: backgroundColor,
+        color: tint.withValues(alpha: isDark ? 0.14 : 0.08),
         shape: BoxShape.circle,
-        border: Border.all(
-          color: borderColor,
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: isDark 
-                ? AppTheme.accentGoldDisabled.withValues(alpha: 0.05) 
-                : AppTheme.primaryTeal.withValues(alpha: 0.03),
-            blurRadius: 10,
-            spreadRadius: 2,
-            offset: const Offset(0, 4),
-          ),
-        ],
       ),
       child: Icon(
         icon,
-        color: iconColor,
+        color: tint,
         size: size,
       ),
     );

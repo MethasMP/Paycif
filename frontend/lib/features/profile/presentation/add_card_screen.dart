@@ -7,6 +7,7 @@ import 'package:frontend/core/utils/pay_notify.dart';
 import 'package:frontend/core/utils/payment_utils.dart';
 import 'package:frontend/core/utils/error_translator.dart';
 import 'package:frontend/core/theme/app_theme.dart';
+import 'package:frontend/core/widgets/app_icon.dart';
 
 class AddCardScreen extends StatefulWidget {
   const AddCardScreen({super.key});
@@ -60,7 +61,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
           ),
         ),
         leading: IconButton(
-          icon: Icon(
+          icon: AppIcon(
             PhosphorIcons.arrowLeft,
             color: AppTheme.textPrimaryColor(context),
           ),
@@ -460,7 +461,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
                 color: Colors.grey.withValues(alpha: 0.5),
                 fontWeight: FontWeight.w400,
               ),
-              prefixIcon: Icon(
+              prefixIcon: AppIcon(
                 icon,
                 color: isDark ? Colors.white70 : AppTheme.primaryColor(context),
               ),

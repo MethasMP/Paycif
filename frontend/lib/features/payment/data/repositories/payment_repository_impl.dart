@@ -35,6 +35,8 @@ class PaymentRepositoryImpl implements IPaymentRepository {
     String? reference1,
     String? reference2,
     String? email,
+    double? lat,
+    double? lng,
   }) async {
     return _apiService.initiateOnRampPayment(
       amountSatang: amountSatang,
@@ -46,6 +48,8 @@ class PaymentRepositoryImpl implements IPaymentRepository {
       reference1: reference1,
       reference2: reference2,
       email: email,
+      lat: lat,
+      lng: lng,
     );
   }
 

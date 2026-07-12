@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 import 'package:frontend/core/l10n/generated/app_localizations.dart';
+import 'package:frontend/core/widgets/app_icon.dart';
 
 /// ─────────────────────────────────────────────────────────────────────────────
 /// PAYMENT METHOD CARD
@@ -152,10 +153,10 @@ class PaymentMethodCard extends StatelessWidget {
                   color: AppTheme.primaryColor(context),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
+                child: AppIcon(
                   PhosphorIcons.check,
                   color: Colors.white,
-                  size: 16,
+                  size: AppIconSize.xs,
                 ),
               )
             else

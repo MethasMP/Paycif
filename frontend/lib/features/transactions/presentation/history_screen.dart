@@ -8,6 +8,7 @@ import 'package:frontend/core/widgets/transaction_item.dart';
 import 'package:go_router/go_router.dart';
 import 'package:frontend/core/l10n/generated/app_localizations.dart';
 import 'package:frontend/core/theme/app_theme.dart';
+import 'package:frontend/core/widgets/app_icon.dart';
 
 class HistoryScreen extends StatelessWidget {
   const HistoryScreen({super.key});
@@ -23,19 +24,19 @@ class HistoryScreen extends StatelessWidget {
         title: Text(l10n.historyTitle),
         leading: canPop
             ? IconButton(
-                icon: Icon(
+                icon: AppIcon(
                   PhosphorIcons.caretLeft,
                   color: AppTheme.textPrimaryColor(context),
-                  size: 24,
+                  size: AppIconSize.md,
                 ),
                 onPressed: () => Navigator.of(context).pop(),
               )
             : (GoRouterState.of(context).uri.path == '/history'
                 ? IconButton(
-                    icon: Icon(
+                    icon: AppIcon(
                       PhosphorIcons.house,
                       color: AppTheme.textPrimaryColor(context),
-                      size: 24,
+                      size: AppIconSize.md,
                     ),
                     onPressed: () => context.go('/main'),
                   )
@@ -134,9 +135,9 @@ class HistoryScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
+            AppIcon(
               PhosphorIcons.clock,
-              size: 60,
+              size: AppIconSize.xl,
               color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
             ),
             SizedBox(height: 16),

@@ -55,6 +55,8 @@
 	<string>Paycif uses your camera to scan QR codes for payments and to read the MRZ code on your passport.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Paycif uses Face ID to securely authenticate and authorize your cross-border PromptPay transactions.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Paycif uses your location to confirm you're in Thailand before processing a payment.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Paycif requires photo library access to allow you to upload and scan PromptPay QR codes saved on your device.</string>
 	<key>UIApplicationSceneManifest</key>

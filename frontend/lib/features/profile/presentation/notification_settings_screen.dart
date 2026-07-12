@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:frontend/core/l10n/generated/app_localizations.dart';
 import 'package:frontend/core/theme/app_theme.dart';
+import 'package:frontend/core/widgets/app_icon.dart';
 
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({super.key});
@@ -248,7 +249,7 @@ class _NotificationSettingsScreenState
           color: theme.scaffoldBackgroundColor,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Icon(icon, color: activeColor, size: 22),
+        child: AppIcon(icon, color: activeColor, size: AppIconSize.md),
       ),
       title: Text(
         title,

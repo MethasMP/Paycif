@@ -82,16 +82,16 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
 
     // Verify that the Login Screen is displayed.
-    // Check for brand title "Paycif"
-    expect(find.text('Paycif'), findsOneWidget);
+    // Check for brand title "paycif"
+    expect(find.text('paycif'), findsOneWidget);
 
     // Check for buttons
-    expect(find.text('Log In with Google'), findsOneWidget);
+    expect(find.text('Continue with Google'), findsOneWidget);
     
     // Apple Sign-in button is conditionally shown on iOS or if supported by the system
     final bool isAppleAvailable = Platform.isIOS;
     if (isAppleAvailable) {
-      expect(find.text('Log In with Apple'), findsOneWidget);
+      expect(find.text('Continue with Apple'), findsOneWidget);
     }
   });
 }

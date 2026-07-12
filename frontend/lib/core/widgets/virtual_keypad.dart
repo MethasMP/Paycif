@@ -1,6 +1,8 @@
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:frontend/core/theme/app_theme.dart';
+import 'package:frontend/core/widgets/app_icon.dart';
 
 class VirtualKeypad extends StatelessWidget {
   final Function(String) onKeyPressed;
@@ -56,37 +58,31 @@ class VirtualKeypad extends StatelessWidget {
           onKeyPressed(label);
         },
         borderRadius: BorderRadius.circular(100),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
+        child: Container(
           width: 72,
           height: 72,
           alignment: Alignment.center,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.03)
-                : Colors.black.withValues(alpha: 0.02),
-            border: Border.all(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.05)
-                  : Colors.black.withValues(alpha: 0.03),
-              width: 1,
-            ),
+            color: isDark ? AppTheme.darkSurfaceSunken : AppTheme.lightSurfaceSunken,
           ),
           child: Semantics(
             label: label == '⌫' ? 'Delete' : 'Digit $label',
             button: true,
             child: label == '⌫'
-                ? Icon(
+                ? AppIcon(
                     PhosphorIcons.backspace,
-                    color: isDark ? Colors.white70 : Colors.black54,
-                    size: 22,
+                    color: AppTheme.textSecondaryColor(context),
+                    size: AppIconSize.md,
                   )
                 : Text(
                     label,
-                    style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                          color: isDark ? Colors.white : Colors.black87,
-                        ),
+                    style: TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimaryColor(context),
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
                   ),
           ),
         ),

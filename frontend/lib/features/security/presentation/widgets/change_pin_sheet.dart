@@ -7,6 +7,7 @@ import 'package:frontend/core/l10n/generated/app_localizations.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 import 'package:frontend/features/security/presentation/logic/security_controller.dart';
 import 'package:frontend/features/security/presentation/widgets/pin_entry_widget.dart';
+import 'package:frontend/core/widgets/app_icon.dart';
 
 class ChangePinSheet extends StatefulWidget {
   const ChangePinSheet({super.key});
@@ -221,10 +222,10 @@ class _ChangePinSheetState extends State<ChangePinSheet> {
                       ),
                       child: Row(
                         children: [
-                          Icon(
+                          AppIcon(
                             PhosphorIcons.warningCircle,
                             color: Colors.red.shade700,
-                            size: 20,
+                            size: AppIconSize.sm,
                           ),
                           SizedBox(width: 8),
                           Expanded(
@@ -249,10 +250,10 @@ class _ChangePinSheetState extends State<ChangePinSheet> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
+                          AppIcon(
                             PhosphorIcons.checkCircle,
                             color: AppTheme.successGreen,
-                            size: 80,
+                            size: AppIconSize.xl,
                           ).animate().scale(
                             duration: 400.ms,
                             curve: Curves.elasticOut,

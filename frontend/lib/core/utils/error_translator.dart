@@ -46,6 +46,10 @@ class ErrorTranslator {
       return l10n.commonSessionExpired;
     }
 
+    if (msg.contains('service_unavailable_in_region')) {
+      return l10n.errorLocationOutsideThailand;
+    }
+
     if (msg.contains('forbidden') || msg.contains('403')) {
       return l10n.errorAuthenticationFailed;
     }

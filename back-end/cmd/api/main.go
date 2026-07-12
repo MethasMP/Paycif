@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log/slog" // Added for HandlerGetLimits return type logic if needed, but mainly standard lib
 	"net/http"
 	_ "net/http/pprof" // Register pprof endpoints
@@ -11,6 +12,7 @@ import (
 	"paysif/internal/adapter/repository"
 	"paysif/internal/infrastructure/logger"
 	"paysif/internal/usecase"
+	"strings"
 	"syscall"
 	"time"
 
@@ -122,6 +124,27 @@ func main() {
 	achSandbox := os.Getenv("ALCHEMY_PAY_SANDBOX") != "false"
 	achAdapter := usecase.NewAlchemyPayAdapter(achAppID, achAppSecret, achSandbox)
 
+	// 2.9 Geo-fencing: Thailand-only regulatory block on money-movement routes
+	geoBlockSvc := usecase.NewGeoBlockService()
+	vpnDetectionSvc := usecase.NewVPNDetectionService()
+
+	// 2.95 Cloudflare bypass detection: Fly.io always exposes a public
+	// *.fly.dev URL that skips Cloudflare's edge/WAF entirely, which would
+	// let an attacker forge CF-Connecting-IP and defeat every geo-fencing
+	// check above. Fail closed at boot if the Cloudflare IP range list can't
+	// be loaded at all — starting up with TrustedPlatform=Cloudflare set but
+	// no way to verify CF-Connecting-IP is unsafe.
+	cfIPSvc := usecase.NewCloudflareIPRangeService()
+	if err := cfIPSvc.Start(context.Background()); err != nil {
+		slog.Error("Failed to load Cloudflare IP ranges at boot — refusing to start with an unverified Cloudflare-trust boundary", "error", err)
+		os.Exit(1)
+	}
+	defer cfIPSvc.Stop()
+
+	// Security-incident log (raw IP, service-role-only) for bypass-rejection
+	// events — separate from AuditService's IP-truncated business-event log.
+	securityEventSvc := usecase.NewSecurityEventService(repository.DB)
+
 	// 3. Handler Initialization
 	transferHandler := &TransferHandler{
 		Service:          walletService,
@@ -138,12 +161,49 @@ func main() {
 		gin.SetMode(mode)
 	}
 
-	r := gin.New()                                // Use New() to avoid default logger
-	r.SetTrustedProxies(nil)                      // Security: Disable trusting all proxies
-	r.Use(middleware.Recovery())                  // 🛡️ Secure Recovery from panics
-	r.Use(middleware.StructuredLogger())          // World-Class JSON Logger
-	r.Use(middleware.CORSMiddleware())            // CORS Configuration
-	r.Use(middleware.SecurityHeadersMiddleware()) // Standard Security Headers
+	r := gin.New() // Use New() to avoid default logger
+
+	// Trust CF-Connecting-IP as the real client IP everywhere c.ClientIP()
+	// is called. Safe only because CloudflareBypassMiddleware (registered
+	// first, below) rejects any request whose Fly-Client-IP isn't a real
+	// Cloudflare edge IP — i.e. anything that hit *.fly.dev directly. Not
+	// env-gated: correctness now depends on that middleware always being
+	// registered (enforced by ValidateCloudflareTrustConfig at boot), not on
+	// an admin setting an env var correctly.
+	r.TrustedPlatform = gin.PlatformCloudflare
+
+	// This CIDR-based trusted-proxy list is now a fallback, not the primary
+	// mechanism: TrustedPlatform (above) takes CF-Connecting-IP unconditionally
+	// wherever it's consulted, and gin only falls through to this list's
+	// X-Forwarded-For parsing for headers TrustedPlatform doesn't cover.
+	// CloudflareBypassMiddleware below is registered globally (r.Use, before
+	// any group or direct route is declared), so it already covers every
+	// route on r — including /hooks/* and /robots.txt registered directly on
+	// r further down — not just v1/moneyMovement. This CIDR fallback exists
+	// purely for any future route added to r that, for its own reasons,
+	// shouldn't require passing through Cloudflare. Do not set it to "*" or a
+	// broad range, since a trusted proxy is one whose X-Forwarded-For value
+	// we blindly believe.
+	if raw := os.Getenv("TRUSTED_PROXIES"); raw != "" {
+		proxies := []string{}
+		for _, p := range strings.Split(raw, ",") {
+			if p = strings.TrimSpace(p); p != "" {
+				proxies = append(proxies, p)
+			}
+		}
+		if err := r.SetTrustedProxies(proxies); err != nil {
+			slog.Error("Invalid TRUSTED_PROXIES value", "value", raw, "error", err)
+			os.Exit(1)
+		}
+	} else {
+		r.SetTrustedProxies(nil) // Security: trust nobody's X-Forwarded-For until configured
+	}
+
+	r.Use(middleware.CloudflareBypassMiddleware(cfIPSvc, securityEventSvc)) // MUST run before anything using c.ClientIP()
+	r.Use(middleware.Recovery())                                            // 🛡️ Secure Recovery from panics
+	r.Use(middleware.StructuredLogger())                                    // World-Class JSON Logger
+	r.Use(middleware.CORSMiddleware())                                      // CORS Configuration
+	r.Use(middleware.SecurityHeadersMiddleware())                           // Standard Security Headers
 
 	publicV1 := r.Group("/api/v1")
 	{
@@ -163,21 +223,34 @@ func main() {
 		// On-Ramp Routes (Protected)
 		v1.GET("/onramp/check-region", paymentHandler.HandleCheckRegion)
 		v1.POST("/onramp/quote", paymentHandler.HandleGetQuote)
-		v1.POST("/onramp/create", paymentHandler.HandleCreateOnRampOrder)
 		v1.GET("/onramp/token", paymentHandler.HandleGetAchToken)
 		v1.GET("/onramp/fiat-methods", paymentHandler.HandleFiatList)
 		v1.GET("/onramp/manage-url", paymentHandler.HandleGetManageUrl)
-		v1.POST("/payments/create-intent", paymentHandler.HandleCreateIntent)
 		v1.GET("/payments/intent/:id/status", paymentHandler.HandleGetIntentStatus)
 
 		// Payout Routes (Wallet -> External)
-		v1.POST("/payout/promptpay", payoutHandler.HandlePromptPayPayout)
 		v1.POST("/payout/decode", payoutHandler.HandleDecodeQR)
 		v1.POST("/payout/quote", payoutHandler.HandleGetQuotation)
 
 		// KYC Routes (On-Ramp Scaffolding)
 		v1.POST("/kyc/register", kycHandler.HandleRegisterOnRampCustomer)
 		v1.GET("/kyc/status", kycHandler.HandleGetOnRampKycStatus)
+	}
+
+	// Money-movement routes: everything in v1 (auth + rate limiting) plus the
+	// Thailand-only geo-fence. Scoped narrowly so read-only routes (balance,
+	// KYC status, etc.) still work for a tourist checking the app before
+	// they travel. Both geo checks must pass — country lookup (GeoBlockMiddleware)
+	// catches requests from a blocked country outright; VPN/proxy detection
+	// (VPNDetectionMiddleware) catches someone outside Thailand routing through
+	// a Thailand-exit VPN to defeat the country check.
+	moneyMovement := v1.Group("")
+	moneyMovement.Use(middleware.GeoBlockMiddleware(geoBlockSvc, auditService))
+	moneyMovement.Use(middleware.VPNDetectionMiddleware(vpnDetectionSvc, auditService))
+	{
+		moneyMovement.POST("/onramp/create", paymentHandler.HandleCreateOnRampOrder)
+		moneyMovement.POST("/payments/create-intent", paymentHandler.HandleCreateIntent)
+		moneyMovement.POST("/payout/promptpay", payoutHandler.HandlePromptPayPayout)
 	}
 
 	// Webhooks (Public)
@@ -188,6 +261,13 @@ func main() {
 	r.GET("/robots.txt", func(c *gin.Context) {
 		c.String(200, "User-agent: *\nAllow: /\nSitemap: https://paycif.com/sitemap.xml")
 	})
+
+	// 4.5 Startup guard: refuse to run if TrustedPlatform trusts Cloudflare
+	// but the bypass middleware that makes that trust safe isn't registered.
+	if err := middleware.ValidateCloudflareTrustConfig(r); err != nil {
+		slog.Error("startup guard failed", "error", err)
+		os.Exit(1)
+	}
 
 	// 5. Start Pprof Server (Internal Only for Security)
 	go func() {

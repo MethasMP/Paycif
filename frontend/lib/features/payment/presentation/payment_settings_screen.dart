@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:frontend/core/widgets/app_icon.dart';
 
 class PaymentSettingsScreen extends StatefulWidget {
   const PaymentSettingsScreen({super.key});
@@ -69,31 +70,24 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
         elevation: 0,
         leading: canPop
             ? IconButton(
-                icon: Icon(
+                icon: AppIcon(
                   PhosphorIcons.caretLeft,
                   color: AppTheme.textPrimaryColor(context),
-                  size: 20,
+                  size: AppIconSize.sm,
                 ),
                 onPressed: () => Navigator.of(context).pop(),
               )
             : (GoRouterState.of(context).uri.path == '/payment_settings'
                 ? IconButton(
-                    icon: Icon(
+                    icon: AppIcon(
                       PhosphorIcons.house,
                       color: AppTheme.textPrimaryColor(context),
-                      size: 20,
+                      size: AppIconSize.sm,
                     ),
                     onPressed: () => context.go('/main'),
                   )
                 : null),
-        title: Text(
-          l10n.paymentSettingsTitle,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: AppTheme.textPrimaryColor(context),
-          ),
-        ),
-        centerTitle: false,
+        title: Text(l10n.paymentSettingsTitle),
       ),
       body: ListView(
         padding: const EdgeInsets.all(24),
@@ -106,7 +100,7 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
             ),
             child: Column(
               children: [
-                Icon(PhosphorIcons.vault, size: 56, color: primary),
+                AppIcon(PhosphorIcons.vault, size: AppIconSize.xl, color: primary),
                 const SizedBox(height: 16),
                 Text(
                   l10n.paymentSettingsHeroLabel,
@@ -195,7 +189,7 @@ class _AchManagePageState extends State<_AchManagePage> {
       appBar: AppBar(
         title: Text(AppLocalizations.of(context)!.paymentSettingsWebviewTitle),
         leading: IconButton(
-          icon: const Icon(PhosphorIcons.x),
+          icon: const AppIcon(PhosphorIcons.x),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),

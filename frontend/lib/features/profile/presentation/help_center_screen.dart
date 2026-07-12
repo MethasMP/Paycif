@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:frontend/core/l10n/generated/app_localizations.dart';
 import 'package:frontend/core/theme/app_theme.dart';
+import 'package:frontend/core/widgets/app_icon.dart';
 
 class HelpCenterScreen extends StatefulWidget {
   const HelpCenterScreen({super.key});
@@ -110,10 +111,10 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
                 onChanged: (value) => setState(() => _searchQuery = value),
                 decoration: InputDecoration(
                   hintText: l10n.helpSearchHint,
-                  prefixIcon: Icon(PhosphorIcons.magnifyingGlass),
+                  prefixIcon: AppIcon(PhosphorIcons.magnifyingGlass),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
-                          icon: Icon(PhosphorIcons.x),
+                          icon: AppIcon(PhosphorIcons.x),
                           onPressed: () {
                             _searchController.clear();
                             setState(() => _searchQuery = '');
@@ -137,9 +138,9 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
+                        AppIcon(
                           PhosphorIcons.magnifyingGlass,
-                          size: 64,
+                          size: AppIconSize.xl,
                           color: Colors.grey.shade400,
                         ),
                         SizedBox(height: 16),
@@ -183,10 +184,10 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
                     color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(
+                  child: AppIcon(
                     PhosphorIcons.headset,
                     color: Colors.white,
-                    size: 28,
+                    size: AppIconSize.lg,
                   ),
                 ),
                 SizedBox(width: 16),
@@ -218,7 +219,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
                     Navigator.pop(context);
                     context.push('/contact_support');
                   },
-                  icon: Icon(
+                  icon: AppIcon(
                     PhosphorIcons.arrowRight,
                     color: Colors.white,
                   ),
@@ -249,10 +250,10 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
                   color: AppTheme.warningAmber.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(
+                child: AppIcon(
                   category.icon,
                   color: AppTheme.warningAmber,
-                  size: 20,
+                  size: AppIconSize.sm,
                 ),
               ),
               SizedBox(width: 12),

@@ -3,9 +3,11 @@ class PaymentBreakdown {
   final double exchangeRate;
   final double convenienceFeePercentage;
 
+  // exchangeRate is required: a breakdown must never be computed from an
+  // invented rate — callers pass a live quote or a fetched indicative rate.
   const PaymentBreakdown({
     required this.amountTHB,
-    this.exchangeRate = 36.45,
+    required this.exchangeRate,
     this.convenienceFeePercentage = 0.035,
   });
 

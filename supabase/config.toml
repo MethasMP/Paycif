@@ -13,7 +13,7 @@ verify_jwt = false
 [functions.payout-executor]
 verify_jwt = false
 
-[functions.get-saved-cards]
+[functions.get-saved-payment-methods]
 verify_jwt = false
 
 [functions.manage-payment-methods]

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
+import 'package:frontend/core/widgets/app_icon.dart';
 
 /// The explainer shown when KYC is in [KycInitial].
 ///
@@ -52,10 +53,10 @@ class KycIntroView extends StatelessWidget {
                         color: AppTheme.primaryTeal.withValues(alpha: 0.08),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(
+                      child: AppIcon(
                         PhosphorIcons.shieldCheck,
                         color: AppTheme.primaryTeal,
-                        size: 44,
+                        size: AppIconSize.lg,
                       ),
                     ),
                   ),
@@ -145,7 +146,7 @@ class _StepTile extends StatelessWidget {
                 color: AppTheme.primaryTeal.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(step.icon, color: AppTheme.primaryTeal, size: 24),
+              child: AppIcon(step.icon, color: AppTheme.primaryTeal, size: AppIconSize.md),
             ),
             Positioned(
               top: -2,
@@ -154,7 +155,7 @@ class _StepTile extends StatelessWidget {
                 width: 20,
                 height: 20,
                 decoration: const BoxDecoration(
-                  color: AppTheme.accentGold,
+                  color: AppTheme.primaryTeal,
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
@@ -207,9 +208,9 @@ class _TimeChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
+          AppIcon(
             PhosphorIcons.timer,
-            size: 16,
+            size: AppIconSize.xs,
             color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
           ),
           const SizedBox(width: 6),
@@ -236,16 +237,16 @@ class _UnlockBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: AppTheme.accentGold.withValues(alpha: 0.10),
+        color: AppTheme.primaryTeal.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: AppTheme.accentGold.withValues(alpha: 0.30),
+          color: AppTheme.primaryTeal.withValues(alpha: 0.25),
         ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(PhosphorIcons.lockKeyOpen, color: AppTheme.accentGold, size: 22),
+          AppIcon(PhosphorIcons.lockKeyOpen, color: AppTheme.primaryTeal, size: AppIconSize.md),
           const SizedBox(width: 12),
           Expanded(
             child: Text(

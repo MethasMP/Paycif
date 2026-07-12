@@ -34,16 +34,15 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await ApiService.initHostOverride();
 
-  const supabaseUrlEnv = String.fromEnvironment('SUPABASE_URL');
-  const supabaseKeyEnv = String.fromEnvironment('SUPABASE_ANON_KEY');
-
-  // 🔌 Fallback to default local development credentials if not specified in environment
-  final String supabaseUrlRaw = supabaseUrlEnv.isNotEmpty 
-      ? supabaseUrlEnv 
-      : 'http://127.0.0.1:54321';
-  final String supabaseKey = supabaseKeyEnv.isNotEmpty 
-      ? supabaseKeyEnv 
-      : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+  // 🛡️ Required via --dart-define; falls back to local-dev defaults only in
+  // kDebugMode. Release/profile builds fail fast instead of silently
+  // shipping with dev credentials. See ApiService.requireEnv.
+  final String supabaseUrlRaw = ApiService.requireEnv(
+    const String.fromEnvironment('SUPABASE_URL'),
+    'SUPABASE_URL',
+    debugFallback: 'http://127.0.0.1:54321',
+  );
+  final String supabaseKey = ApiService.supabaseAnonKey;
 
   final supabaseUrl = ApiService.resolveLocalHost(supabaseUrlRaw);
 
@@ -75,14 +74,14 @@ Future<void> main() async {
     // 📲 Obtain APNS token for iOS devices (required for Supabase realtime / FCM on iOS)
     if (defaultTargetPlatform == TargetPlatform.iOS) {
       final apnsToken = await FirebaseMessaging.instance.getAPNSToken();
-      if (apnsToken != null) {
+      if (apnsToken != null && Supabase.instance.client.auth.currentSession != null) {
         await Supabase.instance.client.auth.updateUser(
           UserAttributes(data: {'apns_token': apnsToken}),
         );
         debugPrint('✅ APNS token set in Supabase');
       } else {
         // Simulators or apps without push entitlements won't have APNS tokens, which is fine in debug/dev
-        debugPrint('📡 APNS token not available yet (normal on iOS Simulator/Debug)');
+        debugPrint('📡 APNS token not available yet or no active session (normal on iOS Simulator/Debug/Startup)');
       }
     }
     await PushNotificationService.initialize();

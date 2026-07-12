@@ -205,7 +205,7 @@ void main() {
       ).thenAnswer((_) async {});
 
       // Act
-      await repository.verifyPin('123456');
+      await repository.verifyPin('123456', serverVerify: true);
 
       // Assert
       verify(

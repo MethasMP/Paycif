@@ -7,6 +7,7 @@ import 'package:frontend/core/utils/pay_notify.dart';
 import 'package:frontend/core/widgets/paycif_icon_container.dart';
 import 'package:frontend/core/widgets/paycif_amount_text.dart';
 import 'package:frontend/core/theme/app_theme.dart';
+import 'package:frontend/core/widgets/app_icon.dart';
 
 class TransactionDetailScreen extends StatelessWidget {
   final Transaction transaction;
@@ -140,7 +141,7 @@ class TransactionDetailScreen extends StatelessWidget {
                       l10n.transactionSupportTicketCreated,
                     );
                   },
-                  icon: Icon(PhosphorIcons.question),
+                  icon: AppIcon(PhosphorIcons.question),
                   label: Text(l10n.transactionHelp),
                   style: OutlinedButton.styleFrom(
                     shape: RoundedRectangleBorder(

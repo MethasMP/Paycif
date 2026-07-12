@@ -8,7 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:frontend/core/utils/error_translator.dart';
 import 'package:frontend/core/l10n/generated/app_localizations.dart';
 import 'package:frontend/core/theme/app_theme.dart';
-import 'package:frontend/core/widgets/paycif_icon_container.dart';
+import 'package:frontend/core/widgets/app_icon.dart';
 
 /// 🚀 World-Class PIN Entry Widget
 /// Designed 20 years ahead with premium UX/UI patterns
@@ -202,10 +202,6 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
                 : 'Protect your account and approve payments.')
             : 'Verify your identity to continue';
 
-        final IconData headerIcon = widget.isSetupMode
-            ? PhosphorIcons.lock
-            : PhosphorIcons.shieldCheck;
-
         final Color descColor = isDark
             ? Colors.white.withValues(alpha: 0.60) // 60-65% Opacity
             : Colors.black.withValues(alpha: 0.60); // 60-65% Opacity
@@ -233,14 +229,7 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
                       const Spacer(flex: 3),
 
                       // --- PART 1: Tight Context Block (Header) ---
-                      PaycifIconContainer(
-                        icon: headerIcon,
-                      ).animate().scale(
-                        duration: 500.ms,
-                        curve: Curves.easeOutBack,
-                      ),
-
-                      const SizedBox(height: 16), // Icon -> Title: 16
+                      // Removed large header icon to enhance minimalism and avoid keyboard layout overlap
 
                       // Title: Semibold, 24 pt, letterSpacing -0.5
                       Text(
@@ -342,9 +331,9 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
                 color: Colors.red.shade400.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(
+              child: AppIcon(
                 PhosphorIcons.warningCircle,
-                size: 20,
+                size: AppIconSize.sm,
                 color: Colors.red.shade300,
               ),
             ),
@@ -438,9 +427,9 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
       isDark: isDark,
       flat: false,
       onTap: widget.onBiometricPressed!,
-      child: Icon(
-        widget.biometricIcon,
-        size: 26,
+      child: AppIcon(
+        widget.biometricIcon!,
+        size: AppIconSize.md,
         color: AppTheme.primaryTeal, // Primary Teal for Focus
       ),
     );
@@ -451,9 +440,9 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
       isDark: isDark,
       flat: false,
       onTap: _onDelete,
-      child: Icon(
+      child: AppIcon(
         PhosphorIcons.backspace,
-        size: 30, // Larger, more prominent
+        size: AppIconSize.lg, // Larger, more prominent
         color: isDark ? Colors.white : Colors.black87, // High contrast neutral
       ),
     );
@@ -469,7 +458,7 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: (isDark ? AppTheme.accentGoldDisabled : AppTheme.primaryTeal).withValues(alpha: 0.8), // Use brand colors!
+            color: (isDark ? AppTheme.darkActionPrimary : AppTheme.primaryTeal).withValues(alpha: 0.9),
             letterSpacing: 0.2,
           ),
         ),
@@ -497,9 +486,9 @@ class _PinEntryWidgetState extends State<PinEntryWidget>
                 ),
               ],
             ),
-            child: Icon(
+            child: AppIcon(
               PhosphorIcons.lockSimple,
-              size: 48,
+              size: AppIconSize.xl,
               color: Colors.white,
             ),
           ),

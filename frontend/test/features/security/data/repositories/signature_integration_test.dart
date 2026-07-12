@@ -80,7 +80,7 @@ void main() {
       ).thenAnswer((_) async {});
 
       // Act
-      await repository.verifyPin('123456');
+      await repository.verifyPin('123456', serverVerify: true);
 
       // Assert
       verify(
@@ -148,7 +148,7 @@ void main() {
       ).thenThrow(Exception('Device not bound'));
 
       try {
-        await repository.verifyPin('1234');
+        await repository.verifyPin('1234', serverVerify: true);
         fail('Should have thrown Exception');
       } catch (e) {
         expect(e.toString(), contains('Device not bound'));

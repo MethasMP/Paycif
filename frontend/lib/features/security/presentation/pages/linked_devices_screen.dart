@@ -7,6 +7,7 @@ import 'package:frontend/features/security/presentation/logic/linked_devices_con
 import 'package:go_router/go_router.dart';
 import 'package:frontend/core/utils/pay_notify.dart';
 import 'package:frontend/core/theme/app_theme.dart';
+import 'package:frontend/core/widgets/app_icon.dart';
 
 class LinkedDevicesScreen extends StatelessWidget {
   const LinkedDevicesScreen({super.key});
@@ -61,9 +62,9 @@ class _LinkedDevicesView extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
+          AppIcon(
             PhosphorIcons.devices,
-            size: 64,
+            size: AppIconSize.xl,
             color: AppTheme.textSecondaryColor(context).withValues(alpha: 0.5),
           ),
           SizedBox(height: 16),
@@ -111,7 +112,7 @@ class _LinkedDevicesView extends StatelessWidget {
           color: AppTheme.errorRed.withValues(alpha: 0.9),
           borderRadius: BorderRadius.circular(16),
         ),
-        child: Icon(PhosphorIcons.trash, color: Colors.white, size: 28),
+        child: AppIcon(PhosphorIcons.trash, color: Colors.white, size: AppIconSize.lg),
       ),
       confirmDismiss: (direction) async {
         return await showDialog<bool>(
@@ -189,7 +190,7 @@ class _LinkedDevicesView extends StatelessWidget {
                     : Theme.of(context).scaffoldBackgroundColor,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(
+              child: AppIcon(
                 platformIcon,
                 color: isCurrent ? AppTheme.successGreen : AppTheme.textSecondaryColor(context),
               ),

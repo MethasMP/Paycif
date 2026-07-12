@@ -7,6 +7,7 @@ import 'package:frontend/core/network/connectivity_service.dart';
 import 'package:frontend/core/network/api_service.dart';
 import 'package:frontend/core/l10n/generated/app_localizations.dart';
 import 'package:frontend/core/theme/app_theme.dart';
+import 'package:frontend/core/widgets/app_icon.dart';
 
 class ConnectivityWrapper extends StatelessWidget {
   final Widget child;
@@ -45,9 +46,9 @@ class ConnectivityWrapper extends StatelessWidget {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(
+                              AppIcon(
                                     PhosphorIcons.wifiSlash,
-                                    size: 100,
+                                    size: AppIconSize.xl,
                                     color: AppTheme.warningAmber,
                                   )
                                   .animate(

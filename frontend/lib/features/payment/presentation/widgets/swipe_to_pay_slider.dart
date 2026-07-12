@@ -2,17 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:frontend/core/theme/app_theme.dart';
+import 'package:frontend/core/widgets/app_icon.dart';
 
 class SwipeToPaySlider extends StatefulWidget {
   final VoidCallback onSwipeComplete;
   final String text;
-  final Color activeColor;
+
+  /// Defaults to the theme's action color when null.
+  final Color? activeColor;
+
+  /// When false the slider ignores drags and renders dimmed
+  /// (e.g. while the FX quote is still loading).
+  final bool enabled;
 
   const SwipeToPaySlider({
     super.key,
     required this.onSwipeComplete,
     this.text = 'Swipe to pay',
-    this.activeColor = AppTheme.accentGold,
+    this.activeColor,
+    this.enabled = true,
   });
 
   @override
@@ -41,8 +49,18 @@ class _SwipeToPaySliderState extends State<SwipeToPaySlider> with SingleTickerPr
     super.dispose();
   }
 
-  void _onHorizontalDragUpdate(DragUpdateDetails details, double maxDragDistance) {
+  void _complete() {
     if (_isCompleted) return;
+    setState(() {
+      _dragPercentage = 1.0;
+      _isCompleted = true;
+    });
+    HapticFeedback.heavyImpact();
+    widget.onSwipeComplete();
+  }
+
+  void _onHorizontalDragUpdate(DragUpdateDetails details, double maxDragDistance) {
+    if (_isCompleted || !widget.enabled) return;
     setState(() {
       _dragPercentage += details.primaryDelta! / maxDragDistance;
       _dragPercentage = _dragPercentage.clamp(0.0, 1.0);
@@ -56,15 +74,9 @@ class _SwipeToPaySliderState extends State<SwipeToPaySlider> with SingleTickerPr
   }
 
   void _onHorizontalDragEnd(DragEndDetails details) {
-    if (_isCompleted) return;
+    if (_isCompleted || !widget.enabled) return;
     if (_dragPercentage >= 0.9) {
-      // Trigger Success
-      setState(() {
-        _dragPercentage = 1.0;
-        _isCompleted = true;
-      });
-      HapticFeedback.heavyImpact();
-      widget.onSwipeComplete();
+      _complete();
     } else {
       // Reset back to start
       HapticFeedback.lightImpact();
@@ -84,6 +96,7 @@ class _SwipeToPaySliderState extends State<SwipeToPaySlider> with SingleTickerPr
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final Color active = widget.activeColor ?? AppTheme.primaryColor(context);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -96,14 +109,10 @@ class _SwipeToPaySliderState extends State<SwipeToPaySlider> with SingleTickerPr
           width: width,
           height: height,
           decoration: BoxDecoration(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.03)
-                : Colors.black.withValues(alpha: 0.02),
+            color: isDark ? AppTheme.darkSurfaceSunken : AppTheme.lightSurfaceSunken,
             borderRadius: BorderRadius.circular(100),
             border: Border.all(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.08)
-                  : Colors.black.withValues(alpha: 0.05),
+              color: isDark ? AppTheme.darkBorderHairline : AppTheme.lightBorderHairline,
               width: 1.0,
             ),
           ),
@@ -116,24 +125,25 @@ class _SwipeToPaySliderState extends State<SwipeToPaySlider> with SingleTickerPr
                 child: Text(
                   widget.text,
                   style: TextStyle(
-                    color: isDark ? Colors.white70 : Colors.black87,
+                    color: AppTheme.textPrimaryColor(context),
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    letterSpacing: 0.5,
                   ),
                 ),
               ),
 
-              // Completed confirmation text
+              // Completed confirmation spinner
               if (_isCompleted)
-                const Positioned.fill(
+                Positioned.fill(
                   child: Center(
                     child: SizedBox(
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          AppTheme.textPrimaryColor(context),
+                        ),
                       ),
                     ),
                   ),
@@ -149,8 +159,8 @@ class _SwipeToPaySliderState extends State<SwipeToPaySlider> with SingleTickerPr
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        widget.activeColor.withValues(alpha: 0.1),
-                        widget.activeColor.withValues(alpha: 0.3),
+                        active.withValues(alpha: 0.08),
+                        active.withValues(alpha: 0.22),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(100),
@@ -165,27 +175,40 @@ class _SwipeToPaySliderState extends State<SwipeToPaySlider> with SingleTickerPr
                   onHorizontalDragUpdate: (details) =>
                       _onHorizontalDragUpdate(details, maxDragDistance),
                   onHorizontalDragEnd: _onHorizontalDragEnd,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 100),
-                    width: handleSize,
-                    height: handleSize,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: _isCompleted
-                          ? Colors.green
-                          : widget.activeColor,
-                      boxShadow: [
-                        BoxShadow(
-                          color: widget.activeColor.withValues(alpha: 0.4),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
+                  child: Semantics(
+                    button: true,
+                    enabled: widget.enabled && !_isCompleted,
+                    label: widget.text,
+                    // Screen-reader activation: a deliberate double-tap on the
+                    // named "Swipe to pay" control is explicit payment intent —
+                    // the drag gesture only guards against accidental touches.
+                    onTap: (widget.enabled && !_isCompleted) ? _complete : null,
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 150),
+                      opacity: widget.enabled ? 1.0 : 0.45,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 100),
+                        width: handleSize,
+                        height: handleSize,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _isCompleted ? AppTheme.signalGreen : active,
+                          boxShadow: [
+                            BoxShadow(
+                              color: active.withValues(alpha: 0.25),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    child: Icon(
-                      _isCompleted ? PhosphorIcons.check : PhosphorIcons.caretRight,
-                      color: Colors.black,
-                      size: 24,
+                        child: AppIcon(
+                          PhosphorIcons.caretRight,
+                          activeIcon: PhosphorIcons.check,
+                          isActive: _isCompleted,
+                          color: Colors.white,
+                          size: AppIconSize.md,
+                        ),
+                      ),
                     ),
                   ),
                 ),

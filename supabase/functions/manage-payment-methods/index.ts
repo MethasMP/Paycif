@@ -114,7 +114,7 @@ serve(async (req: Request) => {
       }
 
       // 4. Parallel Invalidation (NO sequential dependency here)
-      await adminClient.from('cache_saved_cards').delete().eq('user_id', userId);
+      await adminClient.from('cache_saved_payment_methods').delete().eq('user_id', userId);
 
       console.log(`[AddCard] Success in ${Date.now() - startTime}ms`);
       return jsonResponse({
@@ -165,7 +165,7 @@ serve(async (req: Request) => {
 
       // 5. Parallel DB Operations
       const promises = [
-        adminClient.from('cache_saved_cards').delete().eq('user_id', userId),
+        adminClient.from('cache_saved_payment_methods').delete().eq('user_id', userId),
       ];
 
       if (profile.preferred_payment_method_id === card_id) {

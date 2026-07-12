@@ -76,9 +76,9 @@ export const exchangeRates = pgTable('exchange_rates', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
 
-export const cacheSavedCards = pgTable('cache_saved_cards', {
+export const cacheSavedPaymentMethods = pgTable('cache_saved_payment_methods', {
   userId: uuid('user_id').primaryKey().references(() => profiles.id, { onDelete: 'cascade' }),
-  cardsJson: text('cards_json').notNull(), // jsonb
+  paymentMethodsJson: text('payment_methods_json').notNull(), // jsonb
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:frontend/core/l10n/generated/app_localizations.dart';
 import 'package:frontend/core/widgets/paycif_text.dart';
 import 'package:frontend/core/theme/app_theme.dart';
+import 'package:frontend/core/widgets/app_icon.dart';
 
 class PrivacyPolicyScreen extends StatelessWidget {
   const PrivacyPolicyScreen({super.key});
@@ -40,10 +41,10 @@ class PrivacyPolicyScreen extends StatelessWidget {
                       color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(
+                    child: AppIcon(
                       PhosphorIcons.shield,
                       color: Colors.white,
-                      size: 28,
+                      size: AppIconSize.lg,
                     ),
                   ),
                   SizedBox(width: 16),
@@ -87,10 +88,10 @@ class PrivacyPolicyScreen extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Icon(
+                      AppIcon(
                         PhosphorIcons.shield,
                         color: AppTheme.warningAmber,
-                        size: 20,
+                        size: AppIconSize.sm,
                       ),
                       SizedBox(width: 8),
                       PaycifText(
@@ -188,9 +189,9 @@ class PrivacyPolicyScreen extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
+                        AppIcon(
                           PhosphorIcons.envelope,
-                          size: 16,
+                          size: AppIconSize.xs,
                           color: AppTheme.successGreen,
                         ),
                         SizedBox(width: 6),
@@ -220,10 +221,10 @@ class PrivacyPolicyScreen extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
+          AppIcon(
             PhosphorIcons.checkCircle,
             color: AppTheme.successGreen,
-            size: 18,
+            size: AppIconSize.sm,
           ),
           SizedBox(width: 8),
           Expanded(
@@ -268,7 +269,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
                   color: AppTheme.successGreen.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(icon, size: 18, color: AppTheme.successGreen),
+                child: AppIcon(icon, size: AppIconSize.sm, color: AppTheme.successGreen),
               ),
               SizedBox(width: 12),
               Expanded(

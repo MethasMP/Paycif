@@ -4,6 +4,10 @@
 
 product
 
+## Platform
+
+adaptive
+
 ## Users
 
 Foreign tourists in Thailand who want to pay Thai merchants via PromptPay QR, funding the payment from a foreign payment method (credit card, Apple Pay, or stablecoin) rather than a Thai bank account. They are on their phone, often outdoors, mid-transaction at a counter with a merchant waiting — low patience for friction, high need for clarity on exchange rate, fees, and payment status. Job to be done: scan a Thai QR, confirm exactly what they're paying (in their currency and THB), and get a fast, unambiguous confirmation the merchant got paid.

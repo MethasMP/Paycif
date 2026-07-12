@@ -17,7 +17,7 @@ void main() {
     });
 
     test('Should handle zero amount gracefully', () {
-      const breakdown = PaymentBreakdown(amountTHB: 0.0);
+      const breakdown = PaymentBreakdown(amountTHB: 0.0, exchangeRate: 36.45);
       expect(breakdown.amountUSD, 0.0);
       expect(breakdown.feeUSD, 0.0);
       expect(breakdown.totalUSD, 0.0);

@@ -1,4 +1,3 @@
-import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
@@ -11,12 +10,11 @@ import 'package:frontend/core/network/api_service.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
-import 'dart:ui' as ui;
 
 import 'package:frontend/features/dashboard/presentation/home_view.dart';
-import 'package:frontend/features/payment/presentation/payment_settings_screen.dart';
 import 'package:frontend/features/transactions/presentation/history_screen.dart';
 import 'package:frontend/features/profile/presentation/profile_page.dart';
+import 'package:frontend/core/widgets/nav_glyph.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -38,7 +36,6 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
   // Sizing constants for the premium navigation bar
   static const double _barHeight = 80.0;
   static const double _scanButtonSize = 72.0; // 72px circle as per design.md
-  static const double _iconSize = 24.0;
   static const double _dotWidth = 14.0;
   static const double _scanButtonOffset = 16.0; // Overlapping overflow bottom offset
 
@@ -49,6 +46,14 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     )..repeat();
+
+    // Respect reduced-motion: freeze the idle pulse ring entirely.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && MediaQuery.of(context).disableAnimations) {
+        _pulseController.stop();
+        _pulseController.value = 0.0;
+      }
+    });
 
     _pulseScaleAnimation = Tween<double>(begin: 1.0, end: 1.25).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeOut),
@@ -89,7 +94,6 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
   List<Widget> get _screens => [
     const HomeView(),
     const HistoryScreen(),
-    const PaymentSettingsScreen(),
     const ProfilePage(),
   ];
 
@@ -104,15 +108,34 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     if (mounted) context.read<DashboardController>().refresh();
   }
 
-  // Calculates the horizontal starting point of the sliding active dot
+  // 3 real tabs (Home, History, Profile) split unevenly around the center scan
+  // FAB — 2 on the left, 1 on the right. The FAB sits at the true screen
+  // center (Stack's bottomCenter), so the left and right groups must occupy
+  // exactly equal *width* — not equal tab count — or the gap drifts off from
+  // where the FAB actually renders and it visually collides with a tab.
+  static const double _centerGapFraction = 0.22;
+
+  double get _sideWidthFraction => (1.0 - _centerGapFraction) / 2;
+
+  // Calculates the horizontal starting point of the sliding active dot.
   double _calculateDotLeft(double totalWidth) {
-    final double colWidth = totalWidth / 5;
-    // Map selected index (0-3) to columns (0, 1, 3, 4), skipping the center column (2)
-    final int activeCol = _selectedIndex >= 2 ? _selectedIndex + 1 : _selectedIndex;
-    return (activeCol + 0.5) * colWidth - _dotWidth / 2;
+    final double sideWidth = totalWidth * _sideWidthFraction;
+    final double leftTabWidth = sideWidth / 2; // Home, History share the left side
+    double center;
+    switch (_selectedIndex) {
+      case 0:
+        center = leftTabWidth * 0.5;
+        break;
+      case 1:
+        center = leftTabWidth * 1.5;
+        break;
+      default: // 2 = Profile, alone on the right side
+        center = totalWidth - sideWidth * 0.5;
+    }
+    return center - _dotWidth / 2;
   }
 
-  Widget _buildTabItem(int index, IconData unselectedIcon, IconData selectedIcon, String label, double width) {
+  Widget _buildTabItem(int index, NavGlyphType glyph, String label, double width) {
     final isSelected = _selectedIndex == index;
     final activeColor = AppTheme.primaryColor(context);
     final inactiveColor = AppTheme.textSecondaryColor(context);
@@ -139,10 +162,11 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                     scale: isSelected ? 1.05 : 1.0,
                     duration: const Duration(milliseconds: 200),
                     curve: Curves.easeOutQuint,
-                    child: Icon(
-                      isSelected ? selectedIcon : unselectedIcon,
+                    child: NavGlyph(
+                      type: glyph,
+                      isActive: isSelected,
                       color: color,
-                      size: _iconSize,
+                      size: 24.0,
                     ),
                   ),
                 ),
@@ -150,7 +174,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
               const SizedBox(height: 4),
               Text(
                 label,
-                style: GoogleFonts.ibmPlexSans(
+                style: GoogleFonts.inter(
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
                   letterSpacing: 0.2,
@@ -171,10 +195,12 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
-    final floatMargin = bottomPadding > 0 ? bottomPadding : 20.0;
 
     // Total height of bottom bar area, including popping space of FAB button
     const double totalBarHeight = _barHeight + 12.0;
+    final hairline = theme.brightness == Brightness.dark
+        ? AppTheme.darkBorderHairline
+        : AppTheme.lightBorderHairline;
 
     return PopScope(
       canPop: _selectedIndex == 0,
@@ -185,59 +211,29 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
         extendBody: true,
         backgroundColor: theme.scaffoldBackgroundColor,
         body: IndexedStack(index: _selectedIndex, children: _screens),
+        // Docked edge-to-edge, not a floating pill — Session 002: a bar this
+        // load-bearing shouldn't carry its own margin/blur/shadow state. The
+        // scan FAB keeps the pop + idle pulse as the one raised element.
         bottomNavigationBar: Container(
-          height: totalBarHeight + floatMargin,
-          color: Colors.transparent,
-          padding: EdgeInsets.only(
-            left: 20.0,
-            right: 20.0,
-            bottom: floatMargin,
+          height: totalBarHeight + bottomPadding,
+          padding: EdgeInsets.only(bottom: bottomPadding),
+          decoration: BoxDecoration(
+            color: theme.cardColor,
+            border: Border(top: BorderSide(color: hairline, width: 1.0)),
           ),
           child: LayoutBuilder(
             builder: (context, constraints) {
               final double totalWidth = constraints.maxWidth;
-              final double colWidth = totalWidth / 5;
+              final double sideWidth = totalWidth * _sideWidthFraction;
+              final double gapWidth = totalWidth * _centerGapFraction;
+              final double leftTabWidth = sideWidth / 2; // Home, History
               final double dotLeft = _calculateDotLeft(totalWidth);
 
               return Stack(
                 clipBehavior: Clip.none,
                 alignment: Alignment.bottomCenter,
                 children: [
-                  // 1. Glassmorphic Dock Container
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    height: _barHeight,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(32.0),
-                      child: BackdropFilter(
-                        filter: ui.ImageFilter.blur(sigmaX: 15.0, sigmaY: 15.0),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: theme.cardColor.withValues(alpha: 0.85),
-                            borderRadius: BorderRadius.circular(32.0),
-                            border: Border.all(
-                              color: theme.brightness == Brightness.dark
-                                  ? Colors.white.withValues(alpha: 0.08)
-                                  : Colors.black.withValues(alpha: 0.05),
-                              width: 1.0,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.06),
-                                blurRadius: 15,
-                                spreadRadius: 0,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // 2. Sliding Dot Indicator
+                  // 1. Sliding Dot Indicator
                   AnimatedPositioned(
                     duration: const Duration(milliseconds: 300),
                     curve: Curves.easeOutQuint,
@@ -253,7 +249,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                     ),
                   ),
 
-                  // 3. Navigation Tab Items Row
+                  // 2. Navigation Tab Items Row
                   Positioned(
                     left: 0,
                     right: 0,
@@ -261,16 +257,15 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                     height: _barHeight,
                     child: Row(
                       children: [
-                        _buildTabItem(0, PhosphorIconsRegular.house, PhosphorIconsFill.house, l10n.navHome, colWidth),
-                        _buildTabItem(1, PhosphorIconsRegular.receipt, PhosphorIconsFill.receipt, l10n.navHistory, colWidth),
-                        SizedBox(width: colWidth), // Center spacer for FAB
-                        _buildTabItem(2, PhosphorIconsRegular.cardsThree, PhosphorIconsFill.cardsThree, l10n.navPayment, colWidth),
-                        _buildTabItem(3, PhosphorIconsRegular.userCircle, PhosphorIconsFill.userCircle, l10n.navProfile, colWidth),
+                        _buildTabItem(0, NavGlyphType.home, l10n.navHome, leftTabWidth),
+                        _buildTabItem(1, NavGlyphType.history, l10n.navHistory, leftTabWidth),
+                        SizedBox(width: gapWidth), // Center spacer for FAB
+                        _buildTabItem(2, NavGlyphType.profile, l10n.navProfile, sideWidth),
                       ],
                     ),
                   ),
 
-                  // 4. Center QR Scan Button (Popping up)
+                  // 3. Center QR Scan Button (Popping up)
                   Positioned(
                     bottom: _scanButtonOffset,
                     child: GestureDetector(
@@ -299,18 +294,19 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                                       shape: ContinuousRectangleBorder(
                                         borderRadius: BorderRadius.circular(28),
                                       ),
-                                      color: AppTheme.accentGold.withValues(alpha: _pulseOpacityAnimation.value),
+                                      color: AppTheme.primaryColor(context).withValues(alpha: _pulseOpacityAnimation.value),
                                     ),
                                   ),
                                 );
                               },
                             ),
-                            // Main Gold CTA button (Squircle shape)
+                            // Main scan CTA (Squircle) — Action Teal, the app's
+                            // single action color; gold stays warning-only.
                             Container(
                               width: 72,
                               height: 72,
                               decoration: ShapeDecoration(
-                                color: AppTheme.accentGold,
+                                color: AppTheme.primaryColor(context),
                                 shape: ContinuousRectangleBorder(
                                   borderRadius: BorderRadius.circular(28), // Tuned for better Apple squircle look
                                 ),
@@ -322,10 +318,10 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                                   ),
                                 ],
                               ),
-                              child: Center(
+                              child: const Center(
                                 child: CustomScanIcon(
                                   size: 28.0,
-                                  color: AppTheme.accentGoldDark, // accent-900
+                                  color: Colors.white,
                                   strokeWidth: 2.5,
                                 ),
                               ),
@@ -357,7 +353,7 @@ class CustomScanIcon extends StatelessWidget {
   const CustomScanIcon({
     super.key,
     this.size = 28.0,
-    this.color = AppTheme.accentGoldDark,
+    this.color = Colors.white,
     this.strokeWidth = 2.5,
   });
 

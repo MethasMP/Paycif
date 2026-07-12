@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:frontend/core/l10n/generated/app_localizations.dart';
 import 'package:frontend/core/utils/pay_notify.dart';
 import 'package:frontend/core/theme/app_theme.dart';
+import 'package:frontend/core/widgets/app_icon.dart';
 
 class ContactSupportScreen extends StatefulWidget {
   const ContactSupportScreen({super.key});
@@ -100,10 +101,10 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                         color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(
+                      child: AppIcon(
                         PhosphorIcons.headset,
                         color: Colors.white,
-                        size: 32,
+                        size: AppIconSize.lg,
                       ),
                     ),
                     SizedBox(width: 16),
@@ -174,9 +175,9 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
+                          AppIcon(
                             cat['icon'] as IconData,
-                            size: 18,
+                            size: AppIconSize.sm,
                             color: isSelected
                                 ? Colors.white
                                 : (isDark ? Colors.white70 : Colors.black54),
@@ -351,7 +352,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 18, color: AppTheme.warningAmber),
+          AppIcon(icon, size: AppIconSize.sm, color: AppTheme.warningAmber),
           SizedBox(width: 8),
           Text(
             label,

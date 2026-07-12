@@ -1,4 +1,3 @@
-import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -43,7 +42,7 @@ class _SplashScreenState extends State<SplashScreen> {
       // 🛡️ Proactive Check: Is the cached session actually valid?
       final isExpired = JwtDecoder.isExpired(session.accessToken);
       if (isExpired) {
-        debugPrint("⚠️ Session expired on startup. Attempting recovery...");
+        debugPrint("Session expired on startup. Attempting recovery...");
         try {
           final refreshResponse = await Supabase.instance.client.auth
               .refreshSession();
@@ -114,29 +113,27 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final reduce = MediaQuery.of(context).disableAnimations;
+
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Paycif Logo (Shield) — flat-at-rest: solid fill, no glow, no gradient
-            Container(
-                  width: 96,
-                  height: 96,
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryColor(context),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    PhosphorIcons.shield,
-                    size: 48,
-                    color: theme.brightness == Brightness.dark
-                        ? AppTheme.darkTextOnDark
-                        : AppTheme.lightTextOnDark,
-                  ),
-                )
-                .animate()
+            // Brand mark — the same intersecting rings as the login screen,
+            // drawn straight on canvas: splash and login read as one identity.
+            SizedBox(
+              width: 56,
+              height: 56,
+              child: CustomPaint(
+                painter: _SplashRingsPainter(
+                  primaryColor: AppTheme.textPrimaryColor(context),
+                  secondaryColor: AppTheme.primaryColor(context),
+                ),
+              ),
+            )
+                .animate(target: reduce ? 0 : 1)
                 .fadeIn(duration: 500.ms)
                 .scale(
                   begin: const Offset(0.9, 0.9),
@@ -145,30 +142,32 @@ class _SplashScreenState extends State<SplashScreen> {
                   curve: Curves.easeOutCubic,
                 ),
 
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
 
-            // Title
+            // Wordmark — identical treatment to the login screen
             Text(
-                  'Paycif',
-                  style: theme.textTheme.displayMedium?.copyWith(
+                  'paycif',
+                  style: theme.textTheme.displaySmall?.copyWith(
+                    fontSize: 34,
                     color: AppTheme.textPrimaryColor(context),
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.8,
                   ),
                 )
-                .animate()
+                .animate(target: reduce ? 0 : 1)
                 .fadeIn(delay: 400.ms, duration: 600.ms)
                 .slideY(begin: 0.2, end: 0),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
 
             // Tagline
             Text(
               AppLocalizations.of(context)?.splashTagline ?? 'Secure. Simple. Global.',
               style: theme.textTheme.bodyLarge?.copyWith(
                 color: AppTheme.textSecondaryColor(context),
-                letterSpacing: 2.0,
+                fontWeight: FontWeight.w400,
               ),
-            ).animate().fadeIn(delay: 600.ms, duration: 600.ms),
+            ).animate(target: reduce ? 0 : 1).fadeIn(delay: 600.ms, duration: 600.ms),
 
             const SizedBox(height: 64),
 
@@ -179,7 +178,12 @@ class _SplashScreenState extends State<SplashScreen> {
                   style: PaycifTextStyle.caption,
                   color: AppTheme.textSecondaryColor(context).withValues(alpha: 0.7),
                 )
-                .animate(onPlay: (controller) => controller.repeat())
+                .animate(
+                  target: reduce ? 0 : 1,
+                  onPlay: (controller) {
+                    if (!reduce) controller.repeat();
+                  },
+                )
                 .fadeIn(duration: 1000.ms)
                 .then()
                 .fadeOut(duration: 1000.ms),
@@ -188,4 +192,32 @@ class _SplashScreenState extends State<SplashScreen> {
       ),
     );
   }
+}
+
+class _SplashRingsPainter extends CustomPainter {
+  final Color primaryColor;
+  final Color secondaryColor;
+
+  _SplashRingsPainter({required this.primaryColor, required this.secondaryColor});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint1 = Paint()
+      ..color = primaryColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4.0
+      ..strokeCap = StrokeCap.round;
+
+    final paint2 = Paint()
+      ..color = secondaryColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4.0
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawCircle(Offset(size.width * 0.40, size.height * 0.5), size.width * 0.28, paint1);
+    canvas.drawCircle(Offset(size.width * 0.60, size.height * 0.5), size.width * 0.28, paint2);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

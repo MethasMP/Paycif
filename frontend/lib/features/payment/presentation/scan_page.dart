@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:frontend/core/theme/app_theme.dart';
@@ -6,15 +7,17 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:frontend/core/l10n/generated/app_localizations.dart';
-import 'package:frontend/core/widgets/premium_scanner_overlay.dart';
+import 'package:frontend/core/widgets/scanner_overlay.dart';
 import 'package:frontend/features/payment/data/qr_aggregator_service.dart';
-import 'package:frontend/core/widgets/kyc/unified_payment_sheet.dart';
-import 'package:frontend/core/widgets/kyc/kyc_required_sheet.dart';
+import 'package:frontend/features/payment/presentation/widgets/unified_payment_sheet.dart';
+import 'package:frontend/features/kyc/presentation/widgets/kyc_required_sheet.dart';
 import 'package:frontend/core/network/api_service.dart';
 import 'package:frontend/features/dashboard/presentation/dashboard_controller.dart';
 import 'package:frontend/core/utils/pay_notify.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:frontend/core/widgets/app_icon.dart';
+import 'package:frontend/core/widgets/performance_gate_backdrop_filter.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SCAN PAGE v2 — Redesigned from first principles
@@ -35,7 +38,7 @@ class ScanPage extends StatefulWidget {
   State<ScanPage> createState() => _ScanPageState();
 }
 
-class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
+class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin, WidgetsBindingObserver {
   final MobileScannerController _cameraController = MobileScannerController(
     detectionSpeed: DetectionSpeed.normal,
     returnImage: false,
@@ -47,10 +50,76 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
   bool _isProcessing = false;
   bool _hasCameraError = false;
 
+  // Epistemic State Machine Variables (Kalama Sutta Aligned)
+  bool _isCameraRunning = true;
+  bool _isAppInForeground = true;
+  bool _isPageVisible = true;
+
+  // Mutual exclusion lock to prevent concurrent start/stop race conditions
+  Future<void>? _cameraTransitionLock;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _cameraController.dispose();
     super.dispose();
+  }
+
+  // ── Lifecycle Observer (Stephen Lemay / Orlando Baeza spec) ────────────────
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    debugPrint('🔄 [ScanPage] App lifecycle changed to: $state');
+    
+    // Explicitly track foreground state
+    final wasForeground = _isAppInForeground;
+    _isAppInForeground = state == AppLifecycleState.resumed;
+
+    if (wasForeground != _isAppInForeground) {
+      _evaluateCameraState();
+    }
+  }
+
+  // ── Explicit Camera State Evaluator (Wise/Coinbase No-Assumption Spec) ─────
+  /// The single source of truth for camera execution.
+  /// Evaluates variables: _isAppInForeground AND _isPageVisible AND !_isProcessing.
+  Future<void> _evaluateCameraState() async {
+    final shouldRun = _isAppInForeground && _isPageVisible && !_isProcessing;
+
+    // Queue transitions to avoid overlapping start/stop calls (flicker prevention)
+    final previousTransition = _cameraTransitionLock;
+    
+    final completer = Completer<void>();
+    _cameraTransitionLock = completer.future;
+
+    // Wait for the previous operation to finish to prevent native crashes/black screens
+    if (previousTransition != null) {
+      await previousTransition;
+    }
+
+    try {
+      if (shouldRun && !_isCameraRunning) {
+        debugPrint('📹 [ScanPage] Starting camera...');
+        await _cameraController.start();
+        _isCameraRunning = true;
+        setState(() {});
+      } else if (!shouldRun && _isCameraRunning) {
+        debugPrint('🛑 [ScanPage] Stopping camera...');
+        await _cameraController.stop();
+        _isCameraRunning = false;
+        setState(() {});
+      }
+    } catch (e) {
+      debugPrint('⚠️ [ScanPage] Error updating camera state: $e');
+      setState(() => _hasCameraError = true);
+    } finally {
+      completer.complete();
+    }
   }
 
   // ── QR Detection ────────────────────────────────────────────────────────────
@@ -65,7 +134,7 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
     }
   }
 
-  void _handleCode(String code) {
+  void _handleCode(String code) async {
     if (_isProcessing) return;
     final paymentContext = QrAggregatorService.aggregate(code);
     if (paymentContext.isSafe) {
@@ -76,7 +145,10 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
       HapticFeedback.vibrate();
     }
     setState(() => _isProcessing = true);
-    _cameraController.stop();
+    
+    // Stop camera before showing sheet (PERF-03)
+    await _evaluateCameraState();
+    
     if (!mounted) return;
     _handleValidPayment(paymentContext);
   }
@@ -86,7 +158,7 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
       _isProcessing = false;
       _hasCameraError = false;
     });
-    _cameraController.start();
+    _evaluateCameraState();
   }
 
   Future<void> _pickFromGallery() async {
@@ -183,7 +255,17 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
     final wantsToVerify = await KycRequiredSheet.show(context);
     if (wantsToVerify != true || !mounted) return false;
 
+    // We are about to push /kyc route. Manually stop the camera to free up GPU.
+    _isPageVisible = false;
+    await _evaluateCameraState();
+
+    debugPrint('🚦 [ScanPage] Transitioning to /kyc. Camera fully stopped.');
+    if (!mounted) return false;
     final verified = await context.push<bool>('/kyc');
+
+    // Returned from KYC route. Mark visible and re-evaluate camera.
+    _isPageVisible = true;
+    debugPrint('🚦 [ScanPage] Returned from /kyc. Re-evaluating camera.');
 
     // Refresh dashboard so subsequent scans don't re-gate a now-verified user.
     if (verified == true && mounted) {
@@ -192,6 +274,7 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
       } catch (_) {}
     }
 
+    await _evaluateCameraState();
     return verified == true;
   }
 
@@ -230,7 +313,10 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
 
             // ── Scanner overlay: corner brackets + scan beam ───────────────
             if (!_hasCameraError)
-              PremiumScannerOverlay(frameSize: frameSize),
+              ScannerOverlay(
+                frameSize: frameSize,
+                isLocked: _isProcessing,
+              ),
 
             // ── UI Shell ──────────────────────────────────────────────────
             SafeArea(
@@ -369,34 +455,44 @@ class _GlassCircleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final enableBlur = AppTheme.shouldEnableBlur(context);
+    final buttonBody = AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: isActive
+            ? AppTheme.primaryTeal.withValues(alpha: 0.85)
+            : (enableBlur
+                ? Colors.white.withValues(alpha: 0.10)
+                : Colors.white.withValues(alpha: 0.20)),
+        border: Border.all(
+          color: isActive
+              ? Colors.white.withValues(alpha: 0.35)
+              : Colors.white.withValues(alpha: 0.15),
+          width: 1.0,
+        ),
+      ),
+      child: AppIcon(
+        icon,
+        color: Colors.white,
+        size: AppIconSize.sm,
+      ),
+    );
+
     return GestureDetector(
       onTap: onTap,
       child: ClipOval(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isActive
-                  ? AppTheme.accentGold.withValues(alpha: 0.20)
-                  : Colors.white.withValues(alpha: 0.10),
-              border: Border.all(
-                color: isActive
-                    ? AppTheme.accentGold.withValues(alpha: 0.50)
-                    : Colors.white.withValues(alpha: 0.15),
-                width: 1.0,
+        child: enableBlur
+            ? BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                child: buttonBody,
+              )
+            : Container(
+                color: Colors.black.withValues(alpha: 0.85),
+                child: buttonBody,
               ),
-            ),
-            child: Icon(
-              icon,
-              color: isActive ? AppTheme.accentGold : Colors.white,
-              size: 20,
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -427,9 +523,11 @@ class _ScanInstruction extends StatelessWidget {
         Text(
           'Merchant QR  •  PromptPay Supported',
           style: TextStyle(
-            color: AppTheme.primaryTeal.withValues(alpha: 0.90),
+            // White for outdoor legibility — dark teal disappears over the
+            // live camera feed in direct sunlight.
+            color: Colors.white.withValues(alpha: 0.78),
             fontSize: 12,
-            fontWeight: FontWeight.w400,
+            fontWeight: FontWeight.w500,
             letterSpacing: 0.5,
             shadows: const [
               Shadow(color: Colors.black, blurRadius: 8),
@@ -457,40 +555,45 @@ class _BottomActionsBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final barContent = Container(
+      height: 56,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(100),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.12),
+          width: 1.0,
+        ),
+      ),
+      child: IntrinsicWidth(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _ActionChip(
+              icon: PhosphorIcons.image,
+              label: l10n.commonUpload,
+              onTap: onUpload,
+            ),
+            _VerticalDivider(),
+            _ActionChip(
+              icon: PhosphorIcons.question,
+              label: l10n.commonHelp,
+              onTap: onHelp,
+            ),
+          ],
+        ),
+      ),
+    );
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(100),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-        child: Container(
-          height: 56,
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.35),
-            borderRadius: BorderRadius.circular(100),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.12),
-              width: 1.0,
-            ),
-          ),
-          child: IntrinsicWidth(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _ActionChip(
-                  icon: PhosphorIcons.image,
-                  label: l10n.commonUpload,
-                  onTap: onUpload,
-                ),
-                _VerticalDivider(),
-                _ActionChip(
-                  icon: PhosphorIcons.question,
-                  label: l10n.commonHelp,
-                  onTap: onHelp,
-                ),
-              ],
-            ),
-          ),
-        ),
+      child: PerformanceGateBackdropFilter(
+        sigmaX: 24,
+        sigmaY: 24,
+        blurredColor: Colors.black.withValues(alpha: 0.35),
+        fallbackColor: const Color(0xF00B0F0E),
+        child: barContent,
       ),
     );
   }
@@ -532,10 +635,10 @@ class _ActionChip extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
+              AppIcon(
                 icon,
                 color: Colors.white.withValues(alpha: 0.85),
-                size: 17,
+                size: AppIconSize.xs,
               ),
               const SizedBox(width: 6),
               Text(
@@ -562,35 +665,34 @@ class _ActionChip extends StatelessWidget {
 class _ProcessingOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-      child: Container(
-        color: Colors.black.withValues(alpha: 0.55),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                width: 52,
-                height: 52,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  valueColor:
-                      AlwaysStoppedAnimation<Color>(AppTheme.accentGold),
-                ),
+    return PerformanceGateBackdropFilter(
+      sigmaX: 8,
+      sigmaY: 8,
+      blurredColor: Colors.black.withValues(alpha: 0.55),
+      fallbackColor: const Color(0xE00B0F0E),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 52,
+              height: 52,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
               ),
-              const SizedBox(height: 20),
-              Text(
-                'Reading QR…',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.85),
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 0.2,
-                ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Reading QR…',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.85),
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 0.2,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -611,10 +713,10 @@ class _CameraErrorPlaceholder extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
+            AppIcon(
               PhosphorIcons.cameraSlash,
               color: Colors.white.withValues(alpha: 0.25),
-              size: 52,
+              size: AppIconSize.xl,
             ),
             const SizedBox(height: 20),
             Text(
@@ -641,96 +743,101 @@ class _HelpSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(28, 0, 28, 0),
-        decoration: const BoxDecoration(
-          color: Color(0xF00B0F0E), // near-black, 94% opaque
-          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-        ),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Drag handle
-              const SizedBox(height: 14),
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 3,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(2),
+    final sheetContent = Container(
+      padding: const EdgeInsets.fromLTRB(28, 0, 28, 0),
+      decoration: const BoxDecoration(
+        color: Color(0xF00B0F0E), // near-black, 94% opaque
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Drag handle
+            const SizedBox(height: 14),
+            Center(
+              child: Container(
+                width: 36,
+                height: 3,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 36),
+
+            // Title
+            const Text(
+              'Thai QR Payment Guide',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.w600,
+                letterSpacing: -0.4,
+              ),
+            ),
+            const SizedBox(height: 28),
+
+            _HelpRow(
+              icon: PhosphorIcons.qrCode,
+              iconColor: AppTheme.primaryTeal,
+              title: l10n.scanGuidePromptPayTitle,
+              desc: l10n.scanGuidePromptPayDesc,
+            ),
+            _HelpRow(
+              icon: PhosphorIcons.shieldCheck,
+              iconColor: AppTheme.successGreen,
+              title: l10n.scanGuideSafeTitle,
+              desc: l10n.scanGuideSafeDesc,
+            ),
+            _HelpRow(
+              icon: PhosphorIcons.currencyCircleDollar,
+              iconColor: Colors.white70,
+              title: l10n.scanGuideCurrencyTitle,
+              desc: l10n.scanGuideCurrencyDesc,
+            ),
+
+            const SizedBox(height: 32),
+
+            // Got it — wide white CTA
+            SizedBox(
+              width: double.infinity,
+              height: 54,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: const Color(0xFF0B0F0E),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(100),
+                  ),
+                  elevation: 0,
+                ),
+                child: Text(
+                  l10n.commonGotIt,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.1,
                   ),
                 ),
               ),
-              const SizedBox(height: 36),
-
-              // Title
-              const Text(
-                'Thai QR Payment Guide',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: -0.4,
-                ),
-              ),
-              const SizedBox(height: 28),
-
-              _HelpRow(
-                icon: PhosphorIcons.qrCode,
-                iconColor: AppTheme.primaryTeal,
-                title: l10n.scanGuidePromptPayTitle,
-                desc: l10n.scanGuidePromptPayDesc,
-              ),
-              _HelpRow(
-                icon: PhosphorIcons.shieldCheck,
-                iconColor: AppTheme.successGreen,
-                title: l10n.scanGuideSafeTitle,
-                desc: l10n.scanGuideSafeDesc,
-              ),
-              _HelpRow(
-                icon: PhosphorIcons.currencyCircleDollar,
-                iconColor: AppTheme.accentGold,
-                title: l10n.scanGuideCurrencyTitle,
-                desc: l10n.scanGuideCurrencyDesc,
-              ),
-
-              const SizedBox(height: 32),
-
-              // Got it — wide white CTA
-              SizedBox(
-                width: double.infinity,
-                height: 54,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: const Color(0xFF0B0F0E),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(100),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: Text(
-                    l10n.commonGotIt,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.1,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
+            ),
+            const SizedBox(height: 16),
+          ],
         ),
       ),
+    );
+
+    return PerformanceGateBackdropFilter(
+      sigmaX: 24,
+      sigmaY: 24,
+      blurredColor: Colors.transparent, // Color is already set in the child container
+      fallbackColor: Colors.transparent, // Color is already set in the child container
+      child: sheetContent,
     );
   }
 }
@@ -763,7 +870,7 @@ class _HelpRow extends StatelessWidget {
               color: iconColor.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: iconColor, size: 22),
+            child: AppIcon(icon, color: iconColor, size: AppIconSize.md),
           ),
           const SizedBox(width: 16),
           Expanded(

@@ -12,8 +12,8 @@ import 'package:frontend/core/models/exchange_rate_model.dart';
 import 'package:frontend/core/network/api_service.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:frontend/core/theme/app_theme.dart';
+import 'package:frontend/core/widgets/app_icon.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({super.key});
@@ -27,7 +27,6 @@ class _HomeViewState extends State<HomeView> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     return BlocBuilder<DashboardController, DashboardState>(
       builder: (context, state) {
@@ -45,7 +44,7 @@ class _HomeViewState extends State<HomeView> {
         final isReady = state.status == 'success';
 
         return Scaffold(
-          backgroundColor: isDark ? theme.scaffoldBackgroundColor : AppTheme.backgroundGrey,
+          backgroundColor: theme.scaffoldBackgroundColor,
           appBar: _buildAppBar(context),
           body: AnimatedSwitcher(
             duration: const Duration(milliseconds: 600),
@@ -132,9 +131,9 @@ class _HomeViewState extends State<HomeView> {
           mainAxisAlignment: MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Icon(
+            AppIcon(
               PhosphorIconsRegular.clock,
-              size: 18,
+              size: AppIconSize.sm,
               color: AppTheme.textSecondaryColor(context),
             ),
             const SizedBox(width: 8),
@@ -163,9 +162,9 @@ class _HomeViewState extends State<HomeView> {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -209,9 +208,9 @@ class _HomeViewState extends State<HomeView> {
         Padding(
           padding: const EdgeInsets.only(right: 8.0),
           child: IconButton(
-            icon: Icon(
+            icon: AppIcon(
               PhosphorIconsRegular.gear,
-              size: 22.0,
+              size: AppIconSize.md,
               color: AppTheme.textPrimaryColor(context),
             ),
             onPressed: () => context.push('/profile'),
@@ -249,16 +248,16 @@ class _HomeViewState extends State<HomeView> {
                 Text(
                   l10n.homeViewAll,
                   style: theme.textTheme.labelLarge?.copyWith(
-                    color: AppTheme.accentGoldDark,
+                    color: AppTheme.textPrimaryColor(context),
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(width: 2),
-                const Icon(
+                AppIcon(
                   PhosphorIconsBold.caretRight,
-                  color: AppTheme.accentGoldDark,
-                  size: 14,
+                  color: AppTheme.textPrimaryColor(context),
+                  size: AppIconSize.xs,
                 ),
               ],
             ),
@@ -335,10 +334,10 @@ class _LiveFxBannerState extends State<_LiveFxBanner> {
             color: isDark ? Colors.white24 : Colors.black12,
           ),
           const SizedBox(width: 8),
-          Icon(
+          AppIcon(
             PhosphorIconsRegular.lockSimple,
-            size: 13,
-            color: AppTheme.primaryTealDark,
+            size: AppIconSize.xs,
+            color: AppTheme.primaryColor(context),
           ),
           const SizedBox(width: 4),
           Text(
@@ -346,7 +345,7 @@ class _LiveFxBannerState extends State<_LiveFxBanner> {
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               fontSize: 10,
               fontWeight: FontWeight.bold,
-              color: AppTheme.primaryTealDark,
+              color: AppTheme.primaryColor(context),
             ),
           ),
         ],
@@ -520,9 +519,9 @@ class _QuickActionCardState extends State<_QuickActionCard> with SingleTickerPro
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
-                  blurRadius: 16,
-                  offset: const Offset(0, 8),
+                  color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
                 ),
               ],
             ),
@@ -535,13 +534,13 @@ class _QuickActionCardState extends State<_QuickActionCard> with SingleTickerPro
                     color: iconBg,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(widget.icon, color: iconColor, size: 20),
+                  child: AppIcon(widget.icon, color: iconColor, size: AppIconSize.sm),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     widget.label,
-                    style: GoogleFonts.ibmPlexSans(
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: labelColor,

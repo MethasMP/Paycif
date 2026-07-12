@@ -1,7 +1,7 @@
 // ============================================================================
-// Get Saved Cards - PCI DSS Compliant Card Retrieval
+// Get Saved Payment Methods - PCI DSS Compliant Retrieval
 // ============================================================================
-// Retrieves saved card details (masked) from Omise Customer API.
+// Retrieves saved payment method details (masked) from Customer API.
 // SECURITY: Only returns id, brand, last_digits, expiration_month/year
 // ============================================================================
 
@@ -159,7 +159,7 @@ serve(async (req: Request) => {
       .single();
 
     if (profileError) {
-      console.error('[get-saved-cards] Profile fetch error:', profileError);
+      console.error('[get-saved-payment-methods] Profile fetch error:', profileError);
       return new Response(
         JSON.stringify({ error: 'Failed to fetch profile' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
@@ -178,8 +178,8 @@ serve(async (req: Request) => {
     // 3. CACHE LOOKUP (Redis-like experience)
     // =========================================================================
     const { data: cachedData } = await adminClient
-      .from('cache_saved_cards')
-      .select('cards_json, updated_at')
+      .from('cache_saved_payment_methods')
+      .select('payment_methods_json, updated_at')
       .eq('user_id', userId)
       .single();
 
@@ -188,9 +188,9 @@ serve(async (req: Request) => {
       const updatedAt = new Date(cachedData.updated_at).getTime();
       const now = new Date().getTime();
       if (now - updatedAt < CACHE_TTL_MS) {
-        console.log(`[Cache] Returning cached cards for ${userId} (Speed: <10ms)`);
+        console.log(`[Cache] Returning cached payment methods for ${userId} (Speed: <10ms)`);
         return new Response(
-          JSON.stringify({ cards: cachedData.cards_json }),
+          JSON.stringify({ cards: cachedData.payment_methods_json }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
         );
       }
@@ -201,7 +201,7 @@ serve(async (req: Request) => {
     // =========================================================================
     const omiseSecretKey = Deno.env.get('OMISE_SECRET_KEY');
     if (!omiseSecretKey) {
-      console.error('[get-saved-cards] OMISE_SECRET_KEY not configured');
+      console.error('[get-saved-payment-methods] OMISE_SECRET_KEY not configured');
       return new Response(
         JSON.stringify({ error: 'Payment provider not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
@@ -221,8 +221,8 @@ serve(async (req: Request) => {
 
     if (!customerResp.ok) {
       const err = await customerResp.text();
-      console.error('[get-saved-cards] Omise Customer fetch failed:', err);
-      throw new Error(`Omise API error: ${customerResp.status}`);
+      console.error('[get-saved-payment-methods] Customer fetch failed:', err);
+      throw new Error(`Customer API error: ${customerResp.status}`);
     }
 
     const customerData = await customerResp.json();
@@ -241,10 +241,10 @@ serve(async (req: Request) => {
     // =========================================================================
     // 5. UPDATE CACHE
     // =========================================================================
-    console.log(`[Cache] Updating card cache for ${userId}`);
-    await adminClient.from('cache_saved_cards').upsert({
+    console.log(`[Cache] Updating payment methods cache for ${userId}`);
+    await adminClient.from('cache_saved_payment_methods').upsert({
       user_id: userId,
-      cards_json: cards,
+      payment_methods_json: cards,
       updated_at: new Date().toISOString(),
     });
 
@@ -272,7 +272,7 @@ serve(async (req: Request) => {
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   } catch (error) {
-    console.error('[get-saved-cards] Unhandled error:', error);
+    console.error('[get-saved-payment-methods] Unhandled error:', error);
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },

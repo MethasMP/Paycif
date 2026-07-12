@@ -16,6 +16,7 @@ import 'package:frontend/features/security/presentation/widgets/change_pin_sheet
 import 'package:frontend/features/security/presentation/logic/security_controller.dart';
 import 'package:provider/provider.dart';
 import 'package:frontend/core/theme/app_theme.dart';
+import 'package:frontend/core/widgets/app_icon.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -244,7 +245,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 return ListTile(
                   title: Text(LanguageNotifier.getLanguageName(locale)),
                   trailing: isSelected
-                      ? Icon(PhosphorIcons.checkCircle, color: AppTheme.successGreen)
+                      ? AppIcon(PhosphorIcons.checkCircle, color: AppTheme.successGreen)
                       : null,
                   onTap: () {
                     languageNotifier.value = locale;
@@ -283,19 +284,19 @@ class _ProfilePageState extends State<ProfilePage> {
         title: Text(l10n.profileTitle),
         leading: canPop
             ? IconButton(
-                icon: Icon(
+                icon: AppIcon(
                   PhosphorIcons.caretLeft,
                   color: AppTheme.textPrimaryColor(context),
-                  size: 24,
+                  size: AppIconSize.md,
                 ),
                 onPressed: () => Navigator.of(context).pop(),
               )
             : (GoRouterState.of(context).uri.path == '/profile'
                 ? IconButton(
-                    icon: Icon(
+                    icon: AppIcon(
                       PhosphorIcons.house,
                       color: AppTheme.textPrimaryColor(context),
-                      size: 24,
+                      size: AppIconSize.md,
                     ),
                     onPressed: () => context.go('/main'),
                   )
@@ -347,15 +348,15 @@ class _ProfilePageState extends State<ProfilePage> {
                           ? Image.network(
                               avatarUrl,
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Icon(
+                              errorBuilder: (context, error, stackTrace) => AppIcon(
                                 PhosphorIcons.user,
-                                size: 28,
+                                size: AppIconSize.lg,
                                 color: AppTheme.primaryColor(context),
                               ),
                             )
-                          : Icon(
+                          : AppIcon(
                               PhosphorIcons.user,
-                              size: 28,
+                              size: AppIconSize.lg,
                               color: AppTheme.primaryColor(context),
                             ),
                     ),
@@ -396,7 +397,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(PhosphorIcons.shieldCheck, size: 14, color: AppTheme.successGreen),
+                                const AppIcon(PhosphorIcons.shieldCheck, size: AppIconSize.xs, color: AppTheme.successGreen),
                                 const SizedBox(width: 4),
                                 Text(
                                   l10n.profileVerifiedBadge,
@@ -434,7 +435,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   children: [
                     Row(
                       children: [
-                        const Icon(PhosphorIcons.warningCircle, color: AppTheme.stateWarning, size: 20),
+                        const AppIcon(PhosphorIcons.warningCircle, color: AppTheme.stateWarning, size: AppIconSize.sm),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -481,14 +482,32 @@ class _ProfilePageState extends State<ProfilePage> {
 
             const SizedBox(height: 24),
 
-            // ─── Group 1: Security & Safety ─────────────────────────
+            // ─── Group 1: Payment ────────────────────────────────
+            // Moved off the bottom nav bar (Session 002): card management is
+            // an occasional action, not a daily one, unlike Home/History/Scan.
+            _buildSectionHeader(context, l10n.paymentSettingsTitle),
+            const SizedBox(height: 8),
+            _buildMenuContainer(context, [
+              _buildMenuItem(
+                context: context,
+                icon: PhosphorIcons.cardsThree,
+                title: l10n.paymentSettingsTitle,
+                subtitle: l10n.homeActionCards,
+                onTap: () => context.push('/payment_settings'),
+              ),
+            ]),
+
+            const SizedBox(height: 20),
+
+            // ─── Group 2: Security & Safety ─────────────────────────
             _buildSectionHeader(context, l10n.accountSecurity),
             const SizedBox(height: 8),
             _buildMenuContainer(context, [
               _buildBiometricTile(context, l10n),
               _buildMenuItem(
-                PhosphorIcons.lock,
-                l10n.changePin,
+                context: context,
+                icon: PhosphorIcons.lock,
+                title: l10n.changePin,
                 onTap: () {
                   showModalBottomSheet(
                     context: context,
@@ -499,15 +518,16 @@ class _ProfilePageState extends State<ProfilePage> {
                 },
               ),
               _buildMenuItem(
-                PhosphorIcons.devices,
-                l10n.linkedDevices,
+                context: context,
+                icon: PhosphorIcons.devices,
+                title: l10n.linkedDevices,
                 onTap: () => context.push('/linked_devices'),
               ),
             ]),
 
             const SizedBox(height: 20),
 
-            // ─── Group 2: Preferences ─────────────────────────────
+            // ─── Group 3: Preferences ─────────────────────────────
             _buildSectionHeader(context, l10n.preferences),
             const SizedBox(height: 8),
             _buildMenuContainer(context, [
@@ -517,8 +537,9 @@ class _ProfilePageState extends State<ProfilePage> {
                 builder: (context, currentMode, _) {
                   final isDarkMode = currentMode == ThemeMode.dark;
                   return _buildMenuItem(
-                    isDarkMode ? PhosphorIcons.moon : PhosphorIcons.sun,
-                    isDarkMode ? l10n.darkMode : l10n.lightMode,
+                    context: context,
+                    icon: isDarkMode ? PhosphorIcons.moon : PhosphorIcons.sun,
+                    title: isDarkMode ? l10n.darkMode : l10n.lightMode,
                     onTap: () {
                       themeNotifier.value = isDarkMode
                           ? ThemeMode.light
@@ -528,7 +549,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       scale: 0.85,
                       child: Switch.adaptive(
                         value: isDarkMode,
-                        activeTrackColor: AppTheme.accentGold,
+                        activeTrackColor: AppTheme.primaryColor(context),
                         onChanged: (val) {
                           themeNotifier.value = val
                               ? ThemeMode.dark
@@ -540,34 +561,38 @@ class _ProfilePageState extends State<ProfilePage> {
                 },
               ),
               _buildMenuItem(
-                PhosphorIcons.globe,
-                l10n.language,
+                context: context,
+                icon: PhosphorIcons.globe,
+                title: l10n.language,
                 subtitle: LanguageNotifier.getLanguageName(
                   languageNotifier.value,
                 ),
                 onTap: () => _showLanguageSheet(context),
               ),
               _buildMenuItem(
-                PhosphorIcons.bell,
-                l10n.notifications,
+                context: context,
+                icon: PhosphorIcons.bell,
+                title: l10n.notifications,
                 onTap: () => context.push('/notification_settings'),
               ),
             ]),
 
             const SizedBox(height: 20),
 
-            // ─── Group 3: Help & Support ───────────────────────────
+            // ─── Group 4: Help & Support ───────────────────────────
             _buildSectionHeader(context, l10n.support),
             const SizedBox(height: 8),
             _buildMenuContainer(context, [
               _buildMenuItem(
-                PhosphorIcons.question,
-                l10n.helpCenter,
+                context: context,
+                icon: PhosphorIcons.question,
+                title: l10n.helpCenter,
                 onTap: () => context.push('/help'),
               ),
               _buildMenuItem(
-                PhosphorIcons.chat,
-                l10n.contactSupport,
+                context: context,
+                icon: PhosphorIcons.chat,
+                title: l10n.contactSupport,
                 onTap: () => context.push('/contact_support'),
               ),
             ]),
@@ -616,7 +641,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 button: true,
                 child: ElevatedButton.icon(
                   onPressed: () => _showSignOutConfirmation(context),
-                  icon: const Icon(PhosphorIcons.signOut, size: 20),
+                  icon: const AppIcon(PhosphorIcons.signOut, size: AppIconSize.sm),
                   label: Text(l10n.signOut),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.errorRed.withValues(alpha: theme.brightness == Brightness.dark ? 0.12 : 0.1),
@@ -702,9 +727,10 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildMenuItem(
-    IconData icon,
-    String title, {
+  Widget _buildMenuItem({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
     String? subtitle,
     VoidCallback? onTap,
     Widget? trailing,
@@ -713,15 +739,10 @@ class _ProfilePageState extends State<ProfilePage> {
       onTap: onTap,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       horizontalTitleGap: 12,
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Theme.of(context).brightness == Brightness.dark
-              ? Colors.white.withValues(alpha: 0.06)
-              : AppTheme.primaryTealLight,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, size: 24, color: AppTheme.primaryColor(context)),
+      leading: AppIcon(
+        icon,
+        size: AppIconSize.md,
+        color: AppTheme.textSecondaryColor(context),
       ),
       title: Text(
         title,
@@ -740,7 +761,7 @@ class _ProfilePageState extends State<ProfilePage> {
           : null,
       trailing:
           trailing ??
-          Icon(PhosphorIcons.caretRight, color: AppTheme.textSecondaryColor(context), size: 20),
+          AppIcon(PhosphorIcons.caretRight, color: AppTheme.textSecondaryColor(context), size: AppIconSize.sm),
     );
   }
 
@@ -749,19 +770,10 @@ class _ProfilePageState extends State<ProfilePage> {
       onTap: () => _handleBiometricToggle(l10n),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       horizontalTitleGap: 12,
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Theme.of(context).brightness == Brightness.dark
-              ? Colors.white.withValues(alpha: 0.06)
-              : AppTheme.primaryTealLight,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(
-          PhosphorIcons.fingerprint,
-          size: 24,
-          color: AppTheme.primaryColor(context),
-        ),
+      leading: AppIcon(
+        PhosphorIcons.fingerprint,
+        size: AppIconSize.md,
+        color: AppTheme.textSecondaryColor(context),
       ),
       title: Text(
         l10n.biometricLabel,

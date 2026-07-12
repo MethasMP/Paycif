@@ -4,6 +4,7 @@ import 'package:frontend/core/theme/app_theme.dart';
 import 'package:frontend/core/widgets/paycif_button.dart';
 import 'package:frontend/features/payment/data/ach_onramp_service.dart';
 import 'package:frontend/core/l10n/generated/app_localizations.dart';
+import 'package:frontend/core/widgets/app_icon.dart';
 
 /// Bottom sheet shown before opening the ACH widget.
 /// Displays supported payment methods + fee structure for the user's currency.
@@ -155,7 +156,7 @@ class _MethodRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
         children: [
-          Icon(PhosphorIcons.wallet, size: 18, color: AppTheme.primaryColor(context)),
+          AppIcon(PhosphorIcons.wallet, size: AppIconSize.sm, color: AppTheme.primaryColor(context)),
           const SizedBox(width: 10),
           Expanded(
             child: Text(method.payWayName,
@@ -183,7 +184,7 @@ class _InfoRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: mutedColor),
+          AppIcon(icon, size: AppIconSize.sm, color: mutedColor),
           const SizedBox(width: 10),
           Expanded(
             child: Text(label,

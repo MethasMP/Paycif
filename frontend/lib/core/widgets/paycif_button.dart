@@ -45,9 +45,7 @@ class PaycifButton extends StatelessWidget {
         if (variant == PaycifButtonVariant.ghost || variant == PaycifButtonVariant.secondary) {
           return Colors.transparent;
         }
-        return isDark 
-            ? AppTheme.accentGoldDisabled.withValues(alpha: 0.3) 
-            : AppTheme.primaryTealLight;
+        return isDark ? AppTheme.darkSurfaceSunken : AppTheme.lightSurfaceSunken;
       }
 
       switch (variant) {
@@ -56,7 +54,8 @@ class PaycifButton extends StatelessWidget {
         case PaycifButtonVariant.secondary:
           return Colors.transparent;
         case PaycifButtonVariant.accent:
-          return isDark ? AppTheme.darkTheme.colorScheme.secondary : AppTheme.accentGold;
+          // Accent maps to the action color — gold is warning-only.
+          return isDark ? AppTheme.darkActionPrimary : AppTheme.lightActionPrimary;
         case PaycifButtonVariant.ghost:
           return Colors.transparent;
       }
@@ -65,7 +64,7 @@ class PaycifButton extends StatelessWidget {
     // Foreground color
     Color getFgColor() {
       if (_isDisabled) {
-        return theme.disabledColor;
+        return isDark ? AppTheme.darkTextTertiary : AppTheme.lightTextTertiary;
       }
 
       switch (variant) {
@@ -74,9 +73,9 @@ class PaycifButton extends StatelessWidget {
         case PaycifButtonVariant.secondary:
           return isDark ? AppTheme.darkTheme.primaryColor : AppTheme.primaryTeal;
         case PaycifButtonVariant.accent:
-          return AppTheme.accentGoldDark;
+          return Colors.white;
         case PaycifButtonVariant.ghost:
-          return isDark ? Colors.white70 : AppTheme.textSecondary;
+          return isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary;
       }
     }
 
@@ -95,7 +94,9 @@ class PaycifButton extends StatelessWidget {
       height: height,
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 150),
-        opacity: _isDisabled ? 0.6 : 1.0,
+        // Disabled state is carried by the sunken bg + tertiary ink;
+        // extra opacity would double-dim the label below readable contrast.
+        opacity: 1.0,
         child: OutlinedButton(
           onPressed: _isDisabled ? null : onPressed,
           style: OutlinedButton.styleFrom(

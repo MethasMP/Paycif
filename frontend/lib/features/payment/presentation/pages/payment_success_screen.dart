@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -10,10 +11,15 @@ import 'package:frontend/core/theme/app_theme.dart';
 import 'package:frontend/core/widgets/paycif_text.dart';
 import 'package:frontend/core/widgets/paycif_button.dart';
 import 'package:frontend/core/l10n/generated/app_localizations.dart';
+import 'package:frontend/core/widgets/app_icon.dart';
 
-class PaymentSuccessScreen extends StatelessWidget {
+class PaymentSuccessScreen extends StatefulWidget {
   final String transactionId;
   final double amount;
+
+  /// What the card was actually charged, in USD — shown on the slip so the
+  /// user can reconcile their card statement without remembering it.
+  final double? totalUsd;
   final String recipientName;
   final String? promptPayId;
 
@@ -21,9 +27,30 @@ class PaymentSuccessScreen extends StatelessWidget {
     super.key,
     required this.transactionId,
     required this.amount,
+    this.totalUsd,
     required this.recipientName,
     this.promptPayId,
   });
+
+  @override
+  State<PaymentSuccessScreen> createState() => _PaymentSuccessScreenState();
+}
+
+class _PaymentSuccessScreenState extends State<PaymentSuccessScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Play success notification haptic (heavyImpact + lightImpact 100ms apart)
+    // as per paycif-motion-spec-v1.md section 5
+    _triggerSuccessHaptics();
+  }
+
+  void _triggerSuccessHaptics() {
+    HapticFeedback.heavyImpact();
+    Future.delayed(const Duration(milliseconds: 100), () {
+      HapticFeedback.lightImpact();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,11 +74,10 @@ class PaymentSuccessScreen extends StatelessWidget {
                       color: AppTheme.textPrimaryColor(context),
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
-                      letterSpacing: 1.0,
                     ),
                   ),
                   IconButton(
-                    icon: Icon(PhosphorIcons.x, color: AppTheme.textPrimaryColor(context)),
+                    icon: AppIcon(PhosphorIcons.x, color: AppTheme.textPrimaryColor(context)),
                     onPressed: () => _navigateToHome(context),
                   ),
                 ],
@@ -73,19 +99,10 @@ class PaymentSuccessScreen extends StatelessWidget {
                     child: PaycifButton(
                       text: l10n.successBackToHome,
                       onPressed: () => _navigateToHome(context),
-                      variant: PaycifButtonVariant.accent,
+                      variant: PaycifButtonVariant.primary,
                       size: PaycifButtonSize.lg,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  TextButton.icon(
-                    onPressed: null,
-                    icon: Icon(PhosphorIcons.downloadSimple, color: AppTheme.textSecondaryColor(context), size: 20),
-                    label: Text(
-                      l10n.successSaveToGallery,
-                      style: TextStyle(color: AppTheme.textSecondaryColor(context), fontWeight: FontWeight.w500, fontSize: 14),
-                    ),
-                  )
                 ],
               ),
             ),
@@ -139,16 +156,16 @@ class PaymentSuccessScreen extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
+                const AppIcon(
                   PhosphorIcons.shieldCheckFill,
                   color: AppTheme.signalGreen,
-                  size: 18,
+                  size: AppIconSize.xs,
                 ),
                 const SizedBox(width: 8),
                 Text(
                   l10n.successVerifiedBadge,
                   style: const TextStyle(
-                    color: AppTheme.signalGreen,
+                    color: AppTheme.successGreenText,
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 0.5,
@@ -171,7 +188,11 @@ class PaymentSuccessScreen extends StatelessWidget {
                           color: AppTheme.signalGreen.withValues(alpha: 0.1),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(PhosphorIcons.check, color: AppTheme.signalGreen, size: 32),
+                        // Animated drawing checkmark as per spec (300ms easeOut)
+                        child: const AnimatedCheckmark(
+                          size: 28.0,
+                          color: AppTheme.signalGreen,
+                        ),
                       ),
                       const SizedBox(height: 10),
                       PaycifText(
@@ -194,7 +215,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                         label: l10n.successFromLabel,
                         name: l10n.successYourWallet,
                         subtext: Supabase.instance.client.auth.currentUser?.email ?? '',
-                        icon: PhosphorIcons.wallet,
+                        icon: PhosphorIcons.creditCard,
                         textColor: textColor,
                         textMuted: textMuted,
                         isDark: isDark,
@@ -209,8 +230,8 @@ class PaymentSuccessScreen extends StatelessWidget {
                       ),
                       _buildParticipantRow(
                         label: l10n.successToLabel,
-                        name: recipientName,
-                        subtext: promptPayId != null ? 'PromptPay: $promptPayId' : l10n.successMerchantLabel,
+                        name: widget.recipientName,
+                        subtext: widget.promptPayId != null ? 'PromptPay: ${widget.promptPayId}' : l10n.successMerchantLabel,
                         icon: PhosphorIcons.storefront,
                         textColor: textColor,
                         textMuted: textMuted,
@@ -226,35 +247,24 @@ class PaymentSuccessScreen extends StatelessWidget {
                         style: TextStyle(color: textMuted, fontSize: 13, fontWeight: FontWeight.w500),
                       ),
                       const SizedBox(height: 4),
-                      RichText(
-                        text: TextSpan(
+                      // Animated Count-Up text (280ms) with tabular figures
+                      AnimatedAmount(
+                        amount: widget.amount,
+                        textColor: textColor,
+                        textMuted: textMuted,
+                      ),
+                      if (widget.totalUsd != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          l10n.successChargedUsd(widget.totalUsd!.toStringAsFixed(2)),
                           style: TextStyle(
-                            color: textColor,
-                            fontFamily: Theme.of(context).textTheme.displayMedium?.fontFamily,
+                            color: textMuted,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
                             fontFeatures: const [FontFeature.tabularFigures()],
                           ),
-                          children: [
-                            TextSpan(
-                              text: NumberFormat('#,##0.00').format(amount),
-                              style: const TextStyle(
-                                fontSize: 34,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -1,
-                              ),
-                            ),
-                            const TextSpan(text: ' '),
-                            TextSpan(
-                              text: 'THB',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: textMuted,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ],
                         ),
-                      ),
+                      ],
                     ],
                   ),
                   Divider(color: isDark ? Colors.white.withValues(alpha: 0.1) : AppTheme.borderGrey, height: 1),
@@ -272,7 +282,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              transactionId,
+                              widget.transactionId,
                               style: TextStyle(
                                 color: textColor,
                                 fontSize: 11,
@@ -284,12 +294,12 @@ class PaymentSuccessScreen extends StatelessWidget {
                             const SizedBox(height: 8),
                             Row(
                               children: [
-                                const Icon(PhosphorIcons.checkCircleFill, color: AppTheme.signalGreen, size: 16),
+                                const AppIcon(PhosphorIcons.checkCircleFill, color: AppTheme.signalGreen, size: AppIconSize.xs),
                                 const SizedBox(width: 4),
                                 Text(
                                   l10n.successVerifiedLabel,
                                   style: const TextStyle(
-                                    color: AppTheme.signalGreen,
+                                    color: AppTheme.successGreenText,
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -307,7 +317,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                           border: Border.all(color: AppTheme.borderGrey),
                         ),
                         child: QrImageView(
-                          data: 'PAYCIF:TXN:$transactionId:AMT:$amount',
+                          data: 'PAYCIF:TXN:${widget.transactionId}:AMT:${widget.amount}',
                           version: QrVersions.auto,
                           size: 60.0,
                           backgroundColor: Colors.white,
@@ -343,7 +353,7 @@ class PaymentSuccessScreen extends StatelessWidget {
             color: isDark ? Colors.white.withValues(alpha: 0.05) : AppTheme.backgroundGrey,
             shape: BoxShape.circle,
           ),
-          child: Icon(icon, color: textColor, size: 20),
+          child: AppIcon(icon, color: textColor, size: AppIconSize.sm),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -381,5 +391,187 @@ class PaymentSuccessScreen extends StatelessWidget {
       context.read<DashboardController>().refresh();
     } catch (_) {}
     Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ANIMATED CHECKMARK — Draws the path over 300ms using Curves.easeOutCubic
+// ─────────────────────────────────────────────────────────────────────────────
+class AnimatedCheckmark extends StatefulWidget {
+  final double size;
+  final Color color;
+  final Duration duration;
+
+  const AnimatedCheckmark({
+    super.key,
+    this.size = 28.0,
+    required this.color,
+    this.duration = const Duration(milliseconds: 300),
+  });
+
+  @override
+  State<AnimatedCheckmark> createState() => _AnimatedCheckmarkState();
+}
+
+class _AnimatedCheckmarkState extends State<AnimatedCheckmark> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: widget.duration,
+    );
+    _animation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+    );
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: Size(widget.size, widget.size),
+      painter: _CheckmarkPainter(
+        progress: _animation,
+        color: widget.color,
+      ),
+    );
+  }
+}
+
+class _CheckmarkPainter extends CustomPainter {
+  final Animation<double> progress;
+  final Color color;
+
+  _CheckmarkPainter({required this.progress, required this.color}) : super(repaint: progress);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.5
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final path = Path();
+    final start = Offset(size.width * 0.22, size.height * 0.52);
+    final mid = Offset(size.width * 0.44, size.height * 0.72);
+    final end = Offset(size.width * 0.78, size.height * 0.32);
+
+    path.moveTo(start.dx, start.dy);
+    path.lineTo(mid.dx, mid.dy);
+    path.lineTo(end.dx, end.dy);
+
+    final t = progress.value;
+    final animatedPath = Path();
+    animatedPath.moveTo(start.dx, start.dy);
+
+    // Segment 1 (start -> mid): ~0.35 of animation
+    // Segment 2 (mid -> end): ~0.65 of animation
+    if (t < 0.35) {
+      final t1 = t / 0.35;
+      final currentMid = Offset.lerp(start, mid, t1)!;
+      animatedPath.lineTo(currentMid.dx, currentMid.dy);
+    } else {
+      animatedPath.lineTo(mid.dx, mid.dy);
+      final t2 = (t - 0.35) / 0.65;
+      final currentEnd = Offset.lerp(mid, end, t2)!;
+      animatedPath.lineTo(currentEnd.dx, currentEnd.dy);
+    }
+
+    canvas.drawPath(animatedPath, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _CheckmarkPainter oldDelegate) {
+    return oldDelegate.progress.value != progress.value || oldDelegate.color != color;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ANIMATED AMOUNT — Interpolates double amount over 280ms
+// ─────────────────────────────────────────────────────────────────────────────
+class AnimatedAmount extends StatefulWidget {
+  final double amount;
+  final Color textColor;
+  final Color textMuted;
+
+  const AnimatedAmount({
+    super.key,
+    required this.amount,
+    required this.textColor,
+    required this.textMuted,
+  });
+
+  @override
+  State<AnimatedAmount> createState() => _AnimatedAmountState();
+}
+
+class _AnimatedAmountState extends State<AnimatedAmount> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280), // motion.number = 280ms
+    );
+    _animation = Tween<double>(begin: 0.0, end: widget.amount).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
+    );
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return RichText(
+          text: TextSpan(
+            style: TextStyle(
+              color: widget.textColor,
+              fontFamily: Theme.of(context).textTheme.displayMedium?.fontFamily,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+            children: [
+              TextSpan(
+                text: NumberFormat('#,##0.00').format(_animation.value),
+                style: AppTheme.amountTextStyle(context, color: widget.textColor),
+              ),
+              const TextSpan(text: ' '),
+              TextSpan(
+                text: 'THB',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: widget.textMuted,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }

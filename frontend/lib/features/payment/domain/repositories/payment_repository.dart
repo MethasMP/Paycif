@@ -28,6 +28,8 @@ abstract class IPaymentRepository {
     String? reference1,
     String? reference2,
     String? email,
+    double? lat,
+    double? lng,
   });
 
   /// Polls backend for the current status of a PayoutIntent.

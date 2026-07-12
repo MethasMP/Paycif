@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -12,6 +11,7 @@ import 'package:frontend/core/utils/error_translator.dart';
 import 'package:flutter/foundation.dart';
 import 'package:frontend/core/l10n/generated/app_localizations.dart';
 import 'package:frontend/core/theme/app_theme.dart';
+import 'package:frontend/core/widgets/app_icon.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RECOVERY SCREEN
@@ -212,9 +212,9 @@ class _RecoveryScreenState extends State<RecoveryScreen>
                     : Colors.black.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(
+              child: AppIcon(
                 PhosphorIcons.caretLeft,
-                size: 20,
+                size: AppIconSize.sm,
                 color: AppTheme.textPrimaryColor(context),
               ),
             ),
@@ -239,7 +239,7 @@ class _RecoveryScreenState extends State<RecoveryScreen>
             color: primary.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(16),
           ),
-          child: Icon(PhosphorIcons.shieldCheck, color: primary, size: 26),
+          child: AppIcon(PhosphorIcons.shieldCheck, color: primary, size: AppIconSize.md),
         )
         .animate()
         .scale(begin: const Offset(0.7, 0.7), duration: 500.ms, curve: Curves.elasticOut),
@@ -362,8 +362,8 @@ class _RecoveryScreenState extends State<RecoveryScreen>
                   padding: const EdgeInsets.only(top: 10, left: 4),
                   child: Row(
                     children: [
-                      Icon(PhosphorIcons.warningCircle,
-                          size: 14,
+                      AppIcon(PhosphorIcons.warningCircle,
+                          size: AppIconSize.xs,
                           color: AppTheme.errorRedText),
                       const SizedBox(width: 6),
                       Expanded(
@@ -491,9 +491,9 @@ class _RecoveryScreenState extends State<RecoveryScreen>
           return _RecoveryKeypadButton(
             isDark: isDark,
             onTap: _deleteDigit,
-            child: Icon(
+            child: AppIcon(
               PhosphorIcons.backspace,
-              size: 24,
+              size: AppIconSize.md,
               color: AppTheme.textSecondaryColor(context),
             ),
           );
@@ -596,9 +596,9 @@ class _LockedState extends StatelessWidget {
                         : Colors.black.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(
+                  child: AppIcon(
                     PhosphorIcons.caretLeft,
-                    size: 20,
+                    size: AppIconSize.sm,
                     color: AppTheme.textPrimaryColor(context),
                   ),
                 ),
@@ -617,9 +617,9 @@ class _LockedState extends StatelessWidget {
               color: AppTheme.warningAmber.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(24),
             ),
-            child: const Icon(
+            child: const AppIcon(
               PhosphorIcons.lockSimple,
-              size: 36,
+              size: AppIconSize.lg,
               color: AppTheme.warningAmber,
             ),
           )
@@ -699,21 +699,10 @@ class _VerifiedSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-      child: Container(
+    return Container(
         decoration: BoxDecoration(
-          color: isDark
-              ? const Color(0xFF141A18).withValues(alpha: 0.98)
-              : Colors.white.withValues(alpha: 0.98),
+          color: isDark ? AppTheme.darkSurfaceCard : Colors.white,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          border: Border(
-            top: BorderSide(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.08)
-                  : Colors.black.withValues(alpha: 0.05),
-            ),
-          ),
         ),
         padding: EdgeInsets.fromLTRB(
           28,
@@ -746,9 +735,9 @@ class _VerifiedSheet extends StatelessWidget {
                 color: AppTheme.primaryTeal.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: const AppIcon(
                 PhosphorIcons.checkCircle,
-                size: 36,
+                size: AppIconSize.lg,
                 color: AppTheme.primaryTeal,
               ),
             )
@@ -794,9 +783,9 @@ class _VerifiedSheet extends StatelessWidget {
                 onPressed: () => context.go('/pin_setup'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: isDark
-                      ? AppTheme.accentGoldDisabled
-                      : AppTheme.accentGold,
-                  foregroundColor: AppTheme.accentGoldDark,
+                      ? AppTheme.darkActionPrimary
+                      : AppTheme.lightActionPrimary,
+                  foregroundColor: Colors.white,
                   elevation: 0,
                   shadowColor: Colors.transparent,
                   shape: RoundedRectangleBorder(
@@ -818,7 +807,6 @@ class _VerifiedSheet extends StatelessWidget {
             .slideY(begin: 0.1, end: 0, duration: 350.ms, curve: Curves.easeOut),
           ],
         ),
-      ),
     );
   }
 }

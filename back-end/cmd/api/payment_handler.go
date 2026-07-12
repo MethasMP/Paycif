@@ -146,13 +146,15 @@ func (h *PaymentHandler) HandleGetQuote(c *gin.Context) {
 // --- Create Intent + ACH Order ---
 
 type CreatePayoutIntentRequest struct {
-	Amount        int64  `json:"amount" binding:"required,gt=0"` // satangs
-	FiatCurrency  string `json:"fiat_currency" binding:"required"`
-	PromptPayID   string `json:"promptpay_id" binding:"required"`
-	RecipientName string `json:"recipient_name" binding:"required"`
-	SqrilTxID     string `json:"sqril_tx_id" binding:"required"`
-	CorridorType  string `json:"corridor_type" binding:"required"`
-	Email         string `json:"email"` // optional, pre-fills ACH KYC
+	Amount        int64    `json:"amount" binding:"required,gt=0"` // satangs
+	FiatCurrency  string   `json:"fiat_currency" binding:"required"`
+	PromptPayID   string   `json:"promptpay_id" binding:"required"`
+	RecipientName string   `json:"recipient_name" binding:"required"`
+	SqrilTxID     string   `json:"sqril_tx_id" binding:"required"`
+	CorridorType  string   `json:"corridor_type" binding:"required"`
+	Email         string   `json:"email"` // optional, pre-fills ACH KYC
+	Lat           *float64 `json:"lat"`   // optional, device GPS — informational only, not used for blocking (see GeoBlockMiddleware)
+	Lng           *float64 `json:"lng"`
 }
 
 // HandleCreateIntent validates the SQRIL quote, stores a PayoutIntent, calls ACH to create
@@ -173,6 +175,16 @@ func (h *PaymentHandler) HandleCreateIntent(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID"})
 		return
+	}
+
+	// Device-reported GPS is a soft signal only (trivially spoofed) — logged
+	// for audit/evidence purposes, never used to allow or block the request.
+	// The real enforcement is GeoBlockMiddleware's server-side IP check.
+	if req.Lat != nil && req.Lng != nil {
+		h.Service.Audit.Log(c.Request.Context(), userID, "payment_intent_gps", "payment", "", map[string]interface{}{
+			"lat": *req.Lat,
+			"lng": *req.Lng,
+		})
 	}
 
 	// 1. Validate SQRIL quote is still alive before we commit to anything

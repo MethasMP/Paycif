@@ -13,6 +13,30 @@ import 'package:frontend/features/transactions/domain/transaction.dart';
 import 'dart:async'; // Required for Completer
 
 class ApiService {
+  // 🛡️ Local-dev-only fallback for Supabase demo project. NEVER used outside
+  // kDebugMode — release/profile builds must always pass --dart-define.
+  static const String _localDevSupabaseAnonKey =
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+
+  /// Resolves a required `--dart-define` value. Falls back to a local-dev
+  /// default ONLY in debug builds; release/profile builds fail fast instead
+  /// of silently shipping with dev credentials.
+  static String requireEnv(String value, String name, {String? debugFallback}) {
+    if (value.isNotEmpty) return value;
+    if (kDebugMode && debugFallback != null) {
+      return debugFallback;
+    }
+    throw Exception(
+      '🚨 FATAL: $name is missing. Pass it via --dart-define=$name=... at build time.',
+    );
+  }
+
+  static String get supabaseAnonKey => requireEnv(
+        const String.fromEnvironment('SUPABASE_ANON_KEY'),
+        'SUPABASE_ANON_KEY',
+        debugFallback: _localDevSupabaseAnonKey,
+      );
+
   // 🔌 CIRCUIT BREAKER: Stop hammering a dead backend
   static bool _isBackendDead = false;
   static DateTime? _lastBackendFailure;
@@ -105,12 +129,13 @@ class ApiService {
       if (defineUrl.isNotEmpty) {
         url = defineUrl;
       } else {
-        // 2. Fallback logic for Local Development
-        if (Platform.isAndroid) {
-          url = 'http://10.0.2.2:8080';
-        } else {
-          url = 'http://localhost:8080';
-        }
+        // 2. Fallback logic for Local Development only — release/profile
+        // builds must always pass --dart-define=BACKEND_URL=...
+        url = requireEnv(
+          '',
+          'BACKEND_URL',
+          debugFallback: Platform.isAndroid ? 'http://10.0.2.2:8080' : 'http://localhost:8080',
+        );
       }
     }
 
@@ -261,20 +286,17 @@ class ApiService {
     final jwt = token ?? client.auth.currentSession?.accessToken ?? '';
     final sanitizedJwt = jwt.trim().replaceAll('\n', '').replaceAll('\r', '');
 
-    const supabaseUrlEnv = String.fromEnvironment('SUPABASE_URL');
-    final supabaseUrlBase = supabaseUrlEnv.isNotEmpty 
-        ? supabaseUrlEnv 
-        : 'http://127.0.0.1:54321';
+    final supabaseUrlBase = requireEnv(
+      const String.fromEnvironment('SUPABASE_URL'),
+      'SUPABASE_URL',
+      debugFallback: 'http://127.0.0.1:54321',
+    );
     final resolvedUrl = resolveLocalHost(supabaseUrlBase);
     final supabaseUrl = resolvedUrl.endsWith('/')
         ? resolvedUrl.substring(0, resolvedUrl.length - 1)
         : resolvedUrl;
 
-    const supabaseKeyEnv = String.fromEnvironment('SUPABASE_ANON_KEY');
-    final supabaseKeyBase = supabaseKeyEnv.isNotEmpty 
-        ? supabaseKeyEnv 
-        : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
-    final supabaseKey = supabaseKeyBase
+    final supabaseKey = supabaseAnonKey
         .trim()
         .replaceAll('\n', '')
         .replaceAll('\r', '');
@@ -372,11 +394,7 @@ class ApiService {
     final String token = session?.accessToken ?? '';
     final sanitizedJwt = token.trim().replaceAll('\n', '').replaceAll('\r', '');
 
-    const supabaseKeyEnv = String.fromEnvironment('SUPABASE_ANON_KEY');
-    final supabaseKey = supabaseKeyEnv.isNotEmpty 
-        ? supabaseKeyEnv 
-        : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
-    final sanitizedApiKey = supabaseKey
+    final sanitizedApiKey = supabaseAnonKey
         .trim()
         .replaceAll('\n', '').replaceAll('\r', '');
 
@@ -1064,6 +1082,8 @@ class ApiService {
     String? reference1,
     String? reference2,
     String? email,
+    double? lat,
+    double? lng,
   }) async {
     final response = await _safeRequest(
       (headers) => http.post(
@@ -1084,6 +1104,12 @@ class ApiService {
           if (reference2 != null) 'reference2': reference2,
           // ignore: use_null_aware_elements
           if (email != null) 'email': email,
+          // Soft signal only — informational/audit, not used for blocking.
+          // The real geo-fence is the backend's IP-based check.
+          // ignore: use_null_aware_elements
+          if (lat != null) 'lat': lat,
+          // ignore: use_null_aware_elements
+          if (lng != null) 'lng': lng,
         }),
       ),
     );

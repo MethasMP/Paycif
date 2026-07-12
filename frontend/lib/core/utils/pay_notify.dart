@@ -1,9 +1,9 @@
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:frontend/core/theme/app_theme.dart';
+import 'package:frontend/core/widgets/app_icon.dart';
 
 enum PayNotifyType { success, error, info }
 
@@ -175,56 +175,49 @@ class _PayNotifyWidgetState extends State<_PayNotifyWidget> {
                     setState(() => _isExiting = true);
                     Future.delayed(400.ms, widget.onDismiss);
                   },
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 16,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isDark
-                              ? Colors.black.withValues(alpha: 0.6)
-                              : Colors.white.withValues(alpha: 0.8),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: baseColor.withValues(alpha: 0.3),
-                            width: 1.5,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: baseColor.withValues(alpha: 0.1),
-                              blurRadius: 20,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: baseColor.withValues(alpha: 0.2),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(icon, color: baseColor, size: 20),
-                            ),
-                            SizedBox(width: 16),
-                            Expanded(
-                              child: Text(
-                                widget.message,
-                                style: TextStyle(
-                                  color: isDark ? Colors.white : Colors.black87,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 15,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                  // Solid card toast — glass is reserved for the nav dock.
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 16,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppTheme.darkSurfaceCard : Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: baseColor.withValues(alpha: 0.3),
+                        width: 1.5,
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: baseColor.withValues(alpha: 0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: AppIcon(icon, color: baseColor, size: AppIconSize.sm),
+                        ),
+                        SizedBox(width: 16),
+                        Expanded(
+                          child: Text(
+                            widget.message,
+                            style: TextStyle(
+                              color: AppTheme.textPrimaryColor(context),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 )

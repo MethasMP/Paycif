@@ -8,6 +8,7 @@ import 'package:frontend/features/kyc/presentation/kyc_webview_screen.dart';
 import 'package:frontend/features/kyc/presentation/sumsub_kyc_cubit.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
+import 'package:frontend/core/widgets/app_icon.dart';
 
 class KycScreen extends StatefulWidget {
   const KycScreen({super.key});
@@ -45,7 +46,7 @@ class _KycScreenState extends State<KycScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(PhosphorIcons.caretLeft),
+          icon: AppIcon(PhosphorIcons.caretLeft),
           onPressed: () => Navigator.of(context).pop(false),
         ),
         title: Text(
@@ -90,16 +91,16 @@ class _KycScreenState extends State<KycScreen> {
 
   Widget _buildIcon(KycState state) {
     if (state is KycVerified) {
-      return Icon(PhosphorIcons.shieldCheck, color: AppTheme.successGreen, size: 80)
+      return AppIcon(PhosphorIcons.shieldCheck, color: AppTheme.successGreen, size: AppIconSize.xl)
           .animate()
           .scale(begin: const Offset(0.5, 0.5), duration: 400.ms, curve: Curves.elasticOut);
     }
     if (state is KycFailed) {
-      return Icon(PhosphorIcons.shieldWarning, color: AppTheme.errorRed, size: 80);
+      return AppIcon(PhosphorIcons.shieldWarning, color: AppTheme.errorRed, size: AppIconSize.xl);
     }
-    return Icon(PhosphorIcons.shield, color: AppTheme.primaryTeal, size: 80)
+    return AppIcon(PhosphorIcons.shield, color: AppTheme.primaryTeal, size: AppIconSize.xl)
         .animate(onPlay: (c) => c.repeat())
-        .shimmer(duration: 2.seconds, color: AppTheme.accentGold.withValues(alpha: 0.4));
+        .shimmer(duration: 2.seconds, color: Colors.white.withValues(alpha: 0.4));
   }
 
   String _titleFor(KycState state, AppLocalizations l10n) {

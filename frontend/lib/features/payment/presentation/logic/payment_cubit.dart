@@ -4,6 +4,7 @@ import 'package:frontend/features/payment/domain/repositories/payment_repository
 import 'package:frontend/features/payment/presentation/logic/payment_state.dart';
 import 'package:frontend/core/models/decoded_qr.dart';
 import 'package:frontend/core/models/quotation_model.dart';
+import 'package:frontend/core/utils/location_service.dart';
 class PaymentCubit extends Cubit<PaymentState> {
   final IPaymentRepository _paymentRepository;
 
@@ -132,6 +133,10 @@ class PaymentCubit extends Cubit<PaymentState> {
       final amountSatang = (currentState.amount * 100).toInt();
       final sqrilTxId = currentState.sqrilTxId ?? '';
 
+      // Soft signal only — never blocks or delays payment on its own; the
+      // real geo-fence enforcement happens server-side via IP.
+      final location = await getCurrentLocationOrNull();
+
       final result = await _paymentRepository.createOnRampIntent(
         amountSatang: amountSatang,
         sqrilTxId: sqrilTxId,
@@ -142,6 +147,8 @@ class PaymentCubit extends Cubit<PaymentState> {
         reference1: reference1,
         reference2: reference2,
         email: email,
+        lat: location?.lat,
+        lng: location?.lng,
       );
 
       if (isClosed) return;
