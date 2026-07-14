@@ -14,6 +14,7 @@ import (
 	"paysif/internal/infrastructure/logger"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/sony/gobreaker"
 )
 
@@ -212,6 +213,25 @@ type PayoutResponse struct {
 }
 
 
+// isSerializationFailure reports whether err is a Postgres serialization
+// failure (SQLSTATE 40001), which is retryable under SERIALIZABLE isolation.
+func isSerializationFailure(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "40001"
+	}
+	return false
+}
+
+// isDeadlockFailure reports whether err is a Postgres deadlock error (SQLSTATE 40P01).
+func isDeadlockFailure(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "40P01"
+	}
+	return false
+}
+
 // payoutReservation holds the result of the fast reservation transaction (Phase 1).
 type payoutReservation struct {
 	TransactionID  uuid.UUID
@@ -266,7 +286,7 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 	}
 
 	newTxID := uuid.New()
-	description := fmt.Sprintf("PromptPay to %s (%s)", req.RecipientName, req.PromptPayID)
+	description := "PromptPay to " + req.RecipientName + " (" + req.PromptPayID + ")"
 	metadata, err := json.Marshal(map[string]string{
 		"promptpay_id":   req.PromptPayID,
 		"recipient_name": req.RecipientName,
