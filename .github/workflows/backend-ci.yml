@@ -19,11 +19,17 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        if: github.event_name == 'pull_request'
+        run: git fetch origin ${{ github.base_ref }}
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.26.4'
           cache-dependency-path: back-end/go.sum
 
       - name: Verify Dependencies
@@ -34,7 +40,10 @@ jobs:
         with:
           version: latest
           working-directory: back-end
-          args: --timeout=5m
+          install-mode: goinstall
+          args: >
+            --timeout=5m
+            ${{ github.event_name == 'pull_request' && format('--new-from-rev=origin/{0}', github.base_ref) || '' }}
 
       - name: Run Tests with Race Detector
         run: go test -v -race ./...
@@ -54,7 +63,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.26.4'
           cache-dependency-path: back-end/go.sum
 
       - name: Build Microservice
