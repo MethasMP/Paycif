@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -107,7 +108,10 @@ type ExchangeRateResponse struct {
 
 // GetExchangeRate retrieves the latest rate for a currency pair.
 func (s *WalletService) GetExchangeRate(ctx context.Context, fromCurr, toCurr string) (*ExchangeRateResponse, error) {
-	cacheKey := fmt.Sprintf("rate:%s:%s", fromCurr, toCurr)
+	// String concatenation optimization for cache key generation (avoiding slow fmt.Sprintf)
+	fromUpper := strings.ToUpper(fromCurr)
+	toUpper := strings.ToUpper(toCurr)
+	cacheKey := "rate:" + fromUpper + ":" + toUpper
 
 	if val, ok := s.localRateCache.Load(cacheKey); ok {
 		item := val.(localCacheItem)
@@ -120,7 +124,7 @@ func (s *WalletService) GetExchangeRate(ctx context.Context, fromCurr, toCurr st
 	var rate float64
 	var updatedAt time.Time
 	err := s.DB.QueryRowContext(ctx, "SELECT provider_rate, updated_at FROM exchange_rates WHERE from_currency = $1 AND to_currency = $2",
-		strings.ToUpper(fromCurr), strings.ToUpper(toCurr)).Scan(&rate, &updatedAt)
+		fromUpper, toUpper).Scan(&rate, &updatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("rate not found for %s/%s", fromCurr, toCurr)
@@ -129,8 +133,8 @@ func (s *WalletService) GetExchangeRate(ctx context.Context, fromCurr, toCurr st
 	}
 
 	response := &ExchangeRateResponse{
-		FromCurrency: fromCurr,
-		ToCurrency:   toCurr,
+		FromCurrency: fromUpper,
+		ToCurrency:   toUpper,
 		ProviderRate: rate,
 		UpdatedAt:    updatedAt,
 	}
@@ -146,32 +150,35 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
-	// 1. Idempotency check
-	var exists bool
-	err = tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM transactions WHERE reference_id = $1)", referenceID).Scan(&exists)
-	if err != nil {
-		return err
-	}
-	if exists {
-		logger.WithContext(ctx).Info("Payment already processed", "reference_id", referenceID)
-		return nil
-	}
-
-	// 2. Record Transaction
+	// 1. Record Transaction with ON CONFLICT DO NOTHING for atomic idempotency (eliminates redundant SELECT EXISTS check)
 	newTxID := uuid.New()
 	description := "Pay per use: " + merchant
-	_, err = tx.ExecContext(ctx, `
+	providerMetadata := `{"provider": "alchemypay", "merchant": "` + merchant + `", "amount": ` + strconv.FormatFloat(amount, 'f', -1, 64) + `}`
+
+	result, err := tx.ExecContext(ctx, `
 		INSERT INTO transactions (id, profile_id, reference_id, amount, description, settlement_status, gateway_fee, provider_metadata, created_at)
 		VALUES ($1, $2, $3, $4, $5, 'SETTLED', 0, $6, NOW())
-	`, newTxID, userID, referenceID, int64(amount*100), description,
-		fmt.Sprintf(`{"provider": "alchemypay", "merchant": "%s", "amount": %f}`, merchant, amount))
+		ON CONFLICT (reference_id) DO NOTHING
+	`, newTxID, userID, referenceID, int64(amount*100), description, providerMetadata)
 	if err != nil {
 		return fmt.Errorf("failed to insert transaction: %w", err)
 	}
 
-	// 3. Create Ledger Entry
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		logger.WithContext(ctx).Info("Payment already processed (idempotency conflict)", "reference_id", referenceID)
+		_ = tx.Rollback()
+		return nil
+	}
+
+	// 2. Create Ledger Entry
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO ledger_entries (id, transaction_id, profile_id, amount, balance_after, base_currency_amount, home_currency_amount, created_at)
 		VALUES ($1, $2, $3, $4, 0, $4, $4, NOW())
@@ -180,8 +187,8 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 		return fmt.Errorf("failed to create ledger entry: %w", err)
 	}
 
-	// 4. Write to Outbox for async processing
-	payloadStr := fmt.Sprintf(`{"transaction_id": "%s", "amount": %f, "user_id": "%s", "merchant": "%s"}`, newTxID, amount, userID, merchant)
+	// 3. Write to Outbox for async processing (manual JSON string concatenation optimization to avoid fmt.Sprintf overhead)
+	payloadStr := `{"transaction_id": "` + newTxID.String() + `", "amount": ` + strconv.FormatFloat(amount, 'f', -1, 64) + `, "user_id": "` + userID.String() + `", "merchant": "` + merchant + `"}`
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO transaction_outbox (id, transaction_id, event_type, payload, status, created_at)
 		VALUES ($1, $2, 'PAYMENT_COMPLETED', $3, 'PENDING', NOW())
