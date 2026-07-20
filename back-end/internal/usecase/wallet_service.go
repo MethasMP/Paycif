@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -17,8 +18,6 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/sony/gobreaker"
 )
-
-
 
 var (
 	ErrLimitExceeded       = errors.New("kyc verification limit exceeded")
@@ -107,7 +106,8 @@ type ExchangeRateResponse struct {
 
 // GetExchangeRate retrieves the latest rate for a currency pair.
 func (s *WalletService) GetExchangeRate(ctx context.Context, fromCurr, toCurr string) (*ExchangeRateResponse, error) {
-	cacheKey := fmt.Sprintf("rate:%s:%s", fromCurr, toCurr)
+	// Optimization: Use manual string concatenation in cache key hot path to avoid fmt.Sprintf overhead and allocations.
+	cacheKey := "rate:" + fromCurr + ":" + toCurr
 
 	if val, ok := s.localRateCache.Load(cacheKey); ok {
 		item := val.(localCacheItem)
@@ -146,29 +146,39 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
-	// 1. Idempotency check
-	var exists bool
-	err = tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM transactions WHERE reference_id = $1)", referenceID).Scan(&exists)
-	if err != nil {
-		return err
-	}
-	if exists {
-		logger.WithContext(ctx).Info("Payment already processed", "reference_id", referenceID)
-		return nil
-	}
-
-	// 2. Record Transaction
+	// Optimization: Atomic idempotency check using INSERT ... ON CONFLICT (reference_id) DO NOTHING.
+	// This eliminates a redundant SELECT database round-trip under SERIALIZABLE isolation,
+	// minimizing serialization conflicts and reducing transaction latency.
 	newTxID := uuid.New()
 	description := "Pay per use: " + merchant
-	_, err = tx.ExecContext(ctx, `
+
+	// Optimization: Use manual string concatenation and strconv.FormatFloat to construct the provider_metadata JSON,
+	// avoiding reflection/allocation-heavy fmt.Sprintf.
+	amountStr := strconv.FormatFloat(amount, 'f', -1, 64)
+	metadataStr := `{"provider": "alchemypay", "merchant": "` + merchant + `", "amount": ` + amountStr + `}`
+
+	res, err := tx.ExecContext(ctx, `
 		INSERT INTO transactions (id, profile_id, reference_id, amount, description, settlement_status, gateway_fee, provider_metadata, created_at)
 		VALUES ($1, $2, $3, $4, $5, 'SETTLED', 0, $6, NOW())
-	`, newTxID, userID, referenceID, int64(amount*100), description,
-		fmt.Sprintf(`{"provider": "alchemypay", "merchant": "%s", "amount": %f}`, merchant, amount))
+		ON CONFLICT (reference_id) DO NOTHING
+	`, newTxID, userID, referenceID, int64(amount*100), description, metadataStr)
 	if err != nil {
 		return fmt.Errorf("failed to insert transaction: %w", err)
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	// Early return if duplicate payment reference (idempotency triggered)
+	if rowsAffected == 0 {
+		logger.WithContext(ctx).Info("Payment already processed (idempotent ON CONFLICT)", "reference_id", referenceID)
+		return nil
 	}
 
 	// 3. Create Ledger Entry
@@ -181,7 +191,8 @@ func (s *WalletService) ProcessPayment(ctx context.Context, userID uuid.UUID, am
 	}
 
 	// 4. Write to Outbox for async processing
-	payloadStr := fmt.Sprintf(`{"transaction_id": "%s", "amount": %f, "user_id": "%s", "merchant": "%s"}`, newTxID, amount, userID, merchant)
+	// Optimization: Use manual string concatenation instead of fmt.Sprintf for the outbox payload.
+	payloadStr := `{"transaction_id": "` + newTxID.String() + `", "amount": ` + amountStr + `, "user_id": "` + userID.String() + `", "merchant": "` + merchant + `"}`
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO transaction_outbox (id, transaction_id, event_type, payload, status, created_at)
 		VALUES ($1, $2, 'PAYMENT_COMPLETED', $3, 'PENDING', NOW())
@@ -215,7 +226,9 @@ type PayoutResponse struct {
 // isSerializationFailure reports whether err is a Postgres serialization
 // failure (SQLSTATE 40001), which is retryable under SERIALIZABLE isolation.
 func isSerializationFailure(err error) bool {
-	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
+	// Optimization/Refactor: Use standard library errors.As instead of non-standard errors.AsType.
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
 		return pgErr.Code == "40001"
 	}
 	return false
@@ -223,7 +236,9 @@ func isSerializationFailure(err error) bool {
 
 // isDeadlockFailure reports whether err is a Postgres deadlock error (SQLSTATE 40P01).
 func isDeadlockFailure(err error) bool {
-	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
+	// Optimization/Refactor: Use standard library errors.As instead of non-standard errors.AsType.
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
 		return pgErr.Code == "40P01"
 	}
 	return false
@@ -358,8 +373,6 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 		NewBalance:    0,
 	}, nil
 }
-
-
 
 // EnsureUserAccount checks if a profile exists for the user, creating it if missing.
 func (s *WalletService) EnsureUserAccount(ctx context.Context, userID uuid.UUID) error {
