@@ -1,0 +1,5 @@
+# Bolt's Performance Journal
+
+## 2026-07-21 - [Balance Maintainability and JSON Safety in Performance Optimizations]
+**Learning:** While manual string concatenation for JSON payloads (e.g., using `strconv.FormatFloat` and manual bracket concatenation) can yield a ~2x performance speedup in micro-benchmarks, it introduces a massive risk of malformed JSON structures (such as missing closing brackets). This violates Bolt's core boundary of never sacrificing code readability/maintainability for micro-optimizations. Codebase-specific patterns indicate a strong preference for standard formatting (like `fmt.Sprintf` or `encoding/json`) for hot-path JSON payload constructions unless JSON serialization itself is proven to be a system-wide critical bottleneck.
+**Action:** Prioritize robust database/concurrency query patterns (like atomic `ON CONFLICT DO NOTHING` statements) and simple, 100% readable string operations (like cache keys/descriptions concatenation) for hot paths, whilst relying on standard library encoders for JSON payloads to maintain absolute safety.
