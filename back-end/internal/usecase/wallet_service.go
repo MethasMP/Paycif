@@ -321,7 +321,9 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 	if err != nil {
 		return nil, fmt.Errorf("failed to start write transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
 	// Check Idempotency (has this payout already been completed or is it in-flight?)
 	var existingID uuid.UUID
