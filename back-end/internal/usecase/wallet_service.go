@@ -216,7 +216,8 @@ type PayoutResponse struct {
 // isSerializationFailure reports whether err is a Postgres serialization
 // failure (SQLSTATE 40001), which is retryable under SERIALIZABLE isolation.
 func isSerializationFailure(err error) bool {
-	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
 		return pgErr.Code == "40001"
 	}
 	return false
@@ -224,7 +225,8 @@ func isSerializationFailure(err error) bool {
 
 // isDeadlockFailure reports whether err is a Postgres deadlock error (SQLSTATE 40P01).
 func isDeadlockFailure(err error) bool {
-	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
 		return pgErr.Code == "40P01"
 	}
 	return false
