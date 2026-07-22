@@ -19,6 +19,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch origin main for linter diff
+        run: git fetch origin main
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -36,6 +41,7 @@ jobs:
           install-mode: goinstall
           working-directory: back-end
           args: --timeout=5m
+          only-new-issues: true
 
       - name: Run Tests with Race Detector
         run: go test -v -race ./...

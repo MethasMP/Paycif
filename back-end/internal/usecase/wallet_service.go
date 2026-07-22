@@ -214,25 +214,27 @@ type PayoutResponse struct {
 	NewBalance    int64  `json:"new_balance"`
 }
 
-// isSerializationFailure reports whether err is a Postgres serialization
+// IsSerializationFailure reports whether err is a Postgres serialization
 // failure (SQLSTATE 40001), which is retryable under SERIALIZABLE isolation.
-func isSerializationFailure(err error) bool {
-	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
+func IsSerializationFailure(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
 		return pgErr.Code == "40001"
 	}
 	return false
 }
 
-// isDeadlockFailure reports whether err is a Postgres deadlock error (SQLSTATE 40P01).
-func isDeadlockFailure(err error) bool {
-	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
+// IsDeadlockFailure reports whether err is a Postgres deadlock error (SQLSTATE 40P01).
+func IsDeadlockFailure(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
 		return pgErr.Code == "40P01"
 	}
 	return false
 }
 
-// payoutReservation holds the result of the fast reservation transaction (Phase 1).
-type payoutReservation struct {
+// PayoutReservation holds the result of the fast reservation transaction (Phase 1).
+type PayoutReservation struct {
 	TransactionID  uuid.UUID
 	SenderFullName string
 	NewBalance     int64
@@ -311,7 +313,9 @@ func (s *WalletService) PayoutToPromptPay(ctx context.Context, req PayoutRequest
 	if err != nil {
 		return nil, fmt.Errorf("failed to start write transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
 	// Check Idempotency (has this payout already been completed or is it in-flight?)
 	var existingID uuid.UUID
