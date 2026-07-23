@@ -19,6 +19,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -36,6 +38,7 @@ jobs:
           working-directory: back-end
           args: --timeout=5m
           install-mode: goinstall
+          only-new-issues: true
 
       - name: Run Tests with Race Detector
         run: go test -v -race ./...
@@ -51,6 +54,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v5
