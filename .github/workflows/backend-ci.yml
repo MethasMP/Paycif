@@ -19,6 +19,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch origin/main for lint comparison
+        run: git fetch origin main
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -35,7 +40,7 @@ jobs:
           version: latest
           working-directory: back-end
           install-mode: goinstall
-          args: --timeout=5m
+          args: --timeout=5m --new-from-rev=origin/main
 
       - name: Run Tests with Race Detector
         run: go test -v -race ./...
