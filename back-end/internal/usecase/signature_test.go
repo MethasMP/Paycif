@@ -51,7 +51,7 @@ func setupMockVerifyServer(t testing.TB) (string, func()) {
 		respBytes, _ := json.Marshal(resp)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write(respBytes)
+		_, _ = w.Write(respBytes)
 	})
 
 	server := &http.Server{
