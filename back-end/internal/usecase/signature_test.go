@@ -50,7 +50,9 @@ func TestSignature_VerifySignature_Success(t *testing.T) {
 	go func() {
 		_ = server.Serve(listener)
 	}()
-	defer server.Shutdown(context.Background())
+	defer func() {
+		_ = server.Shutdown(context.Background())
+	}()
 
 	// Create SignatureService pointing to the mock UDS
 	sigService := NewSignatureService(nil, socketPath)
@@ -128,7 +130,9 @@ func BenchmarkVerifySignature(b *testing.B) {
 	go func() {
 		_ = server.Serve(listener)
 	}()
-	defer server.Shutdown(context.Background())
+	defer func() {
+		_ = server.Shutdown(context.Background())
+	}()
 
 	sigService := NewSignatureService(nil, socketPath)
 
