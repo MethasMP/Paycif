@@ -145,6 +145,7 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen>
   Widget _buildHeader(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context);
     
     return Semantics(
       header: true,
@@ -152,7 +153,7 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            "Payment Methods", // TODO: Move to AppLocalizations
+            l10n?.paymentSettingsSectionTitle ?? "Payment Methods",
             style: theme.textTheme.headlineMedium?.copyWith(
               fontWeight: FontWeight.w700,
               letterSpacing: -1.0,
@@ -161,7 +162,7 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen>
           ),
           const SizedBox(height: 8),
           Text(
-            "Manage how you pay and receive funds securely.", // TODO: Move to AppLocalizations
+            l10n?.paymentSettingsDescription ?? "Manage how you pay and receive funds securely.",
             style: theme.textTheme.bodyLarge?.copyWith(
               color: isDark ? Colors.white54 : Colors.black54,
               height: 1.4,

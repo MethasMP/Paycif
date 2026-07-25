@@ -19,13 +19,24 @@ void main() {
   });
 
   // Helper to pump widget
-  Future<void> pumpWidget(WidgetTester tester, {bool isSetup = false}) async {
+  Future<void> pumpWidget(
+    WidgetTester tester, {
+    bool isSetup = false,
+    bool isLocked = false,
+    String lockedMessage = 'Try again in 5m',
+    Future<String?> Function(List<int> pin)? onSubmit,
+  }) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
           body: ChangeNotifierProvider<SecurityController>.value(
             value: mockController,
-            child: PinEntryWidget(isSetupMode: isSetup),
+            child: PinEntryWidget(
+              isSetupMode: isSetup,
+              isLocked: isLocked,
+              lockedMessage: lockedMessage,
+              onSubmit: onSubmit,
+            ),
           ),
         ),
       ),
@@ -39,7 +50,7 @@ void main() {
       expect(find.text('1'), findsOneWidget);
       expect(find.text('9'), findsOneWidget);
       expect(find.text('0'), findsOneWidget);
-      expect(find.byIcon(PhosphorIcons.backspace), findsOneWidget);
+      expect(find.byIcon(PhosphorIconsLight.backspace), findsOneWidget);
 
       await tester.pumpAndSettle();
     });
@@ -59,13 +70,15 @@ void main() {
     testWidgets('Submit Verify Call on 6th digit', (tester) async {
       when(() => mockController.verifyPin(any())).thenAnswer((_) async => true);
 
-      await pumpWidget(tester);
+      await pumpWidget(tester, onSubmit: (pin) async {
+        final res = await mockController.verifyPin(pin.join());
+        return res ? null : 'Invalid PIN';
+      });
 
       // Enter 6 digits
       for (int i = 0; i < 6; i++) {
         await tester.tap(find.text('1'));
         await tester.pumpAndSettle(const Duration(milliseconds: 50));
-        // give time for tap processing
       }
 
       // Verify controller called
@@ -75,7 +88,10 @@ void main() {
     testWidgets('Setup Mode: Confirms PIN correctly', (tester) async {
       when(() => mockController.setupPin(any())).thenAnswer((_) async => true);
 
-      await pumpWidget(tester, isSetup: true);
+      await pumpWidget(tester, isSetup: true, onSubmit: (pin) async {
+        final res = await mockController.setupPin(pin.join());
+        return res ? null : 'Setup failed';
+      });
 
       // First Entry: 123456
       for (int i = 0; i < 6; i++) {
@@ -83,8 +99,7 @@ void main() {
         await tester.pumpAndSettle();
       }
 
-      // Should auto-clear for confirmation (check UI text or state)
-      // _isConfirming becomes true.
+      // Should auto-clear for confirmation
       await tester.pumpAndSettle(const Duration(milliseconds: 200));
 
       // Second Entry: 123456
@@ -104,7 +119,7 @@ void main() {
         ),
       );
 
-      await pumpWidget(tester);
+      await pumpWidget(tester, isLocked: true, lockedMessage: 'Try again in 5m');
       await tester.pumpAndSettle();
 
       expect(find.text('Security Lockout'), findsOneWidget);
