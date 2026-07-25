@@ -24,6 +24,7 @@ type SignatureService struct {
 	DB      *sql.DB
 	udsPath string
 	cache   sync.Map
+	client  *http.Client
 }
 
 // NewSignatureService creates a new SignatureService injecting dependencies.
@@ -31,9 +32,22 @@ func NewSignatureService(db *sql.DB, udsPath string) *SignatureService {
 	if udsPath == "" {
 		udsPath = "/tmp/verify_service.sock"
 	}
+	client := &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+				var d net.Dialer
+				return d.DialContext(ctx, "unix", udsPath)
+			},
+			MaxIdleConns:        100,
+			MaxIdleConnsPerHost: 100,
+			IdleConnTimeout:     90 * time.Second,
+		},
+		Timeout: 200 * time.Millisecond,
+	}
 	return &SignatureService{
 		DB:      db,
 		udsPath: udsPath,
+		client:  client,
 	}
 }
 
@@ -77,16 +91,6 @@ type VerifyResponse struct {
 
 // VerifySignature delegates verification to the verify-service over Unix Domain Socket.
 func (s *SignatureService) VerifySignature(ctx context.Context, publicKeyB64, signatureB64, message string) (bool, error) {
-	client := &http.Client{
-		Transport: &http.Transport{
-			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
-				var d net.Dialer
-				return d.DialContext(ctx, "unix", s.udsPath)
-			},
-		},
-		Timeout: 200 * time.Millisecond,
-	}
-
 	verifyReq := VerifyRequest{
 		PublicKeyB64: publicKeyB64,
 		SignatureB64: signatureB64,
@@ -103,11 +107,11 @@ func (s *SignatureService) VerifySignature(ctx context.Context, publicKeyB64, si
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := client.Do(req)
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return false, fmt.Errorf("failed to contact verify service: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return false, fmt.Errorf("verify service returned status %d", resp.StatusCode)
