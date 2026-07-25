@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:frontend/core/l10n/generated/app_localizations.dart';
 import 'package:frontend/features/transactions/domain/transaction.dart';
-import 'package:frontend/core/utils/pay_notify.dart';
+import 'package:frontend/core/utils/app_notification_toast.dart';
 import 'package:frontend/core/widgets/paycif_icon_container.dart';
 import 'package:frontend/core/widgets/paycif_amount_text.dart';
 import 'package:frontend/core/theme/app_theme.dart';
@@ -136,7 +136,7 @@ class TransactionDetailScreen extends StatelessWidget {
                 button: true,
                 child: OutlinedButton.icon(
                   onPressed: () {
-                    PayNotify.success(
+                    AppNotificationToast.success(
                       context,
                       l10n.transactionSupportTicketCreated,
                     );

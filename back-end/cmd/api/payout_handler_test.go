@@ -28,8 +28,8 @@ func TestHandleDecodeQR_AllTestQRs(t *testing.T) {
 	paymentEngine := usecase.NewPaymentEngine("sqril")
 	paymentEngine.RegisterProvider(sqrilProvider)
 
-	// Initialize WalletService with the paymentEngine (other dependencies can be nil for this endpoint)
-	walletService := usecase.NewWalletService(nil, nil, nil, nil, paymentEngine)
+	// Initialize PaymentOrchestrationService with the paymentEngine (other dependencies can be nil for this endpoint)
+	walletService := usecase.NewPaymentOrchestrationService(nil, nil, nil, nil, paymentEngine)
 
 	handler := NewPayoutHandler(walletService, nil)
 

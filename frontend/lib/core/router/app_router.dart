@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:frontend/core/router/analytics_observer.dart';
 import 'package:frontend/features/auth/presentation/splash_screen.dart';
 import 'package:frontend/features/auth/presentation/login_screen.dart';
+import 'package:frontend/features/auth/presentation/blocked_screen.dart';
 import 'package:frontend/features/dashboard/presentation/main_screen.dart';
 import 'package:frontend/features/security/presentation/pages/security_unlock_screen.dart';
 import 'package:frontend/features/security/presentation/pages/pin_setup_screen.dart';
@@ -49,6 +50,11 @@ final GoRouter appRouter = GoRouter(
       path: '/login',
       name: 'login',
       builder: (context, state) => const LoginScreen(),
+    ),
+    GoRoute(
+      path: '/blocked',
+      name: 'blocked',
+      builder: (context, state) => const BlockedScreen(),
     ),
     GoRoute(
       path: '/main',

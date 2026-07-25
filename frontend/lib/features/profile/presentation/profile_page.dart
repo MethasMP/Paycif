@@ -2,7 +2,7 @@ import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import 'package:frontend/core/utils/pay_notify.dart';
+import 'package:frontend/core/utils/app_notification_toast.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:frontend/core/network/api_service.dart';
@@ -179,7 +179,7 @@ class _ProfilePageState extends State<ProfilePage> {
       debugPrint('🚨 Sign Out Disaster: $e');
       if (mounted) {
         Navigator.pop(context); // Close loading
-        PayNotify.error(
+        AppNotificationToast.error(
           context,
           AppLocalizations.of(context)!.profileSignOutCriticalError,
         );
@@ -189,68 +189,206 @@ class _ProfilePageState extends State<ProfilePage> {
 
   void _showSignOutConfirmation(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    showDialog(
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    showGeneralDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(l10n.signOutConfirmTitle),
-        content: Text(l10n.signOutConfirmMessage),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.commonCancel),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _signOut();
-            },
-            child: Text(
-              l10n.signOut,
-              style: const TextStyle(color: AppTheme.errorRedText),
+      barrierDismissible: true,
+      barrierLabel: '',
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      transitionDuration: const Duration(milliseconds: 200),
+      pageBuilder: (ctx, anim1, anim2) => const SizedBox.shrink(),
+      transitionBuilder: (ctx, anim1, anim2, child) {
+        final curve = Curves.easeInOut.transform(anim1.value);
+        return Transform.scale(
+          scale: 0.9 + (0.1 * curve),
+          child: Opacity(
+            opacity: anim1.value,
+            child: AlertDialog(
+              backgroundColor: isDark ? theme.cardColor : Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+                side: BorderSide(
+                  color: isDark ? Colors.white.withValues(alpha: 0.08) : AppTheme.borderGrey,
+                  width: 1,
+                ),
+              ),
+              titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+              contentPadding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+              actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+              title: Text(
+                l10n.signOutConfirmTitle,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
+                  color: AppTheme.textPrimaryColor(context),
+                ),
+              ),
+              content: Text(
+                l10n.signOutConfirmMessage,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: AppTheme.textSecondaryColor(context).withValues(alpha: 0.8),
+                ),
+              ),
+              actions: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 48,
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          style: TextButton.styleFrom(
+                            backgroundColor: isDark
+                                ? Colors.white.withValues(alpha: 0.04)
+                                : AppTheme.borderGrey.withValues(alpha: 0.3),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: Text(
+                            l10n.commonCancel,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.textPrimaryColor(context),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: SizedBox(
+                        height: 48,
+                        child: TextButton(
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _signOut();
+                          },
+                          style: TextButton.styleFrom(
+                            backgroundColor: isDark
+                                ? AppTheme.errorRed.withValues(alpha: 0.15)
+                                : AppTheme.errorRed.withValues(alpha: 0.1),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: Text(
+                            l10n.signOut,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.errorRedText,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
   void _showLanguageSheet(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.4),
       builder: (context) => Container(
         decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          color: theme.scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          border: Border(
+            top: BorderSide(
+              color: isDark ? Colors.white.withValues(alpha: 0.08) : AppTheme.borderGrey,
+              width: 1,
+            ),
+          ),
         ),
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
         child: Material(
           color: Colors.transparent,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Premium Drag Handle
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 24),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.12)
+                        : AppTheme.borderGrey.withValues(alpha: 0.8),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
               Text(
                 l10n.language,
-                style: Theme.of(
-                  context,
-                ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600),
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 20,
+                  letterSpacing: -0.5,
+                  color: AppTheme.textPrimaryColor(context),
+                ),
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               ...LanguageNotifier.supportedLocales.map((locale) {
                 final isSelected = languageNotifier.value == locale;
-                return ListTile(
-                  title: Text(LanguageNotifier.getLanguageName(locale)),
-                  trailing: isSelected
-                      ? AppIcon(PhosphorIcons.checkCircle, color: AppTheme.successGreen)
-                      : null,
-                  onTap: () {
-                    languageNotifier.value = locale;
-                    Navigator.pop(context);
-                  },
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? (isDark ? Colors.white.withValues(alpha: 0.04) : AppTheme.primaryTealLight.withValues(alpha: 0.4))
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isSelected
+                          ? (isDark ? Colors.white.withValues(alpha: 0.08) : AppTheme.primaryTeal.withValues(alpha: 0.15))
+                          : Colors.transparent,
+                    ),
+                  ),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    title: Text(
+                      LanguageNotifier.getLanguageName(locale),
+                      style: TextStyle(
+                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                        color: isSelected
+                            ? AppTheme.primaryColor(context)
+                            : AppTheme.textPrimaryColor(context),
+                      ),
+                    ),
+                    trailing: isSelected
+                        ? const AppIcon(
+                            PhosphorIcons.circleWavyCheck,
+                            color: AppTheme.successGreen,
+                            size: AppIconSize.sm,
+                          )
+                        : null,
+                    onTap: () {
+                      languageNotifier.value = locale;
+                      Navigator.pop(context);
+                    },
+                  ),
                 );
               }),
             ],
@@ -312,35 +450,26 @@ class _ProfilePageState extends State<ProfilePage> {
             // ─── USER PROFILE CARD HEADER ────────────────────────
             // Flat-at-Rest: separation comes from the border + tonal step off
             // canvas, never an idle shadow (design.md §4).
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: theme.brightness == Brightness.dark
-                    ? theme.cardColor
-                    : Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: theme.brightness == Brightness.dark
-                      ? Colors.white.withValues(alpha: 0.08)
-                      : AppTheme.borderGrey,
-                ),
-              ),
+            // ─── USER PROFILE HEADER ────────────────────────
+            // Borderless asymmetric hero block for a premium, custom visual hierarchy
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 8),
               child: Row(
                 children: [
-                  // Beautiful Profile Image (or Fallback Icon)
+                  // Premium Avatar Container (72x72)
                   Container(
-                    width: 64,
-                    height: 64,
+                    width: 72,
+                    height: 72,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: theme.brightness == Brightness.dark
-                          ? Colors.white.withValues(alpha: 0.05)
+                          ? Colors.white.withValues(alpha: 0.04)
                           : AppTheme.primaryTealLight,
                       border: Border.all(
                         color: theme.brightness == Brightness.dark
-                            ? Colors.white.withValues(alpha: 0.1)
-                            : AppTheme.primaryTeal.withValues(alpha: 0.12),
-                        width: 1.5,
+                            ? Colors.white.withValues(alpha: 0.08)
+                            : AppTheme.primaryTeal.withValues(alpha: 0.1),
+                        width: 1,
                       ),
                     ),
                     child: ClipOval(
@@ -361,55 +490,48 @@ class _ProfilePageState extends State<ProfilePage> {
                             ),
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  // User Details Column
+                  const SizedBox(width: 20),
+                  // User Details Column (Asymmetric & Breathable)
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          fullName,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.textPrimaryColor(context),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                fullName,
+                                style: theme.textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.5,
+                                  color: AppTheme.textPrimaryColor(context),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (isVerified) ...[
+                              const SizedBox(width: 6),
+                              Tooltip(
+                                message: l10n.profileVerifiedBadge,
+                                child: const AppIcon(
+                                  PhosphorIcons.shieldCheck,
+                                  size: AppIconSize.sm,
+                                  color: AppTheme.successGreen,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 4),
                         Text(
                           email,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: AppTheme.textSecondaryColor(context),
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: AppTheme.textSecondaryColor(context).withValues(alpha: 0.7),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        if (isVerified) ...[
-                          const SizedBox(height: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: AppTheme.successGreen.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: AppTheme.successGreen.withValues(alpha: 0.2)),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const AppIcon(PhosphorIcons.shieldCheck, size: AppIconSize.xs, color: AppTheme.successGreen),
-                                const SizedBox(width: 4),
-                                Text(
-                                  l10n.profileVerifiedBadge,
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: AppTheme.signalGreen,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
                       ],
                     ),
                   ),
@@ -497,7 +619,7 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ]),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
 
             // ─── Group 2: Security & Safety ─────────────────────────
             _buildSectionHeader(context, l10n.accountSecurity),
@@ -525,7 +647,7 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ]),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
 
             // ─── Group 3: Preferences ─────────────────────────────
             _buildSectionHeader(context, l10n.preferences),
@@ -577,7 +699,7 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ]),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
 
             // ─── Group 4: Help & Support ───────────────────────────
             _buildSectionHeader(context, l10n.support),
@@ -635,32 +757,21 @@ class _ProfilePageState extends State<ProfilePage> {
             const SizedBox(height: 24),
 
             // ─── Sign Out Button ───────────────────────────────────
-            Center(
-              child: Semantics(
-                label: 'Sign out from Paycif',
-                button: true,
-                child: ElevatedButton.icon(
-                  onPressed: () => _showSignOutConfirmation(context),
-                  icon: const AppIcon(PhosphorIcons.signOut, size: AppIconSize.sm),
-                  label: Text(l10n.signOut),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.errorRed.withValues(alpha: theme.brightness == Brightness.dark ? 0.12 : 0.1),
-                    foregroundColor: AppTheme.errorRedText,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 16,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: theme.brightness == Brightness.dark
-                          ? BorderSide(color: AppTheme.errorRed.withValues(alpha: 0.2))
-                          : BorderSide.none,
-                    ),
-                  ),
-                ),
+            _buildMenuContainer(context, [
+              _buildMenuItem(
+                context: context,
+                icon: PhosphorIcons.signOut,
+                title: l10n.signOut,
+                titleColor: theme.brightness == Brightness.dark
+                    ? AppTheme.errorRed.withValues(alpha: 0.8)
+                    : AppTheme.errorRedText,
+                iconColor: theme.brightness == Brightness.dark
+                    ? AppTheme.errorRed.withValues(alpha: 0.8)
+                    : AppTheme.errorRedText,
+                trailing: const SizedBox.shrink(),
+                onTap: () => _showSignOutConfirmation(context),
               ),
-            ),
+            ]),
 
             const SizedBox(height: 16),
 
@@ -679,12 +790,16 @@ class _ProfilePageState extends State<ProfilePage> {
 
 
   Widget _buildSectionHeader(BuildContext context, String title) {
-    return Text(
-      title.toUpperCase(),
-      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-        color: AppTheme.textSecondaryColor(context),
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.6,
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 4),
+      child: Text(
+        title.toUpperCase(),
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.6,
+          color: AppTheme.textSecondaryColor(context).withValues(alpha: 0.6),
+        ),
       ),
     );
   }
@@ -717,7 +832,9 @@ class _ProfilePageState extends State<ProfilePage> {
                 Divider(
                   height: 1,
                   indent: 60,
-                  color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.04)
+                      : AppTheme.borderGrey.withValues(alpha: 0.4),
                 ),
             ],
           );
@@ -734,34 +851,36 @@ class _ProfilePageState extends State<ProfilePage> {
     String? subtitle,
     VoidCallback? onTap,
     Widget? trailing,
+    Color? titleColor,
+    Color? iconColor,
   }) {
     return ListTile(
       onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       horizontalTitleGap: 12,
       leading: AppIcon(
         icon,
         size: AppIconSize.md,
-        color: AppTheme.textSecondaryColor(context),
+        color: iconColor ?? AppTheme.textSecondaryColor(context).withValues(alpha: 0.75),
       ),
       title: Text(
         title,
         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
               fontWeight: FontWeight.w600,
-              color: AppTheme.textPrimaryColor(context),
+              color: titleColor ?? AppTheme.textPrimaryColor(context),
             ),
       ),
       subtitle: subtitle != null
           ? Text(
               subtitle,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textSecondaryColor(context),
+                    color: AppTheme.textSecondaryColor(context).withValues(alpha: 0.8),
                   ),
             )
           : null,
       trailing:
           trailing ??
-          AppIcon(PhosphorIcons.caretRight, color: AppTheme.textSecondaryColor(context), size: AppIconSize.sm),
+          AppIcon(PhosphorIcons.caretRight, color: AppTheme.textSecondaryColor(context).withValues(alpha: 0.35), size: AppIconSize.xs),
     );
   }
 
@@ -829,7 +948,7 @@ class _ProfilePageState extends State<ProfilePage> {
     if (_isProcessingToggle) return;
 
     if (!_isBiometricAvailable) {
-      PayNotify.error(context, l10n.biometricNotAvailable);
+      AppNotificationToast.error(context, l10n.biometricNotAvailable);
       return;
     }
 
@@ -856,10 +975,10 @@ class _ProfilePageState extends State<ProfilePage> {
         if (!mounted) return;
 
         HapticFeedback.lightImpact();
-        PayNotify.success(context, l10n.biometricSettingsUpdated);
+        AppNotificationToast.success(context, l10n.biometricSettingsUpdated);
       } catch (e) {
         if (!mounted) return;
-        PayNotify.error(context, ErrorTranslator.translate(l10n, e.toString()));
+        AppNotificationToast.error(context, ErrorTranslator.translate(l10n, e.toString()));
       } finally {
         if (mounted) {
           setState(() => _isProcessingToggle = false);
@@ -912,9 +1031,17 @@ class _ProfilePageState extends State<ProfilePage> {
             SizedBox(height: 16),
             Expanded(
               child: PinEntryWidget(
-                onSuccess: (pin) {
-                  Navigator.pop(context);
-                  onVerified();
+                onSubmit: (pinList) async {
+                  final pin = pinList.join();
+                  final securityController = context.read<SecurityController>();
+                  final navigator = Navigator.of(context);
+                  final success = await securityController.verifyPin(pin);
+                  if (success) {
+                    navigator.pop();
+                    onVerified();
+                    return null;
+                  }
+                  return 'Incorrect PIN. Try again.';
                 },
               ),
             ),

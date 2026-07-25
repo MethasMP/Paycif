@@ -12,8 +12,8 @@ import 'package:frontend/core/network/connectivity_service.dart';
 import 'package:frontend/features/security/domain/repositories/security_repository.dart';
 import 'package:frontend/features/security/data/repositories/security_repository_impl.dart';
 import 'package:frontend/features/security/data/datasources/security_remote_data_source.dart';
-import 'package:frontend/features/security/data/datasources/crypto_service.dart';
-import 'package:frontend/features/security/data/datasources/secure_storage_service.dart';
+import 'package:frontend/features/security/data/datasources/app_encryption_service.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:frontend/features/payment/presentation/payment_controller.dart';
 import 'package:frontend/features/dashboard/presentation/dashboard_controller.dart';
 import 'package:frontend/features/dashboard/data/dashboard_repository.dart';
@@ -46,8 +46,8 @@ void main() {
               remoteDataSource: SecurityRemoteDataSource(
                 Supabase.instance.client,
               ),
-              cryptoService: CryptoService(),
-              secureStorage: SecureStorageService(),
+              cryptoService: AppEncryptionService(),
+              secureStorage: const FlutterSecureStorage(),
             ),
           ),
           ChangeNotifierProvider<PaymentController>(

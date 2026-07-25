@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:frontend/core/l10n/generated/app_localizations.dart';
 
-import 'package:frontend/core/utils/pay_notify.dart';
+import 'package:frontend/core/utils/app_notification_toast.dart';
 import 'package:frontend/core/utils/payment_utils.dart';
 import 'package:frontend/core/utils/error_translator.dart';
 import 'package:frontend/core/theme/app_theme.dart';
@@ -231,7 +231,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
                                 _isLoading = false;
                                 _loadingMessage = '';
                               });
-                              PayNotify.error(
+                              AppNotificationToast.error(
                                 context,
                                 ErrorTranslator.translate(l10n, e.toString()),
                               );
@@ -242,7 +242,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
                               _autovalidateMode =
                                   AutovalidateMode.onUserInteraction;
                             });
-                            PayNotify.error(
+                            AppNotificationToast.error(
                               context,
                               l10n.commonValidationFailed,
                             );

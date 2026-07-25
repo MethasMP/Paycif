@@ -127,3 +127,20 @@ func (s *SignatureService) VerifySignature(ctx context.Context, publicKeyB64, si
 
 	return true, nil
 }
+
+// VerifyTimestampBucket validates that the request timestamp bucket is within an acceptable time window (max 2 mins drift).
+func (s *SignatureService) VerifyTimestampBucket(timestampBucketStr string) error {
+	if timestampBucketStr == "" {
+		return fmt.Errorf("missing timestamp bucket header")
+	}
+	var clientBucket int64
+	if _, err := fmt.Sscanf(timestampBucketStr, "%d", &clientBucket); err != nil {
+		return fmt.Errorf("invalid timestamp bucket format")
+	}
+	currentBucket := time.Now().Unix() / 60
+	diff := currentBucket - clientBucket
+	if diff < -2 || diff > 2 {
+		return fmt.Errorf("signature timestamp expired or invalid replay window (drift: %d mins)", diff)
+	}
+	return nil
+}

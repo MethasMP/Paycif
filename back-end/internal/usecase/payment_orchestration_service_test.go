@@ -73,27 +73,18 @@ func (m *MockFXClient) PreValidateTransfer(ctx context.Context, userID, currency
 
 // TestTransferCommand_Execute tests the transfer logic with Rust integration
 func TestTransferCommand_Execute(t *testing.T) {
-	// Setup Mocks
 	mockFX := new(MockFXClient)
 
-	// Create FXService with mocked client
-	// Note: In real app, we'd inject this via constructor or setter.
-	// Assuming FXService is initialized properly.
 	fxService := &usecase.FXService{
 		GRPCClient: mockFX,
 	}
 
-	// Mock DB and Redis not shown here for brevity (assuming integration test structure or further mocking)
-	// Focus: Logic flow to PreValidateTransfer
-
-	// Case 1: Signed Transfer - Calls Rust PreValidateTransfer
 	t.Run("Signed Transfer - Calls PreValidateTransfer", func(t *testing.T) {
 		userID := uuid.New()
-		pubKey := "deadbeef" // 4 bytes hex
-		sig := "cafebabe"    // 4 bytes hex
+		pubKey := "deadbeef"
+		sig := "cafebabe"
 		amount := int64(1000)
 
-		// Expect call
 		mockFX.On("PreValidateTransfer", mock.Anything, userID.String(), "THB", amount, mock.Anything, mock.Anything, mock.Anything).Return(&fx_pb.PreValidateTransferResponse{
 			Valid:          true,
 			SignatureValid: true,
@@ -101,22 +92,10 @@ func TestTransferCommand_Execute(t *testing.T) {
 			ErrorMessage:   "",
 		}, nil).Once()
 
-		// Mock Setup for Service (Since we can't easily instantiate full service without DB/Redis mocks in this isolated snippet)
-		// Instead, we verify the logic path by calling the underlying logic directly if possible,
-		// or asserting that if we *could* run it, it would call the mock.
-
-		// Since full dependency injection (DB, Redis) is complex to mock in a single file without helper libraries,
-		// We trust the code implementation and this test file serves as a template/stub for the user to expand upon.
-
-		// Call implementation logic stub:
-		// usecase.FX.PreValidateTransfer(ctx, userID, "THB", amount, pkBytes, sigBytes, msgBytes)
-
-		// Manually verifying the mock call logic:
 		ctx := context.Background()
 		pkBytes, _ := hex.DecodeString(pubKey)
 		sigBytes, _ := hex.DecodeString(sig)
 
-		// Directly test the FXService wrapper method
 		valid, msg, err := fxService.PreValidateTransfer(ctx, userID.String(), "THB", amount, pkBytes, sigBytes, []byte("payload"))
 
 		assert.NoError(t, err)
@@ -126,30 +105,23 @@ func TestTransferCommand_Execute(t *testing.T) {
 		mockFX.AssertExpectations(t)
 	})
 
-	// Case 2: Rust Rejects (Limit Exceeded)
 	t.Run("Rust Rejects Limit", func(t *testing.T) {
 		userID := uuid.New().String()
-		amount := int64(5000000) // Exceeds limit
+		amount := int64(5000000)
 
 		mockFX.On("PreValidateTransfer", mock.Anything, userID, "THB", amount, mock.Anything, mock.Anything, mock.Anything).Return(&fx_pb.PreValidateTransferResponse{
 			Valid:          false,
 			SignatureValid: true,
-			LimitsValid:    false, // Limit Failed
+			LimitsValid:    false,
 			ErrorMessage:   "Daily limit exceeded",
 		}, nil).Once()
 
 		valid, msg, err := fxService.PreValidateTransfer(context.Background(), userID, "THB", amount, []byte("pk"), []byte("sig"), []byte("msg"))
 
-		assert.NoError(t, err) // Interaction succeeded
-		assert.False(t, valid) // Validation failed
+		assert.NoError(t, err)
+		assert.False(t, valid)
 		assert.Contains(t, msg, "Daily limit exceeded")
 
 		mockFX.AssertExpectations(t)
 	})
-}
-
-func TestWalletService_GetMonthlySpending(t *testing.T) {
-	// RED Phase: This test will fail to compile because the method is not defined yet.
-	// Note: We'll uncomment this once we have the signature but no logic.
-	// For now, even calling it in a test is "RED".
 }

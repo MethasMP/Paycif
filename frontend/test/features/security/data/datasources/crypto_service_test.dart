@@ -1,13 +1,13 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:cryptography/cryptography.dart';
-import 'package:frontend/features/security/data/datasources/crypto_service.dart';
+import 'package:frontend/features/security/data/datasources/app_encryption_service.dart';
 import 'dart:convert';
 
 void main() {
-  late CryptoService cryptoService;
+  late AppEncryptionService cryptoService;
 
   setUp(() {
-    cryptoService = CryptoService();
+    cryptoService = AppEncryptionService();
   });
 
   group('CryptoService Security Audit', () {
@@ -77,8 +77,8 @@ void main() {
         final salt = cryptoService.randomBytes(32);
         const pin = '123456';
 
-        final key1 = await CryptoService.derivePinKey({'pin': pin, 'salt': salt});
-        final key2 = await CryptoService.derivePinKey({'pin': pin, 'salt': salt});
+        final key1 = await AppEncryptionService.derivePinKey({'pin': pin, 'salt': salt});
+        final key2 = await AppEncryptionService.derivePinKey({'pin': pin, 'salt': salt});
 
         expect(key1, equals(key2));
         expect(key1.length, 32);
@@ -87,8 +87,8 @@ void main() {
       test('derivePinKey produces different keys for different PINs', () async {
         final salt = cryptoService.randomBytes(32);
 
-        final key1 = await CryptoService.derivePinKey({'pin': '123456', 'salt': salt});
-        final key2 = await CryptoService.derivePinKey({'pin': '654321', 'salt': salt});
+        final key1 = await AppEncryptionService.derivePinKey({'pin': '123456', 'salt': salt});
+        final key2 = await AppEncryptionService.derivePinKey({'pin': '654321', 'salt': salt});
 
         expect(key1, isNot(equals(key2)));
       });
@@ -96,11 +96,11 @@ void main() {
       test('derivePinKey produces different keys for different salts', () async {
         const pin = '123456';
 
-        final key1 = await CryptoService.derivePinKey({
+        final key1 = await AppEncryptionService.derivePinKey({
           'pin': pin,
           'salt': cryptoService.randomBytes(32),
         });
-        final key2 = await CryptoService.derivePinKey({
+        final key2 = await AppEncryptionService.derivePinKey({
           'pin': pin,
           'salt': cryptoService.randomBytes(32),
         });
@@ -109,7 +109,7 @@ void main() {
       });
 
       test('encrypt then decrypt returns original plaintext', () async {
-        final key = await CryptoService.derivePinKey({
+        final key = await AppEncryptionService.derivePinKey({
           'pin': '123456',
           'salt': cryptoService.randomBytes(32),
         });
@@ -123,8 +123,8 @@ void main() {
 
       test('decryptPinToken throws on wrong key (wrong PIN)', () async {
         final salt = cryptoService.randomBytes(32);
-        final correctKey = await CryptoService.derivePinKey({'pin': '123456', 'salt': salt});
-        final wrongKey = await CryptoService.derivePinKey({'pin': '000000', 'salt': salt});
+        final correctKey = await AppEncryptionService.derivePinKey({'pin': '123456', 'salt': salt});
+        final wrongKey = await AppEncryptionService.derivePinKey({'pin': '000000', 'salt': salt});
 
         final packed = await cryptoService.encryptPinToken(correctKey, cryptoService.randomBytes(32));
 
@@ -136,7 +136,7 @@ void main() {
       });
 
       test('each encrypt produces unique ciphertext (random nonce)', () async {
-        final key = await CryptoService.derivePinKey({
+        final key = await AppEncryptionService.derivePinKey({
           'pin': '123456',
           'salt': cryptoService.randomBytes(32),
         });

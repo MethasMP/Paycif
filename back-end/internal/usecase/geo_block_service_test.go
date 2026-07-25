@@ -10,20 +10,43 @@ import (
 	"time"
 )
 
-func TestIsBlocked(t *testing.T) {
+func TestIsAllowedAndGPS(t *testing.T) {
 	svc := NewGeoBlockService()
 
-	blocked := []string{"US", "us", "GB", "DE", "FR", "IE"}
-	for _, c := range blocked {
-		if !svc.IsBlocked(c) {
-			t.Errorf("expected %s to be blocked", c)
+	allowed := []string{"TH", "th"}
+	for _, c := range allowed {
+		if !svc.IsAllowed(c) {
+			t.Errorf("expected %s to be allowed", c)
 		}
 	}
 
-	allowed := []string{"TH", "th", "SG", "JP", "AU", ""}
-	for _, c := range allowed {
-		if svc.IsBlocked(c) {
-			t.Errorf("expected %s to be allowed", c)
+	blocked := []string{"US", "GB", "DE", "SG", "JP", "AU", "", "FR"}
+	for _, c := range blocked {
+		if svc.IsAllowed(c) {
+			t.Errorf("expected %s to be blocked (not allowed)", c)
+		}
+	}
+
+	// GPS checks
+	inTH := []struct{ lat, lng float64 }{
+		{13.7367, 100.5231}, // Bangkok
+		{18.7883, 98.9853},  // Chiang Mai
+		{7.8804, 98.3922},   // Phuket
+	}
+	for _, pt := range inTH {
+		if !svc.IsInThailandGPS(pt.lat, pt.lng) {
+			t.Errorf("expected lat=%f, lng=%f to be in Thailand", pt.lat, pt.lng)
+		}
+	}
+
+	outTH := []struct{ lat, lng float64 }{
+		{37.7749, -122.4194}, // San Francisco
+		{51.5074, -0.1278},   // London
+		{1.3521, 103.8198},   // Singapore
+	}
+	for _, pt := range outTH {
+		if svc.IsInThailandGPS(pt.lat, pt.lng) {
+			t.Errorf("expected lat=%f, lng=%f to be outside Thailand", pt.lat, pt.lng)
 		}
 	}
 }
@@ -42,7 +65,12 @@ func TestTruncateIP(t *testing.T) {
 	}
 }
 
+func init() {
+	DisableRedisCacheForTesting = true
+}
+
 func TestResolveCountry_PrimaryProviderUsed(t *testing.T) {
+	ClearGeoL1Cache()
 	primary := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("US"))
 	}))
@@ -60,12 +88,13 @@ func TestResolveCountry_PrimaryProviderUsed(t *testing.T) {
 	if country != "US" {
 		t.Errorf("got country %q, want US", country)
 	}
-	if !svc.IsBlocked(country) {
-		t.Errorf("expected US to be blocked")
+	if svc.IsAllowed(country) {
+		t.Errorf("expected US to not be allowed")
 	}
 }
 
 func TestResolveCountry_FallsBackToSecondaryProvider(t *testing.T) {
+	ClearGeoL1Cache()
 	primary := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
@@ -90,12 +119,13 @@ func TestResolveCountry_FallsBackToSecondaryProvider(t *testing.T) {
 	if country != "TH" {
 		t.Errorf("got country %q, want TH (from fallback provider)", country)
 	}
-	if svc.IsBlocked(country) {
+	if !svc.IsAllowed(country) {
 		t.Errorf("expected TH to be allowed")
 	}
 }
 
 func TestResolveCountry_FailsOpenWhenBothProvidersDown(t *testing.T) {
+	ClearGeoL1Cache()
 	primary := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))

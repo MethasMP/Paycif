@@ -1,7 +1,7 @@
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:frontend/core/l10n/generated/app_localizations.dart';
-import 'package:frontend/core/utils/pay_notify.dart';
+import 'package:frontend/core/utils/app_notification_toast.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 import 'package:frontend/core/widgets/app_icon.dart';
 
@@ -39,7 +39,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
     setState(() => _isSubmitting = false);
 
     final l10n = AppLocalizations.of(context)!;
-    PayNotify.success(context, l10n.supportTicketSubmitted);
+    AppNotificationToast.success(context, l10n.supportTicketSubmitted);
     Navigator.pop(context);
   }
 

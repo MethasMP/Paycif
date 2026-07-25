@@ -2,8 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:frontend/features/security/data/repositories/security_repository_impl.dart';
 import 'package:frontend/features/security/data/datasources/security_remote_data_source.dart';
-import 'package:frontend/features/security/data/datasources/crypto_service.dart';
-import 'package:frontend/features/security/data/datasources/secure_storage_service.dart';
+import 'package:frontend/features/security/data/datasources/app_encryption_service.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cryptography/cryptography.dart';
 import 'dart:convert';
@@ -12,9 +12,9 @@ import 'dart:convert';
 class MockSecurityRemoteDataSource extends Mock
     implements SecurityRemoteDataSource {}
 
-class MockCryptoService extends Mock implements CryptoService {}
+class MockCryptoService extends Mock implements AppEncryptionService {}
 
-class MockSecureStorageService extends Mock implements SecureStorageService {}
+class MockSecureStorageService extends Mock implements FlutterSecureStorage {}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -32,9 +32,9 @@ void main() {
     mockSecureStorage = MockSecureStorageService();
 
     // Stub default secure storage calls to return null or complete normally
-    when(() => mockSecureStorage.read(any())).thenAnswer((_) async => null);
-    when(() => mockSecureStorage.write(any(), any())).thenAnswer((_) async {});
-    when(() => mockSecureStorage.delete(any())).thenAnswer((_) async {});
+    when(() => mockSecureStorage.read(key: any(named: 'key'))).thenAnswer((_) async => null);
+    when(() => mockSecureStorage.write(key: any(named: 'key'), value: any(named: 'value'))).thenAnswer((_) async {});
+    when(() => mockSecureStorage.delete(key: any(named: 'key'))).thenAnswer((_) async {});
 
     // Crypto Setup
     final algorithm = Ed25519();
@@ -59,10 +59,10 @@ void main() {
     test('verifyPin should sign payload and attach headers', () async {
       // Arrange
       when(
-        () => mockSecureStorage.read('device_binding_id'),
+        () => mockSecureStorage.read(key: 'device_binding_id'),
       ).thenAnswer((_) async => 'mock_device_uuid');
       when(
-        () => mockSecureStorage.read('device_private_key_seed'),
+        () => mockSecureStorage.read(key: 'device_private_key_seed'),
       ).thenAnswer((_) async => base64Encode([1, 2, 3])); // dummy seed b64
 
       when(
@@ -94,10 +94,10 @@ void main() {
     test('initiatePinReset should sign payload and attach headers', () async {
       // Arrange
       when(
-        () => mockSecureStorage.read('device_binding_id'),
+        () => mockSecureStorage.read(key: 'device_binding_id'),
       ).thenAnswer((_) async => 'mock_device_uuid');
       when(
-        () => mockSecureStorage.read('device_private_key_seed'),
+        () => mockSecureStorage.read(key: 'device_private_key_seed'),
       ).thenAnswer((_) async => base64Encode([1, 2, 3]));
 
       when(
@@ -128,10 +128,10 @@ void main() {
 
     test('Should throw error if device not bound when signing', () async {
       when(
-        () => mockSecureStorage.read('device_binding_id'),
+        () => mockSecureStorage.read(key: 'device_binding_id'),
       ).thenAnswer((_) async => null);
       when(
-        () => mockSecureStorage.read('device_private_key_seed'),
+        () => mockSecureStorage.read(key: 'device_private_key_seed'),
       ).thenAnswer((_) async => null);
       when(
         () => mockCryptoService.createHardwareIdentity(),

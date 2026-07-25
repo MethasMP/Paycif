@@ -7,11 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:frontend/features/dashboard/presentation/dashboard_controller.dart';
 import 'package:frontend/features/transactions/domain/transaction.dart';
 import 'package:frontend/core/widgets/transaction_item.dart';
-import 'package:frontend/core/utils/error_translator.dart';
-import 'package:frontend/core/models/exchange_rate_model.dart';
-import 'package:frontend/core/network/api_service.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 import 'package:frontend/core/widgets/app_icon.dart';
 
@@ -30,56 +26,58 @@ class _HomeViewState extends State<HomeView> {
 
     return BlocBuilder<DashboardController, DashboardState>(
       builder: (context, state) {
-        if (state.status == 'error') {
-          return Center(
-            child: Text(
-              "${l10n.commonError}: ${ErrorTranslator.translate(l10n, state.errorMessage ?? '')}",
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.error,
-              ),
-            ),
-          );
-        }
-
-        final isReady = state.status == 'success';
+        // We no longer block the entire screen with an error. 
+        // Background auto-retry handles recovery. If it ultimately fails, we just render the dashboard (which will show an empty state or cached data)
+        // so the user can still pull-to-refresh or navigate elsewhere.
+        
+        final showDashboard = state.status == 'success' || state.status == 'error' || (state.status == 'loading' && state.transactions.isNotEmpty);
 
         return Scaffold(
           backgroundColor: theme.scaffoldBackgroundColor,
-          appBar: _buildAppBar(context),
+          appBar: _buildAppBar(context, theme, l10n),
           body: AnimatedSwitcher(
             duration: const Duration(milliseconds: 600),
-            child: isReady
+            child: showDashboard
                 ? RefreshIndicator(
                     onRefresh: () async => context.read<DashboardController>().refresh(),
                     color: theme.primaryColor,
                     child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      padding: const EdgeInsets.only(left: 20, right: 20, top: 12, bottom: 120),
                       physics: const AlwaysScrollableScrollPhysics(),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          const Center(child: _LiveFxBanner()),
-                          const SizedBox(height: 24),
+                          if (state.status == 'error')
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: Text(
+                                "Offline mode. Showing cached data.",
+                                style: theme.textTheme.bodySmall?.copyWith(color: AppTheme.textSecondaryColor(context)),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                            
+                          const SizedBox(height: 12),
                           
                           // Quick Actions Label
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 4),
                             child: Text(
                               l10n.homeQuickActions,
-                              style: theme.textTheme.labelLarge?.copyWith(
+                              style: theme.textTheme.titleSmall?.copyWith(
                                 fontWeight: FontWeight.w600,
                                 color: AppTheme.textSecondaryColor(context),
                               ),
                             ),
                           ),
                           const SizedBox(height: 12),
-                          _buildQuickActionsDock(context, l10n),
-                          const SizedBox(height: 32),
+                          _buildQuickActionsDock(context, l10n, theme),
+                          const SizedBox(height: 40),
                           
                           // Recent Transactions
-                          _buildRecentTransactionsHeader(context, l10n),
-                          const SizedBox(height: 12),
-                          _buildTransactionContainer(state.transactions),
+                          _buildRecentTransactionsHeader(context, theme, l10n),
+                          const SizedBox(height: 16),
+                          _buildTransactionContainer(context, state.transactions, theme, l10n),
                           const SizedBox(height: 32),
                         ],
                       ),
@@ -92,7 +90,7 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
-  Widget _buildQuickActionsDock(BuildContext context, AppLocalizations l10n) {
+  Widget _buildQuickActionsDock(BuildContext context, AppLocalizations l10n, ThemeData theme) {
     return Row(
       children: [
         Expanded(
@@ -121,44 +119,50 @@ class _HomeViewState extends State<HomeView> {
   }
 
   // --- Transaction Container Card ---
-  Widget _buildTransactionContainer(List<Transaction> transactions) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final l10n = AppLocalizations.of(context)!;
+  Widget _buildTransactionContainer(BuildContext context, List<Transaction> transactions, ThemeData theme, AppLocalizations l10n) {
+    final isDark = theme.brightness == Brightness.dark;
+
     if (transactions.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 4),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.start,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            AppIcon(
-              PhosphorIconsRegular.clock,
-              size: AppIconSize.sm,
-              color: AppTheme.textSecondaryColor(context),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              l10n.homeNoRecentTransactions,
-              style: TextStyle(
-                color: AppTheme.textSecondaryColor(context),
-                fontSize: 14,
-                fontWeight: FontWeight.w400,
-                letterSpacing: 0.2,
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+        decoration: BoxDecoration(
+          color: isDark ? AppTheme.darkTheme.cardColor : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isDark ? Colors.white12 : AppTheme.borderGrey,
+          ),
+        ),
+        child: Center(
+          child: Column(
+            children: [
+              AppIcon(
+                PhosphorIconsRegular.receipt,
+                size: AppIconSize.lg,
+                color: AppTheme.textSecondaryColor(context).withValues(alpha: 0.5),
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+              Text(
+                l10n.homeNoRecentTransactions,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: AppTheme.textSecondaryColor(context),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
 
     final itemCount = transactions.length > 5 ? 5 : transactions.length;
+    final displayList = transactions.take(itemCount).toList();
 
     return Container(
       decoration: BoxDecoration(
         color: isDark ? AppTheme.darkTheme.cardColor : Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isDark ? Colors.white.withValues(alpha: 0.05) : AppTheme.borderGrey,
+          color: isDark ? Colors.white12 : AppTheme.borderGrey,
         ),
         boxShadow: [
           BoxShadow(
@@ -168,36 +172,42 @@ class _HomeViewState extends State<HomeView> {
           ),
         ],
       ),
-      child: ListView.separated(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: itemCount,
-        separatorBuilder: (context, index) => Divider(
-          color: isDark ? Colors.white12 : AppTheme.borderGrey,
-          height: 1,
-          indent: 16,
-          endIndent: 16,
-        ),
-        itemBuilder: (context, index) {
-          return TransactionItem(transaction: transactions[index]);
-        },
+      // Fix: Replaced `shrinkWrap` ListView with Column mapping for performance
+      child: Column(
+        children: displayList.asMap().entries.map((entry) {
+          final int index = entry.key;
+          final Transaction tx = entry.value;
+          final bool isLast = index == displayList.length - 1;
+          
+          return Column(
+            children: [
+              TransactionItem(transaction: tx),
+              if (!isLast)
+                Divider(
+                  color: isDark ? Colors.white12 : AppTheme.borderGrey,
+                  height: 1,
+                  indent: 16,
+                  endIndent: 16,
+                ),
+            ],
+          );
+        }).toList(),
       ),
     );
   }
 
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
-    final theme = Theme.of(context);
+  PreferredSizeWidget _buildAppBar(BuildContext context, ThemeData theme, AppLocalizations l10n) {
     return AppBar(
       backgroundColor: Colors.transparent,
       elevation: 0,
       title: Text(
-        AppLocalizations.of(context)!.appTitle,
+        l10n.appTitle,
         style: theme.appBarTheme.titleTextStyle?.copyWith(
           fontWeight: FontWeight.bold,
           fontSize: 20,
           color: AppTheme.textPrimaryColor(context),
           letterSpacing: -0.6,
-        ) ?? theme.textTheme.headlineSmall?.copyWith(
+        ) ?? theme.textTheme.titleLarge?.copyWith(
           fontWeight: FontWeight.bold,
           fontSize: 20,
           color: AppTheme.textPrimaryColor(context),
@@ -208,10 +218,13 @@ class _HomeViewState extends State<HomeView> {
         Padding(
           padding: const EdgeInsets.only(right: 8.0),
           child: IconButton(
-            icon: AppIcon(
-              PhosphorIconsRegular.gear,
-              size: AppIconSize.md,
-              color: AppTheme.textPrimaryColor(context),
+            icon: Semantics(
+              label: "Settings",
+              child: AppIcon(
+                PhosphorIconsRegular.gear,
+                size: AppIconSize.md,
+                color: AppTheme.textPrimaryColor(context),
+              ),
             ),
             onPressed: () => context.push('/profile'),
           ),
@@ -220,8 +233,7 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
-  Widget _buildRecentTransactionsHeader(BuildContext context, AppLocalizations l10n) {
-    final theme = Theme.of(context);
+  Widget _buildRecentTransactionsHeader(BuildContext context, ThemeData theme, AppLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Row(
@@ -229,9 +241,8 @@ class _HomeViewState extends State<HomeView> {
         children: [
           Text(
             l10n.homeRecentTransactions,
-            style: theme.textTheme.headlineMedium?.copyWith(
+            style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
-              fontSize: 16,
               letterSpacing: -0.2,
               color: AppTheme.textPrimaryColor(context),
             ),
@@ -267,178 +278,6 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 }
-// --- Live FX Banner with Pulsing Dot ---
-class _LiveFxBanner extends StatefulWidget {
-  const _LiveFxBanner();
-
-  @override
-  State<_LiveFxBanner> createState() => _LiveFxBannerState();
-}
-
-class _LiveFxBannerState extends State<_LiveFxBanner> {
-  double? _rate;
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadRate();
-  }
-
-  Future<void> _loadRate() async {
-    try {
-      final json = await ApiService().fetchExchangeRate('USD');
-      final rate = ExchangeRate.fromJson(json).providerRate;
-      if (!mounted) return;
-      setState(() {
-        _rate = (rate != null && rate > 0) ? rate : null;
-        _loading = false;
-      });
-    } catch (_) {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.white,
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(
-          color: isDark ? Colors.white.withValues(alpha: 0.08) : AppTheme.borderGrey,
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          )
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const _PulseDot(),
-          const SizedBox(width: 8),
-          _buildRateText(context),
-          const SizedBox(width: 8),
-          Container(
-            height: 12,
-            width: 1,
-            color: isDark ? Colors.white24 : Colors.black12,
-          ),
-          const SizedBox(width: 8),
-          AppIcon(
-            PhosphorIconsRegular.lockSimple,
-            size: AppIconSize.xs,
-            color: AppTheme.primaryColor(context),
-          ),
-          const SizedBox(width: 4),
-          Text(
-            AppLocalizations.of(context)!.homeFxLocked,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.primaryColor(context),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRateText(BuildContext context) {
-    final style = Theme.of(context).textTheme.bodySmall?.copyWith(
-      fontWeight: FontWeight.w600,
-      letterSpacing: 0.2,
-      color: AppTheme.textSecondaryColor(context),
-    );
-
-    if (_loading) {
-      return Container(
-        width: 120,
-        height: 12,
-        decoration: BoxDecoration(
-          color: AppTheme.textSecondaryColor(context).withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(6),
-        ),
-      ).animate(onPlay: (controller) => controller.repeat(reverse: true))
-          .fadeIn(duration: 600.ms)
-          .fadeOut(duration: 600.ms);
-    }
-
-    final l10n = AppLocalizations.of(context)!;
-
-    if (_rate == null) {
-      return Text(l10n.homeFxUnavailable, style: style);
-    }
-
-    return Text(l10n.homeFxRate(_rate!.toStringAsFixed(2)), style: style);
-  }
-}
-
-// --- Breathing Pulse Dot Widget ---
-class _PulseDot extends StatefulWidget {
-  const _PulseDot();
-
-  @override
-  State<_PulseDot> createState() => _PulseDotState();
-}
-
-class _PulseDotState extends State<_PulseDot> with SingleTickerProviderStateMixin {
-  late AnimationController _pulseController;
-
-  @override
-  void initState() {
-    super.initState();
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _pulseController,
-      builder: (context, child) {
-        return Stack(
-          alignment: Alignment.center,
-          children: [
-            Container(
-              width: 14,
-              height: 14,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppTheme.primaryTeal.withValues(alpha: 0.4 * (1.0 - _pulseController.value)),
-              ),
-            ),
-            Container(
-              width: 7,
-              height: 7,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppTheme.primaryTeal,
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
 
 // --- Custom Animated Quick Action Card with Press Feedback ---
 class _QuickActionCard extends StatefulWidget {
@@ -456,72 +295,47 @@ class _QuickActionCard extends StatefulWidget {
   State<_QuickActionCard> createState() => _QuickActionCardState();
 }
 
-class _QuickActionCardState extends State<_QuickActionCard> with SingleTickerProviderStateMixin {
-  late AnimationController _animController;
-  late Animation<double> _scaleAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _animController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 100),
-    );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.96).animate(
-      CurvedAnimation(parent: _animController, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _animController.dispose();
-    super.dispose();
-  }
-
-  void _handleTapDown(TapDownDetails details) {
-    _animController.forward();
-  }
-
-  void _handleTapUp(TapUpDetails details) {
-    _animController.reverse();
-    widget.onTap();
-  }
-
-  void _handleTapCancel() {
-    _animController.reverse();
-  }
+class _QuickActionCardState extends State<_QuickActionCard> {
+  bool _isPressed = false;
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final Color cardBg = isDark ? AppTheme.darkTheme.cardColor : Colors.white;
-    final Color iconBg = isDark ? Colors.white.withValues(alpha: 0.06) : AppTheme.primaryTealLight;
+    final Color iconBg = isDark ? Colors.white.withValues(alpha: 0.08) : AppTheme.primaryTealLight;
     final Color iconColor = isDark ? AppTheme.primaryColor(context) : AppTheme.primaryTealDark;
     final Color labelColor = isDark ? Colors.white.withValues(alpha: 0.87) : AppTheme.textPrimaryColor(context);
 
     return GestureDetector(
-      onTapDown: _handleTapDown,
-      onTapUp: _handleTapUp,
-      onTapCancel: _handleTapCancel,
-      child: ScaleTransition(
-        scale: _scaleAnimation,
-        child: Semantics(
-          button: true,
-          label: widget.label,
-          child: Container(
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) {
+        setState(() => _isPressed = false);
+        widget.onTap();
+      },
+      onTapCancel: () => setState(() => _isPressed = false),
+      child: Semantics(
+        button: true,
+        label: widget.label,
+        child: AnimatedScale(
+          scale: _isPressed ? 0.95 : 1.0,
+          duration: const Duration(milliseconds: 100),
+          curve: Curves.easeOutQuad,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 100),
+            curve: Curves.easeOutQuad,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             decoration: BoxDecoration(
               color: cardBg,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: isDark ? Colors.white.withValues(alpha: 0.05) : AppTheme.borderGrey,
+                color: isDark ? Colors.white12 : AppTheme.borderGrey,
               ),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
+                  blurRadius: _isPressed ? 4 : 8,
+                  offset: Offset(0, _isPressed ? 1 : 2),
                 ),
               ],
             ),
@@ -545,7 +359,7 @@ class _QuickActionCardState extends State<_QuickActionCard> with SingleTickerPro
                       fontWeight: FontWeight.w600,
                       color: labelColor,
                     ),
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),

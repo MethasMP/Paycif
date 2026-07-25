@@ -11,16 +11,13 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/sony/gobreaker"
 )
 
-// Geo-IP providers. Both are free, keyless tiers — fine for pre-launch
-// volume, but move to a paid tier (or a self-hosted MaxMind DB) before this
-// becomes a bottleneck. ipwho.is is tried only if ipapi.co fails, so a
-// single-provider blip doesn't trip the circuit breaker.
 var (
 	ipapiBaseURL = func() string {
 		if v := os.Getenv("IPAPI_BASE_URL"); v != "" {
@@ -40,20 +37,10 @@ var geoBlockHTTPClient = &http.Client{
 	Timeout: 5 * time.Second,
 }
 
-// consecutiveGeoFailures counts back-to-back total lookup failures (both
-// providers down) across requests, so a sustained outage gets a loud ALERT
-// log line instead of silently fading into per-request warnings.
 var consecutiveGeoFailures int32
 
 const geoFailureAlertThreshold = 3
 
-// Failover alerting: log lines alone aren't a real safety net for a
-// solo-founder setup with no monitoring dashboard, so once the failure
-// threshold is hit we also push an email via Resend (HTTP API, no SMTP/2FA
-// setup needed, free tier is plenty for this volume). lastAlertUnix +
-// geoAlertCooldown stop a sustained outage from flooding the inbox — the
-// first breach fires immediately, then alerts are suppressed for the
-// cooldown window even if failures keep happening.
 var (
 	resendAPIKey = os.Getenv("RESEND_API_KEY")
 	alertToEmail = func() string {
@@ -66,9 +53,6 @@ var (
 		if v := os.Getenv("GEO_ALERT_EMAIL_FROM"); v != "" {
 			return v
 		}
-		// Resend's shared sandbox sender — works with no domain verification.
-		// Verify a real sending domain in the Resend dashboard if this ever
-		// lands in spam; fine as a starting point at zero setup cost.
 		return "alerts@resend.dev"
 	}()
 	resendBaseURL = func() string {
@@ -79,29 +63,133 @@ var (
 	}()
 )
 
-var lastAlertUnix int64 // unix seconds of last sent alert; 0 = never sent
+var lastAlertUnix int64
 
 const geoAlertCooldown = 15 * time.Minute
 
-// blockedCountries is the set of ISO 3166-1 alpha-2 codes MoonPay's
-// regulatory-exposure requirement covers: US, UK, and the EU-27.
-var blockedCountries = map[string]bool{
-	"US": true, "GB": true,
-	"AT": true, "BE": true, "BG": true, "HR": true, "CY": true, "CZ": true,
-	"DK": true, "EE": true, "FI": true, "FR": true, "DE": true, "GR": true,
-	"HU": true, "IE": true, "IT": true, "LV": true, "LT": true, "LU": true,
-	"MT": true, "NL": true, "PL": true, "PT": true, "RO": true, "SK": true,
-	"SI": true, "ES": true, "SE": true,
+// Local CIDR Bounding Database for Thailand (L1.5 Geofence Filter)
+var (
+	thCIDRBlocks       []*net.IPNet
+	thCIDRBlocksLoaded int32
+	thCIDRLoadMutex    sync.Mutex
+)
+
+// LoadTHCIDRBlocks loads the Thailand IP range CIDR subnets from local storage or downloads them.
+func LoadTHCIDRBlocks() {
+	if atomic.LoadInt32(&thCIDRBlocksLoaded) == 1 {
+		return
+	}
+	thCIDRLoadMutex.Lock()
+	defer thCIDRLoadMutex.Unlock()
+	if thCIDRBlocksLoaded == 1 {
+		return
+	}
+
+	filePath := "data/th_cidrs.txt"
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		log.Println("⚠️ Local th_cidrs.txt not found. Fetching from public repository...")
+		resp, dErr := http.Get("https://raw.githubusercontent.com/herrbischoff/country-ip-blocks/master/ipv4/th.cidr")
+		if dErr == nil && resp.StatusCode == http.StatusOK {
+			data, err = io.ReadAll(resp.Body)
+			resp.Body.Close()
+			if err == nil {
+				_ = os.MkdirAll("data", 0755)
+				_ = os.WriteFile(filePath, data, 0644)
+			}
+		}
+	}
+
+	if err != nil {
+		log.Printf("⚠️ Failed to load or download th_cidrs.txt: %v. Local country lookup fallback is disabled.", err)
+		return
+	}
+
+	lines := strings.Split(string(data), "\n")
+	var blocks []*net.IPNet
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		_, ipNet, parseErr := net.ParseCIDR(line)
+		if parseErr == nil {
+			blocks = append(blocks, ipNet)
+		}
+	}
+
+	thCIDRBlocks = blocks
+	atomic.StoreInt32(&thCIDRBlocksLoaded, 1)
+	log.Printf("✅ Loaded %d Thailand IP subnets into memory.", len(thCIDRBlocks))
 }
 
-// GeoBlockService resolves a client IP to a country and decides whether the
-// request must be blocked for regulatory geo-fencing (US/UK/EU).
+// IsInThailandCIDR checks if client IP falls under Thailand network ranges.
+func IsInThailandCIDR(ipStr string) bool {
+	LoadTHCIDRBlocks()
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return false
+	}
+	for _, subnet := range thCIDRBlocks {
+		if subnet.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+// Two-Tier Cache for Geoblock
+type geoCacheEntry struct {
+	value      string
+	expiration time.Time
+}
+
+var (
+	geoL1Cache      = make(map[string]geoCacheEntry)
+	geoL1CacheMutex sync.RWMutex
+)
+
+func getGeoL1(ip string) (string, bool) {
+	geoL1CacheMutex.RLock()
+	defer geoL1CacheMutex.RUnlock()
+	entry, found := geoL1Cache[ip]
+	if !found || time.Now().After(entry.expiration) {
+		return "", false
+	}
+	return entry.value, true
+}
+
+func setGeoL1(ip string, country string, ttl time.Duration) {
+	geoL1CacheMutex.Lock()
+	defer geoL1CacheMutex.Unlock()
+	geoL1Cache[ip] = geoCacheEntry{
+		value:      country,
+		expiration: time.Now().Add(ttl),
+	}
+}
+
+func ClearGeoL1Cache() {
+	geoL1CacheMutex.Lock()
+	defer geoL1CacheMutex.Unlock()
+	geoL1Cache = make(map[string]geoCacheEntry)
+}
+
+// IsAllowed reports whether country is allowed (strictly "TH").
+func (s *GeoBlockService) IsAllowed(country string) bool {
+	return strings.ToUpper(country) == "TH"
+}
+
+// IsInThailandGPS checks bounds
+func (s *GeoBlockService) IsInThailandGPS(lat, lng float64) bool {
+	return lat >= 5.6 && lat <= 20.5 && lng >= 97.3 && lng <= 105.6
+}
+
+// GeoBlockService resolves client IP to country.
 type GeoBlockService struct {
 	cb *gobreaker.CircuitBreaker
 }
 
-// NewGeoBlockService creates a new geo-block service with a circuit breaker
-// around the external IP geolocation lookups, mirroring SanctionsService.
+// NewGeoBlockService creates a new geo-block service with a circuit breaker.
 func NewGeoBlockService() *GeoBlockService {
 	settings := gobreaker.Settings{
 		Name:        "GeoIPLookup",
@@ -119,16 +207,10 @@ func NewGeoBlockService() *GeoBlockService {
 	}
 }
 
-// IsLocalIP reports whether ip is a loopback/dev address that should skip
-// geo-fencing entirely (matches the convention already used in
-// PaymentHandler.HandleCheckRegion).
 func IsLocalIP(ip string) bool {
 	return ip == "" || ip == "::1" || ip == "127.0.0.1"
 }
 
-// TruncateIP zeroes the last IPv4 octet (or the last 80 bits of an IPv6
-// address) so logs retain enough precision for country-level audit
-// correlation without persisting a full client IP long-term.
 func TruncateIP(ip string) string {
 	parsed := net.ParseIP(ip)
 	if parsed == nil {
@@ -195,9 +277,32 @@ func fetchCountryFromIPWhois(ctx context.Context, ip string) (string, error) {
 	return strings.ToUpper(parsed.CountryCode), nil
 }
 
-// ResolveCountry looks up the ISO country code for ip, trying ipapi.co first
-// and falling back to ipwho.is within the same circuit-breaker call.
+// ResolveCountry looks up the country using a multi-tiered cache hierarchy and local database fallback.
 func (s *GeoBlockService) ResolveCountry(ctx context.Context, ip string) (string, error) {
+	if IsLocalIP(ip) {
+		return "TH", nil
+	}
+
+	// 1. L1 In-Memory Cache check
+	if val, found := getGeoL1(ip); found {
+		return val, nil
+	}
+
+	// 2. L2 Redis Cache check
+	redisKey := fmt.Sprintf("geo_country:%s", ip)
+	if val, found := CacheGet(ctx, redisKey); found {
+		setGeoL1(ip, val, 1*time.Hour)
+		return val, nil
+	}
+
+	// 3. Local CIDR check (L1.5 filter)
+	if IsInThailandCIDR(ip) {
+		setGeoL1(ip, "TH", 1*time.Hour)
+		CacheSet(ctx, redisKey, "TH", 24*time.Hour)
+		return "TH", nil
+	}
+
+	// 4. API check with circuit breaker
 	result, err := s.cb.Execute(func() (interface{}, error) {
 		country, primaryErr := fetchCountryFromIPAPI(ctx, ip)
 		if primaryErr == nil {
@@ -214,32 +319,24 @@ func (s *GeoBlockService) ResolveCountry(ctx context.Context, ip string) (string
 
 	if err != nil {
 		failures := atomic.AddInt32(&consecutiveGeoFailures, 1)
-		log.Printf("GEO_FAILOPEN: geo lookup failed for ip=%s: %v", TruncateIP(ip), err)
+		log.Printf("GEO_FAILCLOSED: geo lookup failed for ip=%s: %v", TruncateIP(ip), err)
 		if failures >= geoFailureAlertThreshold {
-			log.Printf("ALERT: %d consecutive geo-IP lookup failures — both providers may be down, geo-fencing is currently fail-open for all requests", failures)
+			log.Printf("ALERT: %d consecutive geo-IP lookup failures — both providers may be down, geo-fencing is currently fail-closed", failures)
 			maybeSendFailoverAlert("Country geo-fencing (ipapi.co/ipwho.is)", failures)
 		}
 		return "", err
 	}
 
 	atomic.StoreInt32(&consecutiveGeoFailures, 0)
-	return result.(string), nil
+	country := result.(string)
+
+	// Save to caches
+	setGeoL1(ip, country, 1*time.Hour)
+	CacheSet(ctx, redisKey, country, 24*time.Hour)
+
+	return country, nil
 }
 
-// IsBlocked reports whether country is in the blocked set (US/UK/EU-27).
-func (s *GeoBlockService) IsBlocked(country string) bool {
-	return blockedCountries[strings.ToUpper(country)]
-}
-
-// maybeSendFailoverAlert fires an async email alert once the failure
-// threshold is hit, unless one already fired within geoAlertCooldown. The
-// CompareAndSwap ensures that under concurrent requests only one goroutine
-// claims the alert slot — the rest see the swap fail and skip silently.
-//
-// Shared across both geo dependencies (country lookup and VPN/proxy
-// detection) via a single global cooldown/timestamp — if either external
-// service is flapping you get one email, not two independent alert streams,
-// and the reason string tells you which one tripped it.
 func maybeSendFailoverAlert(reason string, failures int32) {
 	now := time.Now().Unix()
 	last := atomic.LoadInt64(&lastAlertUnix)
@@ -249,30 +346,23 @@ func maybeSendFailoverAlert(reason string, failures int32) {
 	if !atomic.CompareAndSwapInt64(&lastAlertUnix, last, now) {
 		return
 	}
-	// Never block the request that triggered this — the email send has its
-	// own timeout and happens entirely off the request path.
 	go sendFailoverAlertEmail(reason, failures)
 }
 
-// sendFailoverAlertEmail pushes a single alert email via Resend's HTTP API.
-// This is the one real safety net for a solo-founder setup with no
-// monitoring dashboard: if a geo dependency is down, the corresponding check
-// is silently fail-open, and this is what surfaces that.
 func sendFailoverAlertEmail(reason string, failures int32) {
 	if resendAPIKey == "" {
-		log.Printf("geo alert: RESEND_API_KEY not set — %d consecutive failures on %q went unemailed, log lines are the only record", failures, reason)
+		log.Printf("geo alert: RESEND_API_KEY not set — %d consecutive failures on %q went unemailed", failures, reason)
 		return
 	}
 
 	payload, err := json.Marshal(map[string]interface{}{
 		"from":    alertFromEmail,
 		"to":      []string{alertToEmail},
-		"subject": fmt.Sprintf("Paycif ALERT: %s is fail-open", reason),
+		"subject": fmt.Sprintf("Paycif ALERT: %s is down", reason),
 		"text": fmt.Sprintf(
 			"%s has failed %d times in a row.\n\n"+
-				"This check is currently FAIL-OPEN: it is NOT blocking requests right now.\n\n"+
-				"Further alerts are suppressed for %s even if failures continue, to avoid flooding this inbox.",
-			reason, failures, geoAlertCooldown,
+				"This check is FAIL-CLOSED and will block non-TH requests.",
+			reason, failures,
 		),
 	})
 	if err != nil {
@@ -304,5 +394,5 @@ func sendFailoverAlertEmail(reason string, failures int32) {
 		return
 	}
 
-	log.Printf("geo alert: failover email sent to %s (%q, %d consecutive failures)", alertToEmail, reason, failures)
+	log.Printf("geo alert: email sent to %s (%q, %d consecutive failures)", alertToEmail, reason, failures)
 }

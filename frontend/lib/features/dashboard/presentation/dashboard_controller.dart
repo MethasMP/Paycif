@@ -99,7 +99,7 @@ class DashboardController extends Cubit<DashboardState> {
     emit(DashboardState());
   }
 
-  Future<void> init() async {
+  Future<void> init({int retryCount = 0}) async {
     if (_isRefreshing) return;
     _isRefreshing = true;
     try {
@@ -109,7 +109,9 @@ class DashboardController extends Cubit<DashboardState> {
         return;
       }
 
-      emit(state.copyWith(status: 'loading'));
+      if (retryCount == 0) {
+        emit(state.copyWith(status: 'loading'));
+      }
 
       try {
         String kycStatus = 'UNVERIFIED';
@@ -119,6 +121,7 @@ class DashboardController extends Cubit<DashboardState> {
         } catch (_) {
           // Non-fatal — dashboard loads even if KYC status fails
         }
+        
         if (isClosed) return;
 
         emit(state.copyWith(
@@ -130,6 +133,13 @@ class DashboardController extends Cubit<DashboardState> {
 
       } catch (e) {
         if (!isClosed) {
+          if (retryCount < 3) {
+            _isRefreshing = false;
+            Future.delayed(Duration(seconds: 2 * (retryCount + 1)), () {
+              if (!isClosed) init(retryCount: retryCount + 1);
+            });
+            return;
+          }
           emit(state.copyWith(status: 'error', errorMessage: e.toString()));
         }
       } finally {
@@ -138,6 +148,12 @@ class DashboardController extends Cubit<DashboardState> {
     } catch (e) {
       _isRefreshing = false;
       if (!isClosed) {
+        if (retryCount < 3) {
+          Future.delayed(Duration(seconds: 2 * (retryCount + 1)), () {
+            if (!isClosed) init(retryCount: retryCount + 1);
+          });
+          return;
+        }
         emit(state.copyWith(status: 'error', errorMessage: e.toString()));
       }
     }

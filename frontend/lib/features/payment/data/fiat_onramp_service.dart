@@ -49,7 +49,7 @@ class AchFiatMethod {
 }
 
 /// Manages ACH on-ramp token refresh and fiat method queries.
-class AchOnRampService {
+class FiatOnRampService {
   final ApiService _api = ApiService();
 
   // ─── Token ───────────────────────────────────────────────────────────────
@@ -117,7 +117,7 @@ class AchOnRampService {
     if (Platform.isAndroid) {
       // Google Pay requires real browser — WebView popup blocker breaks it
       if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-        debugPrint('❌ AchOnRampService: could not launch external browser');
+        debugPrint('❌ FiatOnRampService: could not launch external browser');
       }
       return;
     }
@@ -175,7 +175,7 @@ class _AchWebViewPageState extends State<_AchWebViewPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.sandbox ? 'Pay via AlchemyPay (Sandbox)' : 'Pay via AlchemyPay'),
+        title: Text(widget.sandbox ? 'Pay via On-Ramp (Sandbox)' : 'Pay via On-Ramp'),
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.of(context).pop(),

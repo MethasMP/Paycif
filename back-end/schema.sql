@@ -10,19 +10,19 @@ CREATE TABLE profiles (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Table: wallets
-CREATE TABLE wallets (
+-- Table: payment_accounts (Non-custodial user payment profile tracking)
+CREATE TABLE payment_accounts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     profile_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-    currency TEXT NOT NULL, -- e.g., 'USD', 'EUR', 'BTC'
+    currency TEXT NOT NULL, -- e.g., 'USD', 'EUR', 'THB'
     balance BIGINT NOT NULL DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     CONSTRAINT balance_non_negative CHECK (balance >= 0)
 );
 
--- Index for wallet lookups
-CREATE INDEX idx_wallets_profile_currency ON wallets(profile_id, currency);
+-- Index for payment account lookups
+CREATE INDEX idx_payment_accounts_profile_currency ON payment_accounts(profile_id, currency);
 
 -- Table: transactions
 -- Represents a group of ledger entries making up a single financial event
@@ -42,13 +42,13 @@ CREATE INDEX idx_transactions_reference_id ON transactions(reference_id);
 CREATE TABLE ledger_entries (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     transaction_id UUID NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
-    wallet_id UUID NOT NULL REFERENCES wallets(id) ON DELETE RESTRICT,
+    account_id UUID NOT NULL REFERENCES payment_accounts(id) ON DELETE RESTRICT,
     amount BIGINT NOT NULL, -- Positive for credit (add), Negative for debit (subtract)
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Index for transaction history
-CREATE INDEX idx_ledger_entries_wallet ON ledger_entries(wallet_id);
+CREATE INDEX idx_ledger_entries_account ON ledger_entries(account_id);
 CREATE INDEX idx_ledger_entries_transaction ON ledger_entries(transaction_id);
 
 -- Enforce strictly non-zero amounts for ledger entries if desired (usually good practice)

@@ -7,7 +7,7 @@ import 'package:frontend/core/l10n/generated/app_localizations.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 import 'package:frontend/features/security/presentation/logic/security_controller.dart';
 import 'package:frontend/features/security/presentation/widgets/pin_entry_widget.dart';
-import 'package:frontend/core/widgets/app_icon.dart';
+import 'package:frontend/features/security/data/datasources/app_encryption_service.dart';
 
 class ChangePinSheet extends StatefulWidget {
   const ChangePinSheet({super.key});
@@ -18,9 +18,11 @@ class ChangePinSheet extends StatefulWidget {
 
 class _ChangePinSheetState extends State<ChangePinSheet> {
   final PageController _pageController = PageController();
+  final _appEncryptionService = AppEncryptionService();
   int _currentStep = 0;
   String? _oldPin;
-  String? _newPin;
+  String? _newPinHash;
+  List<int>? _setupSalt;
   bool _isSuccess = false;
   String? _errorMessage;
 
@@ -41,15 +43,17 @@ class _ChangePinSheetState extends State<ChangePinSheet> {
       setState(() => _errorMessage = 'New PIN cannot be same as old PIN');
       return;
     }
+    _setupSalt = _appEncryptionService.randomBytes(16);
     setState(() {
-      _newPin = pin;
+      _newPinHash = _appEncryptionService.hashPinForComparison(pin, _setupSalt!);
       _errorMessage = null;
     });
     _nextPage();
   }
 
   void _onConfirmNewPinEntered(String pin) async {
-    if (pin != _newPin) {
+    final currentHash = _appEncryptionService.hashPinForComparison(pin, _setupSalt!);
+    if (currentHash != _newPinHash) {
       setState(() => _errorMessage = 'PINs do not match. Please try again.');
       // Reset back to step 2 so user re-enters new PIN cleanly
       await Future.delayed(1200.ms);
@@ -61,7 +65,8 @@ class _ChangePinSheetState extends State<ChangePinSheet> {
       );
       setState(() {
         _currentStep = 1;
-        _newPin = null;
+        _newPinHash = null;
+        _setupSalt = null;
         _errorMessage = null;
       });
       return;
@@ -104,22 +109,12 @@ class _ChangePinSheetState extends State<ChangePinSheet> {
     }
   }
 
-  Color _getHeaderColor(BuildContext context) {
-    switch (_currentStep) {
-      case 0:
-        return Colors.orange;
-      case 1:
-        return Colors.blue;
-      case 2:
-        return Colors.green;
-      default:
-        return Theme.of(context).primaryColor;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = AppTheme.textPrimaryColor(context);
+    final inactiveColor = isDark ? Colors.white12 : Colors.black12;
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.85,
@@ -149,7 +144,7 @@ class _ChangePinSheetState extends State<ChangePinSheet> {
               key: ValueKey(_currentStep),
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.w600,
-                color: _getHeaderColor(context),
+                color: primaryColor,
               ),
             ),
           ),
@@ -168,8 +163,8 @@ class _ChangePinSheetState extends State<ChangePinSheet> {
                 height: 8,
                 decoration: BoxDecoration(
                   color: active
-                      ? _getHeaderColor(context)
-                      : Colors.grey.withValues(alpha: 0.2),
+                      ? primaryColor
+                      : inactiveColor,
                   borderRadius: BorderRadius.circular(4),
                 ),
               );
@@ -187,22 +182,56 @@ class _ChangePinSheetState extends State<ChangePinSheet> {
                   physics: const NeverScrollableScrollPhysics(),
                   children: [
                     // Step 1: Verify Old PIN
-                    PinEntryWidget(onSuccess: _onOldPinEntered),
+                    PinEntryWidget(
+                      onSubmit: (pinList) async {
+                        final pin = pinList.join();
+                        final success = await context.read<SecurityController>().verifyPin(pin);
+                        if (success) {
+                          _onOldPinEntered(pin);
+                          return null;
+                        }
+                        return 'Incorrect PIN. Try again.';
+                      },
+                    ),
 
                     // Step 2: Create New PIN
                     PinEntryWidget(
                       key: const ValueKey('step2'),
-                      showLabel: false,
-                      onVerify: (pin) async => true,
-                      onSuccess: _onNewPinEntered,
+                      onSubmit: (pinList) async {
+                        final pin = pinList.join();
+                        if (pin == _oldPin) {
+                          return 'New PIN cannot be same as old PIN';
+                        }
+                        _onNewPinEntered(pin);
+                        return null;
+                      },
                     ),
 
                     // Step 3: Confirm New PIN
                     PinEntryWidget(
                       key: const ValueKey('step3'),
-                      showLabel: false,
-                      onVerify: (pin) async => pin == _newPin,
-                      onSuccess: _onConfirmNewPinEntered,
+                      onSubmit: (pinList) async {
+                        final pin = pinList.join();
+                        final currentHash = _appEncryptionService.hashPinForComparison(pin, _setupSalt!);
+                        if (currentHash != _newPinHash) {
+                          Future.delayed(1200.ms, () {
+                            if (!mounted) return;
+                            _pageController.animateToPage(
+                              1,
+                              duration: 300.ms,
+                              curve: Curves.easeInOutCubicEmphasized,
+                            );
+                            setState(() {
+                              _currentStep = 1;
+                              _newPinHash = null;
+                              _setupSalt = null;
+                            });
+                          });
+                          return 'PINs do not match. Please try again.';
+                        }
+                        _onConfirmNewPinEntered(pin);
+                        return null;
+                      },
                     ),
                   ],
                 ),
@@ -222,10 +251,10 @@ class _ChangePinSheetState extends State<ChangePinSheet> {
                       ),
                       child: Row(
                         children: [
-                          AppIcon(
+                          Icon(
                             PhosphorIcons.warningCircle,
                             color: Colors.red.shade700,
-                            size: AppIconSize.sm,
+                            size: 20,
                           ),
                           SizedBox(width: 8),
                           Expanded(
@@ -250,10 +279,10 @@ class _ChangePinSheetState extends State<ChangePinSheet> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          AppIcon(
+                          Icon(
                             PhosphorIcons.checkCircle,
                             color: AppTheme.successGreen,
-                            size: AppIconSize.xl,
+                            size: 32,
                           ).animate().scale(
                             duration: 400.ms,
                             curve: Curves.elasticOut,

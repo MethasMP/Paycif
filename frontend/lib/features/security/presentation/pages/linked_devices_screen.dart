@@ -5,7 +5,7 @@ import 'package:frontend/core/l10n/generated/app_localizations.dart';
 import 'package:frontend/features/security/domain/repositories/security_repository.dart';
 import 'package:frontend/features/security/presentation/logic/linked_devices_controller.dart';
 import 'package:go_router/go_router.dart';
-import 'package:frontend/core/utils/pay_notify.dart';
+import 'package:frontend/core/utils/app_notification_toast.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 import 'package:frontend/core/widgets/app_icon.dart';
 
@@ -148,12 +148,12 @@ class _LinkedDevicesView extends StatelessWidget {
             // Force Logout logic
             context.go('/login');
           } else if (context.mounted) {
-            PayNotify.success(context, l10n.devicesRevokeSuccess);
+            AppNotificationToast.success(context, l10n.devicesRevokeSuccess);
           }
         } catch (e) {
           // If error occurs, state might be desync, but controller reloads usually
           if (context.mounted) {
-            PayNotify.error(context, l10n.devicesRevokeFailed);
+            AppNotificationToast.error(context, l10n.devicesRevokeFailed);
           }
         }
       },

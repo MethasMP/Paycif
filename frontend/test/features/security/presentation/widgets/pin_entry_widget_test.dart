@@ -73,7 +73,7 @@ void main() {
     });
 
     testWidgets('Setup Mode: Confirms PIN correctly', (tester) async {
-      when(() => mockController.setupPin(any())).thenAnswer((_) async {});
+      when(() => mockController.setupPin(any())).thenAnswer((_) async => true);
 
       await pumpWidget(tester, isSetup: true);
 

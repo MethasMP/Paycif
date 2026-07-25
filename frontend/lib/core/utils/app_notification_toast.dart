@@ -5,9 +5,9 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 import 'package:frontend/core/widgets/app_icon.dart';
 
-enum PayNotifyType { success, error, info }
+enum AppNotificationToastType { success, error, info }
 
-enum PayNotifyVibrationStyle {
+enum AppNotificationToastVibrationStyle {
   selection,
   light,
   medium,
@@ -17,11 +17,11 @@ enum PayNotifyVibrationStyle {
   longSuccess,
 }
 
-class PayNotify {
+class AppNotificationToast {
   static void show(
     BuildContext context,
     String message, {
-    PayNotifyType type = PayNotifyType.info,
+    AppNotificationToastType type = AppNotificationToastType.info,
     Duration duration = const Duration(seconds: 3),
   }) {
     final overlayState = Overlay.maybeOf(context);
@@ -31,13 +31,13 @@ class PayNotify {
 
     // Haptic Feedback based on type
     switch (type) {
-      case PayNotifyType.success:
+      case AppNotificationToastType.success:
         HapticFeedback.mediumImpact();
         break;
-      case PayNotifyType.error:
+      case AppNotificationToastType.error:
         HapticFeedback.heavyImpact();
         break;
-      case PayNotifyType.info:
+      case AppNotificationToastType.info:
         HapticFeedback.selectionClick();
         break;
     }
@@ -45,7 +45,7 @@ class PayNotify {
     bool isDismissed = false;
 
     overlayEntry = OverlayEntry(
-      builder: (context) => _PayNotifyWidget(
+      builder: (context) => _AppNotificationToastWidget(
         message: message,
         type: type,
         onDismiss: () {
@@ -63,41 +63,41 @@ class PayNotify {
 
   // Shorthand methods
   static void success(BuildContext context, String message) =>
-      show(context, message, type: PayNotifyType.success);
+      show(context, message, type: AppNotificationToastType.success);
   static void error(BuildContext context, String message) =>
-      show(context, message, type: PayNotifyType.error);
+      show(context, message, type: AppNotificationToastType.error);
   static void info(BuildContext context, String message) =>
-      show(context, message, type: PayNotifyType.info);
+      show(context, message, type: AppNotificationToastType.info);
 
   static void vibrate({
-    PayNotifyVibrationStyle style = PayNotifyVibrationStyle.selection,
+    AppNotificationToastVibrationStyle style = AppNotificationToastVibrationStyle.selection,
   }) {
     switch (style) {
-      case PayNotifyVibrationStyle.selection:
+      case AppNotificationToastVibrationStyle.selection:
         HapticFeedback.selectionClick();
         break;
-      case PayNotifyVibrationStyle.light:
+      case AppNotificationToastVibrationStyle.light:
         HapticFeedback.lightImpact();
         break;
-      case PayNotifyVibrationStyle.medium:
+      case AppNotificationToastVibrationStyle.medium:
         HapticFeedback.mediumImpact();
         break;
-      case PayNotifyVibrationStyle.heavy:
+      case AppNotificationToastVibrationStyle.heavy:
         HapticFeedback.heavyImpact();
         break;
-      case PayNotifyVibrationStyle.success:
+      case AppNotificationToastVibrationStyle.success:
         HapticFeedback.lightImpact();
         Future.delayed(const Duration(milliseconds: 50), () {
           HapticFeedback.lightImpact();
         });
         break;
-      case PayNotifyVibrationStyle.error:
+      case AppNotificationToastVibrationStyle.error:
         HapticFeedback.heavyImpact();
         Future.delayed(const Duration(milliseconds: 100), () {
           HapticFeedback.heavyImpact();
         });
         break;
-      case PayNotifyVibrationStyle.longSuccess:
+      case AppNotificationToastVibrationStyle.longSuccess:
         HapticFeedback.mediumImpact();
         Future.delayed(const Duration(milliseconds: 100), () {
           HapticFeedback.mediumImpact();
@@ -110,13 +110,13 @@ class PayNotify {
   }
 }
 
-class _PayNotifyWidget extends StatefulWidget {
+class _AppNotificationToastWidget extends StatefulWidget {
   final String message;
-  final PayNotifyType type;
+  final AppNotificationToastType type;
   final VoidCallback onDismiss;
   final Duration duration;
 
-  const _PayNotifyWidget({
+  const _AppNotificationToastWidget({
     required this.message,
     required this.type,
     required this.onDismiss,
@@ -124,10 +124,10 @@ class _PayNotifyWidget extends StatefulWidget {
   });
 
   @override
-  State<_PayNotifyWidget> createState() => _PayNotifyWidgetState();
+  State<_AppNotificationToastWidget> createState() => _AppNotificationToastWidgetState();
 }
 
-class _PayNotifyWidgetState extends State<_PayNotifyWidget> {
+class _AppNotificationToastWidgetState extends State<_AppNotificationToastWidget> {
   bool _isExiting = false;
 
   @override
@@ -149,15 +149,15 @@ class _PayNotifyWidgetState extends State<_PayNotifyWidget> {
     Color baseColor;
     IconData icon;
     switch (widget.type) {
-      case PayNotifyType.success:
+      case AppNotificationToastType.success:
         baseColor = AppTheme.successGreen; // Emerald
         icon = PhosphorIcons.checkCircle;
         break;
-      case PayNotifyType.error:
+      case AppNotificationToastType.error:
         baseColor = AppTheme.errorRed; // Rose
         icon = PhosphorIcons.warningCircle;
         break;
-      case PayNotifyType.info:
+      case AppNotificationToastType.info:
         baseColor = AppTheme.infoBlue; // Blue
         icon = PhosphorIcons.info;
         break;

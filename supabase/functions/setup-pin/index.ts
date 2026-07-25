@@ -19,9 +19,14 @@ serve(async (req) => {
     const { data: { user }, error } = await admin.auth.getUser(auth.replace(/^Bearer /i, ''));
     if (error || !user) return err('Unauthorized', 401);
 
-    const { pin } = await req.json().catch(() => ({}));
-    if (!pin || typeof pin !== 'string' || pin.length !== 6 || !/^\d+$/.test(pin))
-      return err('PIN must be an 8-digit number', 400);
+    const { pin, is_hashed } = await req.json().catch(() => ({}));
+    if (is_hashed) {
+      if (!pin || typeof pin !== 'string' || pin.length !== 64 || !/^[a-fA-F0-9]+$/.test(pin))
+        return err('Invalid hashed PIN format', 400);
+    } else {
+      if (!pin || typeof pin !== 'string' || pin.length !== 6 || !/^\d+$/.test(pin))
+        return err('PIN must be a 6-digit number', 400);
+    }
 
     // DB does Argon2id hashing via pgsodium
     const { error: rpcErr } = await admin.rpc('setup_user_pin_v2', { p_user_id: user.id, p_pin: pin });

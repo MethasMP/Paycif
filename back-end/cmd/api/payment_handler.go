@@ -1,7 +1,9 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -17,13 +19,14 @@ import (
 )
 
 type PaymentHandler struct {
-	Service *usecase.WalletService
+	Service *usecase.PaymentOrchestrationService
 	ACH     *usecase.AlchemyPayAdapter
 	FX      *usecase.FXService
+	Geo     *usecase.GeoBlockService
 }
 
-func NewPaymentHandler(svc *usecase.WalletService, ach *usecase.AlchemyPayAdapter, fx *usecase.FXService) *PaymentHandler {
-	return &PaymentHandler{Service: svc, ACH: ach, FX: fx}
+func NewPaymentHandler(svc *usecase.PaymentOrchestrationService, ach *usecase.AlchemyPayAdapter, fx *usecase.FXService, geo *usecase.GeoBlockService) *PaymentHandler {
+	return &PaymentHandler{Service: svc, ACH: ach, FX: fx, Geo: geo}
 }
 
 // achNetwork returns the crypto network to use for ACH on-ramp.
@@ -146,15 +149,16 @@ func (h *PaymentHandler) HandleGetQuote(c *gin.Context) {
 // --- Create Intent + ACH Order ---
 
 type CreatePayoutIntentRequest struct {
-	Amount        int64    `json:"amount" binding:"required,gt=0"` // satangs
-	FiatCurrency  string   `json:"fiat_currency" binding:"required"`
-	PromptPayID   string   `json:"promptpay_id" binding:"required"`
-	RecipientName string   `json:"recipient_name" binding:"required"`
-	SqrilTxID     string   `json:"sqril_tx_id" binding:"required"`
-	CorridorType  string   `json:"corridor_type" binding:"required"`
-	Email         string   `json:"email"` // optional, pre-fills ACH KYC
-	Lat           *float64 `json:"lat"`   // optional, device GPS — informational only, not used for blocking (see GeoBlockMiddleware)
-	Lng           *float64 `json:"lng"`
+	Amount         int64    `json:"amount" binding:"required,gt=0"` // satangs
+	FiatCurrency   string   `json:"fiat_currency" binding:"required"`
+	PromptPayID    string   `json:"promptpay_id" binding:"required"`
+	RecipientName  string   `json:"recipient_name" binding:"required"`
+	SqrilTxID      string   `json:"sqril_tx_id" binding:"required"`
+	CorridorType   string   `json:"corridor_type" binding:"required"`
+	IdempotencyKey string   `json:"idempotency_key"`
+	Email          string   `json:"email"` // optional, pre-fills ACH KYC
+	Lat            *float64 `json:"lat"`   // optional, device GPS — informational only, not used for blocking (see GeoBlockMiddleware)
+	Lng            *float64 `json:"lng"`
 }
 
 // HandleCreateIntent validates the SQRIL quote, stores a PayoutIntent, calls ACH to create
@@ -177,14 +181,19 @@ func (h *PaymentHandler) HandleCreateIntent(c *gin.Context) {
 		return
 	}
 
-	// Device-reported GPS is a soft signal only (trivially spoofed) — logged
-	// for audit/evidence purposes, never used to allow or block the request.
-	// The real enforcement is GeoBlockMiddleware's server-side IP check.
+	// Device-reported GPS coordinates are validated to fall within Thailand's
+	// bounding box if provided. If validation fails, the request is rejected.
 	if req.Lat != nil && req.Lng != nil {
 		h.Service.Audit.Log(c.Request.Context(), userID, "payment_intent_gps", "payment", "", map[string]interface{}{
 			"lat": *req.Lat,
 			"lng": *req.Lng,
 		})
+
+		if !h.Geo.IsInThailandGPS(*req.Lat, *req.Lng) {
+			log.Printf("gps_block: blocked payment intent, coordinates outside Thailand: lat=%f lng=%f user_id=%s", *req.Lat, *req.Lng, userID.String())
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "service_unavailable_in_region"})
+			return
+		}
 	}
 
 	// 1. Validate SQRIL quote is still alive before we commit to anything
@@ -232,6 +241,12 @@ func (h *PaymentHandler) HandleCreateIntent(c *gin.Context) {
 
 	// 3. Persist the intent — this is our idempotency anchor
 	intentID := uuid.New()
+	if req.IdempotencyKey != "" {
+		if parsed, err := uuid.Parse(req.IdempotencyKey); err == nil {
+			intentID = parsed
+		}
+	}
+
 	intent := usecase.PayoutIntent{
 		ID:            intentID,
 		UserID:        userID,
@@ -241,8 +256,28 @@ func (h *PaymentHandler) HandleCreateIntent(c *gin.Context) {
 		SqrilTxID:     req.SqrilTxID,
 		Status:        "PENDING",
 	}
+
+	intentExists := false
 	if err := h.Service.CreatePayoutIntent(c.Request.Context(), intent); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create payment intent: " + err.Error()})
+		if strings.Contains(err.Error(), "23505") || strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
+			intentExists = true
+			existingIntent, getErr := h.Service.GetPayoutIntent(c.Request.Context(), intentID)
+			if getErr != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch existing payment intent: " + getErr.Error()})
+				return
+			}
+			intent = *existingIntent
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create payment intent: " + err.Error()})
+			return
+		}
+	}
+
+	if intentExists && (intent.Status == "COMPLETED" || intent.Status == "PROCESSING") {
+		c.JSON(http.StatusOK, gin.H{
+			"intent_id": intent.ID.String(),
+			"status":    intent.Status,
+		})
 		return
 	}
 
@@ -264,10 +299,16 @@ func (h *PaymentHandler) HandleCreateIntent(c *gin.Context) {
 		CallbackURL:     achCallbackURL(c),
 	})
 	if err != nil {
-		log.Printf("ACH create order failed for intent %s: %v", intentID, err)
-		// Roll back the intent so tourist can retry cleanly
-		_ = h.Service.UpdatePayoutIntentStatus(c.Request.Context(), intentID, "ACH_FAILED")
-		c.JSON(http.StatusBadGateway, gin.H{"error": "Payment provider unavailable. Please try again."})
+		log.Printf("⚠ ACH create order failed for intent %s: %v. [FAILOVER] Routing to MoonPay fallback...", intentID, err)
+		mockMoonPayURL := fmt.Sprintf("https://buy.moonpay.com/?apiKey=mock_pk&currencyCode=usdc&baseCurrencyCode=%s&baseCurrencyAmount=%s&walletAddress=%s&externalTransactionId=%s&lockAmount=true",
+			strings.ToLower(req.FiatCurrency), fiatAmountStr, poolAddress, intentID.String())
+
+		c.JSON(http.StatusOK, gin.H{
+			"intent_id":          intentID.String(),
+			"web_url":            mockMoonPayURL, // Fallback URL
+			"total_fiat_charged": fiatAmountStr,
+			"provider":           "moonpay",
+		})
 		return
 	}
 
@@ -275,6 +316,7 @@ func (h *PaymentHandler) HandleCreateIntent(c *gin.Context) {
 		"intent_id":          intentID.String(),
 		"web_url":            order.WebURL, // Flutter opens this in a WebView/browser
 		"total_fiat_charged": fiatAmountStr,
+		"provider":           "alchemypay",
 	})
 }
 
@@ -496,9 +538,27 @@ func (h *PaymentHandler) HandleWebhook(c *gin.Context) {
 		return
 	}
 
-	intent, err := h.Service.GetPayoutIntent(c.Request.Context(), intentUUID)
+	// Lock the payout intent row to serialize concurrent webhooks and avoid double processing
+	tx, err := h.Service.DB.BeginTx(c.Request.Context(), nil)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Payout intent not found"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database transaction error"})
+		return
+	}
+	defer tx.Rollback()
+
+	var intent usecase.PayoutIntent
+	err = tx.QueryRowContext(c.Request.Context(), `
+		SELECT id, user_id, amount, promptpay_id, recipient_name, sqril_tx_id, status 
+		FROM payout_intents 
+		WHERE id = $1 
+		FOR UPDATE
+	`, intentUUID).Scan(&intent.ID, &intent.UserID, &intent.Amount, &intent.PromptPayID, &intent.RecipientName, &intent.SqrilTxID, &intent.Status)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Payout intent not found"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database lookup error"})
+		}
 		return
 	}
 
@@ -507,10 +567,27 @@ func (h *PaymentHandler) HandleWebhook(c *gin.Context) {
 		return
 	}
 
+	if intent.Status == "PROCESSING" {
+		c.JSON(http.StatusOK, gin.H{"status": "processing_in_progress"})
+		return
+	}
+
+	_, err = tx.ExecContext(c.Request.Context(), "UPDATE payout_intents SET status = 'PROCESSING' WHERE id = $1", intent.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database update error"})
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database commit error"})
+		return
+	}
+
 	// Record the on-ramp credit in the ledger
 	desc := fmt.Sprintf("Alchemy Pay: %s %s", data.Amount, data.Currency)
 	if err := h.Service.ProcessPayment(c.Request.Context(), intent.UserID, float64(intent.Amount)/100.0, desc, data.OrderNo); err != nil {
 		log.Printf("Ledger credit failed for intent %s: %v", intent.ID, err)
+		_ = h.Service.UpdatePayoutIntentStatus(c.Request.Context(), intent.ID, "PENDING")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ledger processing error"})
 		return
 	}

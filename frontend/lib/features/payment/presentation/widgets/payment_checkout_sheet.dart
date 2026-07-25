@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:uuid/uuid.dart';
 
 import 'package:frontend/core/theme/app_theme.dart';
 import 'package:frontend/features/payment/presentation/logic/payment_cubit.dart';
@@ -20,22 +21,22 @@ import 'package:frontend/core/widgets/paycif_icon_container.dart';
 import 'package:frontend/core/widgets/app_icon.dart';
 import 'package:frontend/core/widgets/virtual_keypad.dart';
 import 'package:frontend/features/payment/presentation/widgets/swipe_to_pay_slider.dart';
-import 'package:frontend/features/payment/data/qr_aggregator_service.dart';
+import 'package:frontend/features/payment/data/promptpay_qr_parser.dart';
 import 'package:frontend/features/payment/domain/entities/payment_breakdown.dart';
 import 'package:go_router/go_router.dart';
 
 enum UnifiedSheetStep { amountInput, preview, polling, failure }
 
-class UnifiedPaymentSheet extends StatefulWidget {
+class PaymentCheckoutSheet extends StatefulWidget {
   final PaymentContext payContext;
 
-  const UnifiedPaymentSheet({super.key, required this.payContext});
+  const PaymentCheckoutSheet({super.key, required this.payContext});
 
   @override
-  State<UnifiedPaymentSheet> createState() => _UnifiedPaymentSheetState();
+  State<PaymentCheckoutSheet> createState() => _PaymentCheckoutSheetState();
 }
 
-class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
+class _PaymentCheckoutSheetState extends State<PaymentCheckoutSheet> {
   late UnifiedSheetStep _step;
   final TextEditingController _amountController = TextEditingController();
 
@@ -44,24 +45,69 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
   double _customAmount = 0.0;
   String _failureMessage = '';
 
-  /// Live indicative FX rate for estimates while typing; null until fetched.
-  /// Never a hardcoded constant — no rate is shown before a real one exists.
   double? _indicativeRate;
+  String _activeIdempotencyKey = const Uuid().v4();
+  String _selectedFiatCurrency = 'USD';
+  late final PaymentCubit _paymentCubit;
+  bool _ownsCubit = false;
 
   @override
   void initState() {
     super.initState();
+    _activeIdempotencyKey = const Uuid().v4();
     final hasAmount = (widget.payContext.amount ?? 0) > 0;
     _step = hasAmount ? UnifiedSheetStep.preview : UnifiedSheetStep.amountInput;
     _customAmount = widget.payContext.amount ?? 0.0;
     _amountController.text = hasAmount ? _customAmount.toStringAsFixed(2) : '';
+
+    // Safely lookup existing Cubit or construct scoped one cleanly
+    try {
+      _paymentCubit = context.read<PaymentCubit>();
+      _ownsCubit = false;
+    } catch (_) {
+      _paymentCubit = PaymentCubit(
+        paymentRepository: PaymentRepositoryImpl(
+          apiService: ApiService(),
+          securityRepository: context.read<SecurityRepository>(),
+        ),
+      );
+      _ownsCubit = true;
+    }
+
+    _paymentCubit.initializeWithQR(
+      qrString: widget.payContext.metadata['raw'] ?? '',
+      amount: _customAmount,
+    );
+
     _lookupRecipientName();
-    _fetchIndicativeRate();
+    _loadUserPreferredCurrencyAndRate();
   }
 
-  Future<void> _fetchIndicativeRate() async {
+  @override
+  void dispose() {
+    _amountController.dispose();
+    if (_ownsCubit) {
+      _paymentCubit.close();
+    }
+    super.dispose();
+  }
+
+  Future<void> _loadUserPreferredCurrencyAndRate() async {
     try {
-      final json = await ApiService().fetchExchangeRate('USD');
+      final profile = await ApiService().getUserProfile();
+      final userFiat = profile?.lastUsedFiat ?? 'USD';
+      if (mounted) {
+        setState(() => _selectedFiatCurrency = userFiat);
+      }
+      await _fetchIndicativeRate(userFiat);
+    } catch (_) {
+      await _fetchIndicativeRate('USD');
+    }
+  }
+
+  Future<void> _fetchIndicativeRate([String currency = 'USD']) async {
+    try {
+      final json = await ApiService().fetchExchangeRate(currency);
       final rate = ExchangeRate.fromJson(json).providerRate;
       if (mounted && rate != null && rate > 0) {
         setState(() => _indicativeRate = rate);
@@ -179,19 +225,28 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
 
   Future<void> _initiateOnRamp(PaymentCubit cubit) async {
     if (_isInitiating) return;
-    _isInitiating = true;
+    
+    // ⚡ Fresh Idempotency Key generated per payment attempt
+    _activeIdempotencyKey = const Uuid().v4();
+
+    setState(() {
+      _isInitiating = true;
+    });
 
     try {
-      cubit.initiateOnRamp(
+      await cubit.initiateOnRamp(
         promptPayId: widget.payContext.accountId ?? '',
         recipientName: _displayName,
-        fiatCurrency: 'USD',
+        fiatCurrency: _selectedFiatCurrency,
+        idempotencyKey: _activeIdempotencyKey,
         billerId: widget.payContext.billerId,
         reference1: widget.payContext.reference1,
         reference2: widget.payContext.reference2,
       );
-    } finally {
-      _isInitiating = false;
+    } catch (_) {
+      setState(() {
+        _isInitiating = false;
+      });
     }
   }
 
@@ -202,13 +257,23 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
     final uri = Uri.parse(webUrl);
 
     if (Platform.isIOS) {
-      await Navigator.of(context).push(
+      final result = await Navigator.of(context).push<String>(
         MaterialPageRoute(
           builder: (_) => _AchCheckoutPage(uri: uri),
         ),
       );
       // User returned from WebView (via paycif:// redirect or close button)
-      if (mounted) cubit.pollForCompletion(intentId);
+      if (mounted) {
+        if (result != null && result.startsWith('paycif://')) {
+          cubit.pollForCompletion(intentId);
+        } else {
+          // User aborted/closed the webview. Reset preview screen with fresh quote.
+          cubit.initializeWithQR(
+            qrString: widget.payContext.metadata['raw'] ?? '',
+            amount: _customAmount,
+          );
+        }
+      }
     } else {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
       // Android: start polling immediately since we can't intercept browser close
@@ -221,16 +286,8 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    return BlocProvider(
-      create: (context) => PaymentCubit(
-        paymentRepository: PaymentRepositoryImpl(
-          apiService: ApiService(),
-          securityRepository: context.read<SecurityRepository>(),
-        ),
-      )..initializeWithQR(
-          qrString: widget.payContext.metadata['raw'] ?? '',
-          amount: _customAmount,
-        ),
+    return BlocProvider.value(
+      value: _paymentCubit,
       child: BlocConsumer<PaymentCubit, PaymentState>(
         listener: (context, state) {
           if (state is PaymentSuccess) {
@@ -244,6 +301,7 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
             });
           } else if (state is PaymentFailure) {
             setState(() {
+              _isInitiating = false;
               _step = UnifiedSheetStep.failure;
               _failureMessage = ErrorTranslator.translate(
                 AppLocalizations.of(context)!,
@@ -251,6 +309,9 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
               );
             });
           } else if (state is PaymentOnRampReady) {
+            setState(() {
+              _isInitiating = false;
+            });
             _launchCheckout(state.webUrl, state.intentId, context.read<PaymentCubit>());
           } else if (state is PaymentPolling) {
             setState(() => _step = UnifiedSheetStep.polling);
@@ -272,62 +333,65 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
               color: theme.cardColor,
               borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Top Navigation Row
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    if (_canGoBack)
-                      IconButton(
-                        icon: AppIcon(
-                          PhosphorIcons.caretLeft,
-                          color: AppTheme.textSecondaryColor(context),
-                          size: AppIconSize.sm,
-                        ),
-                        onPressed: _handleBackPress,
-                      )
-                    else if (_step == UnifiedSheetStep.amountInput ||
-                        _step == UnifiedSheetStep.preview ||
-                        _step == UnifiedSheetStep.polling)
-                      // During polling this closes the sheet only — the payment
-                      // keeps settling server-side and lands in History.
-                      IconButton(
-                        icon: AppIcon(
-                          PhosphorIcons.x,
-                          color: AppTheme.textSecondaryColor(context),
-                          size: AppIconSize.sm,
-                        ),
-                        onPressed: () => Navigator.of(context).pop(false),
-                      )
-                    else
-                      const SizedBox(width: 48, height: 48),
+            child: AbsorbPointer(
+              absorbing: _isInitiating || state is PaymentProcessing,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Top Navigation Row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      if (_canGoBack)
+                        IconButton(
+                          icon: AppIcon(
+                            PhosphorIcons.caretLeft,
+                            color: AppTheme.textSecondaryColor(context),
+                            size: AppIconSize.sm,
+                          ),
+                          onPressed: _handleBackPress,
+                        )
+                      else if (_step == UnifiedSheetStep.amountInput ||
+                          _step == UnifiedSheetStep.preview ||
+                          _step == UnifiedSheetStep.polling)
+                        // During polling this closes the sheet only — the payment
+                        // keeps settling server-side and lands in History.
+                        IconButton(
+                          icon: AppIcon(
+                            PhosphorIcons.x,
+                            color: AppTheme.textSecondaryColor(context),
+                            size: AppIconSize.sm,
+                          ),
+                          onPressed: () => Navigator.of(context).pop(false),
+                        )
+                      else
+                        const SizedBox(width: 48, height: 48),
 
-                    // Grab Handle
-                    Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: isDark ? AppTheme.darkBorderHairline : AppTheme.lightBorderHairline,
-                        borderRadius: BorderRadius.circular(2),
+                      // Grab Handle
+                      Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: isDark ? AppTheme.darkBorderHairline : AppTheme.lightBorderHairline,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
                       ),
-                    ),
 
-                    const SizedBox(width: 48, height: 48),
+                      const SizedBox(width: 48, height: 48),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Header / Recipient View (Shown in input and failure steps; inline in preview)
+                  if (_step == UnifiedSheetStep.amountInput || _step == UnifiedSheetStep.failure) ...[
+                    _buildRecipientCard(isDark),
+                    const SizedBox(height: 20),
                   ],
-                ),
-                const SizedBox(height: 16),
 
-                // Header / Recipient View (Shown in input and failure steps; inline in preview)
-                if (_step == UnifiedSheetStep.amountInput || _step == UnifiedSheetStep.failure) ...[
-                  _buildRecipientCard(isDark),
-                  const SizedBox(height: 20),
+                  // Conditional Step Layouts
+                  _buildStepContent(context, cubit, isDark),
                 ],
-
-                // Conditional Step Layouts
-                _buildStepContent(context, cubit, isDark),
-              ],
+              ),
             ),
           );
         },
@@ -644,10 +708,13 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
         ),
         const SizedBox(height: 20),
 
-        SwipeToPaySlider(
-          onSwipeComplete: () => _initiateOnRamp(cubit),
-          text: _hasRealTotal ? l10n.confirmSwipeToPay : l10n.sheetFetchingRate,
-          enabled: _hasRealTotal,
+        AbsorbPointer(
+          absorbing: _isInitiating || cubit.state is PaymentProcessing || cubit.state is PaymentSuccess || cubit.state is PaymentPolling,
+          child: SwipeToPaySlider(
+            onSwipeComplete: () => _initiateOnRamp(cubit),
+            text: _hasRealTotal ? l10n.confirmSwipeToPay : l10n.sheetFetchingRate,
+            enabled: _hasRealTotal,
+          ),
         ),
         const SizedBox(height: 12),
       ],
@@ -764,6 +831,10 @@ class _UnifiedPaymentSheetState extends State<UnifiedPaymentSheet> {
                       setState(() {
                         _step = UnifiedSheetStep.preview;
                       });
+                      cubit.initializeWithQR(
+                        qrString: widget.payContext.metadata['raw'] ?? '',
+                        amount: _customAmount,
+                      );
                     },
                     variant: PaycifButtonVariant.primary,
                     size: PaycifButtonSize.lg,

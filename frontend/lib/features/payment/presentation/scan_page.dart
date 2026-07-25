@@ -8,12 +8,11 @@ import 'package:image_picker/image_picker.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:frontend/core/l10n/generated/app_localizations.dart';
 import 'package:frontend/core/widgets/scanner_overlay.dart';
-import 'package:frontend/features/payment/data/qr_aggregator_service.dart';
-import 'package:frontend/features/payment/presentation/widgets/unified_payment_sheet.dart';
+import 'package:frontend/features/payment/data/promptpay_qr_parser.dart';
+import 'package:frontend/features/payment/presentation/widgets/payment_checkout_sheet.dart';
 import 'package:frontend/features/kyc/presentation/widgets/kyc_required_sheet.dart';
-import 'package:frontend/core/network/api_service.dart';
 import 'package:frontend/features/dashboard/presentation/dashboard_controller.dart';
-import 'package:frontend/core/utils/pay_notify.dart';
+import 'package:frontend/core/utils/app_notification_toast.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:frontend/core/widgets/app_icon.dart';
@@ -40,7 +39,7 @@ class ScanPage extends StatefulWidget {
 
 class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin, WidgetsBindingObserver {
   final MobileScannerController _cameraController = MobileScannerController(
-    detectionSpeed: DetectionSpeed.normal,
+    detectionSpeed: DetectionSpeed.unrestricted,
     returnImage: false,
     formats: [BarcodeFormat.qrCode],
   );
@@ -136,7 +135,7 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin, Widg
 
   void _handleCode(String code) async {
     if (_isProcessing) return;
-    final paymentContext = QrAggregatorService.aggregate(code);
+    final paymentContext = PromptPayQrParser.aggregate(code);
     if (paymentContext.isSafe) {
       HapticFeedback.mediumImpact();
       Future.delayed(
@@ -182,7 +181,7 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin, Widg
 
   void _showError(String message) {
     if (!mounted) return;
-    PayNotify.error(context, message);
+    AppNotificationToast.error(context, message);
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) _resumeScanning();
     });
@@ -211,7 +210,7 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin, Widg
       isScrollControlled: true,
       isDismissible: false,
       enableDrag: false,
-      builder: (c) => UnifiedPaymentSheet(payContext: payContext),
+      builder: (c) => PaymentCheckoutSheet(payContext: payContext),
     );
 
     if (mounted) {
@@ -224,33 +223,19 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin, Widg
 
   /// Returns `true` if the user may proceed into the payment flow.
   ///
-  /// Reads KYC status from the already-fetched DashboardController state when
-  /// available (no extra network round-trip); otherwise falls back to a fresh
-  /// fetch. Any status other than 'VERIFIED' (case-insensitive) triggers the
-  /// verification gate sheet, which routes to the `/kyc` flow.
+  /// Instantly checks KYC status from the in-memory DashboardController state.
+  /// Zero network round-trips during active scanning — unverified users are gated
+  /// before opening the payment sheet, while verified users pass through in 0ms.
   Future<bool> _ensureKycVerified() async {
-    // Always start with the dashboard's cached value for zero-latency check.
     String? cachedStatus;
     try {
       cachedStatus = context.read<DashboardController>().state.kycTier;
     } catch (_) {}
 
-    // Cache is authoritative only when it's already VERIFIED — avoids
-    // a network round-trip on every scan for verified users.
+    // Instant zero-latency check: If verified in state, proceed immediately.
     if (cachedStatus?.toUpperCase() == 'VERIFIED') return true;
 
-    // Otherwise, fresh-fetch to get the true current status.
-    try {
-      final data = await ApiService.getKycStatus();
-      final freshStatus = (data['kyc_status'] as String?)?.toUpperCase();
-      if (freshStatus == 'VERIFIED') return true;
-    } catch (e) {
-      // Fail-open: backend still rejects unverified users at settlement.
-      debugPrint('⚠️ [ScanPage] KYC status fetch failed, allowing through: $e');
-      return true;
-    }
-
-    // Not verified — present the gate.
+    // Not verified in local state — present the KYC gate sheet.
     if (!mounted) return false;
     final wantsToVerify = await KycRequiredSheet.show(context);
     if (wantsToVerify != true || !mounted) return false;

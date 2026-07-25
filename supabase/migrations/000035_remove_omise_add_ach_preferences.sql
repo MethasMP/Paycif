@@ -18,8 +18,8 @@ ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS last_used_crypto       TEXT DEFAULT 'USDC',
   ADD COLUMN IF NOT EXISTS last_used_network      TEXT DEFAULT 'BASE';
 
--- 3. Drop cache_saved_cards table (Omise card vault cache)
-DROP TABLE IF EXISTS public.cache_saved_cards CASCADE;
+-- 3. Keep cache_saved_cards table (will be altered in 000043 and renamed to cache_saved_payment_methods in 000044)
+-- DROP TABLE IF EXISTS public.cache_saved_cards CASCADE;
 
 -- 4. RLS: ensure ach preferences columns are owner-only
 -- (profiles table already has RLS; the new columns inherit the existing policy)

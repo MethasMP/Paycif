@@ -9,7 +9,7 @@ import 'package:frontend/core/widgets/app_icon.dart';
 //
 // Shown when an unverified user attempts to pay. Explains that identity
 // verification is required before the first payment and routes them into the
-// KYC flow. Mirrors the styling of UnifiedPaymentSheet (solid card surface,
+// KYC flow. Mirrors the styling of PaymentCheckoutSheet (solid card surface,
 // rounded top, theme-aware light/dark).
 //
 // Returns via Navigator.pop(true) when the user taps "Verify Now" so the caller

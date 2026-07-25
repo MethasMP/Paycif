@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"container/list"
 	"context"
 	"encoding/json"
 	"errors"
@@ -9,82 +10,148 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/sony/gobreaker"
 )
 
-// VPN/proxy detection via IPQualityScore's Proxy Detection API. This is a
-// SECOND, independent check layered onto GeoBlockService's country lookup —
-// a user physically outside Thailand can route through a Thailand-exit VPN
-// and pass the country check undetected; this check exists to catch that.
-// Both checks must pass for a money-movement request to proceed.
-//
-// Confirmed against IPQS's live docs (not assumed from memory): request is
-// GET https://www.ipqualityscore.com/api/json/ip/{key}/{ip}, response has
-// boolean `proxy`/`vpn`/`tor` fields and a `fraud_score` (0-100).
-//
-// Free tier is 1,000 lookups/month — far lower than ipapi.co/ipwho.is's
-// 30k+, and will likely be the first geo dependency exhausted as volume
-// grows. Quota exhaustion is logged distinctly (VPN_CHECK_QUOTA_EXCEEDED)
-// from a genuine API outage (VPN_CHECK_FAILOPEN) so the two are
-// distinguishable later without guessing — both still fail open the same
-// way, but "we're out of quota" and "IPQS is down" call for different fixes.
 var (
-	ipqsAPIKey  = os.Getenv("IPQS_API_KEY")
-	ipqsBaseURL = func() string {
-		if v := os.Getenv("IPQS_BASE_URL"); v != "" {
+	proxycheckAPIKey  = os.Getenv("PROXYCHECK_API_KEY")
+	proxycheckBaseURL = func() string {
+		if v := os.Getenv("PROXYCHECK_BASE_URL"); v != "" {
 			return v
 		}
-		return "https://www.ipqualityscore.com/api/json/ip"
-	}()
-	// Tunable without a redeploy: raise/lower how aggressively borderline
-	// fraud scores get blocked.
-	ipqsFraudScoreThreshold = func() int {
-		if v := os.Getenv("IPQS_FRAUD_SCORE_THRESHOLD"); v != "" {
-			if n, err := strconv.Atoi(v); err == nil {
-				return n
-			}
-		}
-		return 85
+		return "https://proxycheck.io/v2"
 	}()
 )
 
 var consecutiveVPNCheckFailures int32
 
-// quotaExceededError distinguishes "IPQS said no more lookups this month"
-// from a generic network/API failure, purely for logging clarity.
 type quotaExceededError struct {
 	msg string
 }
 
 func (e quotaExceededError) Error() string {
-	return "ipqs quota exceeded: " + e.msg
+	return "proxycheck quota exceeded: " + e.msg
 }
 
-type ipqsResponse struct {
-	Success    bool   `json:"success"`
-	Message    string `json:"message"`
-	Proxy      bool   `json:"proxy"`
-	VPN        bool   `json:"vpn"`
-	Tor        bool   `json:"tor"`
-	FraudScore int    `json:"fraud_score"`
+// Two-Tier Bounded LRU Cache for VPN Detection
+type lruCacheEntry struct {
+	key        string
+	suspicious bool
+	expiration time.Time
 }
 
-// VPNDetectionService flags whether a client IP is a VPN/proxy/Tor exit node
-// or otherwise high-fraud-risk, via IPQualityScore.
+type boundedLRUCache struct {
+	capacity  int
+	items     map[string]*list.Element
+	evictList *list.List
+	mu        sync.RWMutex
+}
+
+func newBoundedLRUCache(capacity int) *boundedLRUCache {
+	return &boundedLRUCache{
+		capacity:  capacity,
+		items:     make(map[string]*list.Element),
+		evictList: list.New(),
+	}
+}
+
+func (c *boundedLRUCache) Get(key string) (bool, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if elem, found := c.items[key]; found {
+		entry := elem.Value.(*lruCacheEntry)
+		if time.Now().After(entry.expiration) {
+			c.removeElement(elem)
+			return false, false
+		}
+		c.evictList.MoveToFront(elem)
+		return entry.suspicious, true
+	}
+	return false, false
+}
+
+func (c *boundedLRUCache) Put(key string, suspicious bool, ttl time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if elem, found := c.items[key]; found {
+		c.evictList.MoveToFront(elem)
+		entry := elem.Value.(*lruCacheEntry)
+		entry.suspicious = suspicious
+		entry.expiration = time.Now().Add(ttl)
+		return
+	}
+
+	entry := &lruCacheEntry{
+		key:        key,
+		suspicious: suspicious,
+		expiration: time.Now().Add(ttl),
+	}
+	elem := c.evictList.PushFront(entry)
+	c.items[key] = elem
+
+	if c.evictList.Len() > c.capacity {
+		c.removeOldest()
+	}
+}
+
+func (c *boundedLRUCache) removeOldest() {
+	elem := c.evictList.Back()
+	if elem != nil {
+		c.removeElement(elem)
+	}
+}
+
+func (c *boundedLRUCache) removeElement(elem *list.Element) {
+	c.evictList.Remove(elem)
+	entry := elem.Value.(*lruCacheEntry)
+	delete(c.items, entry.key)
+}
+
+func (c *boundedLRUCache) Purge() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.items = make(map[string]*list.Element)
+	c.evictList.Init()
+}
+
+var vpnL1LRUCache = newBoundedLRUCache(10000)
+
+func getVPNL1(ip string) (bool, bool) {
+	return vpnL1LRUCache.Get(ip)
+}
+
+func setVPNL1(ip string, suspicious bool, ttl time.Duration) {
+	vpnL1LRUCache.Put(ip, suspicious, ttl)
+}
+
+func ClearVPNL1Cache() {
+	vpnL1LRUCache.Purge()
+}
+
+// VPNCheckResult contains detailed decision output for middleware evaluation.
+type VPNCheckResult struct {
+	Suspicious   bool
+	IsDegraded   bool // set true when external lookup failed & system operates in degraded state
+	ProviderUsed string
+}
+
+// VPNDetectionService flags whether a client IP is a VPN/proxy/Tor exit node.
 type VPNDetectionService struct {
-	cb *gobreaker.CircuitBreaker
+	cb      *gobreaker.CircuitBreaker
+	ipqsSvc *IPQSService
 }
 
-// NewVPNDetectionService creates a new VPN/proxy detection service with a
-// circuit breaker around the IPQS lookup, mirroring GeoBlockService.
+// NewVPNDetectionService creates a new VPN/proxy detection service.
 func NewVPNDetectionService() *VPNDetectionService {
 	settings := gobreaker.Settings{
-		Name:        "IPQSProxyDetection",
+		Name:        "ProxycheckDetection",
 		MaxRequests: 5,
 		Interval:    10 * time.Second,
 		Timeout:     30 * time.Second,
@@ -95,21 +162,103 @@ func NewVPNDetectionService() *VPNDetectionService {
 	}
 
 	return &VPNDetectionService{
-		cb: gobreaker.NewCircuitBreaker(settings),
+		cb:      gobreaker.NewCircuitBreaker(settings),
+		ipqsSvc: NewIPQSService(),
 	}
 }
 
-// IsSuspicious reports whether ip looks like a VPN/proxy/Tor exit node or is
-// otherwise high-fraud-risk (fraud_score above the configured threshold). On
-// lookup failure it returns (false, err) — callers are responsible for
-// failing open, matching GeoBlockService's contract.
+// IsSuspicious reports whether ip looks like a VPN/proxy/Tor exit node (without extra headers).
 func (s *VPNDetectionService) IsSuspicious(ctx context.Context, ip string) (bool, error) {
-	result, err := s.cb.Execute(func() (interface{}, error) {
-		if ipqsAPIKey == "" {
-			return false, fmt.Errorf("IPQS_API_KEY not set")
+	return s.IsSuspiciousWithHeaders(ctx, ip, "", "")
+}
+
+// IsSuspiciousWithHeaders reports whether ip looks like a VPN/proxy/Tor exit node, passing optional headers to providers like IPQS.
+func (s *VPNDetectionService) IsSuspiciousWithHeaders(ctx context.Context, ip string, userAgent string, userLanguage string) (bool, error) {
+	if IsLocalIP(ip) {
+		return false, nil
+	}
+
+	// 1. L1 Cache Check
+	if val, found := getVPNL1(ip); found {
+		return val, nil
+	}
+
+	// 2. L2 Redis Cache Check
+	redisKey := fmt.Sprintf("vpn_check:%s", ip)
+	if cachedVal, found := CacheGet(ctx, redisKey); found {
+		isSuspicious := cachedVal == "yes"
+		// Default TTL for cached hit
+		setVPNL1(ip, isSuspicious, 1*time.Hour)
+		return isSuspicious, nil
+	}
+
+	strategy := os.Getenv("VPN_PROVIDER_STRATEGY")
+	if strategy == "" {
+		strategy = "fallback"
+	}
+
+	switch strategy {
+	case "ipqualityscore":
+		suspicious, _, err := s.ipqsSvc.IsSuspicious(ctx, ip, userAgent, userLanguage)
+		if err != nil {
+			log.Printf("VPN_CHECK_FAILCLOSED: IPQS lookup failed for ip=%s: %v", TruncateIP(ip), err)
+			return false, err
+		}
+		s.cacheResult(ctx, ip, suspicious, 24*time.Hour)
+		return suspicious, nil
+
+	case "dual":
+		// Query Proxycheck first, then IPQS if available. Return true if either flags suspicious.
+		pSuspicious, pErr := s.checkProxycheck(ctx, ip)
+		ipqsSuspicious, _, ipqsErr := s.ipqsSvc.IsSuspicious(ctx, ip, userAgent, userLanguage)
+
+		if pErr != nil && ipqsErr != nil {
+			return false, fmt.Errorf("dual check failed: proxycheck err: %v, ipqs err: %v", pErr, ipqsErr)
 		}
 
-		url := fmt.Sprintf("%s/%s/%s", ipqsBaseURL, ipqsAPIKey, ip)
+		suspicious := (pErr == nil && pSuspicious) || (ipqsErr == nil && ipqsSuspicious)
+		s.cacheResult(ctx, ip, suspicious, 24*time.Hour)
+		return suspicious, nil
+
+	case "fallback":
+		fallthrough
+	default:
+		// Attempt primary provider (Proxycheck if configured, or IPQS if Proxycheck key missing)
+		var primaryErr error
+		if proxycheckAPIKey != "" {
+			suspicious, err := s.checkProxycheck(ctx, ip)
+			if err == nil {
+				return suspicious, nil
+			}
+			primaryErr = err
+			log.Printf("VPN_CHECK_PRIMARY_FAILED: Proxycheck error for ip=%s (%v), attempting IPQS fallback", TruncateIP(ip), err)
+		}
+
+		// Fallback to IPQS
+		if ipqsAPIKey != "" {
+			suspicious, _, err := s.ipqsSvc.IsSuspicious(ctx, ip, userAgent, userLanguage)
+			if err == nil {
+				s.cacheResult(ctx, ip, suspicious, 24*time.Hour)
+				return suspicious, nil
+			}
+			log.Printf("VPN_CHECK_FALLBACK_FAILED: IPQS lookup failed for ip=%s: %v", TruncateIP(ip), err)
+			return false, err
+		}
+
+		if primaryErr != nil {
+			return false, primaryErr
+		}
+		return false, fmt.Errorf("no VPN detection API keys configured (PROXYCHECK_API_KEY / IPQUALITYSCORE_API_KEY)")
+	}
+}
+
+func (s *VPNDetectionService) checkProxycheck(ctx context.Context, ip string) (bool, error) {
+	result, err := s.cb.Execute(func() (interface{}, error) {
+		if proxycheckAPIKey == "" {
+			return false, fmt.Errorf("PROXYCHECK_API_KEY not set")
+		}
+
+		url := fmt.Sprintf("%s/%s?key=%s&vpn=1&asn=1", proxycheckBaseURL, ip, proxycheckAPIKey)
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 		if err != nil {
 			return false, err
@@ -125,23 +274,61 @@ func (s *VPNDetectionService) IsSuspicious(ctx context.Context, ip string) (bool
 			return false, err
 		}
 		if resp.StatusCode != http.StatusOK {
-			return false, fmt.Errorf("ipqs returned status %d: %s", resp.StatusCode, string(body))
+			return false, fmt.Errorf("proxycheck returned status %d: %s", resp.StatusCode, string(body))
 		}
 
-		var parsed ipqsResponse
+		var parsed map[string]json.RawMessage
 		if err := json.Unmarshal(body, &parsed); err != nil {
 			return false, err
 		}
-		if !parsed.Success {
-			msg := strings.ToLower(parsed.Message)
-			if strings.Contains(msg, "exceed") || strings.Contains(msg, "limit") || strings.Contains(msg, "quota") {
-				return false, quotaExceededError{msg: parsed.Message}
-			}
-			return false, fmt.Errorf("ipqs lookup unsuccessful: %s", parsed.Message)
+
+		var status string
+		if statusRaw, ok := parsed["status"]; ok {
+			_ = json.Unmarshal(statusRaw, &status)
 		}
 
-		suspicious := parsed.Proxy || parsed.VPN || parsed.Tor || parsed.FraudScore > ipqsFraudScoreThreshold
-		return suspicious, nil
+		if status != "ok" {
+			var msg string
+			if msgRaw, ok := parsed["message"]; ok {
+				_ = json.Unmarshal(msgRaw, &msg)
+			}
+			msgLower := strings.ToLower(msg)
+			if strings.Contains(msgLower, "limit") || strings.Contains(msgLower, "quota") || strings.Contains(msgLower, "denied") {
+				return false, quotaExceededError{msg: msg}
+			}
+			return false, fmt.Errorf("proxycheck lookup unsuccessful: %s", msg)
+		}
+
+		ipRaw, ok := parsed[ip]
+		if !ok {
+			return false, fmt.Errorf("ip %s not found in proxycheck response", ip)
+		}
+
+		var ipData struct {
+			Proxy   string `json:"proxy"`
+			Type    string `json:"type"`
+			ASN     string `json:"asn"`
+			Isocode string `json:"isocode"`
+		}
+		if err := json.Unmarshal(ipRaw, &ipData); err != nil {
+			return false, err
+		}
+
+		isSuspicious := strings.ToLower(ipData.Proxy) == "yes"
+
+		ttl := 24 * time.Hour
+		if isSuspicious {
+			ttl = 3 * time.Hour
+
+			asn := strings.ToUpper(ipData.ASN)
+			if ipData.Isocode == "TH" && (strings.Contains(asn, "AS131273") || strings.Contains(asn, "AS17552") || strings.Contains(asn, "AS45430") || strings.Contains(asn, "AS52030")) {
+				ttl = 30 * time.Minute
+			}
+		}
+
+		s.cacheResult(ctx, ip, isSuspicious, ttl)
+
+		return isSuspicious, nil
 	})
 
 	if err != nil {
@@ -151,12 +338,12 @@ func (s *VPNDetectionService) IsSuspicious(ctx context.Context, ip string) (bool
 		if errors.As(err, &quotaErr) {
 			log.Printf("VPN_CHECK_QUOTA_EXCEEDED: ip=%s: %s", TruncateIP(ip), quotaErr.msg)
 		} else {
-			log.Printf("VPN_CHECK_FAILOPEN: vpn/proxy lookup failed for ip=%s: %v", TruncateIP(ip), err)
+			log.Printf("VPN_CHECK_FAILCLOSED: vpn/proxy lookup failed for ip=%s: %v", TruncateIP(ip), err)
 		}
 
 		if failures >= geoFailureAlertThreshold {
-			log.Printf("ALERT: %d consecutive VPN/proxy lookup failures — IPQS may be down or quota exhausted, VPN detection is currently fail-open", failures)
-			maybeSendFailoverAlert("VPN/proxy detection (IPQS)", failures)
+			log.Printf("ALERT: %d consecutive VPN/proxy lookup failures — Proxycheck may be down or quota exhausted", failures)
+			maybeSendFailoverAlert("VPN/proxy detection (Proxycheck)", failures)
 		}
 
 		return false, err
@@ -165,3 +352,14 @@ func (s *VPNDetectionService) IsSuspicious(ctx context.Context, ip string) (bool
 	atomic.StoreInt32(&consecutiveVPNCheckFailures, 0)
 	return result.(bool), nil
 }
+
+func (s *VPNDetectionService) cacheResult(ctx context.Context, ip string, isSuspicious bool, ttl time.Duration) {
+	setVPNL1(ip, isSuspicious, 1*time.Hour)
+	cacheValStr := "no"
+	if isSuspicious {
+		cacheValStr = "yes"
+	}
+	redisKey := fmt.Sprintf("vpn_check:%s", ip)
+	CacheSet(ctx, redisKey, cacheValStr, ttl)
+}
+

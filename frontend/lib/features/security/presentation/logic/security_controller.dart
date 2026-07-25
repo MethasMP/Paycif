@@ -136,11 +136,13 @@ class SecurityController extends ChangeNotifier {
   }
 
   /// Sets up a new PIN.
-  Future<void> setupPin(String pin) async {
+  Future<bool> setupPin(String pin) async {
     _setState(_state.copyWith(status: SecurityStatus.loading));
     try {
       await _repository.setupPin(pin);
+      _hasPinCached = true;
       _setState(_state.copyWith(status: SecurityStatus.success));
+      return true;
     } catch (e) {
       _setState(
         _state.copyWith(
@@ -148,6 +150,7 @@ class SecurityController extends ChangeNotifier {
           errorMessage: e.toString(),
         ),
       );
+      return false;
     }
   }
 
@@ -180,21 +183,6 @@ class SecurityController extends ChangeNotifier {
                             errorStr.contains('credentials missing');
 
       if (errorStr.contains('PIN not setup') || errorStr.contains('PIN not set up')) {
-        await _repository.clearAllPinData();
-        _setState(
-          _state.copyWith(
-            status: SecurityStatus.error,
-            errorMessage: 'PIN not setup on server. Redirecting...',
-          ),
-        );
-        return false;
-      }
-
-      if (errorStr.contains('PIN not setup') || 
-          errorStr.contains('PIN not set up') ||
-          errorStr.contains('401') ||
-          errorStr.contains('Unauthorized') ||
-          errorStr.contains('Invalid JWT')) {
         await _repository.clearAllPinData();
         _setState(
           _state.copyWith(

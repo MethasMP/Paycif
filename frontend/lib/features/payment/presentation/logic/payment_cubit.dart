@@ -1,5 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:uuid/uuid.dart';
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:frontend/features/payment/domain/repositories/payment_repository.dart';
 import 'package:frontend/features/payment/presentation/logic/payment_state.dart';
 import 'package:frontend/core/models/decoded_qr.dart';
@@ -13,11 +15,41 @@ class PaymentCubit extends Cubit<PaymentState> {
   }) : _paymentRepository = paymentRepository,
        super(PaymentInitial());
 
+  bool _canTransition(PaymentState nextState) {
+    final current = state;
+    if (current.runtimeType == nextState.runtimeType &&
+        (current is PaymentLoading || current is PaymentProcessing || current is PaymentPolling)) {
+      return false;
+    }
+
+    if (current is PaymentProcessing) {
+      return nextState is PaymentSuccess ||
+             nextState is PaymentFailure ||
+             nextState is PaymentOnRampReady;
+    }
+
+    if (current is PaymentPolling) {
+      return nextState is PaymentSuccess ||
+             nextState is PaymentFailure;
+    }
+
+    return true;
+  }
+
+  @override
+  void emit(PaymentState state) {
+    if (isClosed) return;
+    if (!_canTransition(state)) {
+      debugPrint('🚫 [PaymentCubit] Blocked invalid transition: ${this.state.runtimeType} -> ${state.runtimeType}');
+      return;
+    }
+    super.emit(state);
+  }
+
+
   Future<void> initialize(double amount, {String? recipientName}) async {
     emit(PaymentLoading());
     try {
-      const double balanceMajor = 0.0;
-
       const payPerUseMethod = PaymentMethod(
         id: 'pay_per_use',
         type: PaymentMethodType.wallet,
@@ -30,7 +62,6 @@ class PaymentCubit extends Cubit<PaymentState> {
           method: payPerUseMethod,
           amount: amount,
           availableMethods: const [payPerUseMethod],
-          balance: balanceMajor,
         ),
       );
     } catch (e) {
@@ -65,7 +96,7 @@ class PaymentCubit extends Cubit<PaymentState> {
       }
 
       // 2. Fetch Quotation via Backend/SQRIL
-      final int amountSatang = (amount * 100).toInt();
+      final int amountSatang = (amount * 100).round();
       double rate = 36.45;
       double feeUSD = 0.0;
       double amountUSD = 0.0;
@@ -89,7 +120,6 @@ class PaymentCubit extends Cubit<PaymentState> {
           method: payPerUseMethod,
           amount: amount,
           availableMethods: const [payPerUseMethod],
-          balance: 0.0,
           sqrilTxId: sqrilTxId,
           exchangeRate: rate,
           feeUSD: feeUSD,
@@ -119,23 +149,33 @@ class PaymentCubit extends Cubit<PaymentState> {
     required String promptPayId,
     required String recipientName,
     required String fiatCurrency,
+    required String idempotencyKey,
     String? billerId,
     String? reference1,
     String? reference2,
     String? email,
   }) async {
     final currentState = state;
-    if (currentState is! PaymentReady) return;
+    if (currentState is! PaymentReady) {
+      emit(PaymentFailure(
+        errorMessage: 'Invalid state for transaction.',
+        failedMethod: const PaymentMethod(
+          id: 'pay_per_use',
+          type: PaymentMethodType.wallet,
+          title: 'Pay per use',
+        ),
+      ));
+      return;
+    }
 
     emit(PaymentProcessing(method: currentState.method));
 
     try {
-      final amountSatang = (currentState.amount * 100).toInt();
+      final amountSatang = (currentState.amount * 100).round();
       final sqrilTxId = currentState.sqrilTxId ?? '';
 
-      // Soft signal only — never blocks or delays payment on its own; the
-      // real geo-fence enforcement happens server-side via IP.
-      final location = await getCurrentLocationOrNull();
+      // Mandatory location check to enforce geofence compliance.
+      final location = await getCurrentLocation();
 
       final result = await _paymentRepository.createOnRampIntent(
         amountSatang: amountSatang,
@@ -143,12 +183,13 @@ class PaymentCubit extends Cubit<PaymentState> {
         promptPayId: promptPayId,
         recipientName: recipientName,
         fiatCurrency: fiatCurrency,
+        idempotencyKey: idempotencyKey,
         billerId: billerId,
         reference1: reference1,
         reference2: reference2,
         email: email,
-        lat: location?.lat,
-        lng: location?.lng,
+        lat: location.lat,
+        lng: location.lng,
       );
 
       if (isClosed) return;
@@ -169,54 +210,79 @@ class PaymentCubit extends Cubit<PaymentState> {
 
   /// Polls backend for intent completion. Call this after the AlchemyPay
   /// checkout closes (redirect/deep-link) to detect success or failure.
+  /// Polls backend for intent completion using real-time database changes.
+  /// Call this after the AlchemyPay checkout closes to detect success/failure.
   Future<void> pollForCompletion(String intentId) async {
     emit(PaymentPolling(intentId: intentId));
 
-    const maxAttempts = 45; // 45 × 2s = 90s max
-    for (var i = 0; i < maxAttempts; i++) {
-      if (isClosed) return;
-      await Future.delayed(const Duration(seconds: 2));
-      if (isClosed) return;
+    StreamSubscription<String>? subscription;
+    Timer? timeoutTimer;
+    final completer = Completer<void>();
 
-      try {
-        final status = await _paymentRepository.getIntentStatus(intentId);
+    void handleStatus(String status) {
+      if (isClosed) {
+        if (!completer.isCompleted) completer.complete();
+        return;
+      }
 
-        if (status == 'COMPLETED') {
-          emit(PaymentSuccess(
-            transactionId: intentId,
-            senderName: 'Card Payment',
-            remainingBalance: 0.0,
-          ));
-          return;
-        }
-
-        if (status == 'FAILED' || status == 'ACH_FAILED') {
-          emit(PaymentFailure(
-            errorMessage: 'Payment did not complete. Please try again.',
-            failedMethod: const PaymentMethod(
-              id: 'pay_per_use',
-              type: PaymentMethodType.wallet,
-              title: 'Pay per use',
-            ),
-          ));
-          return;
-        }
-        // PENDING / PAYMENT_SUCCESS_PAYOUT_PENDING → keep polling
-      } catch (_) {
-        // Network blip — keep polling
+      if (status == 'COMPLETED') {
+        emit(PaymentSuccess(
+          transactionId: intentId,
+          senderName: 'Card Payment',
+        ));
+        if (!completer.isCompleted) completer.complete();
+      } else if (status == 'FAILED' || status == 'ACH_FAILED') {
+        emit(PaymentFailure(
+          errorMessage: 'Payment did not complete. Please try again.',
+          failedMethod: const PaymentMethod(
+            id: 'pay_per_use',
+            type: PaymentMethodType.wallet,
+            title: 'Pay per use',
+          ),
+        ));
+        if (!completer.isCompleted) completer.complete();
       }
     }
 
-    // Timeout: payment may still succeed via webhook. Show neutral message.
-    if (!isClosed) {
-      emit(PaymentFailure(
-        errorMessage: 'Payment is being confirmed. Check your transaction history in a moment.',
-        failedMethod: const PaymentMethod(
-          id: 'pay_per_use',
-          type: PaymentMethodType.wallet,
-          title: 'Pay per use',
-        ),
-      ));
+    try {
+      // 1. Subscribe to Real-time Stream
+      subscription = _paymentRepository.watchIntentStatus(intentId).listen(
+        handleStatus,
+        onError: (e) {
+          debugPrint('⚠️ [PaymentCubit] Real-time stream error: $e');
+        },
+      );
+
+      // 2. Set a 180-second timeout
+      timeoutTimer = Timer(const Duration(seconds: 180), () {
+        if (!completer.isCompleted) {
+          if (!isClosed) {
+            emit(PaymentFailure(
+              errorMessage: 'Payment is being confirmed. Check your transaction history in a moment.',
+              failedMethod: const PaymentMethod(
+                id: 'pay_per_use',
+                type: PaymentMethodType.wallet,
+                title: 'Pay per use',
+              ),
+            ));
+          }
+          completer.complete();
+        }
+      });
+
+      // Wait until complete (COMPLETED, FAILED, or Timeout)
+      await completer.future;
+
+    } catch (e) {
+      debugPrint('⚠️ [PaymentCubit] Stream initialization failed, falling back to one-time query: $e');
+      // Fallback: If streaming setup fails, run a quick one-time query check
+      try {
+        final status = await _paymentRepository.getIntentStatus(intentId);
+        handleStatus(status);
+      } catch (_) {}
+    } finally {
+      await subscription?.cancel();
+      timeoutTimer?.cancel();
     }
   }
 
@@ -235,7 +301,7 @@ class PaymentCubit extends Cubit<PaymentState> {
     try {
       final idempotencyKey = const Uuid().v4();
 
-      final amountInSatang = (currentState.amount * 100).toInt();
+      final amountInSatang = (currentState.amount * 100).round();
 
       final transactionId = await _paymentRepository.payToPromptPay(
         amountInSatang: amountInSatang,
@@ -253,8 +319,7 @@ class PaymentCubit extends Cubit<PaymentState> {
       emit(
         PaymentSuccess(
           transactionId: transactionId,
-          senderName: 'Tourist Wallet',
-          remainingBalance: 0.0,
+          senderName: 'Card Payment',
         ),
       );
     } catch (e) {
@@ -275,7 +340,6 @@ class PaymentCubit extends Cubit<PaymentState> {
         PaymentReady(
           method: method,
           amount: currentState.amount,
-          balance: currentState.balance,
           sqrilTxId: currentState.sqrilTxId,
           exchangeRate: currentState.exchangeRate,
           feeUSD: currentState.feeUSD,

@@ -33,11 +33,18 @@ serve(async (req: Request): Promise<Response> => {
     if (!deviceId || !signature || !nonce) return err('Device authorization missing', 401);
 
     // 3. Body
-    const { old_pin, new_pin } = await req.json().catch(() => ({}));
-    if (!old_pin || typeof old_pin !== 'string' || old_pin.length !== 6 || !/^\d+$/.test(old_pin))
-      return err('old_pin must be an 8-digit number', 400);
-    if (!new_pin || typeof new_pin !== 'string' || new_pin.length !== 6 || !/^\d+$/.test(new_pin))
-      return err('new_pin must be an 8-digit number', 400);
+    const { old_pin, new_pin, is_hashed } = await req.json().catch(() => ({}));
+    if (is_hashed) {
+      if (!old_pin || typeof old_pin !== 'string' || old_pin.length !== 64 || !/^[a-fA-F0-9]+$/.test(old_pin))
+        return err('Invalid old_pin format', 400);
+      if (!new_pin || typeof new_pin !== 'string' || new_pin.length !== 64 || !/^[a-fA-F0-9]+$/.test(new_pin))
+        return err('Invalid new_pin format', 400);
+    } else {
+      if (!old_pin || typeof old_pin !== 'string' || old_pin.length !== 6 || !/^\d+$/.test(old_pin))
+        return err('old_pin must be a 6-digit number', 400);
+      if (!new_pin || typeof new_pin !== 'string' || new_pin.length !== 6 || !/^\d+$/.test(new_pin))
+        return err('new_pin must be a 6-digit number', 400);
+    }
     if (old_pin === new_pin) return err('New PIN must differ from current PIN.', 400);
 
     // 4. Load auth context

@@ -12,12 +12,12 @@ import (
 // StaticRouter is the v0 implementation of the Smart Routing Engine.
 // It uses simple heuristic references to determine the best path.
 type StaticRouter struct {
-	walletService *usecase.WalletService
+	orchService *usecase.PaymentOrchestrationService
 }
 
 // NewStaticRouter creates a new instance.
-func NewStaticRouter(ws *usecase.WalletService) *StaticRouter {
-	return &StaticRouter{walletService: ws}
+func NewStaticRouter(os *usecase.PaymentOrchestrationService) *StaticRouter {
+	return &StaticRouter{orchService: os}
 }
 
 // GetQuote calculates the best payment routes.

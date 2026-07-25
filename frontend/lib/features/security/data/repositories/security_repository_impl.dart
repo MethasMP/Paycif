@@ -4,23 +4,23 @@ import 'package:flutter/foundation.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:uuid/uuid.dart';
 import 'package:frontend/features/security/domain/repositories/security_repository.dart';
-import 'package:frontend/features/security/data/datasources/crypto_service.dart';
-import 'package:frontend/features/security/data/datasources/secure_storage_service.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:frontend/features/security/data/datasources/security_remote_data_source.dart';
+import 'package:frontend/features/security/data/datasources/app_encryption_service.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SecurityRepositoryImpl implements SecurityRepository {
   final SecurityRemoteDataSource _remoteDataSource;
-  final CryptoService _cryptoService;
-  final SecureStorageService _secureStorage;
+  final AppEncryptionService _cryptoService;
+  final FlutterSecureStorage _secureStorage;
   final DeviceInfoPlugin _deviceInfoPlugin;
   final Uuid _uuidSource;
 
   SecurityRepositoryImpl({
     required SecurityRemoteDataSource remoteDataSource,
-    required CryptoService cryptoService,
-    required SecureStorageService secureStorage,
+    required AppEncryptionService cryptoService,
+    required FlutterSecureStorage secureStorage,
     DeviceInfoPlugin? deviceInfoPlugin,
     Uuid? uuidSource,
   }) : _remoteDataSource = remoteDataSource,
@@ -38,6 +38,7 @@ class SecurityRepositoryImpl implements SecurityRepository {
   // AES-256-GCM + PBKDF2-SHA256 PIN token (v2 suffix avoids collision with old Argon2id keys)
   static const _kPinEncryptedToken = 'pin_enc_token_v2';
   static const _kPinTokenSalt = 'pin_token_salt_v2';
+  static const _kPinIterations = 'pin_token_iterations_v2';
   static const _kPinAttemptCount = 'pin_attempt_count';
   static const _kMaxLocalAttempts = 5;
 
@@ -63,10 +64,12 @@ class SecurityRepositoryImpl implements SecurityRepository {
     try {
       final salt = _cryptoService.randomBytes(32);
       final token = _cryptoService.randomBytes(32); // random verification marker
+      final iterations = kDebugMode ? 1000 : 100000;
 
-      final keyBytes = await compute(CryptoService.derivePinKey, {
+      final keyBytes = await compute(AppEncryptionService.derivePinKey, {
         'pin': pin,
         'salt': salt,
+        'iterations': iterations,
       });
 
       _cachedPinKey = keyBytes;
@@ -74,12 +77,13 @@ class SecurityRepositoryImpl implements SecurityRepository {
       final encrypted = await _cryptoService.encryptPinToken(keyBytes, token);
 
       await Future.wait([
-        _secureStorage.write(_kPinEncryptedToken, base64Encode(encrypted)),
-        _secureStorage.write(_kPinTokenSalt, base64Encode(salt)),
-        _secureStorage.write(_kPinAttemptCount, '0'),
+        _secureStorage.write(key: _kPinEncryptedToken, value: base64Encode(encrypted)),
+        _secureStorage.write(key: _kPinTokenSalt, value: base64Encode(salt)),
+        _secureStorage.write(key: _kPinIterations, value: iterations.toString()),
+        _secureStorage.write(key: _kPinAttemptCount, value: '0'),
         // Clean up legacy Argon2id keys if present
-        _secureStorage.delete(_kLegacyPinHashKey),
-        _secureStorage.delete(_kLegacyPinSaltKey),
+        _secureStorage.delete(key: _kLegacyPinHashKey),
+        _secureStorage.delete(key: _kLegacyPinSaltKey),
       ]);
 
       debugPrint('✅ [PIN] Local AES-256-GCM token persisted.');
@@ -95,17 +99,17 @@ class SecurityRepositoryImpl implements SecurityRepository {
     // 2. Server confirmed: persist local token and mark configured
     await Future.wait([
       _persistLocalPinToken(pin),
-      _secureStorage.write(_kHasPinCacheKey, 'true'),
+      _secureStorage.write(key: _kHasPinCacheKey, value: 'true'),
     ]);
   }
 
   @override
   Future<void> bindCurrentDevice() async {
     // 1. Ensure Stable Device ID
-    String? deviceId = await _secureStorage.read(_kDeviceIdKey);
+    String? deviceId = await _secureStorage.read(key: _kDeviceIdKey);
     if (deviceId == null) {
       deviceId = _uuidSource.v4();
-      await _secureStorage.write(_kDeviceIdKey, deviceId);
+      await _secureStorage.write(key: _kDeviceIdKey, value: deviceId);
     }
 
     // Check if biometric is enabled
@@ -129,12 +133,12 @@ class SecurityRepositoryImpl implements SecurityRepository {
       final privateKeyBytes = await _cryptoService.getPrivateKeyBytes(keyPair);
       publicKeyBase64 = await _cryptoService.getPublicKeyBase64(keyPair);
 
-      await _secureStorage.write(_kPrivateKeySeedKey, base64Encode(privateKeyBytes));
-      await _secureStorage.write(_kIsHardwareKey, 'false');
+      await _secureStorage.write(key: _kPrivateKeySeedKey, value: base64Encode(privateKeyBytes));
+      await _secureStorage.write(key: _kIsHardwareKey, value: 'false');
     } else {
       // 3. Mark as Hardware Backed (No Private Key extraction!)
-      await _secureStorage.write(_kIsHardwareKey, 'true');
-      await _secureStorage.delete(_kPrivateKeySeedKey); // Wipe any old software seeds
+      await _secureStorage.write(key: _kIsHardwareKey, value: 'true');
+      await _secureStorage.delete(key: _kPrivateKeySeedKey); // Wipe any old software seeds
     }
 
     // 🔬 DEBUG: Print public key prefix for tracing
@@ -179,8 +183,8 @@ class SecurityRepositoryImpl implements SecurityRepository {
     // ⚡ Warm device credential cache on first call (parallel reads)
     if (_cachedDeviceId == null || _cachedIsHardware == null) {
       final results = await Future.wait([
-        _secureStorage.read(_kDeviceIdKey),
-        _secureStorage.read(_kIsHardwareKey),
+        _secureStorage.read(key: _kDeviceIdKey),
+        _secureStorage.read(key: _kIsHardwareKey),
       ]);
       _cachedDeviceId = results[0];
       _cachedIsHardware = results[1] == 'true';
@@ -197,13 +201,24 @@ class SecurityRepositoryImpl implements SecurityRepository {
 
     String signature;
     if (isHardware) {
-      final sig = await _cryptoService.signWithHardware(payload: signaturePayload);
-      if (sig == null) throw Exception('Biometric authentication failed.');
+      String? sig;
+      try {
+        sig = await _cryptoService.signWithHardware(payload: signaturePayload);
+      } catch (e) {
+        debugPrint('⚠️ [SecurityRepo] Hardware signing failed, falling back to software self-healing: $e');
+      }
+      if (sig == null) {
+        // Enclave Key missing (e.g. fresh reinstall or device restore).
+        // Clear cached hardware flag so self-healing re-bind can regenerate identity.
+        _cachedIsHardware = false;
+        await _secureStorage.write(key: _kIsHardwareKey, value: 'false');
+        throw Exception('Device credentials missing. Please re-bind device.');
+      }
       signature = sig;
     } else {
       // ⚡ Cache reconstructed key pair — expensive operation, result is stable
       if (_cachedKeyPair == null) {
-        final privateKeyB64 = await _secureStorage.read(_kPrivateKeySeedKey);
+        final privateKeyB64 = await _secureStorage.read(key: _kPrivateKeySeedKey);
         if (privateKeyB64 == null) {
           throw Exception('Security credentials missing. Please re-bind device.');
         }
@@ -269,70 +284,76 @@ class SecurityRepositoryImpl implements SecurityRepository {
   @override
   Future<void> verifyPin(String pin, {bool serverVerify = false}) async {
     // ── Attempt guard ──────────────────────────────────────────────────────────
-    final attemptsStr = await _secureStorage.read(_kPinAttemptCount);
+    final attemptsStr = await _secureStorage.read(key: _kPinAttemptCount);
     final attempts = int.tryParse(attemptsStr ?? '0') ?? 0;
     if (attempts >= _kMaxLocalAttempts) {
       await clearAllPinData();
       throw Exception('Too many incorrect attempts. PIN data wiped for security.');
     }
 
-    // ── Local fast-fail via AES-256-GCM decryption ────────────────────────────
-    // Wrong PIN → GCM auth tag fails → throws → skip network, save latency.
-    // No hash to brute-force offline; attacker needs device + Keychain + PIN.
+    bool localTokenMissing = false;
     try {
       if (_cachedPinKey != null) {
         // ⚡ Warm path: reuse derived key from memory (~0ms)
-        final encB64 = await _secureStorage.read(_kPinEncryptedToken);
+        final encB64 = await _secureStorage.read(key: _kPinEncryptedToken);
         if (encB64 != null) {
           await _cryptoService.decryptPinToken(_cachedPinKey!, base64Decode(encB64));
           debugPrint('✅ [PIN] Local token verified (warm cache).');
+        } else {
+          localTokenMissing = true;
         }
       } else {
-        // Cold path: parallel read salt + token, derive key (~10ms)
+        // Cold path: parallel read salt, iterations, token, derive key (~10ms)
         final results = await Future.wait([
-          _secureStorage.read(_kPinEncryptedToken),
-          _secureStorage.read(_kPinTokenSalt),
+          _secureStorage.read(key: _kPinEncryptedToken),
+          _secureStorage.read(key: _kPinTokenSalt),
+          _secureStorage.read(key: _kPinIterations),
         ]);
         final encB64 = results[0];
         final saltB64 = results[1];
+        final iterStr = results[2];
+        final iterations = int.tryParse(iterStr ?? '') ?? 10000;
 
         if (encB64 != null && saltB64 != null) {
-          final keyBytes = await compute(CryptoService.derivePinKey, {
+          final keyBytes = await compute(AppEncryptionService.derivePinKey, {
             'pin': pin,
             'salt': base64Decode(saltB64),
+            'iterations': iterations,
           });
           await _cryptoService.decryptPinToken(keyBytes, base64Decode(encB64));
           _cachedPinKey = keyBytes;
           debugPrint('✅ [PIN] Local token verified (cold path).');
         } else {
-          debugPrint('⚠️ [PIN] No local token — proceeding to server-only path.');
+          debugPrint('⚠️ [PIN] No local token (fresh reinstall) — falling back to server verification.');
+          localTokenMissing = true;
         }
       }
     } catch (e) {
-      // GCM auth failure = wrong PIN. Increment counter and block network call.
-      final next = attempts + 1;
-      await _secureStorage.write(_kPinAttemptCount, next.toString());
-      _cachedPinKey = null;
-      debugPrint('❌ [PIN] Wrong PIN — attempt $next/$_kMaxLocalAttempts.');
-      throw Exception('Incorrect PIN');
+      if (!localTokenMissing) {
+        // GCM auth failure = wrong PIN on existing local token.
+        final next = attempts + 1;
+        await _secureStorage.write(key: _kPinAttemptCount, value: next.toString());
+        _cachedPinKey = null;
+        debugPrint('❌ [PIN] Wrong PIN — attempt $next/$_kMaxLocalAttempts.');
+        throw Exception('Incorrect PIN');
+      }
     }
 
-    // ── Server gate (payment only) ────────────────────────────────────────────
-    // For app unlock, local AES-256-GCM is sufficient — skip the ~500ms Argon2id
-    // server call. For payment confirmation, always hit the server.
-    if (serverVerify) {
+    // ── Server gate (required for payment OR fresh reinstall recovery) ────────
+    if (serverVerify || localTokenMissing) {
       await _withDeviceSelfHealing(() async {
         final headers = await generateSignatureHeaders(pin);
         await _remoteDataSource.verifyPin(pin, headers: headers);
 
         await Future.wait([
-          _secureStorage.write(_kPinAttemptCount, '0'),
+          _secureStorage.write(key: _kPinAttemptCount, value: '0'),
+          _secureStorage.write(key: _kHasPinCacheKey, value: 'true'),
           if (_cachedPinKey == null) _persistLocalPinToken(pin),
         ]);
       });
     } else {
       // Local-only path: reset attempt counter on success
-      await _secureStorage.write(_kPinAttemptCount, '0');
+      await _secureStorage.write(key: _kPinAttemptCount, value: '0');
     }
   }
 
@@ -349,14 +370,14 @@ class SecurityRepositoryImpl implements SecurityRepository {
 
   @override
   Future<bool> isDeviceBound() async {
-    final deviceId = await _secureStorage.read(_kDeviceIdKey);
+    final deviceId = await _secureStorage.read(key: _kDeviceIdKey);
     if (deviceId == null) {
       return false;
     }
 
-    final isHardware = await _secureStorage.read(_kIsHardwareKey) == 'true';
+    final isHardware = await _secureStorage.read(key: _kIsHardwareKey) == 'true';
     if (!isHardware) {
-      final privateKey = await _secureStorage.read(_kPrivateKeySeedKey);
+      final privateKey = await _secureStorage.read(key: _kPrivateKeySeedKey);
       if (privateKey == null) {
         return false;
       }
@@ -372,7 +393,7 @@ class SecurityRepositoryImpl implements SecurityRepository {
   @override
   Future<bool> hasPin() async {
     // ⚡ Fast-Path: Check Disk Cache first
-    final cached = await _secureStorage.read(_kHasPinCacheKey);
+    final cached = await _secureStorage.read(key: _kHasPinCacheKey);
     if (cached != null) return cached == 'true';
 
     try {
@@ -380,11 +401,12 @@ class SecurityRepositoryImpl implements SecurityRepository {
       final hasPin = status?['has_pin'] ?? false;
 
       // 📡 Side-Effect: Warm up the cache
-      _secureStorage.write(_kHasPinCacheKey, hasPin.toString()).ignore();
+      _secureStorage.write(key: _kHasPinCacheKey, value: hasPin.toString()).ignore();
 
       return hasPin;
     } catch (e) {
-      return false;
+      debugPrint("❌ [SecurityRepository] Failed to fetch PIN status: $e");
+      rethrow;
     }
   }
 
@@ -417,7 +439,7 @@ class SecurityRepositoryImpl implements SecurityRepository {
 
     // ⚡ 2. Disk Fast-Path: Cold-Start Zero Latency
     if (_devicesCache == null) {
-      final json = await _secureStorage.read(_kDevicesCacheKey);
+      final json = await _secureStorage.read(key: _kDevicesCacheKey);
       if (json != null) {
         try {
           final List<dynamic> decoded = jsonDecode(json);
@@ -434,7 +456,7 @@ class SecurityRepositoryImpl implements SecurityRepository {
     final devices = await _remoteDataSource.getLinkedDevices();
     _devicesCache = devices;
     // Persist for next cold start
-    await _secureStorage.write(_kDevicesCacheKey, jsonEncode(devices));
+    await _secureStorage.write(key: _kDevicesCacheKey, value: jsonEncode(devices));
     return devices;
   }
 
@@ -443,7 +465,7 @@ class SecurityRepositoryImpl implements SecurityRepository {
     return _remoteDataSource.watchLinkedDevices().map((devices) {
       // 📡 Side-Effect: Keep local cache synced with Real-time push
       _devicesCache = devices;
-      _secureStorage.write(_kDevicesCacheKey, jsonEncode(devices)).ignore();
+      _secureStorage.write(key: _kDevicesCacheKey, value: jsonEncode(devices)).ignore();
       return devices;
     });
   }
@@ -455,7 +477,7 @@ class SecurityRepositoryImpl implements SecurityRepository {
 
   @override
   Future<String?> getCurrentDeviceId() async {
-    return await _secureStorage.read(_kDeviceIdKey);
+    return await _secureStorage.read(key: _kDeviceIdKey);
   }
 
   @override
@@ -468,13 +490,14 @@ class SecurityRepositoryImpl implements SecurityRepository {
 
     // Remove all PIN-related Keychain entries
     await Future.wait([
-      _secureStorage.delete(_kPinEncryptedToken),
-      _secureStorage.delete(_kPinTokenSalt),
-      _secureStorage.delete(_kPinAttemptCount),
-      _secureStorage.delete(_kHasPinCacheKey),
+      _secureStorage.delete(key: _kPinEncryptedToken),
+      _secureStorage.delete(key: _kPinTokenSalt),
+      _secureStorage.delete(key: _kPinIterations),
+      _secureStorage.delete(key: _kPinAttemptCount),
+      _secureStorage.delete(key: _kHasPinCacheKey),
       // Legacy cleanup
-      _secureStorage.delete(_kLegacyPinHashKey),
-      _secureStorage.delete(_kLegacyPinSaltKey),
+      _secureStorage.delete(key: _kLegacyPinHashKey),
+      _secureStorage.delete(key: _kLegacyPinSaltKey),
     ]);
 
     debugPrint('🔒 [SecurityRepo] clearAllPinData: Local PIN data wiped.');
@@ -493,13 +516,14 @@ class SecurityRepositoryImpl implements SecurityRepository {
     // We keep device_binding_id/seed because it usually persists across logout
     // unless the user wants a full factory reset.
     await Future.wait([
-      _secureStorage.delete(_kHasPinCacheKey),
-      _secureStorage.delete(_kPinEncryptedToken),
-      _secureStorage.delete(_kPinTokenSalt),
-      _secureStorage.delete(_kPinAttemptCount),
-      _secureStorage.delete(_kLegacyPinHashKey),
-      _secureStorage.delete(_kLegacyPinSaltKey),
-      _secureStorage.delete(_kDevicesCacheKey),
+      _secureStorage.delete(key: _kHasPinCacheKey),
+      _secureStorage.delete(key: _kPinEncryptedToken),
+      _secureStorage.delete(key: _kPinTokenSalt),
+      _secureStorage.delete(key: _kPinIterations),
+      _secureStorage.delete(key: _kPinAttemptCount),
+      _secureStorage.delete(key: _kLegacyPinHashKey),
+      _secureStorage.delete(key: _kLegacyPinSaltKey),
+      _secureStorage.delete(key: _kDevicesCacheKey),
     ]);
 
     debugPrint('🔒 [SecurityRepo] Hard-Clear: Sensitive data wiped.');

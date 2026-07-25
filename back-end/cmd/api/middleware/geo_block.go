@@ -25,12 +25,13 @@ func GeoBlockMiddleware(svc *usecase.GeoBlockService, audit *usecase.AuditServic
 
 		country, err := svc.ResolveCountry(c.Request.Context(), ip)
 		if err != nil {
-			// Fail open: lookup unavailable, let the request proceed.
-			c.Next()
+			// Fail closed: lookup unavailable, reject request for safety.
+			log.Printf("geo_block: lookup failed for ip=%s (fail-closed): %v", usecase.TruncateIP(ip), err)
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "service_unavailable_in_region"})
 			return
 		}
 
-		if !svc.IsBlocked(country) {
+		if svc.IsAllowed(country) {
 			c.Next()
 			return
 		}

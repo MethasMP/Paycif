@@ -55,8 +55,7 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
       );
 
       if (wantsBiometrics == true) {
-        // Fire-and-forget — don't block navigation on biometric setup.
-        _enableBiometricsInBackground(securityController);
+        await _enableBiometrics(securityController);
       }
     }
 
@@ -65,29 +64,27 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
     }
   }
 
-  void _enableBiometricsInBackground(SecurityController securityController) {
-    () async {
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('biometric_enabled', true);
+  Future<void> _enableBiometrics(SecurityController securityController) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('biometric_enabled', true);
 
-        final supabase = Supabase.instance.client;
-        final user = supabase.auth.currentUser;
-        if (user != null) {
-          await supabase
-              .from('profiles')
-              .update({
-                'biometric_enabled': true,
-                'updated_at': DateTime.now().toIso8601String(),
-              })
-              .eq('id', user.id);
-        }
-
-        await securityController.bindDevice();
-      } catch (e) {
-        debugPrint('⚠️ Background biometric setup failed: $e');
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user != null) {
+        await supabase
+            .from('profiles')
+            .update({
+              'biometric_enabled': true,
+              'updated_at': DateTime.now().toIso8601String(),
+            })
+            .eq('id', user.id);
       }
-    }();
+
+      await securityController.bindDevice();
+    } catch (e) {
+      debugPrint('⚠️ Biometric setup failed: $e');
+    }
   }
 
   @override
@@ -97,7 +94,17 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
       body: SafeArea(
         child: PinEntryWidget(
           isSetupMode: true,
-          onSuccess: _onPinSuccess,
+          onSubmit: (pinList) async {
+            final pin = pinList.join();
+            final securityController = context.read<SecurityController>();
+            final success = await securityController.setupPin(pin);
+            if (success) {
+              if (mounted) _onPinSuccess(pin);
+              return null;
+            } else {
+              return securityController.state.errorMessage ?? 'Failed to setup PIN';
+            }
+          },
         ),
       ),
     );

@@ -245,9 +245,10 @@ func (s *SqrilProvider) DecodeQR(ctx context.Context, qrString string, customerI
 		if err != nil {
 			return nil, fmt.Errorf("decode request failed: %w", err)
 		}
-		defer resp.Body.Close()
-
-		bodyBytes, _ := io.ReadAll(resp.Body)
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read decode response body: %w", err)
+		}
 		if resp.StatusCode != http.StatusOK {
 			return nil, fmt.Errorf("decode returned status %d: %s", resp.StatusCode, string(bodyBytes))
 		}
@@ -325,7 +326,10 @@ func (s *SqrilProvider) GetQuotation(ctx context.Context, txID string, customerI
 		}
 		defer resp.Body.Close()
 
-		bodyBytes, _ := io.ReadAll(resp.Body)
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read quote response body: %w", err)
+		}
 		if resp.StatusCode != http.StatusOK {
 			return nil, fmt.Errorf("quote returned status %d: %s", resp.StatusCode, string(bodyBytes))
 		}
@@ -374,7 +378,10 @@ func (s *SqrilProvider) GetTransaction(ctx context.Context, transactionID string
 		}
 		defer resp.Body.Close()
 
-		bodyBytes, _ := io.ReadAll(resp.Body)
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read transaction response body: %w", err)
+		}
 		if resp.StatusCode != http.StatusOK {
 			return nil, fmt.Errorf("getTransaction returned status %d: %s", resp.StatusCode, string(bodyBytes))
 		}
@@ -453,7 +460,10 @@ func (s *SqrilProvider) Payout(ctx context.Context, amount int64, currency strin
 		}
 		defer resp.Body.Close()
 
-		bodyBytes, _ := io.ReadAll(resp.Body)
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read payout response body: %w", err)
+		}
 		if resp.StatusCode != http.StatusAccepted && resp.StatusCode != http.StatusOK {
 			return nil, fmt.Errorf("execute payout returned status %d: %s", resp.StatusCode, string(bodyBytes))
 		}
@@ -523,7 +533,10 @@ func (s *SqrilProvider) GetAccountBalances(ctx context.Context) (*AccountBalance
 		}
 		defer resp.Body.Close()
 
-		bodyBytes, _ := io.ReadAll(resp.Body)
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read balances response body: %w", err)
+		}
 		if resp.StatusCode != http.StatusOK {
 			return nil, fmt.Errorf("getAccountBalances returned status %d: %s", resp.StatusCode, string(bodyBytes))
 		}

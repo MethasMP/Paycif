@@ -12,7 +12,7 @@ enum PromptPayType {
   unknown,
 }
 
-class EMFData {
+class EmvQrData {
   final Map<String, String> rawTags;
   final String merchantName;
   final String? merchantCity;
@@ -28,7 +28,7 @@ class EMFData {
   final String? reference2;
   final bool isPersonal;
 
-  EMFData({
+  EmvQrData({
     required this.rawTags,
     required this.merchantName,
     this.merchantCity,
@@ -48,7 +48,7 @@ class EMFData {
 
 class EMVCoParser {
   /// Parses a raw EMVCo string into a structured object
-  static EMFData parse(String raw) {
+  static EmvQrData parse(String raw) {
     if (raw.isEmpty) return _empty();
 
     final tags = _parseTLV(raw);
@@ -106,7 +106,7 @@ class EMVCoParser {
       amount = double.tryParse(tags['54']!);
     }
 
-    return EMFData(
+    return EmvQrData(
       rawTags: tags,
       merchantName: merchantName,
       merchantCity: tags['60'],
@@ -182,8 +182,8 @@ class EMVCoParser {
     return crc.toRadixString(16).toUpperCase().padLeft(4, '0');
   }
 
-  static EMFData _empty() {
-    return EMFData(
+  static EmvQrData _empty() {
+    return EmvQrData(
       rawTags: {},
       merchantName: 'Unknown',
       currencyCode: '764',

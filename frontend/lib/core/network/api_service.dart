@@ -11,6 +11,7 @@ import 'package:frontend/core/models/decoded_qr.dart';
 import 'package:frontend/core/models/quotation_model.dart';
 import 'package:frontend/features/transactions/domain/transaction.dart';
 import 'dart:async'; // Required for Completer
+import 'package:frontend/core/router/app_router.dart';
 
 class ApiService {
   // 🛡️ Local-dev-only fallback for Supabase demo project. NEVER used outside
@@ -147,14 +148,28 @@ class ApiService {
   }
 
   /// ️ [Performance] Pre-warm Connection
-  /// Establishes TCP/TLS handshake with the backend early to eliminate
-  /// the 200-500ms connection delay for the first actual request.
+  /// Establishes TCP/TLS handshake with the backend and Supabase Auth early
+  /// to eliminate connection setup delays for the first actual request.
   static Future<void> prewarmConnection() async {
     try {
       debugPrint('🕯️ [Warm-up] Priming connection to $baseUrl...');
       // Use a valid endpoint to avoid 404 logs
       final warmUpUrl = Uri.parse('$baseUrl/rates/latest?home_currency=USD');
       await http.head(warmUpUrl).timeout(const Duration(seconds: 2));
+    } catch (_) {
+      // Ignore failures
+    }
+
+    try {
+      final supabaseUrlBase = requireEnv(
+        const String.fromEnvironment('SUPABASE_URL'),
+        'SUPABASE_URL',
+        debugFallback: 'http://127.0.0.1:54321',
+      );
+      final supabaseUrl = resolveLocalHost(supabaseUrlBase);
+      debugPrint('🕯️ [Warm-up] Priming connection to Supabase at $supabaseUrl...');
+      final warmUpSupabase = Uri.parse('$supabaseUrl/auth/v1/health');
+      await http.get(warmUpSupabase).timeout(const Duration(seconds: 2));
     } catch (_) {
       // Ignore failures
     }
@@ -383,6 +398,12 @@ class ApiService {
         rethrow;
       }
     }
+    if (response.statusCode == 403 && response.body.contains("service_unavailable_in_region")) {
+      debugPrint("🚨 [Universal Interceptor] Geofencing block triggered. Redirecting to BlockedScreen...");
+      appRouter.go('/blocked');
+      return response;
+    }
+
     return response;
   }
 
@@ -836,7 +857,7 @@ class ApiService {
   // Execute Payout (calls payout-executor Edge Function)
   // ============================================================================
   /// Executes a real payout by calling the Supabase Edge Function.
-  /// This deducts balance from wallet, creates transaction and ledger entry.
+  /// Orchestrates card/partner funding to PromptPay settlement and creates transaction ledger entries.
   Future<Map<String, dynamic>> executePayout({
     required String walletId,
     required double amountSatang,
@@ -898,7 +919,7 @@ class ApiService {
 
   // ============================================================================
   // ACH On-Ramp Preferences
-  // Non-sensitive pre-fill data only — card credentials live in AlchemyPay.
+  // Non-sensitive pre-fill data only — card credentials live in On-Ramp.
   // ============================================================================
   static Completer<UserProfile?>? _profileCompleter;
 
@@ -931,7 +952,7 @@ class ApiService {
     return null;
   }
 
-  /// Returns a signed AlchemyPay Page Integration URL for managing saved payment methods.
+  /// Returns a signed On-Ramp Page Integration URL for managing saved payment methods.
   /// Backend embeds the ACH token so the user lands directly in their account.
   Future<String?> fetchManageUrl() async {
     try {
@@ -1070,7 +1091,7 @@ class ApiService {
     throw Exception('Failed to fetch KYC status: ${response.body}');
   }
 
-  /// Creates a PayoutIntent and returns the AlchemyPay checkout URL + intent ID.
+  /// Creates a PayoutIntent and returns the On-Ramp checkout URL + intent ID.
   /// This is the entry point for the pay-per-use on-ramp flow.
   Future<({String webUrl, String intentId})> initiateOnRampPayment({
     required int amountSatang,
@@ -1078,6 +1099,7 @@ class ApiService {
     required String promptPayId,
     required String recipientName,
     required String fiatCurrency,
+    required String idempotencyKey,
     String? billerId,
     String? reference1,
     String? reference2,
@@ -1096,6 +1118,7 @@ class ApiService {
           'recipient_name': recipientName,
           'sqril_tx_id': sqrilTxId,
           'corridor_type': 'CARD',
+          'idempotency_key': idempotencyKey,
           // ignore: use_null_aware_elements
           if (billerId != null) 'biller_id': billerId,
           // ignore: use_null_aware_elements

@@ -33,8 +33,12 @@ serve(async (req: Request): Promise<Response> => {
     if (!deviceId || !signature || !nonce) return err('Device authorization missing', 401);
 
     // 3. Body
-    const { pin } = await req.json().catch(() => ({}));
+    const { pin, is_hashed } = await req.json().catch(() => ({}));
     if (!pin || typeof pin !== 'string') return err('PIN required', 400);
+    if (is_hashed) {
+      if (pin.length !== 64 || !/^[a-fA-F0-9]+$/.test(pin))
+        return err('Invalid hashed PIN format', 400);
+    }
 
     // 4. Load auth context
     const ctx = await fetchContext(db, user.id, deviceId);

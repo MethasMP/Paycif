@@ -3,6 +3,7 @@ import 'package:frontend/core/network/api_service.dart';
 import 'package:frontend/core/models/decoded_qr.dart';
 import 'package:frontend/core/models/quotation_model.dart';
 import 'package:frontend/features/security/domain/repositories/security_repository.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class PaymentRepositoryImpl implements IPaymentRepository {
   final ApiService _apiService;
@@ -31,6 +32,7 @@ class PaymentRepositoryImpl implements IPaymentRepository {
     required String promptPayId,
     required String recipientName,
     required String fiatCurrency,
+    required String idempotencyKey,
     String? billerId,
     String? reference1,
     String? reference2,
@@ -44,6 +46,7 @@ class PaymentRepositoryImpl implements IPaymentRepository {
       promptPayId: promptPayId,
       recipientName: recipientName,
       fiatCurrency: fiatCurrency,
+      idempotencyKey: idempotencyKey,
       billerId: billerId,
       reference1: reference1,
       reference2: reference2,
@@ -84,5 +87,17 @@ class PaymentRepositoryImpl implements IPaymentRepository {
       headers: headers,
     );
     return response['transaction_id'] ?? response['id'] ?? idempotencyKey;
+  }
+
+  @override
+  Stream<String> watchIntentStatus(String intentId) {
+    return Supabase.instance.client
+        .from('payout_intents')
+        .stream(primaryKey: ['id'])
+        .eq('id', intentId)
+        .map((data) {
+          if (data.isEmpty) return 'PENDING';
+          return data.first['status'] as String? ?? 'PENDING';
+        });
   }
 }

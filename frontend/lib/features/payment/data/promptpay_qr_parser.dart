@@ -1,4 +1,4 @@
-import 'package:frontend/core/utils/emv_parser.dart';
+import 'package:frontend/core/utils/emvco_qr_decoder.dart';
 
 enum PaymentMethodType {
   promptPay,
@@ -36,7 +36,8 @@ class PaymentContext {
   });
 }
 
-class QrAggregatorService {
+/// Parses and validates EMVCo PromptPay QR Codes.
+class PromptPayQrParser {
   /// The core IP logic to aggregate and interpret any scanned code
   static PaymentContext aggregate(String rawData) {
     // 1. Try EMVCo Parsing (The core standard)
@@ -67,7 +68,7 @@ class QrAggregatorService {
     return data.startsWith('000201');
   }
 
-  static PaymentContext _fromEMV(EMFData emv) {
+  static PaymentContext _fromEMV(EmvQrData emv) {
     PaymentMethodType method = PaymentMethodType.promptPay;
     String subtitle = 'PromptPay Transfer';
 

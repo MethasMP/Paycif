@@ -45,12 +45,12 @@ func ComputePayloadHash(req PromptPayPayoutRequest) string {
 
 // PayoutHandler handles payout-related API endpoints.
 type PayoutHandler struct {
-	Service          *usecase.WalletService
+	Service          *usecase.PaymentOrchestrationService
 	SignatureService *usecase.SignatureService
 }
 
 // NewPayoutHandler creates a new PayoutHandler instance.
-func NewPayoutHandler(svc *usecase.WalletService, sigSvc *usecase.SignatureService) *PayoutHandler {
+func NewPayoutHandler(svc *usecase.PaymentOrchestrationService, sigSvc *usecase.SignatureService) *PayoutHandler {
 	return &PayoutHandler{
 		Service:          svc,
 		SignatureService: sigSvc,

@@ -89,20 +89,15 @@ void main() {
       verify(() => mockRepository.clearAllPinData()).called(1);
     });
 
-    test('verifyPin should handle session expired (401) and redirect to setup', () async {
+    test('verifyPin should handle session expired (401) without clearing pin data', () async {
       when(
         () => mockRepository.verifyPin('000000'),
       ).thenThrow(Exception('401 Unauthorized'));
-      when(
-        () => mockRepository.clearAllPinData(),
-      ).thenAnswer((_) async {});
 
       final result = await controller.verifyPin('000000');
 
       expect(result, isFalse);
-      expect(controller.state.status, SecurityStatus.error);
-      expect(controller.state.errorMessage, 'PIN not setup on server. Redirecting...');
-      verify(() => mockRepository.clearAllPinData()).called(1);
+      verifyNever(() => mockRepository.clearAllPinData());
     });
   });
 }

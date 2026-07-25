@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
+import 'dart:convert';
+import 'package:crypto/crypto.dart' as crypto_pkg;
 import 'package:frontend/core/network/api_service.dart';
 
 class SecurityRemoteDataSource {
@@ -23,18 +25,28 @@ class SecurityRemoteDataSource {
   }
 
   Future<void> setupPin(String pin, {Map<String, String>? headers}) async {
+    final pinBytes = utf8.encode(pin);
+    final hashedPin = crypto_pkg.sha256.convert(pinBytes).toString();
     await _invokeEdgeFunction(
       'setup-pin',
-      body: {'pin': pin},
+      body: {
+        'pin': hashedPin,
+        'is_hashed': true,
+      },
       headers: headers,
     );
   }
 
   Future<void> verifyPin(String pin, {Map<String, String>? headers}) async {
     try {
+      final pinBytes = utf8.encode(pin);
+      final hashedPin = crypto_pkg.sha256.convert(pinBytes).toString();
       await _invokeEdgeFunction(
         'verify-pin',
-        body: {'pin': pin},
+        body: {
+          'pin': hashedPin,
+          'is_hashed': true,
+        },
         headers: headers,
       );
     } catch (e) {
@@ -109,9 +121,17 @@ class SecurityRemoteDataSource {
     required String newPin,
     Map<String, String>? headers,
   }) async {
+    final oldBytes = utf8.encode(oldPin);
+    final newBytes = utf8.encode(newPin);
+    final hashedOld = crypto_pkg.sha256.convert(oldBytes).toString();
+    final hashedNew = crypto_pkg.sha256.convert(newBytes).toString();
     await _invokeEdgeFunction(
       'change-pin',
-      body: {'old_pin': oldPin, 'new_pin': newPin},
+      body: {
+        'old_pin': hashedOld,
+        'new_pin': hashedNew,
+        'is_hashed': true,
+      },
       headers: headers,
     );
   }

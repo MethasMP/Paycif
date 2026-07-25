@@ -21,6 +21,8 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  int _currentDelaySeconds = 1;
+
   @override
   void initState() {
     super.initState();
@@ -42,18 +44,16 @@ class _SplashScreenState extends State<SplashScreen> {
       // 🛡️ Proactive Check: Is the cached session actually valid?
       final isExpired = JwtDecoder.isExpired(session.accessToken);
       if (isExpired) {
-        debugPrint("Session expired on startup. Attempting recovery...");
+        debugPrint("Session expired on startup. Attempting silent recovery...");
         try {
-          final refreshResponse = await Supabase.instance.client.auth
-              .refreshSession();
-          if (refreshResponse.session == null) {
-            throw Exception("Refresh failed");
+          final refreshResponse = await Supabase.instance.client.auth.refreshSession();
+          if (refreshResponse.session != null) {
+            debugPrint("✅ Session recovered successfully via Refresh Token.");
+          } else {
+            debugPrint("⚠️ Refresh returned null, but keeping session for PIN unlock self-healing.");
           }
-          debugPrint("✅ Session recovered successfully.");
         } catch (e) {
-          debugPrint("❌ Recovery failed. Redirecting to login.");
-          await _delayedNavigateToLogin();
-          return;
+          debugPrint("⚠️ Network/Refresh error during splash ($e). Proceeding with local PIN authentication.");
         }
       }
 
@@ -83,6 +83,9 @@ class _SplashScreenState extends State<SplashScreen> {
       final securityController = context.read<SecurityController>();
       final hasPin = await securityController.hasPin();
 
+      // Reset delay on success
+      _currentDelaySeconds = 1;
+
       if (hasPin) {
         debugPrint("🚨 [Security] PIN detected. Challenging user identity...");
         _navigateTo('/unlock');
@@ -91,10 +94,25 @@ class _SplashScreenState extends State<SplashScreen> {
         _navigateTo('/pin_setup');
       }
     } catch (e) {
-      debugPrint("❌ Fatal error during startup: $e");
-      // Fallback: Clear session and force user to login to recover state
-      await Supabase.instance.client.auth.signOut();
-      await _delayedNavigateToLogin();
+      debugPrint("❌ Connection error during startup: $e");
+      
+      // If it is a true AuthException, it signifies a credentials/session failure
+      if (e is AuthException) {
+        debugPrint("Session is invalid/expired. Forcing login...");
+        await Supabase.instance.client.auth.signOut();
+        await _delayedNavigateToLogin();
+        return;
+      }
+      
+      // Silent Exponential Backoff Retry (1s -> 2s -> 4s -> 5s max)
+      debugPrint("🔁 Retrying connection in $_currentDelaySeconds seconds...");
+      await Future.delayed(Duration(seconds: _currentDelaySeconds));
+      
+      _currentDelaySeconds = (_currentDelaySeconds * 2).clamp(1, 5);
+      
+      if (mounted) {
+        _initializeApp();
+      }
     }
   }
 
@@ -170,7 +188,6 @@ class _SplashScreenState extends State<SplashScreen> {
             ).animate(target: reduce ? 0 : 1).fadeIn(delay: 600.ms, duration: 600.ms),
 
             const SizedBox(height: 64),
-
             // Loading Text
             PaycifText(
                   AppLocalizations.of(context)?.splashLoading ??

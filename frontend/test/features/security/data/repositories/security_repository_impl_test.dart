@@ -2,8 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:frontend/features/security/data/repositories/security_repository_impl.dart';
 import 'package:frontend/features/security/data/datasources/security_remote_data_source.dart';
-import 'package:frontend/features/security/data/datasources/crypto_service.dart';
-import 'package:frontend/features/security/data/datasources/secure_storage_service.dart';
+import 'package:frontend/features/security/data/datasources/app_encryption_service.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cryptography/cryptography.dart';
 import 'dart:convert';
@@ -12,9 +12,9 @@ import 'dart:convert';
 class MockSecurityRemoteDataSource extends Mock
     implements SecurityRemoteDataSource {}
 
-class MockCryptoService extends Mock implements CryptoService {}
+class MockCryptoService extends Mock implements AppEncryptionService {}
 
-class MockSecureStorageService extends Mock implements SecureStorageService {}
+class MockSecureStorageService extends Mock implements FlutterSecureStorage {}
 // We skip specific DeviceInfoPlugin mocking for simplicity, assuming fallback or we can mock it if needed.
 // But SecurityRepositoryImpl handles the try-catch for platform channels.
 
@@ -33,9 +33,9 @@ void main() {
     mockSecureStorage = MockSecureStorageService();
 
     // Stub secure storage default behaviours
-    when(() => mockSecureStorage.read(any())).thenAnswer((_) async => null);
-    when(() => mockSecureStorage.write(any(), any())).thenAnswer((_) async {});
-    when(() => mockSecureStorage.delete(any())).thenAnswer((_) async {});
+    when(() => mockSecureStorage.read(key: any(named: 'key'))).thenAnswer((_) async => null);
+    when(() => mockSecureStorage.write(key: any(named: 'key'), value: any(named: 'value'))).thenAnswer((_) async {});
+    when(() => mockSecureStorage.delete(key: any(named: 'key'))).thenAnswer((_) async {});
 
     // Stub crypto service hardware enclave behaviours
     when(() => mockCryptoService.createHardwareIdentity())
@@ -66,11 +66,11 @@ void main() {
         // Arrange
         // 1. Storage returns no existing deviceId
         when(
-          () => mockSecureStorage.read('device_binding_id'),
+          () => mockSecureStorage.read(key: 'device_binding_id'),
         ).thenAnswer((_) async => null);
         // 2. Storage write setup
         when(
-          () => mockSecureStorage.write(any(), any()),
+          () => mockSecureStorage.write(key: any(named: 'key'), value: any(named: 'value')),
         ).thenAnswer((_) async {});
 
         // 3. Crypto Setup
@@ -106,15 +106,17 @@ void main() {
 
         // Assert
         // 1. Should have generated and stored UUID
-        verify(() => mockSecureStorage.read('device_binding_id')).called(1);
+        // Assert
+        // 1. Should have generated and stored UUID
+        verify(() => mockSecureStorage.read(key: 'device_binding_id')).called(1);
         verify(
-          () => mockSecureStorage.write('device_binding_id', any()),
+          () => mockSecureStorage.write(key: 'device_binding_id', value: any(named: 'value')),
         ).called(1);
 
         // 2. Should have generated hardware identity and marked as hardware backed
         verify(() => mockCryptoService.createHardwareIdentity()).called(1);
         verify(
-          () => mockSecureStorage.write('is_hardware_backed', 'true'),
+          () => mockSecureStorage.write(key: 'is_hardware_backed', value: 'true'),
         ).called(1);
 
         // 3. Should have called backend
@@ -134,10 +136,10 @@ void main() {
     test('bindCurrentDevice should re-use existing deviceId', () async {
       // Arrange
       when(
-        () => mockSecureStorage.read('device_binding_id'),
+        () => mockSecureStorage.read(key: 'device_binding_id'),
       ).thenAnswer((_) async => 'existing_uuid');
       when(
-        () => mockSecureStorage.write(any(), any()),
+        () => mockSecureStorage.write(key: any(named: 'key'), value: any(named: 'value')),
       ).thenAnswer((_) async {});
 
       final algorithm = Ed25519();
@@ -170,22 +172,22 @@ void main() {
       await repository.bindCurrentDevice();
 
       // Assert
-      verify(() => mockSecureStorage.read('device_binding_id')).called(1);
+      verify(() => mockSecureStorage.read(key: 'device_binding_id')).called(1);
       // Should NOT have written a new device id
-      verifyNever(() => mockSecureStorage.write('device_binding_id', any()));
+      verifyNever(() => mockSecureStorage.write(key: 'device_binding_id', value: any(named: 'value')));
       // But should have marked as hardware backed
       verify(
-        () => mockSecureStorage.write('is_hardware_backed', 'true'),
+        () => mockSecureStorage.write(key: 'is_hardware_backed', value: 'true'),
       ).called(1);
     });
 
     test('verifyPin should delegate to remote source (with headers)', () async {
       // Arrange: Mock Binding Data
       when(
-        () => mockSecureStorage.read('device_binding_id'),
+        () => mockSecureStorage.read(key: 'device_binding_id'),
       ).thenAnswer((_) async => 'mock_uuid');
       when(
-        () => mockSecureStorage.read('device_private_key_seed'),
+        () => mockSecureStorage.read(key: 'device_private_key_seed'),
       ).thenAnswer((_) async => base64Encode([1, 2, 3])); // Dummy seed
 
       final algorithm = Ed25519();
@@ -218,10 +220,10 @@ void main() {
 
     test('isDeviceBound should return false if local keys missing', () async {
       when(
-        () => mockSecureStorage.read('device_binding_id'),
+        () => mockSecureStorage.read(key: 'device_binding_id'),
       ).thenAnswer((_) async => null);
       when(
-        () => mockSecureStorage.read('device_private_key_seed'),
+        () => mockSecureStorage.read(key: 'device_private_key_seed'),
       ).thenAnswer((_) async => 'some_key');
 
       final result = await repository.isDeviceBound();
@@ -230,10 +232,10 @@ void main() {
 
     test('isDeviceBound should delegate to remote if keys exist', () async {
       when(
-        () => mockSecureStorage.read('device_binding_id'),
+        () => mockSecureStorage.read(key: 'device_binding_id'),
       ).thenAnswer((_) async => 'uuid');
       when(
-        () => mockSecureStorage.read('device_private_key_seed'),
+        () => mockSecureStorage.read(key: 'device_private_key_seed'),
       ).thenAnswer((_) async => 'seed');
       when(
         () => mockRemoteDataSource.isDeviceBound('uuid'),

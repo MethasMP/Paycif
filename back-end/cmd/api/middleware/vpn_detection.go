@@ -32,9 +32,18 @@ func VPNDetectionMiddleware(svc *usecase.VPNDetectionService, audit *usecase.Aud
 			return
 		}
 
-		suspicious, err := svc.IsSuspicious(c.Request.Context(), ip)
+		userAgent := c.Request.UserAgent()
+		userLang := c.Request.Header.Get("Accept-Language")
+		suspicious, err := svc.IsSuspiciousWithHeaders(c.Request.Context(), ip, userAgent, userLang)
+
 		if err != nil {
-			// Fail open: lookup unavailable, let the request proceed.
+			// Adaptive Failover Strategy (Enterprise Grade):
+			// When external IP lookup services are experiencing an outage/quota limit,
+			// rather than causing a 100% platform outage for legitimate Thailand users,
+			// mark the context with `require_step_up` = true to enforce mandatory Liveness/OTP
+			// verification on money-movement endpoints downstream.
+			log.Printf("vpn_block: lookup degraded for ip=%s: %v — setting require_step_up=true", usecase.TruncateIP(ip), err)
+			c.Set("require_step_up", true)
 			c.Next()
 			return
 		}

@@ -103,8 +103,9 @@ func main() {
 	paymentEngine.RegisterProvider(sqrilProvider)
 	paymentEngine.RegisterProvider(&usecase.WiseProvider{Token: os.Getenv("WISE_API_TOKEN")})
 
-	// Pass AuditService to WalletService
-	walletService := usecase.NewWalletService(repository.DB, fxService, alertService, auditService, paymentEngine)
+		// Pass AuditService to PaymentOrchestrationService
+	orchService := usecase.NewPaymentOrchestrationService(repository.DB, fxService, alertService, auditService, paymentEngine)
+	usecase.StartReconciliationWorker(context.Background(), repository.DB, orchService) // Start transaction reconciler 🔄
 	achKYCClient := usecase.NewAlchemyPayKYCClient(
 		os.Getenv("ALCHEMY_PAY_APP_ID"),
 		os.Getenv("ALCHEMY_PAY_APP_SECRET"),
@@ -147,13 +148,13 @@ func main() {
 
 	// 3. Handler Initialization
 	transferHandler := &TransferHandler{
-		Service:          walletService,
+		Service:          orchService,
 		SignatureService: sigService,
 	}
-	paymentHandler := NewPaymentHandler(walletService, achAdapter, fxService)
-	payoutHandler := NewPayoutHandler(walletService, sigService)
+	paymentHandler := NewPaymentHandler(orchService, achAdapter, fxService, geoBlockSvc)
+	payoutHandler := NewPayoutHandler(orchService, sigService)
 	kycHandler := NewKYCHandler(kycService)
-	routingService := routing.NewStaticRouter(walletService)
+	routingService := routing.NewStaticRouter(orchService)
 	routingHandler := NewRoutingHandler(routingService)
 
 	// 4. Router Setup
@@ -207,13 +208,21 @@ func main() {
 
 	publicV1 := r.Group("/api/v1")
 	{
-		publicV1.GET("/rates/latest", transferHandler.HandleGetLatestRate)
 		publicV1.POST("/kyc/onramp-webhook", kycHandler.HandleOnRampKycWebhook)
 	}
 
+	publicGeofencedV1 := r.Group("/api/v1")
+	publicGeofencedV1.Use(middleware.GeoBlockMiddleware(geoBlockSvc, auditService))
+	publicGeofencedV1.Use(middleware.VPNDetectionMiddleware(vpnDetectionSvc, auditService))
+	{
+		publicGeofencedV1.GET("/rates/latest", transferHandler.HandleGetLatestRate)
+	}
+
 	v1 := r.Group("/api/v1")
-	v1.Use(middleware.AuthMiddleware(walletService)) // Apply Auth with Service injection 🛡️
+	v1.Use(middleware.AuthMiddleware(orchService)) // Apply Auth with Service injection 🛡️
 	v1.Use(middleware.RateLimiterMiddleware())       // Use local in-memory RateLimiter
+	v1.Use(middleware.GeoBlockMiddleware(geoBlockSvc, auditService))
+	v1.Use(middleware.VPNDetectionMiddleware(vpnDetectionSvc, auditService))
 	{
 		v1.GET("/balance", transferHandler.HandleBalance)
 		v1.GET("/limits", transferHandler.HandleGetLimits) // New Route for Rust Limits
@@ -235,22 +244,11 @@ func main() {
 		// KYC Routes (On-Ramp Scaffolding)
 		v1.POST("/kyc/register", kycHandler.HandleRegisterOnRampCustomer)
 		v1.GET("/kyc/status", kycHandler.HandleGetOnRampKycStatus)
-	}
 
-	// Money-movement routes: everything in v1 (auth + rate limiting) plus the
-	// Thailand-only geo-fence. Scoped narrowly so read-only routes (balance,
-	// KYC status, etc.) still work for a tourist checking the app before
-	// they travel. Both geo checks must pass — country lookup (GeoBlockMiddleware)
-	// catches requests from a blocked country outright; VPN/proxy detection
-	// (VPNDetectionMiddleware) catches someone outside Thailand routing through
-	// a Thailand-exit VPN to defeat the country check.
-	moneyMovement := v1.Group("")
-	moneyMovement.Use(middleware.GeoBlockMiddleware(geoBlockSvc, auditService))
-	moneyMovement.Use(middleware.VPNDetectionMiddleware(vpnDetectionSvc, auditService))
-	{
-		moneyMovement.POST("/onramp/create", paymentHandler.HandleCreateOnRampOrder)
-		moneyMovement.POST("/payments/create-intent", paymentHandler.HandleCreateIntent)
-		moneyMovement.POST("/payout/promptpay", payoutHandler.HandlePromptPayPayout)
+		// Money-movement routes
+		v1.POST("/onramp/create", paymentHandler.HandleCreateOnRampOrder)
+		v1.POST("/payments/create-intent", paymentHandler.HandleCreateIntent)
+		v1.POST("/payout/promptpay", payoutHandler.HandlePromptPayPayout)
 	}
 
 	// Webhooks (Public)

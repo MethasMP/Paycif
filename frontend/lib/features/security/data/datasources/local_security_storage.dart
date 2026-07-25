@@ -2,7 +2,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Service for storing sensitive data (like Private Keys) securely.
 /// Enforces hardware-backed encryption and access controls.
-class SecureStorageService {
+class LocalSecurityStorage {
   final _storage = const FlutterSecureStorage();
 
   /// Relaxed Options: For device identity (DeviceID).

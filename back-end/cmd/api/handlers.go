@@ -15,7 +15,7 @@ import (
 
 // TransferHandler holds dependencies for transfer operations.
 type TransferHandler struct {
-	Service          *usecase.WalletService
+	Service          *usecase.PaymentOrchestrationService
 	SignatureService *usecase.SignatureService
 }
 
@@ -28,9 +28,9 @@ func (h *TransferHandler) HandleBalance(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"wallet_id": "00000000-0000-0000-0000-000000000000",
-		"currency":  currency,
-		"balance":   0,
+		"account_id": "00000000-0000-0000-0000-000000000000",
+		"currency":   currency,
+		"balance":    0,
 	})
 }
 

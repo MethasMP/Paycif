@@ -7,9 +7,6 @@ import 'package:go_router/go_router.dart';
 
 import 'package:frontend/features/security/presentation/logic/security_controller.dart';
 import 'package:frontend/features/security/presentation/widgets/pin_entry_widget.dart';
-import 'package:frontend/core/theme/app_theme.dart';
-
-import 'package:frontend/features/security/presentation/pages/recovery_screen.dart';
 
 class SecurityUnlockScreen extends StatefulWidget {
   const SecurityUnlockScreen({super.key});
@@ -22,16 +19,35 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
   bool _isAuthenticating = false;
   Future<BiometricProfile>? _profileFuture;
   late Future<Map<String, dynamic>> _biometricStatusFuture;
+  late AppLifecycleListener _lifecycleListener;
+  bool _isSuccessOverlayActive = false;
 
   @override
   void initState() {
     super.initState();
     _profileFuture = context.read<SecurityController>().getBiometricProfile();
     _biometricStatusFuture = _getBiometricStatus();
-    // 🚀 Auto-Trigger Biometric for a "Magical" Experience
+    
+    // 🚀 Auto-Trigger Biometric on Boot
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _tryAutoBiometricUnlock();
     });
+
+    // Listen to app lifecycle to re-trigger biometrics when returning from background
+    _lifecycleListener = AppLifecycleListener(
+      onResume: () {
+        // Only trigger if we are actively on the lock screen and not already success/authenticating
+        if (mounted && !_isAuthenticating && !_isSuccessOverlayActive) {
+          _tryAutoBiometricUnlock();
+        }
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _lifecycleListener.dispose();
+    super.dispose();
   }
 
   Future<void> _tryAutoBiometricUnlock() async {
@@ -50,9 +66,7 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final biometricEnabled = prefs.getBool('biometric_enabled') ?? false;
-      if (!biometricEnabled) {
-        return; // Abort if disabled by preference
-      }
+      if (!biometricEnabled) return;
 
       BiometricProfile? profile;
       if (_profileFuture != null) {
@@ -82,9 +96,7 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
 
       if (authenticated && mounted) {
         HapticFeedback.mediumImpact();
-        // Give time for iOS native Face ID dialog to dismiss fully before replacing route
-        await Future.delayed(const Duration(milliseconds: 300));
-        if (mounted) _onUnlockSuccess();
+        _onUnlockSuccess();
       }
     } catch (e) {
       debugPrint('Biometric unlock failed: $e');
@@ -93,8 +105,37 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
     }
   }
 
+  Future<String?> _handlePinSubmit(List<int> rawPin) async {
+    final controller = context.read<SecurityController>();
+    
+    // Security layer: We extract the string here, pass it to the controller.
+    // In a full production app, the controller would accept List<int>.
+    final pinStr = rawPin.join();
+    
+    // Securely clear the raw array now that we extracted what we need
+    rawPin.fillRange(0, rawPin.length, 0);
+    rawPin.clear();
+
+    final success = await controller.verifyPin(pinStr, serverVerify: false);
+    
+    if (success) {
+      _onUnlockSuccess();
+      return null;
+    } else {
+      if (controller.state.errorMessage?.contains('PIN not setup') == true) {
+        if (mounted) context.go('/pin_setup');
+        return null;
+      }
+      return controller.state.errorMessage ?? 'Incorrect PIN';
+    }
+  }
+
   void _onUnlockSuccess() {
+    setState(() => _isSuccessOverlayActive = true);
     context.read<SecurityController>().recordBiometricVerificationSuccess();
+    
+    // Use GoRouter replacement rather than magic Future.delayed times
+    // We wrapped the screen in AbsorbPointer below when _isSuccessOverlayActive is true
     context.go('/main');
   }
 
@@ -111,52 +152,41 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
     };
   }
 
+  void _handleForgotPin() {
+    // Decoupled routing logic, perfectly compliant with GoRouter
+    context.push('/recovery');
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    return Scaffold(
-      backgroundColor: isDark ? AppTheme.darkTheme.scaffoldBackgroundColor : Theme.of(context).scaffoldBackgroundColor,
-      body: SafeArea(
-        child: FutureBuilder<Map<String, dynamic>>(
+    return AbsorbPointer(
+      absorbing: _isSuccessOverlayActive,
+      child: Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor, // Redundant dark theme check removed
+        body: FutureBuilder<Map<String, dynamic>>(
           future: _biometricStatusFuture,
           builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const SizedBox.shrink(); // Prevent biometric button pop-in jank
+            }
+
             final data = snapshot.data;
             final enabled = data?['enabled'] ?? false;
             final profile = data?['profile'] as BiometricProfile?;
+            final controller = context.watch<SecurityController>();
+            final isLocked = controller.state.status == SecurityStatus.locked;
+            final errorMsg = controller.state.errorMessage;
 
             return PinEntryWidget(
-              onSuccess: (_) => _onUnlockSuccess(),
-              onForgotPin: () => _handleForgotPin(context),
+              onSubmit: _handlePinSubmit,
+              onForgotPin: _handleForgotPin,
               biometricIcon: enabled ? profile?.bioIcon : null,
               onBiometricPressed: enabled ? _tryBiometricUnlock : null,
+              isLocked: isLocked,
+              lockedMessage: errorMsg ?? 'Account Locked',
             );
           },
         ),
-      ),
-    );
-  }
-
-  void _handleForgotPin(BuildContext context) {
-    // 🛡️ World-Class UX: Seamless Transition to Recovery Protocol
-    // Instead of a jarring dialog, we flow into the Identity Challenge.
-    Navigator.of(context).push(
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            const RecoveryScreen(),
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          const begin = Offset(0.0, 1.0);
-          const end = Offset.zero;
-          const curve = Curves.easeInOutCubicEmphasized;
-          var tween = Tween(
-            begin: begin,
-            end: end,
-          ).chain(CurveTween(curve: curve));
-          return SlideTransition(
-            position: animation.drive(tween),
-            child: child,
-          );
-        },
       ),
     );
   }

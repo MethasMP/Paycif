@@ -36,7 +36,6 @@ class PaymentLoading extends PaymentState {}
 class PaymentReady extends PaymentState {
   final PaymentMethod method;
   final double amount;
-  final double balance;
   final List<PaymentMethod> availableMethods;
   final String? sqrilTxId;
   final double? exchangeRate;
@@ -47,7 +46,6 @@ class PaymentReady extends PaymentState {
   const PaymentReady({
     required this.method,
     required this.amount,
-    this.balance = 0.0,
     this.availableMethods = const [],
     this.sqrilTxId,
     this.exchangeRate,
@@ -60,7 +58,6 @@ class PaymentReady extends PaymentState {
   List<Object?> get props => [
         method,
         amount,
-        balance,
         availableMethods,
         sqrilTxId,
         exchangeRate,
@@ -68,21 +65,6 @@ class PaymentReady extends PaymentState {
         totalUSD,
         isBusiness,
       ];
-}
-
-class PaymentInsufficientFunds extends PaymentState {
-  final double availableBalance;
-  final double requiredAmount;
-
-  const PaymentInsufficientFunds({
-    required this.availableBalance,
-    required this.requiredAmount,
-  });
-
-  double get shortfall => requiredAmount - availableBalance;
-
-  @override
-  List<Object?> get props => [availableBalance, requiredAmount];
 }
 
 class PaymentProcessing extends PaymentState {
@@ -97,16 +79,14 @@ class PaymentProcessing extends PaymentState {
 class PaymentSuccess extends PaymentState {
   final String transactionId;
   final String? senderName;
-  final double? remainingBalance;
 
   const PaymentSuccess({
     required this.transactionId,
     this.senderName,
-    this.remainingBalance,
   });
 
   @override
-  List<Object?> get props => [transactionId, senderName, remainingBalance];
+  List<Object?> get props => [transactionId, senderName];
 }
 
 class PaymentFailure extends PaymentState {

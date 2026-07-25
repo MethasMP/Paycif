@@ -18,14 +18,14 @@ import (
 
 var jwks *keyfunc.JWKS
 
-// ensuredAccounts caches user IDs whose wallet account has been verified/created
-// recently, so EnsureUserAccount isn't re-run (and a goroutine spawned) on every request.
+// ensuredAccounts caches user IDs whose payment profile has been verified/created
+// recently, so EnsurePaymentProfile isn't re-run (and a goroutine spawned) on every request.
 var ensuredAccounts sync.Map
 
 const ensuredAccountTTL = 1 * time.Hour
 
 // AuthMiddleware validates Supabase JWT using JWKS and sets userID in context.
-func AuthMiddleware(walletSvc *usecase.WalletService) gin.HandlerFunc {
+func AuthMiddleware(orchSvc *usecase.PaymentOrchestrationService) gin.HandlerFunc {
 	// Load JWKS URL from environment variable with fallback to default
 	// CRITICAL: In production, always set JWKS_URL environment variable per environment
 	jwksURL := os.Getenv("JWKS_URL")
@@ -47,9 +47,10 @@ func AuthMiddleware(walletSvc *usecase.WalletService) gin.HandlerFunc {
 	}
 	jwks, err = keyfunc.Get(jwksURL, options)
 	if err != nil {
-		log.Fatalf("❌ Failed to initialize JWKS: %v\n", err)
+		log.Printf("⚠️ WARNING: Failed to initialize JWKS (%v). Auth validation will fall back to HMAC/HMAC-local verification.", err)
+	} else {
+		log.Println("✅ JWKS Initialized")
 	}
-	log.Println("✅ JWKS Initialized")
 
 	return func(c *gin.Context) {
 		// Load test/local dev bypass (only if GIN_MODE is not release)
@@ -123,7 +124,7 @@ func AuthMiddleware(walletSvc *usecase.WalletService) gin.HandlerFunc {
 		if expiresAt, ok := ensuredAccounts.Load(uid); !ok || time.Now().After(expiresAt.(time.Time)) {
 			ensuredAccounts.Store(uid, time.Now().Add(ensuredAccountTTL))
 			go func(id uuid.UUID) {
-				if err := walletSvc.EnsureUserAccount(context.Background(), id); err != nil {
+				if err := orchSvc.EnsureUserAccount(context.Background(), id); err != nil {
 					log.Printf("⚠️ Auto-Heal Error for %s: %v\n", id, err)
 					ensuredAccounts.Delete(id)
 				}

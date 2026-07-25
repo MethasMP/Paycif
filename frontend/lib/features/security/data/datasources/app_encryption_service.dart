@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter/foundation.dart';
+import 'package:crypto/crypto.dart' as crypto_pkg;
 import 'package:frontend/features/security/data/datasources/hardware_security_bridge.dart';
 
 // PBKDF2 iterations: OWASP 2023 recommendation for PBKDF2-SHA256 on mobile
@@ -9,7 +10,7 @@ const _kPbkdf2Iterations = 10000;
 
 /// Service responsible for cryptographic operations.
 /// Supports Ed25519 (Software) and P256 (Hardware-Backed Secure Enclave).
-class CryptoService {
+class AppEncryptionService {
   final _algorithm = Ed25519();
   final _hardwareBridge = HardwareSecurityBridge();
 
@@ -112,10 +113,11 @@ class CryptoService {
   static Future<List<int>> derivePinKey(Map<String, dynamic> params) async {
     final String pin = params['pin'];
     final List<int> salt = params['salt'];
+    final int iterations = params['iterations'] ?? _kPbkdf2Iterations;
 
     final pbkdf2 = Pbkdf2(
       macAlgorithm: Hmac.sha256(),
-      iterations: _kPbkdf2Iterations,
+      iterations: iterations,
       bits: 256,
     );
     final secretKey = await pbkdf2.deriveKeyFromPassword(
@@ -161,5 +163,13 @@ class CryptoService {
   List<int> randomBytes(int length) {
     final rng = Random.secure();
     return List<int>.generate(length, (_) => rng.nextInt(256));
+  }
+
+  /// Hashes a PIN with a salt using SHA-256 for secure in-memory comparison.
+  /// This prevents storing plaintext PINs in memory.
+  String hashPinForComparison(String pin, List<int> salt) {
+    final bytes = utf8.encode(pin) + salt;
+    final digest = crypto_pkg.sha256.convert(bytes);
+    return digest.toString();
   }
 }

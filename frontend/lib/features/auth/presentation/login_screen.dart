@@ -16,7 +16,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:frontend/core/network/api_service.dart';
 import 'package:frontend/core/utils/error_translator.dart';
-import 'package:frontend/core/utils/pay_notify.dart';
+import 'package:frontend/core/utils/app_notification_toast.dart';
 import 'package:frontend/core/widgets/app_icon.dart';
 import 'package:frontend/core/widgets/paycif_button.dart';
 
@@ -79,7 +79,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _navigateToMain() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.go('/');
+      if (mounted && GoRouterState.of(context).matchedLocation == '/login') {
+        context.go('/');
+      }
     });
   }
 
@@ -165,7 +167,7 @@ class _LoginScreenState extends State<LoginScreen> {
         emailRedirectTo: 'paycif://login-callback',
       );
       if (mounted) {
-        PayNotify.success(
+        AppNotificationToast.success(
           context,
           AppLocalizations.of(context)!.loginMagicLinkSent,
         );
@@ -198,7 +200,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
     debugPrint('Sign-in error: $error');
     if (mounted) {
-      PayNotify.error(
+      AppNotificationToast.error(
         context,
         ErrorTranslator.translate(
             AppLocalizations.of(context)!, error.toString()),

@@ -347,7 +347,7 @@ func (c *ShardedLimitCache) hydrateFromDB(ctx context.Context, userID uuid.UUID)
 	query := `
 		SELECT SUM(ABS(amount))
 		FROM ledger_entries
-		WHERE wallet_id IN (SELECT id FROM wallets WHERE profile_id = $1::uuid)
+		WHERE account_id IN (SELECT id FROM payment_accounts WHERE profile_id = $1::uuid)
 		  AND amount < 0
 		  AND created_at >= CURRENT_DATE
 	`
@@ -371,7 +371,7 @@ func (c *ShardedLimitCache) PreHydrate(ctx context.Context) error {
 	query := `
 		SELECT w.profile_id, SUM(ABS(le.amount)) 
 		FROM ledger_entries le
-		JOIN wallets w ON le.wallet_id = w.id
+		JOIN payment_accounts w ON le.account_id = w.id
 		WHERE le.created_at >= CURRENT_DATE
 		GROUP BY w.profile_id
 		ORDER BY COUNT(*) DESC
@@ -475,25 +475,25 @@ func (t *TransferExecutor) Execute(ctx context.Context, req *pb.TransferRequest)
 		return nil, status.Errorf(codes.Internal, "idempotency check error: %v", err)
 	}
 
-	// 2. Verify wallet ownership
+	// 2. Verify payment account ownership
 	var ownerID uuid.UUID
-	err = tx.QueryRowContext(ctx, "SELECT profile_id FROM wallets WHERE id = $1", fromWallet).Scan(&ownerID)
+	err = tx.QueryRowContext(ctx, "SELECT profile_id FROM payment_accounts WHERE id = $1", fromWallet).Scan(&ownerID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return &pb.TransferResponse{
 				Success:      false,
 				ErrorCode:    "UNAUTHORIZED",
-				ErrorMessage: "Sender wallet not found",
+				ErrorMessage: "Sender payment account not found",
 			}, nil
 		}
-		return nil, status.Errorf(codes.Internal, "wallet ownership fetch failed: %v", err)
+		return nil, status.Errorf(codes.Internal, "account ownership fetch failed: %v", err)
 	}
 
 	if ownerID != userUUID {
 		return &pb.TransferResponse{
 			Success:      false,
 			ErrorCode:    "UNAUTHORIZED",
-			ErrorMessage: "Wallet does not belong to user",
+			ErrorMessage: "Account does not belong to user",
 		}, nil
 	}
 
@@ -542,10 +542,10 @@ func (t *TransferExecutor) executeDoubleEntry(ctx context.Context, tx *sql.Tx, f
 	// Lock sender
 	var sBal int64
 	var sCurr, sStatus string
-	err = tx.QueryRowContext(ctx, "SELECT balance, currency::text, status FROM wallets WHERE id = $1 FOR UPDATE", from).Scan(&sBal, &sCurr, &sStatus)
+	err = tx.QueryRowContext(ctx, "SELECT balance, currency::text, status FROM payment_accounts WHERE id = $1 FOR UPDATE", from).Scan(&sBal, &sCurr, &sStatus)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return 0, 0, errors.New("Sender wallet not found")
+			return 0, 0, errors.New("Sender payment account not found")
 		}
 		return 0, 0, err
 	}
@@ -554,7 +554,7 @@ func (t *TransferExecutor) executeDoubleEntry(ctx context.Context, tx *sql.Tx, f
 		return 0, 0, errors.New("Currency mismatch")
 	}
 	if sStatus != "ACTIVE" {
-		return 0, 0, errors.New("Sender wallet not active")
+		return 0, 0, errors.New("Sender account not active")
 	}
 	if sBal < amount {
 		return 0, 0, errors.New("Insufficient funds")
@@ -563,10 +563,10 @@ func (t *TransferExecutor) executeDoubleEntry(ctx context.Context, tx *sql.Tx, f
 	// Lock receiver
 	var rBal int64
 	var rCurr string
-	err = tx.QueryRowContext(ctx, "SELECT balance, currency::text FROM wallets WHERE id = $1 FOR UPDATE", to).Scan(&rBal, &rCurr)
+	err = tx.QueryRowContext(ctx, "SELECT balance, currency::text FROM payment_accounts WHERE id = $1 FOR UPDATE", to).Scan(&rBal, &rCurr)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return 0, 0, errors.New("Receiver wallet not found")
+			return 0, 0, errors.New("Receiver payment account not found")
 		}
 		return 0, 0, err
 	}
@@ -578,13 +578,13 @@ func (t *TransferExecutor) executeDoubleEntry(ctx context.Context, tx *sql.Tx, f
 	newSBal := sBal - amount
 	newRBal := rBal + amount
 
-	// Update wallets
-	_, err = tx.ExecContext(ctx, "UPDATE wallets SET balance = $1, updated_at = NOW() WHERE id = $2", newSBal, from)
+	// Update accounts
+	_, err = tx.ExecContext(ctx, "UPDATE payment_accounts SET balance = $1, updated_at = NOW() WHERE id = $2", newSBal, from)
 	if err != nil {
 		return 0, 0, err
 	}
 
-	_, err = tx.ExecContext(ctx, "UPDATE wallets SET balance = $1, updated_at = NOW() WHERE id = $2", newRBal, to)
+	_, err = tx.ExecContext(ctx, "UPDATE payment_accounts SET balance = $1, updated_at = NOW() WHERE id = $2", newRBal, to)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -598,13 +598,13 @@ func (t *TransferExecutor) executeDoubleEntry(ctx context.Context, tx *sql.Tx, f
 	}
 
 	// Create ledger entries
-	_, err = tx.ExecContext(ctx, "INSERT INTO ledger_entries (id, transaction_id, wallet_id, amount, balance_after) VALUES ($1, $2, $3, $4, $5)",
+	_, err = tx.ExecContext(ctx, "INSERT INTO ledger_entries (id, transaction_id, account_id, amount, balance_after) VALUES ($1, $2, $3, $4, $5)",
 		uuid.New(), txnID, from, -amount, newSBal)
 	if err != nil {
 		return 0, 0, err
 	}
 
-	_, err = tx.ExecContext(ctx, "INSERT INTO ledger_entries (id, transaction_id, wallet_id, amount, balance_after) VALUES ($1, $2, $3, $4, $5)",
+	_, err = tx.ExecContext(ctx, "INSERT INTO ledger_entries (id, transaction_id, account_id, amount, balance_after) VALUES ($1, $2, $3, $4, $5)",
 		uuid.New(), txnID, to, amount, newRBal)
 	if err != nil {
 		return 0, 0, err
@@ -634,10 +634,10 @@ func (t *TransferExecutor) Validate(ctx context.Context, req *pb.TransferRequest
 	}
 
 	var ownerID uuid.UUID
-	err = t.db.QueryRowContext(ctx, "SELECT profile_id FROM wallets WHERE id = $1", fromWallet).Scan(&ownerID)
+	err = t.db.QueryRowContext(ctx, "SELECT profile_id FROM payment_accounts WHERE id = $1", fromWallet).Scan(&ownerID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return false, "Sender wallet not found", nil
+			return false, "Sender payment account not found", nil
 		}
 		return false, "", err
 	}
@@ -706,12 +706,12 @@ func (s *AccountingService) GetBalance(ctx context.Context, in *pb.BalanceReques
 
 	var balance int64
 	var currency sql.NullString
-	err = s.db.QueryRowContext(ctx, "SELECT balance, currency FROM wallets WHERE id = $1", walletUUID).Scan(&balance, &currency)
+	err = s.db.QueryRowContext(ctx, "SELECT balance, currency FROM payment_accounts WHERE id = $1", walletUUID).Scan(&balance, &currency)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return &pb.BalanceResponse{
 				Success:      false,
-				ErrorMessage: "Wallet not found",
+				ErrorMessage: "Payment account not found",
 			}, nil
 		}
 		return nil, status.Errorf(codes.Internal, "database query failed: %v", err)

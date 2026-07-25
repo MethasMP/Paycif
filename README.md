@@ -170,7 +170,7 @@ jobs (Queue System)
 
 | Variable | Description | Example |
 |---|---|---|
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://postgres:postgres@localhost:54322/postgres` |
+| `DATABASE_URL` | PostgreSQL connection string | `postgresql://postgres:postgrespassword@localhost:5432/postgres` |
 | `SUPABASE_URL` | API URL for Supabase | `http://127.0.0.1:54321` |
 | `GIN_MODE` | Framework mode | `debug` or `release` |
 

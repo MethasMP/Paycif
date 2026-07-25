@@ -2,19 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 import 'package:frontend/core/widgets/paycif_button.dart';
-import 'package:frontend/features/payment/data/ach_onramp_service.dart';
+import 'package:frontend/features/payment/data/fiat_onramp_service.dart';
 import 'package:frontend/core/l10n/generated/app_localizations.dart';
 import 'package:frontend/core/widgets/app_icon.dart';
 
 /// Bottom sheet shown before opening the ACH widget.
 /// Displays supported payment methods + fee structure for the user's currency.
 /// User taps "Continue" → app launches ACH widget.
-class AchFeePreviewSheet extends StatelessWidget {
+class OnRampFeePreviewSheet extends StatelessWidget {
   final List<AchFiatMethod> methods;
   final String currency;
   final VoidCallback onConfirm;
 
-  const AchFeePreviewSheet({
+  const OnRampFeePreviewSheet({
     super.key,
     required this.methods,
     required this.currency,
@@ -31,7 +31,7 @@ class AchFeePreviewSheet extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => AchFeePreviewSheet(
+      builder: (_) => OnRampFeePreviewSheet(
         methods: methods,
         currency: currency,
         onConfirm: onConfirm,

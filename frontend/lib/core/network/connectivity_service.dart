@@ -14,7 +14,13 @@ class ConnectivityService {
   ConnectivityStatus _currentStatus = ConnectivityStatus.online;
   ConnectivityStatus get currentStatus => _currentStatus;
 
+  bool _isVpnActive = false;
+  bool get isVpnActive => _isVpnActive;
+
   Stream<ConnectivityStatus> get statusStream => _statusController.stream;
+
+  final StreamController<bool> _vpnStatusController = StreamController<bool>.broadcast();
+  Stream<bool> get vpnStatusStream => _vpnStatusController.stream;
 
   // Elite UX: Stabilization flag to prevent blips on startup
   bool _isStabilizing = true;
@@ -79,6 +85,12 @@ class ConnectivityService {
         (result) => result != ConnectivityResult.none,
       );
 
+      final vpnDetected = results.contains(ConnectivityResult.vpn);
+      if (vpnDetected != _isVpnActive) {
+        _isVpnActive = vpnDetected;
+        _vpnStatusController.add(_isVpnActive);
+      }
+
       // Workaround for iOS Simulator connectivity bug
       if (!hasConnection && kDebugMode) {
         debugPrint('⚠️ [Simulator Workaround] Forcing connection status to online.');
@@ -119,5 +131,6 @@ class ConnectivityService {
   void dispose() {
     _subscription?.cancel();
     _statusController.close();
+    _vpnStatusController.close();
   }
 }

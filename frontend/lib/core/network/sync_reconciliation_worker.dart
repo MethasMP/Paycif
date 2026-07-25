@@ -48,7 +48,7 @@ class SyncReconciliationWorker {
         } catch (e) {
           debugPrint('⚠️ [SyncWorker] Error syncing transaction $txId: $e');
           
-          // Determine if error is terminal (e.g. invalid balance, bad QR) or transient (network timeout)
+          // Determine if error is terminal (e.g. card charge declined, bad QR) or transient (network timeout)
           final isTerminalError = e.toString().contains('PERSONAL_QR_NOT_SUPPORTED') || 
                                   e.toString().contains('Invalid') ||
                                   e.toString().contains('insufficient');
