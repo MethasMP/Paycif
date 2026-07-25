@@ -111,7 +111,7 @@ func (s *SignatureService) VerifySignature(ctx context.Context, publicKeyB64, si
 	if err != nil {
 		return false, fmt.Errorf("failed to contact verify service: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return false, fmt.Errorf("verify service returned status %d", resp.StatusCode)

@@ -115,7 +115,7 @@ func verifySignatureOldStyle(ctx context.Context, udsPath, publicKeyB64, signatu
 	if err != nil {
 		return false, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return false, fmt.Errorf("verify service returned status %d", resp.StatusCode)
