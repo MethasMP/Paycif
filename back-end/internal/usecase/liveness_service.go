@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"math"
-	"math/cmplx"
 )
 
 // LivenessService handles advanced anti-spoofing logic.
@@ -21,17 +20,12 @@ func (s *LivenessService) VerifyPulse(samples []float64, fps float64) (bool, flo
 		return false, 0
 	}
 
-	// 1. Detrending
+	// 1. Calculate Mean for detrending
 	mean := 0.0
 	for _, v := range samples {
 		mean += v
 	}
 	mean /= float64(n)
-
-	detrended := make([]float64, n)
-	for i, v := range samples {
-		detrended[i] = v - mean
-	}
 
 	// 2. DFT with Zero-Padding (Tesla optimization for high resolution)
 	paddedN := 512
@@ -48,7 +42,6 @@ func (s *LivenessService) VerifyPulse(samples []float64, fps float64) (bool, flo
 	maxFreq := 3.0  // 180 BPM
 
 	for k := 1; k < paddedN/2; k++ {
-		var sum complex128
 		freq := float64(k) * fps / float64(paddedN)
 
 		// Optimization: Focus on human HR range
@@ -56,12 +49,24 @@ func (s *LivenessService) VerifyPulse(samples []float64, fps float64) (bool, flo
 			continue
 		}
 
+		// Bolt Performance Optimization:
+		// Avoid expensive complex number operations, math/cmplx calls, and division in the loop.
+		// Precalculate angle factor outside the inner loop.
+		// Use math.Sincos to efficiently calculate sine and cosine in a single CPU instruction/call.
+		// Also avoid detrended slice allocation by computing (v - mean) on the fly!
+		sumReal := 0.0
+		sumImag := 0.0
+		factor := 2.0 * math.Pi * float64(k) / float64(paddedN)
+
 		for t := 0; t < n; t++ {
-			angle := 2.0 * math.Pi * float64(k) * float64(t) / float64(paddedN)
-			sum += complex(detrended[t], 0) * cmplx.Exp(complex(0, -angle))
+			angle := factor * float64(t)
+			sin, cos := math.Sincos(angle)
+			val := samples[t] - mean
+			sumReal += val * cos
+			sumImag -= val * sin
 		}
 
-		mag := cmplx.Abs(sum)
+		mag := math.Sqrt(sumReal*sumReal + sumImag*sumImag)
 		totalMag += mag
 		validBins++
 

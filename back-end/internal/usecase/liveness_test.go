@@ -50,3 +50,22 @@ func TestLivenessService_VerifyPulse(t *testing.T) {
 		assert.False(t, isLive)
 	})
 }
+
+func BenchmarkLivenessService_VerifyPulse(b *testing.B) {
+	svc := usecase.NewLivenessService()
+	fps := 30.0
+	duration := 4.0 // seconds
+	n := int(fps * duration)
+	bpm := 72.0
+	freq := bpm / 60.0
+
+	samples := make([]float64, n)
+	for i := 0; i < n; i++ {
+		samples[i] = math.Sin(2.0*math.Pi*freq*float64(i)/fps) + 0.1
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = svc.VerifyPulse(samples, fps)
+	}
+}
