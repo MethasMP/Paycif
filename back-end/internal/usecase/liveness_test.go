@@ -1,15 +1,14 @@
-package usecase_test
+package usecase
 
 import (
 	"math"
-	"paysif/internal/usecase"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestLivenessService_VerifyPulse(t *testing.T) {
-	svc := usecase.NewLivenessService()
+	svc := NewLivenessService()
 	fps := 30.0
 	duration := 4.0 // seconds
 	n := int(fps * duration)
@@ -52,7 +51,7 @@ func TestLivenessService_VerifyPulse(t *testing.T) {
 }
 
 func BenchmarkLivenessService_VerifyPulse(b *testing.B) {
-	svc := usecase.NewLivenessService()
+	svc := NewLivenessService()
 	fps := 30.0
 	duration := 4.0 // seconds
 	n := int(fps * duration)
