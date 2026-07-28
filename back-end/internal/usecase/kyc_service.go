@@ -37,8 +37,8 @@ type RegisterOnRampCustomerRequest struct {
 
 // RegisterResult is the outcome of initiating KYC registration.
 type RegisterResult struct {
-	KycURL             string
-	AlreadyRegistered  bool
+	KycURL            string
+	AlreadyRegistered bool
 }
 
 // OnRampKycStatus holds verification status details.
@@ -195,10 +195,10 @@ func (s *KYCService) SyncOnRampKycStatus(ctx context.Context, payload AchWebhook
 	}
 
 	s.Audit.Log(ctx, userID, "ONRAMP_KYC_WEBHOOK", "IDENTITY_VERIFICATION", userID.String(), map[string]interface{}{
-		"ach_kyc_status": payload.KycStatus,
+		"ach_kyc_status":  payload.KycStatus,
 		"internal_status": internalStatus,
-		"user_no":        payload.UserNo,
-		"kyc_type":       payload.KycType,
+		"user_no":         payload.UserNo,
+		"kyc_type":        payload.KycType,
 	})
 
 	return nil

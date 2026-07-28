@@ -362,4 +362,3 @@ func (s *VPNDetectionService) cacheResult(ctx context.Context, ip string, isSusp
 	redisKey := fmt.Sprintf("vpn_check:%s", ip)
 	CacheSet(ctx, redisKey, cacheValStr, ttl)
 }
-
