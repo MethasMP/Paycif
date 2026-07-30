@@ -196,72 +196,72 @@ class _PinEntryWidgetState extends State<PinEntryWidget> {
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24.0),
-            child: Column(
-              children: [
-                const Spacer(flex: 2),
+            child: SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
+              child: Column(
+                children: [
+                  const SizedBox(height: 32),
 
-                // Lock Icon & Header
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryTeal.withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Center(
-                    child: AppIcon(
-                      PhosphorIconsFill.shieldCheck,
-                      color: AppTheme.primaryTeal,
-                      size: AppIconSize.lg,
+                  // Lock Icon & Header
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryTeal.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Center(
+                      child: AppIcon(
+                        PhosphorIconsFill.shieldCheck,
+                        color: AppTheme.primaryTeal,
+                        size: AppIconSize.lg,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 20),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
-                  child: Text(
-                    titleText,
-                    key: ValueKey<String>(titleText),
-                    style: GoogleFonts.inter(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.5,
-                      color: AppTheme.textPrimaryColor(context),
+                  const SizedBox(height: 16),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    child: Text(
+                      titleText,
+                      key: ValueKey<String>(titleText),
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.5,
+                        color: AppTheme.textPrimaryColor(context),
+                      ),
+                      textAlign: TextAlign.center,
                     ),
-                    textAlign: TextAlign.center,
                   ),
-                ),
-                const SizedBox(height: 28),
+                  const SizedBox(height: 24),
 
-                // PIN Indicator Dots
-                Semantics(
-                  liveRegion: true,
-                  label: '${_pin.length} out of 6 digits entered',
-                  child: RepaintBoundary(
-                    child: _buildPinDots(isDark)
-                        .animate(target: _shakeOffset)
-                        .shake(duration: 400.ms),
+                  // PIN Indicator Dots
+                  Semantics(
+                    label: '${_pin.length} out of 6 digits entered',
+                    child: RepaintBoundary(
+                      child: _buildPinDots(isDark),
+                    ),
                   ),
-                ),
 
-                const Spacer(flex: 3),
+                  const SizedBox(height: 32),
 
-                // Keypad Section (Constrained width for elegance)
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 320),
-                  child: _buildKeypadGrid(isDark),
-                ),
+                  // Keypad Section (Constrained width for elegance)
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 320),
+                    child: _buildKeypadGrid(isDark),
+                  ),
 
-                const SizedBox(height: 20),
+                  const SizedBox(height: 20),
 
-                // Action Footer
-                if (widget.onForgotPin != null) ...[
-                  _buildForgotAction(isDark),
-                ] else ...[
-                  const SizedBox(height: 48),
+                  // Action Footer
+                  if (widget.onForgotPin != null) ...[
+                    _buildForgotAction(isDark),
+                  ] else ...[
+                    const SizedBox(height: 32),
+                  ],
+                  const SizedBox(height: 16),
                 ],
-                const SizedBox(height: 12),
-              ],
+              ),
             ),
           ),
 
@@ -378,7 +378,7 @@ class _PinEntryWidgetState extends State<PinEntryWidget> {
 
   Widget _buildKeypadRow(List<String> keys, bool isDark) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: keys.map((key) {
         if (key == 'BIO') {
           return Expanded(child: _buildBiometricButton(isDark));
@@ -402,7 +402,7 @@ class _PinEntryWidgetState extends State<PinEntryWidget> {
           digit,
           // Limit scaling factor to prevent overflows on giant text sizes
           textScaler: MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1.5),
-          style: GoogleFonts.inter(
+          style: TextStyle(
             fontSize: 34,
             fontWeight: FontWeight.w700,
             color: AppTheme.textPrimaryColor(context),
@@ -526,24 +526,20 @@ class KeypadButton extends StatelessWidget {
         ? Colors.white.withValues(alpha: 0.08)
         : Colors.black.withValues(alpha: 0.04);
 
-    return Semantics(
-      button: true,
-      label: semanticLabel,
-      child: Center(
-        child: SizedBox(
-          width: 72,
-          height: 72,
-          child: Material(
-            color: keyBgColor,
-            shape: const CircleBorder(),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              onTap: onTap,
-              splashColor: isDark
-                  ? Colors.white.withValues(alpha: 0.15)
-                  : Colors.black.withValues(alpha: 0.1),
-              child: Center(child: child),
-            ),
+    return Center(
+      child: SizedBox(
+        width: 72,
+        height: 72,
+        child: Material(
+          color: keyBgColor,
+          shape: const CircleBorder(),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            splashColor: isDark
+                ? Colors.white.withValues(alpha: 0.15)
+                : Colors.black.withValues(alpha: 0.1),
+            child: Center(child: child),
           ),
         ),
       ),

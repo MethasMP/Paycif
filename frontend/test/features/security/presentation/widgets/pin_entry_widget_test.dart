@@ -4,6 +4,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 
+import 'package:frontend/core/l10n/generated/app_localizations.dart';
 import 'package:frontend/features/security/presentation/widgets/pin_entry_widget.dart';
 import 'package:frontend/features/security/presentation/logic/security_controller.dart';
 
@@ -26,8 +27,15 @@ void main() {
     String lockedMessage = 'Try again in 5m',
     Future<String?> Function(List<int> pin)? onSubmit,
   }) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 3.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: ChangeNotifierProvider<SecurityController>.value(
             value: mockController,
