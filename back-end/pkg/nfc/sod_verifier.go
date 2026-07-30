@@ -49,19 +49,22 @@ func VerifyPassportNfcSignature(payload NfcPassportPayload) (*PassportIdentity, 
 		return nil, errors.New("NFC Payload missing DG1 (Text data)")
 	}
 
-	// 1. SOD and Certificate Chain Verification
+	// 1. Extract Identity from DG1 (The source of truth) upfront to avoid redundant parsing
+	identity, err := parseDG1(payload.DG1)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse DG1: %w", err)
+	}
+
+	// 2. SOD and Certificate Chain Verification
 	// Passive Authentication: Ensures data hasn't been modified and honors the issuer's signature.
 	if len(payload.DocumentSignerCert) > 0 {
-		// Extract identity first to get nationality for CSCA lookup
-		id, err := parseDG1(payload.DG1)
-		if err == nil {
-			if err := VerifyDocumentSigner(payload.DocumentSignerCert, id.Nationality); err != nil {
-				return nil, fmt.Errorf("certificate chain verification failed: %w", err)
-			}
+		// Reuse extracted identity to get nationality for CSCA lookup
+		if err := VerifyDocumentSigner(payload.DocumentSignerCert, identity.Nationality); err != nil {
+			return nil, fmt.Errorf("certificate chain verification failed: %w", err)
 		}
 	}
 
-	// 2. Data Integrity Check (The Core of PA)
+	// 3. Data Integrity Check (The Core of PA)
 	// We verify that the Hash of DG1/DG2 matches what's signed in the SOD.
 	if len(payload.SOD) > 0 && string(payload.SOD[0:13]) == "MOCK_SOD_CMS:" {
 		slog.Info("🔍 Integrity Check: Validating DG hashes against SOD signature...")
@@ -90,12 +93,6 @@ func VerifyPassportNfcSignature(payload NfcPassportPayload) (*PassportIdentity, 
 		}
 
 		slog.Info("✅ Passive Authentication Successful: Data integrity verified.")
-	}
-
-	// 3. Extract Identity from DG1 (The source of truth)
-	identity, err := parseDG1(payload.DG1)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse DG1: %w", err)
 	}
 
 	slog.Info("✅ NFC Passport Verified.", "name", identity.FirstName+" "+identity.LastName)
