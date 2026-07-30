@@ -91,21 +91,19 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: SafeArea(
-        child: PinEntryWidget(
-          isSetupMode: true,
-          onSubmit: (pinList) async {
-            final pin = pinList.join();
-            final securityController = context.read<SecurityController>();
-            final success = await securityController.setupPin(pin);
-            if (success) {
-              if (mounted) _onPinSuccess(pin);
-              return null;
-            } else {
-              return securityController.state.errorMessage ?? 'Failed to setup PIN';
-            }
-          },
-        ),
+      body: PinEntryWidget(
+        isSetupMode: true,
+        onSubmit: (pinList) async {
+          final pin = pinList.join();
+          final securityController = context.read<SecurityController>();
+          final success = await securityController.setupPin(pin);
+          if (success) {
+            if (mounted) _onPinSuccess(pin);
+            return null;
+          } else {
+            return securityController.state.errorMessage ?? 'Failed to setup PIN';
+          }
+        },
       ),
     );
   }

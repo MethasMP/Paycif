@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
@@ -8,27 +9,43 @@ class AppTheme {
   static const Color lightSurfaceBase = Color(0xFFF8F9FC); // Ice-White consensus
   static const Color lightSurfaceCard = Color(0xFFFFFFFF);
   static const Color lightSurfaceSunken = Color(0xFFF1F3F9);
-  static const Color lightBorderHairline = Color(0xFFE2E5F0);
+  static const Color lightBorderHairline = Color(0xFFD0D5E0);
 
   // Light Mode Text (Grayscale only)
   static const Color lightTextPrimary = Color(0xFF0A0E1A); // Align text with dark slate tone
-  static const Color lightTextSecondary = Color(0xFF5E6577);
-  static const Color lightTextTertiary = Color(0xFF8D94A6);
-  static const Color lightTextDisabled = Color(0xFFC3C7D4);
+  static const Color lightTextSecondary = Color(0xFF344054);
+  static const Color lightTextTertiary = Color(0xFF475467);
+  static const Color lightTextDisabled = Color(0xFF98A2B3);
   static const Color lightTextOnDark = Color(0xFFF8F9FC);
 
   // Dark Mode Surface & Border
   static const Color darkSurfaceBase = Color(0xFF0A0E1A); // Deep Navy-Slate consensus
   static const Color darkSurfaceCard = Color(0xFF121829);
   static const Color darkSurfaceSunken = Color(0xFF1A2138);
-  static const Color darkBorderHairline = Color(0xFF242C44);
+  static const Color darkBorderHairline = Color(0xFF333D5A);
 
   // Dark Mode Text (Grayscale only)
   static const Color darkTextPrimary = Color(0xFFF8F9FC);
   static const Color darkTextSecondary = Color(0xFFA6ACBE);
-  static const Color darkTextTertiary = Color(0xFF7D8498);
+  static const Color darkTextTertiary = Color(0xFF949BAE);
   static const Color darkTextDisabled = Color(0xFF3F465B);
   static const Color darkTextOnDark = Color(0xFF0A0E1A);
+
+  // Touch Target Constants & Helpers
+  static const double minTouchTargetSize = 48.0;
+
+  // Haptic Feedback Helpers
+  static void triggerSelectionHaptic() {
+    HapticFeedback.selectionClick();
+  }
+
+  static void triggerActionHaptic() {
+    HapticFeedback.lightImpact();
+  }
+
+  static void triggerConfirmHaptic() {
+    HapticFeedback.mediumImpact();
+  }
 
   // Action Buttons — Grayscale Action Ink carries CTAs/focus states; everything else stays grayscale
   static const Color lightActionPrimary = Color(0xFF0A0E1A);
@@ -219,6 +236,8 @@ class AppTheme {
           backgroundColor: lightActionPrimary,
           foregroundColor: lightTextOnDark,
           elevation: 0, // Flat-at-rest rule: no shadow on static buttons
+          minimumSize: const Size(minTouchTargetSize, minTouchTargetSize),
+          tapTargetSize: MaterialTapTargetSize.padded,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(radiusLg), // --radius-lg
           ),
@@ -235,6 +254,8 @@ class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: lightTextPrimary,
+          minimumSize: const Size(minTouchTargetSize, minTouchTargetSize),
+          tapTargetSize: MaterialTapTargetSize.padded,
           side: const BorderSide(color: lightBorderHairline, width: 1.0), // Hairline border
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(radiusLg),
@@ -252,6 +273,8 @@ class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: lightActionPrimary,
+          minimumSize: const Size(minTouchTargetSize, minTouchTargetSize),
+          tapTargetSize: MaterialTapTargetSize.padded,
           textStyle: GoogleFonts.inter(
             fontWeight: FontWeight.w600,
             fontSize: 16,
@@ -259,10 +282,11 @@ class AppTheme {
         ),
       ),
       cardTheme: const CardThemeData(
-        elevation: 0, // Flat-at-rest rule: no shadow on cards
+        elevation: 2.0,
+        shadowColor: Color(0x1F0A0E1A),
         shape: RoundedRectangleBorder(
-          side: BorderSide(color: lightBorderHairline, width: 1.0), // 1px divider border
-          borderRadius: BorderRadius.all(Radius.circular(radiusMd)), // --radius-md
+          side: BorderSide(color: Color(0xFFD0D5E0), width: 1.0),
+          borderRadius: BorderRadius.all(Radius.circular(radiusMd)),
         ),
         color: lightSurfaceCard,
       ),
@@ -366,6 +390,8 @@ class AppTheme {
           backgroundColor: darkActionPrimary,
           foregroundColor: darkTextOnDark,
           elevation: 0,
+          minimumSize: const Size(minTouchTargetSize, minTouchTargetSize),
+          tapTargetSize: MaterialTapTargetSize.padded,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(radiusLg),
           ),
@@ -382,6 +408,8 @@ class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: darkTextPrimary,
+          minimumSize: const Size(minTouchTargetSize, minTouchTargetSize),
+          tapTargetSize: MaterialTapTargetSize.padded,
           side: const BorderSide(color: darkBorderHairline, width: 1.0),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(radiusLg),
@@ -399,6 +427,8 @@ class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: darkActionPrimary,
+          minimumSize: const Size(minTouchTargetSize, minTouchTargetSize),
+          tapTargetSize: MaterialTapTargetSize.padded,
           textStyle: GoogleFonts.inter(
             fontWeight: FontWeight.w600,
             fontSize: 16,
@@ -406,9 +436,10 @@ class AppTheme {
         ),
       ),
       cardTheme: const CardThemeData(
-        elevation: 0,
+        elevation: 3.0,
+        shadowColor: Color(0x3F000000),
         shape: RoundedRectangleBorder(
-          side: BorderSide(color: darkBorderHairline, width: 1.0),
+          side: BorderSide(color: Color(0xFF333D5A), width: 1.0),
           borderRadius: BorderRadius.all(Radius.circular(radiusMd)),
         ),
         color: darkSurfaceCard,
@@ -487,3 +518,4 @@ class AppTheme {
     return true;
   }
 }
+

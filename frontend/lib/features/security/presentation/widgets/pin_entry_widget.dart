@@ -194,93 +194,75 @@ class _PinEntryWidgetState extends State<PinEntryWidget> {
     return SafeArea(
       child: Stack(
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Header Section
-              Expanded(
-                flex: 2,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryTeal.withValues(alpha: 0.15),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Center(
-                        child: AppIcon(
-                          PhosphorIconsFill.shieldCheck,
-                          color: AppTheme.primaryTeal,
-                          size: AppIconSize.md,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 300),
-                      transitionBuilder: (Widget child, Animation<double> animation) {
-                        return FadeTransition(
-                          opacity: animation,
-                          child: SlideTransition(
-                            position: Tween<Offset>(
-                              begin: const Offset(0.0, 0.2),
-                              end: Offset.zero,
-                            ).animate(animation),
-                            child: child,
-                          ),
-                        );
-                      },
-                      child: Text(
-                        titleText,
-                        key: ValueKey<String>(titleText),
-                        style: GoogleFonts.inter(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.5,
-                          color: AppTheme.textPrimaryColor(context),
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            child: Column(
+              children: [
+                const Spacer(flex: 2),
 
-              // PIN Indicators Section
-              Padding(
-                padding: const EdgeInsets.only(bottom: 40),
-                child: Semantics(
+                // Lock Icon & Header
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryTeal.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Center(
+                    child: AppIcon(
+                      PhosphorIconsFill.shieldCheck,
+                      color: AppTheme.primaryTeal,
+                      size: AppIconSize.lg,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: Text(
+                    titleText,
+                    key: ValueKey<String>(titleText),
+                    style: GoogleFonts.inter(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.5,
+                      color: AppTheme.textPrimaryColor(context),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: 28),
+
+                // PIN Indicator Dots
+                Semantics(
                   liveRegion: true,
                   label: '${_pin.length} out of 6 digits entered',
                   child: RepaintBoundary(
                     child: _buildPinDots(isDark)
-                      .animate(target: _shakeOffset)
-                      .shake(duration: 400.ms),
+                        .animate(target: _shakeOffset)
+                        .shake(duration: 400.ms),
                   ),
                 ),
-              ),
 
-              // Keypad Section
-              Expanded(
-                flex: 3,
-                child: RepaintBoundary(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: _buildKeypadGrid(isDark),
-                  ),
+                const Spacer(flex: 3),
+
+                // Keypad Section (Constrained width for elegance)
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 320),
+                  child: _buildKeypadGrid(isDark),
                 ),
-              ),
 
-              if (widget.onForgotPin != null) ...[
-                _buildForgotAction(isDark),
-                const SizedBox(height: 16),
-              ] else ...[
-                const SizedBox(height: 32),
+                const SizedBox(height: 20),
+
+                // Action Footer
+                if (widget.onForgotPin != null) ...[
+                  _buildForgotAction(isDark),
+                ] else ...[
+                  const SizedBox(height: 48),
+                ],
+                const SizedBox(height: 12),
               ],
-            ],
+            ),
           ),
 
           // Error Banner Overlay (Prevents Layout Shifts)
@@ -302,11 +284,15 @@ class _PinEntryWidgetState extends State<PinEntryWidget> {
 
   Widget _buildKeypadGrid(bool isDark) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Expanded(child: _buildKeypadRow(['1', '2', '3'], isDark)),
-        Expanded(child: _buildKeypadRow(['4', '5', '6'], isDark)),
-        Expanded(child: _buildKeypadRow(['7', '8', '9'], isDark)),
-        Expanded(child: _buildKeypadRow(['BIO', '0', 'DEL'], isDark)),
+        _buildKeypadRow(['1', '2', '3'], isDark),
+        const SizedBox(height: 16),
+        _buildKeypadRow(['4', '5', '6'], isDark),
+        const SizedBox(height: 16),
+        _buildKeypadRow(['7', '8', '9'], isDark),
+        const SizedBox(height: 16),
+        _buildKeypadRow(['BIO', '0', 'DEL'], isDark),
       ],
     );
   }
@@ -536,16 +522,29 @@ class KeypadButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final keyBgColor = isDark
+        ? Colors.white.withValues(alpha: 0.08)
+        : Colors.black.withValues(alpha: 0.04);
+
     return Semantics(
       button: true,
       label: semanticLabel,
-      child: InkResponse(
-        onTap: onTap,
-        radius: 40,
-        splashColor: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05),
-        highlightColor: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.02),
-        child: Center(
-          child: child,
+      child: Center(
+        child: SizedBox(
+          width: 72,
+          height: 72,
+          child: Material(
+            color: keyBgColor,
+            shape: const CircleBorder(),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: onTap,
+              splashColor: isDark
+                  ? Colors.white.withValues(alpha: 0.15)
+                  : Colors.black.withValues(alpha: 0.1),
+              child: Center(child: child),
+            ),
+          ),
         ),
       ),
     );
