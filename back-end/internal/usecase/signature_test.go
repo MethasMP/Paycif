@@ -44,10 +44,10 @@ func TestSignatureService_VerifySignature(t *testing.T) {
 
 			w.Header().Set("Content-Type", "application/json")
 			if req.Message == "valid" {
-				json.NewEncoder(w).Encode(VerifyResponse{IsValid: true})
+				_ = json.NewEncoder(w).Encode(VerifyResponse{IsValid: true})
 			} else {
 				errMsg := "invalid signature"
-				json.NewEncoder(w).Encode(VerifyResponse{IsValid: false, Error: &errMsg})
+				_ = json.NewEncoder(w).Encode(VerifyResponse{IsValid: false, Error: &errMsg})
 			}
 		}),
 	}
@@ -131,7 +131,7 @@ func BenchmarkVerifySignature(b *testing.B) {
 	server := &http.Server{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(VerifyResponse{IsValid: true})
+			_ = json.NewEncoder(w).Encode(VerifyResponse{IsValid: true})
 		}),
 	}
 
