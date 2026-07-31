@@ -11,8 +11,8 @@ import (
 )
 
 var (
-	redisClient *redis.Client
-	redisOnce   sync.Once
+	redisClient                 *redis.Client
+	redisOnce                   sync.Once
 	DisableRedisCacheForTesting = false
 )
 

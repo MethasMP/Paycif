@@ -103,7 +103,7 @@ func main() {
 	paymentEngine.RegisterProvider(sqrilProvider)
 	paymentEngine.RegisterProvider(&usecase.WiseProvider{Token: os.Getenv("WISE_API_TOKEN")})
 
-		// Pass AuditService to PaymentOrchestrationService
+	// Pass AuditService to PaymentOrchestrationService
 	orchService := usecase.NewPaymentOrchestrationService(repository.DB, fxService, alertService, auditService, paymentEngine)
 	usecase.StartReconciliationWorker(context.Background(), repository.DB, orchService) // Start transaction reconciler 🔄
 	achKYCClient := usecase.NewAlchemyPayKYCClient(
@@ -220,7 +220,7 @@ func main() {
 
 	v1 := r.Group("/api/v1")
 	v1.Use(middleware.AuthMiddleware(orchService)) // Apply Auth with Service injection 🛡️
-	v1.Use(middleware.RateLimiterMiddleware())       // Use local in-memory RateLimiter
+	v1.Use(middleware.RateLimiterMiddleware())     // Use local in-memory RateLimiter
 	v1.Use(middleware.GeoBlockMiddleware(geoBlockSvc, auditService))
 	v1.Use(middleware.VPNDetectionMiddleware(vpnDetectionSvc, auditService))
 	{
