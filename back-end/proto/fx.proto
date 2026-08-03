@@ -29,6 +29,21 @@ service FXService {
 
     // Pre-Validation: Combined Signature + Amount + Limits Check (Fast Path for Payment)
     rpc PreValidateTransfer(PreValidateTransferRequest) returns (PreValidateTransferResponse);
+
+    // High-Performance Streaming: Push real-time FX rate updates to subscribers
+    rpc StreamRates(StreamRatesRequest) returns (stream RateTick);
+}
+
+message StreamRatesRequest {
+    string base_currency = 1;
+    repeated string target_currencies = 2;
+}
+
+message RateTick {
+    string pair = 1;         // e.g., "USD/THB"
+    string rate = 2;         // Decimal string representation
+    int64 timestamp = 3;     // Unix timestamp (milliseconds)
+    string source = 4;       // Source provider ID
 }
 
 message VerifySignatureRequest {

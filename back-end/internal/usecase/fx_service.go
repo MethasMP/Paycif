@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	fxrpc "paysif/internal/adapter/grpc"
 
@@ -89,19 +90,31 @@ func (s *FXService) CalculateDynamicQuote(ctx context.Context, targetAmountUSD f
 // ConvertToBase converts an amount in a given currency to THB (Base).
 // Returns (baseAmount, usedRate, error)
 func (s *FXService) ConvertToBase(ctx context.Context, amount int64, currency string) (int64, decimal.Decimal, error) {
-	if currency == "THB" {
+	upperCurr := strings.ToUpper(currency)
+	if upperCurr == "THB" {
 		return amount, decimal.NewFromInt(1), nil
+	}
+
+	// 0. Redis L2 Cache Lookup (Ultra Fast <1ms response)
+	cacheKey := fmt.Sprintf("fx_rate:%s:THB", upperCurr)
+	if cachedRateStr, found := CacheGet(ctx, cacheKey); found {
+		if cachedRate, err := decimal.NewFromString(cachedRateStr); err == nil {
+			amountDec := decimal.NewFromInt(amount)
+			baseAmountDec := amountDec.Mul(cachedRate)
+			return baseAmountDec.IntPart(), cachedRate, nil
+		}
 	}
 
 	// 1. Try Rust FX Engine (High Performance)
 	if s.GRPCClient != nil {
 		resp, err := s.GRPCClient.Convert(ctx, currency, "THB", amount, "srv-req")
 		if err == nil && resp.Success {
-			// Success!
 			rate, err := decimal.NewFromString(resp.RateUsed)
 			if err != nil {
 				return 0, decimal.Zero, fmt.Errorf("invalid decimal rate from Rust FX Engine: %w", err)
 			}
+			// Store in Redis L2 Cache (TTL 10 seconds)
+			CacheSet(ctx, cacheKey, resp.RateUsed, 10*time.Second)
 			return resp.ConvertedAmount, rate, nil
 		}
 		// If failed, log and fall back to DB
@@ -113,7 +126,7 @@ func (s *FXService) ConvertToBase(ctx context.Context, amount int64, currency st
 	var rateStr string
 	convQuery := "SELECT provider_rate FROM exchange_rates WHERE from_currency = $1 AND to_currency = 'THB'"
 
-	err := s.DB.QueryRowContext(ctx, convQuery, strings.ToUpper(currency)).Scan(&rateStr)
+	err := s.DB.QueryRowContext(ctx, convQuery, upperCurr).Scan(&rateStr)
 
 	if err != nil {
 		return 0, decimal.Zero, fmt.Errorf("no exchange rate found for %s/THB (DB Fallback): %w", currency, err)
@@ -123,6 +136,9 @@ func (s *FXService) ConvertToBase(ctx context.Context, amount int64, currency st
 	if err != nil {
 		return 0, decimal.Zero, fmt.Errorf("invalid decimal in DB: %w", err)
 	}
+
+	// Store in Redis L2 Cache
+	CacheSet(ctx, cacheKey, rateStr, 10*time.Second)
 
 	amountDec := decimal.NewFromInt(amount)
 	baseAmountDec := amountDec.Mul(rate)

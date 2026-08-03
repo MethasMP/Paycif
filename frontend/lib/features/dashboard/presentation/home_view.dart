@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 import 'package:frontend/features/dashboard/presentation/dashboard_controller.dart';
 import 'package:frontend/features/transactions/domain/transaction.dart';
 import 'package:frontend/core/widgets/transaction_item.dart';
-import 'package:flutter/services.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 import 'package:frontend/core/widgets/app_icon.dart';
 
@@ -59,21 +58,6 @@ class _HomeViewState extends State<HomeView> {
                             
                           const SizedBox(height: 12),
                           
-                          // Quick Actions Label
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            child: Text(
-                              l10n.homeQuickActions,
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: AppTheme.textSecondaryColor(context),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          _buildQuickActionsDock(context, l10n, theme),
-                          const SizedBox(height: 40),
-                          
                           // Recent Transactions
                           _buildRecentTransactionsHeader(context, theme, l10n),
                           const SizedBox(height: 16),
@@ -87,34 +71,6 @@ class _HomeViewState extends State<HomeView> {
           ),
         );
       },
-    );
-  }
-
-  Widget _buildQuickActionsDock(BuildContext context, AppLocalizations l10n, ThemeData theme) {
-    return Row(
-      children: [
-        Expanded(
-          child: _QuickActionCard(
-            label: l10n.homeActionCards,
-            icon: PhosphorIconsRegular.creditCard,
-            onTap: () {
-              HapticFeedback.lightImpact();
-              context.push('/payment_settings');
-            },
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _QuickActionCard(
-            label: l10n.homeActionRates,
-            icon: PhosphorIconsRegular.chartLineUp,
-            onTap: () {
-              HapticFeedback.lightImpact();
-              context.push('/history');
-            },
-          ),
-        ),
-      ],
     );
   }
 
@@ -274,99 +230,6 @@ class _HomeViewState extends State<HomeView> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// --- Custom Animated Quick Action Card with Press Feedback ---
-class _QuickActionCard extends StatefulWidget {
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  const _QuickActionCard({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-  });
-
-  @override
-  State<_QuickActionCard> createState() => _QuickActionCardState();
-}
-
-class _QuickActionCardState extends State<_QuickActionCard> {
-  bool _isPressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    final Color cardBg = isDark ? AppTheme.darkTheme.cardColor : Colors.white;
-    final Color iconBg = isDark ? Colors.white.withValues(alpha: 0.08) : AppTheme.primaryTealLight;
-    final Color iconColor = isDark ? AppTheme.primaryColor(context) : AppTheme.primaryTealDark;
-    final Color labelColor = isDark ? Colors.white.withValues(alpha: 0.87) : AppTheme.textPrimaryColor(context);
-
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _isPressed = true),
-      onTapUp: (_) {
-        setState(() => _isPressed = false);
-        widget.onTap();
-      },
-      onTapCancel: () => setState(() => _isPressed = false),
-      child: Semantics(
-        button: true,
-        label: widget.label,
-        child: AnimatedScale(
-          scale: _isPressed ? 0.95 : 1.0,
-          duration: const Duration(milliseconds: 100),
-          curve: Curves.easeOutQuad,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 100),
-            curve: Curves.easeOutQuad,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            decoration: BoxDecoration(
-              color: cardBg,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: isDark ? Colors.white12 : AppTheme.borderGrey,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
-                  blurRadius: _isPressed ? 4 : 8,
-                  offset: Offset(0, _isPressed ? 1 : 2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: iconBg,
-                    shape: BoxShape.circle,
-                  ),
-                  child: AppIcon(widget.icon, color: iconColor, size: AppIconSize.sm),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    widget.label,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: labelColor,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }

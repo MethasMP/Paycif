@@ -173,14 +173,14 @@ class _MainScreenState extends State<MainScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     decoration: BoxDecoration(
                       color: isDark 
-                        ? Colors.black.withValues(alpha: 0.65)
-                        : Colors.white.withValues(alpha: 0.85),
+                        ? const Color(0xFF121212)
+                        : Colors.white.withValues(alpha: 0.96),
                       borderRadius: BorderRadius.circular(36),
                       border: Border.all(
                         color: isDark 
-                          ? Colors.white.withValues(alpha: 0.15)
-                          : Colors.white.withValues(alpha: 0.5),
-                        width: 1,
+                          ? Colors.white.withValues(alpha: 0.2)
+                          : Colors.black.withValues(alpha: 0.08),
+                        width: 1.5,
                       ),
                     ),
                     child: Row(

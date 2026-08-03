@@ -127,6 +127,16 @@ class AppEncryptionService {
     return secretKey.extractBytes();
   }
 
+  /// Offloads PBKDF2 Key Derivation to a background isolate using compute()
+  /// Ensures Main UI Thread remains at 60/120 FPS during encryption.
+  Future<List<int>> derivePinKeyAsync(String pin, List<int> salt, {int? iterations}) async {
+    return await compute(derivePinKey, {
+      'pin': pin,
+      'salt': salt,
+      'iterations': iterations ?? _kPbkdf2Iterations,
+    });
+  }
+
   /// Encrypts [plaintext] with AES-256-GCM using [keyBytes].
   /// Returns nonce (12 B) + ciphertext + GCM auth tag (16 B) packed together.
   Future<List<int>> encryptPinToken(

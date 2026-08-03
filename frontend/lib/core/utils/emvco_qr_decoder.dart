@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 enum QRType {
   static, // 11: Reusable, Amount optional
   dynamic, // 12: One-time, Amount usually mandatory
@@ -47,6 +49,12 @@ class EmvQrData {
 }
 
 class EMVCoParser {
+  /// Asynchronously parses raw EMVCo payload using a background Dart Isolate
+  /// Prevents main UI thread stutters (Jank) during camera scanning.
+  static Future<EmvQrData> parseAsync(String raw) async {
+    return await compute(parse, raw);
+  }
+
   /// Parses a raw EMVCo string into a structured object
   static EmvQrData parse(String raw) {
     if (raw.isEmpty) return _empty();

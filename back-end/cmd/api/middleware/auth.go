@@ -47,7 +47,10 @@ func AuthMiddleware(orchSvc *usecase.PaymentOrchestrationService) gin.HandlerFun
 	}
 	jwks, err = keyfunc.Get(jwksURL, options)
 	if err != nil {
-		log.Printf("⚠️ WARNING: Failed to initialize JWKS (%v). Auth validation will fall back to HMAC/HMAC-local verification.", err)
+		if os.Getenv("GIN_MODE") == "release" {
+			log.Fatalf("❌ CRITICAL: Failed to initialize JWKS in release mode: %v", err)
+		}
+		log.Printf("⚠️ WARNING: Failed to initialize JWKS (%v). Local dev mode will reject unverified Bearer tokens unless JWKS is reachable.", err)
 	} else {
 		log.Println("✅ JWKS Initialized")
 	}
@@ -72,6 +75,11 @@ func AuthMiddleware(orchSvc *usecase.PaymentOrchestrationService) gin.HandlerFun
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 		if tokenString == authHeader {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Bearer token required"})
+			return
+		}
+
+		if jwks == nil {
+			c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"error": "Authentication service temporarily unavailable (JWKS unreachable)"})
 			return
 		}
 
