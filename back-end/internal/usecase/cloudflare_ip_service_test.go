@@ -9,11 +9,11 @@ import (
 
 func TestCloudflareIPRangeService_ContainsAfterRefresh(t *testing.T) {
 	v4 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte("1.2.3.0/24\n"))
+		w.Write([]byte("1.2.3.0/24\n"))
 	}))
 	defer v4.Close()
 	v6 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte("2001:db8::/32\n"))
+		w.Write([]byte("2001:db8::/32\n"))
 	}))
 	defer v6.Close()
 
@@ -39,11 +39,11 @@ func TestCloudflareIPRangeService_ContainsAfterRefresh(t *testing.T) {
 
 func TestCloudflareIPRangeService_FailedRefreshKeepsLastKnownGood(t *testing.T) {
 	good4 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte("1.2.3.0/24\n"))
+		w.Write([]byte("1.2.3.0/24\n"))
 	}))
 	defer good4.Close()
 	good6 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte("2001:db8::/32\n"))
+		w.Write([]byte("2001:db8::/32\n"))
 	}))
 	defer good6.Close()
 
