@@ -72,7 +72,7 @@ func init() {
 func TestResolveCountry_PrimaryProviderUsed(t *testing.T) {
 	ClearGeoL1Cache()
 	primary := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("US"))
+		_, _ = w.Write([]byte("US"))
 	}))
 	defer primary.Close()
 
@@ -102,7 +102,7 @@ func TestResolveCountry_FallsBackToSecondaryProvider(t *testing.T) {
 
 	fallback := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"success":true,"country_code":"TH"}`))
+		_, _ = w.Write([]byte(`{"success":true,"country_code":"TH"}`))
 	}))
 	defer fallback.Close()
 
