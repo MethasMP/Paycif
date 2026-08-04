@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"strings"
 	"sync"
@@ -69,7 +70,7 @@ const geoAlertCooldown = 15 * time.Minute
 
 // Local CIDR Bounding Database for Thailand (L1.5 Geofence Filter)
 var (
-	thCIDRBlocks       []*net.IPNet
+	thCIDRBlocks       []netip.Prefix
 	thCIDRBlocksLoaded int32
 	thCIDRLoadMutex    sync.Mutex
 )
@@ -102,23 +103,24 @@ func LoadTHCIDRBlocks() {
 
 	if err != nil {
 		log.Printf("⚠️ Failed to load or download th_cidrs.txt: %v. Local country lookup fallback is disabled.", err)
+		atomic.StoreInt32(&thCIDRBlocksLoaded, 1)
 		return
 	}
 
 	lines := strings.Split(string(data), "\n")
-	var blocks []*net.IPNet
+	var prefixes []netip.Prefix
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		_, ipNet, parseErr := net.ParseCIDR(line)
+		prefix, parseErr := netip.ParsePrefix(line)
 		if parseErr == nil {
-			blocks = append(blocks, ipNet)
+			prefixes = append(prefixes, prefix)
 		}
 	}
 
-	thCIDRBlocks = blocks
+	thCIDRBlocks = prefixes
 	atomic.StoreInt32(&thCIDRBlocksLoaded, 1)
 	log.Printf("✅ Loaded %d Thailand IP subnets into memory.", len(thCIDRBlocks))
 }
@@ -126,8 +128,8 @@ func LoadTHCIDRBlocks() {
 // IsInThailandCIDR checks if client IP falls under Thailand network ranges.
 func IsInThailandCIDR(ipStr string) bool {
 	LoadTHCIDRBlocks()
-	ip := net.ParseIP(ipStr)
-	if ip == nil {
+	ip, err := netip.ParseAddr(ipStr)
+	if err != nil {
 		return false
 	}
 	for _, subnet := range thCIDRBlocks {

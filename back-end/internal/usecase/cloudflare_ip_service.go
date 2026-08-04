@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -58,9 +58,9 @@ var consecutiveCloudflareIPFailures int32
 // answers whether a given IP belongs to Cloudflare. The list is refreshed
 // periodically in the background rather than fetched per-request.
 type CloudflareIPRangeService struct {
-	ranges atomic.Pointer[[]*net.IPNet]
-	cb     *gobreaker.CircuitBreaker
-	stopCh chan struct{}
+	prefixes atomic.Pointer[[]netip.Prefix]
+	cb       *gobreaker.CircuitBreaker
+	stopCh   chan struct{}
 }
 
 // NewCloudflareIPRangeService creates a new service with a circuit breaker
@@ -117,18 +117,18 @@ func (s *CloudflareIPRangeService) Stop() {
 // Contains reports whether ip falls within any of Cloudflare's published
 // ranges. Returns false if ip is unparseable or no list has ever loaded.
 func (s *CloudflareIPRangeService) Contains(ip string) bool {
-	parsed := net.ParseIP(ip)
-	if parsed == nil {
+	parsed, err := netip.ParseAddr(ip)
+	if err != nil {
 		return false
 	}
 
-	ranges := s.ranges.Load()
-	if ranges == nil {
+	prefixes := s.prefixes.Load()
+	if prefixes == nil {
 		return false
 	}
 
-	for _, ipNet := range *ranges {
-		if ipNet.Contains(parsed) {
+	for _, prefix := range *prefixes {
+		if prefix.Contains(parsed) {
 			return true
 		}
 	}
@@ -168,12 +168,12 @@ func (s *CloudflareIPRangeService) Refresh(ctx context.Context) error {
 	}
 
 	atomic.StoreInt32(&consecutiveCloudflareIPFailures, 0)
-	ranges := result.([]*net.IPNet)
-	s.ranges.Store(&ranges)
+	prefixes := result.([]netip.Prefix)
+	s.prefixes.Store(&prefixes)
 	return nil
 }
 
-func fetchCIDRList(ctx context.Context, url string) ([]*net.IPNet, error) {
+func fetchCIDRList(ctx context.Context, url string) ([]netip.Prefix, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -189,22 +189,22 @@ func fetchCIDRList(ctx context.Context, url string) ([]*net.IPNet, error) {
 		return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
 	}
 
-	var nets []*net.IPNet
+	var prefixes []netip.Prefix
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" {
 			continue
 		}
-		_, ipNet, err := net.ParseCIDR(line)
+		prefix, err := netip.ParsePrefix(line)
 		if err != nil {
 			return nil, fmt.Errorf("invalid CIDR %q: %w", line, err)
 		}
-		nets = append(nets, ipNet)
+		prefixes = append(prefixes, prefix)
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, err
 	}
 
-	return nets, nil
+	return prefixes, nil
 }
