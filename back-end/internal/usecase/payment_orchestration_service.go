@@ -106,7 +106,8 @@ type ExchangeRateResponse struct {
 
 // GetExchangeRate retrieves the latest rate for a currency pair.
 func (s *PaymentOrchestrationService) GetExchangeRate(ctx context.Context, fromCurr, toCurr string) (*ExchangeRateResponse, error) {
-	cacheKey := fmt.Sprintf("rate:%s:%s", fromCurr, toCurr)
+	// Optimize cache key generation by using manual string concatenation instead of fmt.Sprintf to eliminate allocations on cache-hit paths.
+	cacheKey := "rate:" + fromCurr + ":" + toCurr
 
 	if val, ok := s.localRateCache.Load(cacheKey); ok {
 		item := val.(localCacheItem)
