@@ -21,9 +21,10 @@ type keyCacheEntry struct {
 
 // SignatureService handles Ed25519 signature verification via the Go verify-service.
 type SignatureService struct {
-	DB      *sql.DB
-	udsPath string
-	cache   sync.Map
+	DB         *sql.DB
+	udsPath    string
+	cache      sync.Map
+	httpClient *http.Client
 }
 
 // NewSignatureService creates a new SignatureService injecting dependencies.
@@ -31,9 +32,23 @@ func NewSignatureService(db *sql.DB, udsPath string) *SignatureService {
 	if udsPath == "" {
 		udsPath = "/tmp/verify_service.sock"
 	}
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+				var d net.Dialer
+				return d.DialContext(ctx, "unix", udsPath)
+			},
+			DisableKeepAlives:   false,
+			MaxIdleConns:        100,
+			MaxIdleConnsPerHost: 100,
+			IdleConnTimeout:     90 * time.Second,
+		},
+		Timeout: 200 * time.Millisecond,
+	}
 	return &SignatureService{
-		DB:      db,
-		udsPath: udsPath,
+		DB:         db,
+		udsPath:    udsPath,
+		httpClient: httpClient,
 	}
 }
 
@@ -77,14 +92,18 @@ type VerifyResponse struct {
 
 // VerifySignature delegates verification to the verify-service over Unix Domain Socket.
 func (s *SignatureService) VerifySignature(ctx context.Context, publicKeyB64, signatureB64, message string) (bool, error) {
-	client := &http.Client{
-		Transport: &http.Transport{
-			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
-				var d net.Dialer
-				return d.DialContext(ctx, "unix", s.udsPath)
+	client := s.httpClient
+	if client == nil {
+		// Fallback for backward compatibility if instantiated manually without NewSignatureService
+		client = &http.Client{
+			Transport: &http.Transport{
+				DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+					var d net.Dialer
+					return d.DialContext(ctx, "unix", s.udsPath)
+				},
 			},
-		},
-		Timeout: 200 * time.Millisecond,
+			Timeout: 200 * time.Millisecond,
+		}
 	}
 
 	verifyReq := VerifyRequest{
