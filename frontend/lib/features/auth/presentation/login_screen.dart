@@ -338,7 +338,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               transitionBuilder: (child, animation) {
                                 return SizeTransition(
                                   sizeFactor: animation,
-                                  alignment: Alignment.topCenter,
+                                  axisAlignment: -1.0,
                                   child: FadeTransition(opacity: animation, child: child),
                                 );
                               },
