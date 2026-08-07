@@ -22,6 +22,10 @@ import (
 )
 
 func TestKYC_EndToEndFlow(t *testing.T) {
+	if os.Getenv("GITHUB_ACTIONS") == "true" {
+		t.Skip("Skipping testcontainers-based PostgreSQL test in GitHub Actions environment")
+	}
+
 	ctx := context.Background()
 	logger.Init()
 
