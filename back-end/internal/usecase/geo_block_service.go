@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"strings"
 	"sync"
@@ -69,7 +70,7 @@ const geoAlertCooldown = 15 * time.Minute
 
 // Local CIDR Bounding Database for Thailand (L1.5 Geofence Filter)
 var (
-	thCIDRBlocks       []*net.IPNet
+	thCIDRBlocks       []netip.Prefix
 	thCIDRBlocksLoaded int32
 	thCIDRLoadMutex    sync.Mutex
 )
@@ -106,15 +107,15 @@ func LoadTHCIDRBlocks() {
 	}
 
 	lines := strings.Split(string(data), "\n")
-	var blocks []*net.IPNet
+	var blocks []netip.Prefix
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		_, ipNet, parseErr := net.ParseCIDR(line)
+		prefix, parseErr := netip.ParsePrefix(line)
 		if parseErr == nil {
-			blocks = append(blocks, ipNet)
+			blocks = append(blocks, prefix)
 		}
 	}
 
@@ -126,8 +127,8 @@ func LoadTHCIDRBlocks() {
 // IsInThailandCIDR checks if client IP falls under Thailand network ranges.
 func IsInThailandCIDR(ipStr string) bool {
 	LoadTHCIDRBlocks()
-	ip := net.ParseIP(ipStr)
-	if ip == nil {
+	ip, err := netip.ParseAddr(ipStr)
+	if err != nil {
 		return false
 	}
 	for _, subnet := range thCIDRBlocks {
