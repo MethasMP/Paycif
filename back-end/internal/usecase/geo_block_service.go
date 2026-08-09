@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"net/http"
 	"net/netip"
 	"os"
@@ -213,19 +212,22 @@ func IsLocalIP(ip string) bool {
 }
 
 func TruncateIP(ip string) string {
-	parsed := net.ParseIP(ip)
-	if parsed == nil {
+	parsed, err := netip.ParseAddr(ip)
+	if err != nil {
 		return "invalid"
 	}
-	if v4 := parsed.To4(); v4 != nil {
+	if parsed.Is4() {
+		v4 := parsed.As4()
 		return fmt.Sprintf("%d.%d.%d.0", v4[0], v4[1], v4[2])
 	}
-	v6 := parsed.To16()
-	if v6 == nil {
-		return "invalid"
+	if parsed.Is6() {
+		prefix, err := parsed.Prefix(48)
+		if err != nil {
+			return "invalid"
+		}
+		return prefix.Addr().String()
 	}
-	masked := net.CIDRMask(48, 128)
-	return parsed.Mask(masked).String()
+	return "invalid"
 }
 
 func fetchCountryFromIPAPI(ctx context.Context, ip string) (string, error) {
