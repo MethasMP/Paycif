@@ -96,7 +96,7 @@ func (s *FXService) ConvertToBase(ctx context.Context, amount int64, currency st
 	}
 
 	// 0. Redis L2 Cache Lookup (Ultra Fast <1ms response)
-	cacheKey := fmt.Sprintf("fx_rate:%s:THB", upperCurr)
+	cacheKey := "fx_rate:" + upperCurr + ":THB"
 	if cachedRateStr, found := CacheGet(ctx, cacheKey); found {
 		if cachedRate, err := decimal.NewFromString(cachedRateStr); err == nil {
 			amountDec := decimal.NewFromInt(amount)
