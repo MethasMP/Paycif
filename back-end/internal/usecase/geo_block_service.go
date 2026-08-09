@@ -216,6 +216,7 @@ func TruncateIP(ip string) string {
 	if err != nil {
 		return "invalid"
 	}
+	parsed = parsed.Unmap()
 	if parsed.Is4() {
 		v4 := parsed.As4()
 		return fmt.Sprintf("%d.%d.%d.0", v4[0], v4[1], v4[2])
@@ -225,7 +226,7 @@ func TruncateIP(ip string) string {
 		if err != nil {
 			return "invalid"
 		}
-		return prefix.Addr().String()
+		return prefix.Masked().Addr().String()
 	}
 	return "invalid"
 }
