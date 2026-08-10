@@ -19,6 +19,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branches for linter diff
+        run: |
+          git fetch origin main || git fetch origin master || true
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -35,6 +41,8 @@ jobs:
           version: latest
           working-directory: back-end
           args: --timeout=5m
+          install-mode: goinstall
+          only-new-issues: true
 
       - name: Run Tests with Race Detector
         run: go test -v -race ./...
