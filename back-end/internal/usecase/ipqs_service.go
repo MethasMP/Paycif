@@ -35,21 +35,21 @@ var consecutiveIPQSFailures int32
 
 // IPQSResponse represents the response from IPQualityScore Proxy Detection API.
 type IPQSResponse struct {
-	Success            bool                `json:"success"`
-	Message            string              `json:"message"`
-	Proxy              bool                `json:"proxy"`
-	VPN                bool                `json:"vpn"`
-	ActiveVPN          bool                `json:"active_vpn"`
-	TOR                bool                `json:"tor"`
-	ActiveTOR          bool                `json:"active_tor"`
-	RecentAbuse        bool                `json:"recent_abuse"`
-	BotStatus          bool                `json:"bot_status"`
-	FraudScore         float64             `json:"fraud_score"`
-	CountryCode        string              `json:"country_code"`
-	ISP                string              `json:"ISP"`
-	ASN                int                 `json:"ASN"`
-	RequestID          string              `json:"request_id"`
-	TransactionDetails *IPQSTransDetails   `json:"transaction_details,omitempty"`
+	Success            bool              `json:"success"`
+	Message            string            `json:"message"`
+	Proxy              bool              `json:"proxy"`
+	VPN                bool              `json:"vpn"`
+	ActiveVPN          bool              `json:"active_vpn"`
+	TOR                bool              `json:"tor"`
+	ActiveTOR          bool              `json:"active_tor"`
+	RecentAbuse        bool              `json:"recent_abuse"`
+	BotStatus          bool              `json:"bot_status"`
+	FraudScore         float64           `json:"fraud_score"`
+	CountryCode        string            `json:"country_code"`
+	ISP                string            `json:"ISP"`
+	ASN                int               `json:"ASN"`
+	RequestID          string            `json:"request_id"`
+	TransactionDetails *IPQSTransDetails `json:"transaction_details,omitempty"`
 }
 
 // IPQSTransDetails represents details returned when transaction data is passed to IPQS.
@@ -267,4 +267,3 @@ func (s *IPQSService) ScoreTransactionRisk(ctx context.Context, params *Transact
 	}
 	return result.(*IPQSResponse), nil
 }
-

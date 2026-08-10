@@ -103,7 +103,7 @@ func runReconciliationCycle(ctx context.Context, db *sql.DB, service *PaymentOrc
 						_ = service.UpdatePayoutIntentStatus(cycleCtx, intent.ID, intent.Status)
 						continue
 					}
-					
+
 					// Sqril statuses: Mock provider defaults to empty transaction structure.
 					// Handle sandbox mock transaction status or real "SUCCESS"/"FINISHED" statuses.
 					statusStr := strings.ToUpper(txDetails.Transaction.Status)
