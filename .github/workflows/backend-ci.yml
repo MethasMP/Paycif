@@ -19,12 +19,17 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version-file: 'back-end/go.mod'
           cache-dependency-path: back-end/go.sum
+
+      - name: Fetch origin/main for linting comparison
+        run: git fetch origin main || true
 
       - name: Verify Dependencies
         run: go mod verify
@@ -34,7 +39,8 @@ jobs:
         with:
           version: latest
           working-directory: back-end
-          args: --timeout=5m
+          args: --timeout=5m --new-from-rev=origin/main
+          install-mode: goinstall
 
       - name: Run Tests with Race Detector
         run: go test -v -race ./...

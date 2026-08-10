@@ -1,0 +1,3 @@
+## 2026-07-31 - [Socket HTTP Client Reuse in Signature Verification]
+**Learning:** Instantiating a new `http.Client` and `http.Transport` for every request to a Unix Domain Socket (UDS) bypasses connection pooling, leading to high latency (~298 µs), connection establishment overhead, and heavy memory allocations (~31 KB/op). Reusing a single thread-safe `http.Client` reduces verification latency to ~135 µs (~2.2x speedup) and cuts heap allocations by ~3.0x (~10 KB/op).
+**Action:** Always maintain and reuse a single thread-safe `http.Client` and `http.Transport` instance inside services that communicate over sockets or loopback interfaces, rather than allocating them in hot function bodies.

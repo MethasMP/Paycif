@@ -18,9 +18,9 @@ const (
 	achKYCSandboxURL    = "https://sbx-user-api.alchemytech.cc"
 	achKYCProductionURL = "https://pro-user-api.alchemytech.cc"
 
-	achKYCRegisterPath   = "/open/api/user/core/register"
-	achKYCStatusPath     = "/open/api/user/core/getKycStatusInfo"
-	achKYCUserInfoPath   = "/open/api/user/core/queryUserInfo"
+	achKYCRegisterPath = "/open/api/user/core/register"
+	achKYCStatusPath   = "/open/api/user/core/getKycStatusInfo"
+	achKYCUserInfoPath = "/open/api/user/core/queryUserInfo"
 )
 
 // Alchemy Pay kycStatus values returned in API and webhook.
@@ -102,12 +102,12 @@ func (c *AlchemyPayKYCClient) doRequest(ctx context.Context, method, path string
 }
 
 type achEnvelope struct {
-	Code    interface{}            `json:"code"`
-	Msg     string                 `json:"msg"`
-	Model   interface{}            `json:"model"`
-	TraceID string                 `json:"traceId"`
-	Success bool                   `json:"success"`
-	Error   bool                   `json:"error"`
+	Code    interface{} `json:"code"`
+	Msg     string      `json:"msg"`
+	Model   interface{} `json:"model"`
+	TraceID string      `json:"traceId"`
+	Success bool        `json:"success"`
+	Error   bool        `json:"error"`
 }
 
 func (r *achEnvelope) codeIsZero() bool {
@@ -265,22 +265,22 @@ func (c *AlchemyPayKYCClient) VerifyWebhookSignature(timestamp, method, path, bo
 
 // AchWebhookPayload is the callback payload sent by Alchemy Pay after KYC completion.
 type AchWebhookPayload struct {
-	UserNo          string `json:"userNo"`
-	Email           string `json:"email"`
-	MerchantNo      string `json:"merchantNo"`
-	SubMerchantNo   string `json:"subMerchantNo"`
-	KycLevel        int    `json:"kycLevel"`
-	KycStatus       int    `json:"kycStatus"` // 1=approved, 2=permanent reject, 3=temp reject
-	KycType         string `json:"kycType"`
-	FirstName       string `json:"firstName"`
-	LastName        string `json:"lastName"`
-	Dob             string `json:"dob"`
-	Gender          string `json:"gender"`
-	Country         string `json:"country"`
-	IdDocType       string `json:"idDocType"`
-	ValidUntil      string `json:"validUntil"`
-	ApplicantID     string `json:"applicantId"`
-	KycFailJson     string `json:"kycFailJson"`
+	UserNo        string `json:"userNo"`
+	Email         string `json:"email"`
+	MerchantNo    string `json:"merchantNo"`
+	SubMerchantNo string `json:"subMerchantNo"`
+	KycLevel      int    `json:"kycLevel"`
+	KycStatus     int    `json:"kycStatus"` // 1=approved, 2=permanent reject, 3=temp reject
+	KycType       string `json:"kycType"`
+	FirstName     string `json:"firstName"`
+	LastName      string `json:"lastName"`
+	Dob           string `json:"dob"`
+	Gender        string `json:"gender"`
+	Country       string `json:"country"`
+	IdDocType     string `json:"idDocType"`
+	ValidUntil    string `json:"validUntil"`
+	ApplicantID   string `json:"applicantId"`
+	KycFailJson   string `json:"kycFailJson"`
 }
 
 // AchUserInfoResult holds detailed user info from Alchemy Pay.
