@@ -24,6 +24,7 @@ type SignatureService struct {
 	DB      *sql.DB
 	udsPath string
 	cache   sync.Map
+	client  *http.Client
 }
 
 // NewSignatureService creates a new SignatureService injecting dependencies.
@@ -31,9 +32,27 @@ func NewSignatureService(db *sql.DB, udsPath string) *SignatureService {
 	if udsPath == "" {
 		udsPath = "/tmp/verify_service.sock"
 	}
+
+	// Initialize and reuse a single thread-safe http.Client and Transport for UDS
+	transport := &http.Transport{
+		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+			var d net.Dialer
+			return d.DialContext(ctx, "unix", udsPath)
+		},
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 100,
+		IdleConnTimeout:     90 * time.Second,
+	}
+
+	client := &http.Client{
+		Transport: transport,
+		Timeout:   200 * time.Millisecond,
+	}
+
 	return &SignatureService{
 		DB:      db,
 		udsPath: udsPath,
+		client:  client,
 	}
 }
 
@@ -77,14 +96,22 @@ type VerifyResponse struct {
 
 // VerifySignature delegates verification to the verify-service over Unix Domain Socket.
 func (s *SignatureService) VerifySignature(ctx context.Context, publicKeyB64, signatureB64, message string) (bool, error) {
-	client := &http.Client{
-		Transport: &http.Transport{
+	client := s.client
+	if client == nil {
+		// Fallback safe path in case SignatureService was initialized directly without NewSignatureService
+		transport := &http.Transport{
 			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 				var d net.Dialer
 				return d.DialContext(ctx, "unix", s.udsPath)
 			},
-		},
-		Timeout: 200 * time.Millisecond,
+			MaxIdleConns:        100,
+			MaxIdleConnsPerHost: 100,
+			IdleConnTimeout:     90 * time.Second,
+		}
+		client = &http.Client{
+			Transport: transport,
+			Timeout:   200 * time.Millisecond,
+		}
 	}
 
 	verifyReq := VerifyRequest{
