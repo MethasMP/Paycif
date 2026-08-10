@@ -191,4 +191,3 @@ func TestBoundedLRUCache_CapacityEviction(t *testing.T) {
 		t.Errorf("expected ip3 to exist in cache")
 	}
 }
-
