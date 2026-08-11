@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -58,7 +58,7 @@ var consecutiveCloudflareIPFailures int32
 // answers whether a given IP belongs to Cloudflare. The list is refreshed
 // periodically in the background rather than fetched per-request.
 type CloudflareIPRangeService struct {
-	ranges atomic.Pointer[[]*net.IPNet]
+	ranges atomic.Pointer[[]netip.Prefix]
 	cb     *gobreaker.CircuitBreaker
 	stopCh chan struct{}
 }
@@ -117,8 +117,8 @@ func (s *CloudflareIPRangeService) Stop() {
 // Contains reports whether ip falls within any of Cloudflare's published
 // ranges. Returns false if ip is unparseable or no list has ever loaded.
 func (s *CloudflareIPRangeService) Contains(ip string) bool {
-	parsed := net.ParseIP(ip)
-	if parsed == nil {
+	parsed, err := netip.ParseAddr(ip)
+	if err != nil {
 		return false
 	}
 
@@ -127,8 +127,8 @@ func (s *CloudflareIPRangeService) Contains(ip string) bool {
 		return false
 	}
 
-	for _, ipNet := range *ranges {
-		if ipNet.Contains(parsed) {
+	for _, prefix := range *ranges {
+		if prefix.Contains(parsed) {
 			return true
 		}
 	}
@@ -168,12 +168,12 @@ func (s *CloudflareIPRangeService) Refresh(ctx context.Context) error {
 	}
 
 	atomic.StoreInt32(&consecutiveCloudflareIPFailures, 0)
-	ranges := result.([]*net.IPNet)
+	ranges := result.([]netip.Prefix)
 	s.ranges.Store(&ranges)
 	return nil
 }
 
-func fetchCIDRList(ctx context.Context, url string) ([]*net.IPNet, error) {
+func fetchCIDRList(ctx context.Context, url string) ([]netip.Prefix, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -189,14 +189,14 @@ func fetchCIDRList(ctx context.Context, url string) ([]*net.IPNet, error) {
 		return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
 	}
 
-	var nets []*net.IPNet
+	var nets []netip.Prefix
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" {
 			continue
 		}
-		_, ipNet, err := net.ParseCIDR(line)
+		ipNet, err := netip.ParsePrefix(line)
 		if err != nil {
 			return nil, fmt.Errorf("invalid CIDR %q: %w", line, err)
 		}
