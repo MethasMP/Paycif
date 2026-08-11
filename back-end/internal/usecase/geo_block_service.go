@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"strings"
 	"sync"
@@ -69,7 +69,7 @@ const geoAlertCooldown = 15 * time.Minute
 
 // Local CIDR Bounding Database for Thailand (L1.5 Geofence Filter)
 var (
-	thCIDRBlocks       []*net.IPNet
+	thCIDRBlocks       []netip.Prefix
 	thCIDRBlocksLoaded int32
 	thCIDRLoadMutex    sync.Mutex
 )
@@ -106,13 +106,13 @@ func LoadTHCIDRBlocks() {
 	}
 
 	lines := strings.Split(string(data), "\n")
-	var blocks []*net.IPNet
+	var blocks []netip.Prefix
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		_, ipNet, parseErr := net.ParseCIDR(line)
+		ipNet, parseErr := netip.ParsePrefix(line)
 		if parseErr == nil {
 			blocks = append(blocks, ipNet)
 		}
@@ -126,10 +126,11 @@ func LoadTHCIDRBlocks() {
 // IsInThailandCIDR checks if client IP falls under Thailand network ranges.
 func IsInThailandCIDR(ipStr string) bool {
 	LoadTHCIDRBlocks()
-	ip := net.ParseIP(ipStr)
-	if ip == nil {
+	ip, err := netip.ParseAddr(ipStr)
+	if err != nil {
 		return false
 	}
+	ip = ip.Unmap()
 	for _, subnet := range thCIDRBlocks {
 		if subnet.Contains(ip) {
 			return true
@@ -212,19 +213,23 @@ func IsLocalIP(ip string) bool {
 }
 
 func TruncateIP(ip string) string {
-	parsed := net.ParseIP(ip)
-	if parsed == nil {
+	parsed, err := netip.ParseAddr(ip)
+	if err != nil {
 		return "invalid"
 	}
-	if v4 := parsed.To4(); v4 != nil {
-		return fmt.Sprintf("%d.%d.%d.0", v4[0], v4[1], v4[2])
+	parsed = parsed.Unmap()
+	if parsed.Is4() {
+		b := parsed.As4()
+		b[3] = 0
+		return netip.AddrFrom4(b).String()
+	} else if parsed.Is6() {
+		b := parsed.As16()
+		for i := 6; i < 16; i++ {
+			b[i] = 0
+		}
+		return netip.AddrFrom16(b).String()
 	}
-	v6 := parsed.To16()
-	if v6 == nil {
-		return "invalid"
-	}
-	masked := net.CIDRMask(48, 128)
-	return parsed.Mask(masked).String()
+	return "invalid"
 }
 
 func fetchCountryFromIPAPI(ctx context.Context, ip string) (string, error) {
