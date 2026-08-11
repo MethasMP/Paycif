@@ -121,6 +121,7 @@ func (s *CloudflareIPRangeService) Contains(ip string) bool {
 	if err != nil {
 		return false
 	}
+	parsed = parsed.Unmap()
 
 	ranges := s.ranges.Load()
 	if ranges == nil {
