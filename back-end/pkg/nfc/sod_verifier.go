@@ -49,19 +49,21 @@ func VerifyPassportNfcSignature(payload NfcPassportPayload) (*PassportIdentity, 
 		return nil, errors.New("NFC Payload missing DG1 (Text data)")
 	}
 
-	// 1. SOD and Certificate Chain Verification
+	// 1. Extract Identity from DG1 (The source of truth) upfront to avoid double-parsing
+	identity, err := parseDG1(payload.DG1)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse DG1: %w", err)
+	}
+
+	// 2. SOD and Certificate Chain Verification
 	// Passive Authentication: Ensures data hasn't been modified and honors the issuer's signature.
 	if len(payload.DocumentSignerCert) > 0 {
-		// Extract identity first to get nationality for CSCA lookup
-		id, err := parseDG1(payload.DG1)
-		if err == nil {
-			if err := VerifyDocumentSigner(payload.DocumentSignerCert, id.Nationality); err != nil {
-				return nil, fmt.Errorf("certificate chain verification failed: %w", err)
-			}
+		if err := VerifyDocumentSigner(payload.DocumentSignerCert, identity.Nationality); err != nil {
+			return nil, fmt.Errorf("certificate chain verification failed: %w", err)
 		}
 	}
 
-	// 2. Data Integrity Check (The Core of PA)
+	// 3. Data Integrity Check (The Core of PA)
 	// We verify that the Hash of DG1/DG2 matches what's signed in the SOD.
 	if len(payload.SOD) > 0 && string(payload.SOD[0:13]) == "MOCK_SOD_CMS:" {
 		slog.Info("🔍 Integrity Check: Validating DG hashes against SOD signature...")
@@ -92,12 +94,6 @@ func VerifyPassportNfcSignature(payload NfcPassportPayload) (*PassportIdentity, 
 		slog.Info("✅ Passive Authentication Successful: Data integrity verified.")
 	}
 
-	// 3. Extract Identity from DG1 (The source of truth)
-	identity, err := parseDG1(payload.DG1)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse DG1: %w", err)
-	}
-
 	slog.Info("✅ NFC Passport Verified.", "name", identity.FirstName+" "+identity.LastName)
 	return identity, nil
 }
@@ -105,24 +101,31 @@ func VerifyPassportNfcSignature(payload NfcPassportPayload) (*PassportIdentity, 
 // parseDG1 extracts MRZ fields from physical DG1 bytes.
 // DG1 format: [Tag: 61] [Len] [Tag: 5F1F] [Len] [Exactly 88 or 90 characters of MRZ]
 func parseDG1(data []byte) (*PassportIdentity, error) {
-	// Simple scanner for the MRZ string within DG1
-	mrzStr := ""
+	// Simple scanner for the MRZ string within DG1, scanning byte indexes directly to avoid string allocations in the loop
+	mrzIdx := -1
 	for i := 0; i < len(data)-44; i++ {
 		// Look for start of MRZ lines (e.g., P<THA)
 		if data[i] == 'P' && (data[i+1] == '<' || (data[i+1] >= 'A' && data[i+1] <= 'Z')) {
-			mrzStr = string(data[i:])
+			mrzIdx = i
 			break
 		}
 	}
 
-	if mrzStr == "" {
+	if mrzIdx == -1 {
 		return nil, errors.New("could not find MRZ string in DG1")
 	}
 
 	// Basic MRZ parser (TD3 - 2 lines of 44 chars)
-	if len(mrzStr) < 88 {
+	if len(data)-mrzIdx < 88 {
 		return nil, errors.New("MRZ string too short")
 	}
+
+	// Slicing and allocating only the exact MRZ window (88 or 90 bytes) instead of copying the rest of the slice
+	mrzLen := 88
+	if len(data)-mrzIdx >= 90 {
+		mrzLen = 90
+	}
+	mrzStr := string(data[mrzIdx : mrzIdx+mrzLen])
 
 	// Real-world parsing (Simplified for prototype)
 	// Line 1: P<THA[LASTNAME]<<[FIRSTNAME]<<...
