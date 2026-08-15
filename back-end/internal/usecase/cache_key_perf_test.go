@@ -5,6 +5,8 @@ import (
 	"testing"
 )
 
+// Benchmark Redis cache key generation using Sprintf vs string concatenation.
+
 func BenchmarkVPNKeySprintf(b *testing.B) {
 	ip := "192.168.1.100"
 	b.ResetTimer()
