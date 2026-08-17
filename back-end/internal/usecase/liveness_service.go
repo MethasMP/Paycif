@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"math"
-	"math/cmplx"
 )
 
 // LivenessService handles advanced anti-spoofing logic.
@@ -22,16 +21,13 @@ func (s *LivenessService) VerifyPulse(samples []float64, fps float64) (bool, flo
 	}
 
 	// 1. Detrending
+	// Calculate mean sample value. To avoid heap allocation of an intermediate
+	// 'detrended' slice, detrending is performed on-the-fly inside the DFT loop.
 	mean := 0.0
 	for _, v := range samples {
 		mean += v
 	}
 	mean /= float64(n)
-
-	detrended := make([]float64, n)
-	for i, v := range samples {
-		detrended[i] = v - mean
-	}
 
 	// 2. DFT with Zero-Padding (Tesla optimization for high resolution)
 	paddedN := 512
@@ -47,8 +43,12 @@ func (s *LivenessService) VerifyPulse(samples []float64, fps float64) (bool, flo
 	minFreq := 0.75 // 45 BPM
 	maxFreq := 3.0  // 180 BPM
 
+	// Optimization: Pre-calculate scaling factor and DFT loop constants.
+	// Replacing cmplx.Exp/cmplx.Abs with direct math.Sincos/math.Hypot avoids
+	// complex struct allocations/conversions and speeds up computation.
+	angleFactor := -2.0 * math.Pi / float64(paddedN)
+
 	for k := 1; k < paddedN/2; k++ {
-		var sum complex128
 		freq := float64(k) * fps / float64(paddedN)
 
 		// Optimization: Focus on human HR range
@@ -56,12 +56,18 @@ func (s *LivenessService) VerifyPulse(samples []float64, fps float64) (bool, flo
 			continue
 		}
 
+		kAngle := float64(k) * angleFactor
+		var realSum, imagSum float64
+
 		for t := 0; t < n; t++ {
-			angle := 2.0 * math.Pi * float64(k) * float64(t) / float64(paddedN)
-			sum += complex(detrended[t], 0) * cmplx.Exp(complex(0, -angle))
+			detrendedVal := samples[t] - mean
+			angle := kAngle * float64(t)
+			sinVal, cosVal := math.Sincos(angle)
+			realSum += detrendedVal * cosVal
+			imagSum += detrendedVal * sinVal
 		}
 
-		mag := cmplx.Abs(sum)
+		mag := math.Hypot(realSum, imagSum)
 		totalMag += mag
 		validBins++
 

@@ -1,0 +1,3 @@
+## 2026-08-16 - Zero-allocation Discrete Fourier Transform in Liveness Pulse Verification
+**Learning:** In signal processing algorithms like Discrete Fourier Transform (DFT), converting real inputs into `complex128` types and calling `cmplx.Exp` / `cmplx.Abs` introduces unnecessary complex struct conversions and floating point overhead. Replacing complex exponential calls with direct trigonometric functions (`math.Sincos` and `math.Hypot`) and calculating sample detrending on-the-fly completely eliminates intermediate slice allocations.
+**Action:** When performing spectral analysis or DFT over real-valued sample vectors, evaluate real/imaginary sums directly using `math.Sincos` and `math.Hypot` to keep operations allocation-free and maximize throughput.
