@@ -1,0 +1,3 @@
+## 2026-08-17 - Direct String Concatenation for Cache Key Formatting
+**Learning:** In Go, replacing `fmt.Sprintf` calls with direct string concatenation (`+`) on hot paths (like Redis or local cache key generation) avoids reflection overhead, format string parsing, and `interface{}` heap allocations. Benchmarks showed a ~3.5x to ~4.8x speedup (reducing latency from ~106-128 ns/op down to ~23-36 ns/op) and eliminated heap allocations entirely (0 B/op, 0 allocs/op vs 16-24 B/op).
+**Action:** Always prefer direct string concatenation for constructing fixed-pattern cache keys and transaction descriptions in Go use cases.
