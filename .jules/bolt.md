@@ -1,0 +1,3 @@
+## 2026-08-18 - Parameterized IN Batch Queries in database/sql
+**Learning:** In Go's `database/sql` standard library, passing raw slice types directly (e.g. `[]uuid.UUID`) into query arguments returns a runtime error (`unsupported type []uuid.UUID, a slice`). Constructing a driver-agnostic parameterized `IN ($1, $2, ...)` query with `args...` allows single-query batch updates that reduce $N$ database round-trips to 1 without requiring driver-specific slice wrappers.
+**Action:** When batching SQL updates or queries in `database/sql`, use dynamic `$1, $2, ...` placeholders with `args...` for driver compatibility and safe batching.
