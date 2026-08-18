@@ -167,7 +167,7 @@ func (s *PaymentOrchestrationService) ProcessPayment(ctx context.Context, userID
 		if err != nil {
 			return nil, err
 		}
-		defer tx.Rollback()
+		defer func() { _ = tx.Rollback() }()
 
 		var txID uuid.UUID
 		err = tx.QueryRowContext(ctx, `
