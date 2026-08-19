@@ -3,8 +3,8 @@ package usecase
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -71,13 +71,20 @@ func runReconciliationCycle(ctx context.Context, db *sql.DB, service *PaymentOrc
 		return
 	}
 
-	// Update status of claimed intents to RECONCILING to block other worker instances
-	for _, intent := range intents {
-		_, err = tx.ExecContext(cycleCtx, "UPDATE payout_intents SET status = 'RECONCILING' WHERE id = $1", intent.ID)
-		if err != nil {
-			log.Printf("❌ [RECONCILER] Failed to mark intent %s as RECONCILING: %v", intent.ID, err)
-			return
-		}
+	// ⚡ OPTIMIZATION: Batch update status of claimed intents to RECONCILING in a single query
+	// using parameterized IN ($1, $2, ...) instead of executing N individual queries in a loop,
+	// reducing N database round-trips to 1 while remaining fully driver-agnostic in database/sql.
+	placeholders := make([]string, len(intents))
+	args := make([]interface{}, len(intents))
+	for i, intent := range intents {
+		placeholders[i] = "$" + strconv.Itoa(i+1)
+		args[i] = intent.ID
+	}
+	batchQuery := "UPDATE payout_intents SET status = 'RECONCILING' WHERE id IN (" + strings.Join(placeholders, ", ") + ")"
+	_, err = tx.ExecContext(cycleCtx, batchQuery, args...)
+	if err != nil {
+		log.Printf("❌ [RECONCILER] Failed to batch mark intents as RECONCILING: %v", err)
+		return
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -126,7 +133,8 @@ func runReconciliationCycle(ctx context.Context, db *sql.DB, service *PaymentOrc
 
 		// 3. Process payment ledger credit (only if not already credited in a previous run)
 		if intent.Status == "PENDING" {
-			desc := fmt.Sprintf("Reconciled Deposit: %d satang", intent.Amount)
+			// ⚡ OPTIMIZATION: Direct string concatenation with strconv.FormatInt to avoid fmt.Sprintf overhead.
+			desc := "Reconciled Deposit: " + strconv.FormatInt(intent.Amount, 10) + " satang"
 			mockOrderNo := "rec_" + intent.ID.String()
 			if err := service.ProcessPayment(cycleCtx, intent.UserID, float64(intent.Amount)/100.0, desc, mockOrderNo); err != nil {
 				log.Printf("❌ [RECONCILER] Ledger credit failed for intent %s: %v", intent.ID, err)
