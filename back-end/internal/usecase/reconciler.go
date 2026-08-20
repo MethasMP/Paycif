@@ -3,8 +3,8 @@ package usecase
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -71,13 +71,18 @@ func runReconciliationCycle(ctx context.Context, db *sql.DB, service *PaymentOrc
 		return
 	}
 
-	// Update status of claimed intents to RECONCILING to block other worker instances
-	for _, intent := range intents {
-		_, err = tx.ExecContext(cycleCtx, "UPDATE payout_intents SET status = 'RECONCILING' WHERE id = $1", intent.ID)
-		if err != nil {
-			log.Printf("❌ [RECONCILER] Failed to mark intent %s as RECONCILING: %v", intent.ID, err)
-			return
-		}
+	// Update status of claimed intents to RECONCILING to block other worker instances in a single batch query
+	ids := make([]interface{}, len(intents))
+	placeholders := make([]string, len(intents))
+	for i, intent := range intents {
+		ids[i] = intent.ID
+		placeholders[i] = "$" + strconv.Itoa(i+1)
+	}
+	query := "UPDATE payout_intents SET status = 'RECONCILING' WHERE id IN (" + strings.Join(placeholders, ", ") + ")"
+	_, err = tx.ExecContext(cycleCtx, query, ids...)
+	if err != nil {
+		log.Printf("❌ [RECONCILER] Failed to mark intents as RECONCILING: %v", err)
+		return
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -126,7 +131,7 @@ func runReconciliationCycle(ctx context.Context, db *sql.DB, service *PaymentOrc
 
 		// 3. Process payment ledger credit (only if not already credited in a previous run)
 		if intent.Status == "PENDING" {
-			desc := fmt.Sprintf("Reconciled Deposit: %d satang", intent.Amount)
+			desc := "Reconciled Deposit: " + strconv.FormatInt(intent.Amount, 10) + " satang"
 			mockOrderNo := "rec_" + intent.ID.String()
 			if err := service.ProcessPayment(cycleCtx, intent.UserID, float64(intent.Amount)/100.0, desc, mockOrderNo); err != nil {
 				log.Printf("❌ [RECONCILER] Ledger credit failed for intent %s: %v", intent.ID, err)
