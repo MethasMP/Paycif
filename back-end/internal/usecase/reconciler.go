@@ -72,6 +72,7 @@ func runReconciliationCycle(ctx context.Context, db *sql.DB, service *PaymentOrc
 	}
 
 	// Update status of claimed intents to RECONCILING in a single query to reduce DB round-trips from N down to 1
+	// Safety check: len(intents) > 0 is guaranteed above so IN (...) is never empty
 	placeholders := make([]string, len(intents))
 	args := make([]interface{}, len(intents))
 	for i, intent := range intents {
