@@ -54,5 +54,6 @@ func BenchmarkReconcilerBatchQueryBuilding_ParameterizedIN(b *testing.B) {
 			args[j] = intent.ID
 		}
 		_ = "UPDATE payout_intents SET status = 'RECONCILING' WHERE id IN (" + strings.Join(placeholders, ",") + ")"
+		_ = args
 	}
 }
