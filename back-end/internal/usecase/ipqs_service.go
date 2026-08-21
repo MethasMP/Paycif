@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -97,7 +98,8 @@ func (s *IPQSService) IsSuspicious(ctx context.Context, ip string, userAgent str
 			return nil, fmt.Errorf("IPQUALITYSCORE_API_KEY not set")
 		}
 
-		endpoint := fmt.Sprintf("%s/%s/%s", strings.TrimRight(ipqsBaseURL, "/"), url.PathEscape(apiKey), url.PathEscape(ip))
+		// Bolt performance optimization: direct string concatenation avoids fmt.Sprintf overhead and unnecessary heap allocations
+		endpoint := strings.TrimRight(ipqsBaseURL, "/") + "/" + url.PathEscape(apiKey) + "/" + url.PathEscape(ip)
 
 		queryParams := url.Values{}
 		queryParams.Set("strictness", ipqsStrictness)
@@ -110,7 +112,7 @@ func (s *IPQSService) IsSuspicious(ctx context.Context, ip string, userAgent str
 			queryParams.Set("user_language", userLanguage)
 		}
 
-		fullURL := fmt.Sprintf("%s?%s", endpoint, queryParams.Encode())
+		fullURL := endpoint + "?" + queryParams.Encode()
 
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, fullURL, nil)
 		if err != nil {
@@ -200,7 +202,8 @@ func (s *IPQSService) ScoreTransactionRisk(ctx context.Context, params *Transact
 			return nil, fmt.Errorf("IPQUALITYSCORE_API_KEY not set")
 		}
 
-		endpoint := fmt.Sprintf("%s/%s/%s", strings.TrimRight(ipqsBaseURL, "/"), url.PathEscape(apiKey), url.PathEscape(params.IP))
+		// Bolt performance optimization: direct string concatenation and strconv.FormatFloat avoid fmt.Sprintf overhead
+		endpoint := strings.TrimRight(ipqsBaseURL, "/") + "/" + url.PathEscape(apiKey) + "/" + url.PathEscape(params.IP)
 		queryParams := url.Values{}
 		queryParams.Set("strictness", ipqsStrictness)
 		queryParams.Set("allow_public_access_points", "true")
@@ -221,7 +224,7 @@ func (s *IPQSService) ScoreTransactionRisk(ctx context.Context, params *Transact
 			queryParams.Set("billing_country", params.BillingCountry)
 		}
 		if params.OrderAmount > 0 {
-			queryParams.Set("order_amount", fmt.Sprintf("%.2f", params.OrderAmount))
+			queryParams.Set("order_amount", strconv.FormatFloat(params.OrderAmount, 'f', 2, 64))
 		}
 		if params.CreditCardBin != "" {
 			queryParams.Set("credit_card_bin", params.CreditCardBin)
@@ -233,7 +236,7 @@ func (s *IPQSService) ScoreTransactionRisk(ctx context.Context, params *Transact
 			queryParams.Set("transaction_type", params.TransactionType)
 		}
 
-		fullURL := fmt.Sprintf("%s?%s", endpoint, queryParams.Encode())
+		fullURL := endpoint + "?" + queryParams.Encode()
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, fullURL, nil)
 		if err != nil {
 			return nil, err
