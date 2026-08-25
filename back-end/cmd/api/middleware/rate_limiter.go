@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -77,8 +76,10 @@ func RateLimiterMiddleware() gin.HandlerFunc {
 		}
 
 		// Key: rate:{id}:{current_minute_unix}
+		// Performance optimization (Bolt ⚡): replace fmt.Sprintf with direct string concatenation
+		// for hot path HTTP request rate limiting cache keys.
 		currentMinute := time.Now().Unix() / 60
-		key := fmt.Sprintf("rate:%s:%d", identifier, currentMinute)
+		key := "rate:" + identifier + ":" + strconv.FormatInt(currentMinute, 10)
 
 		// In-Memory Rate Limiter
 		val, _ := memoryStore.LoadOrStore(key, &SafeCounter{})
