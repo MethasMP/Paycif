@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -55,7 +56,7 @@ func NewAlchemyPayAdapter(appID, appSecret string, sandbox bool) *AlchemyPayAdap
 // When token is provided the user skips email verification — payment methods
 // saved in a previous session are pre-loaded.
 func (a *AlchemyPayAdapter) GenerateManageURL(merchantOrderNo, token, callbackURL, redirectURL string) string {
-	ts := fmt.Sprintf("%d", time.Now().UnixMilli())
+	ts := strconv.FormatInt(time.Now().UnixMilli(), 10)
 
 	params := map[string]string{
 		"appId":           a.appID,
@@ -98,7 +99,7 @@ func (a *AlchemyPayAdapter) GenerateManageURL(merchantOrderNo, token, callbackUR
 	mac.Write([]byte(signInput))
 	sig := url.QueryEscape(base64.StdEncoding.EncodeToString(mac.Sum(nil)))
 
-	return fmt.Sprintf("%s?%s&sign=%s", a.pageBaseURL, queryString, sig)
+	return a.pageBaseURL + "?" + queryString + "&sign=" + sig
 }
 
 // sign builds the HMAC-SHA256 signature required by ACH.
@@ -228,9 +229,9 @@ type GetTokenResult struct {
 // skip the email verification step entirely.
 // Prerequisite: the user's email must already be verified on Paycif's side.
 func (a *AlchemyPayAdapter) GetToken(ctx context.Context, email string) (*GetTokenResult, error) {
-	timestamp := fmt.Sprintf("%d", time.Now().UnixMilli())
+	timestamp := strconv.FormatInt(time.Now().UnixMilli(), 10)
 	path := "/open/api/v4/merchant/getToken"
-	body := fmt.Sprintf(`{"email":%q}`, email)
+	body := `{"email":` + strconv.Quote(email) + `}`
 
 	mac := hmac.New(sha256.New, []byte(a.appSecret))
 	mac.Write([]byte(timestamp + "POST" + path + body))
