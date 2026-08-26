@@ -3,6 +3,7 @@ package usecase_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -62,6 +63,29 @@ func TestSqrilProvider_DecodeQR(t *testing.T) {
 	assert.Equal(t, int64(25000), resp.Amount)
 	assert.Equal(t, false, resp.IsDynamic)
 	assert.Equal(t, "0xABCDEF1234567890", resp.DepositAddress)
+}
+
+func BenchmarkGetTransactionURL(b *testing.B) {
+	baseURL := "https://api.sqril.com/v1"
+	txID := "tx_sqril_123456789"
+
+	b.Run("fmt.Sprintf", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			_ = usecase_test_sprintf(baseURL, txID)
+		}
+	})
+
+	b.Run("string concatenation", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			_ = baseURL + "/getTransaction?transaction_id=" + txID
+		}
+	})
+}
+
+func usecase_test_sprintf(baseURL, transactionID string) string {
+	return fmt.Sprintf("%s/getTransaction?transaction_id=%s", baseURL, transactionID)
 }
 
 func TestSqrilProvider_GetQuotation(t *testing.T) {
