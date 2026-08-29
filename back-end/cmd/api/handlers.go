@@ -148,17 +148,26 @@ func (h *TransferHandler) HandleGetLimits(c *gin.Context) {
 	hasher := fnv.New64a()
 	var buf [32]byte
 
-	maxDaily, _ := limits["max_daily_amount"].(float64)
-	currentTotal, _ := limits["current_daily_total"].(float64)
-	remaining, _ := limits["remaining_daily_amount"].(float64)
-
-	hasher.Write(strconv.AppendFloat(buf[:0], maxDaily, 'f', -1, 64))
-	hasher.Write([]byte{'-'})
-	hasher.Write(strconv.AppendFloat(buf[:0], currentTotal, 'f', -1, 64))
-	hasher.Write([]byte{'-'})
-	hasher.Write(strconv.AppendFloat(buf[:0], remaining, 'f', -1, 64))
-	hasher.Write([]byte{'-'})
-	hasher.Write([]byte(userIDStr.(string)))
+	for _, key := range []string{"max_daily_amount", "current_daily_total", "remaining_daily_amount"} {
+		switch v := limits[key].(type) {
+		case float64:
+			hasher.Write(strconv.AppendFloat(buf[:0], v, 'f', -1, 64))
+		case float32:
+			hasher.Write(strconv.AppendFloat(buf[:0], float64(v), 'f', -1, 64))
+		case int64:
+			hasher.Write(strconv.AppendInt(buf[:0], v, 10))
+		case int:
+			hasher.Write(strconv.AppendInt(buf[:0], int64(v), 10))
+		default:
+			if v != nil {
+				hasher.Write([]byte(fmt.Sprint(v)))
+			}
+		}
+		hasher.Write([]byte{'-'})
+	}
+	if strUser, ok := userIDStr.(string); ok {
+		hasher.Write([]byte(strUser))
+	}
 
 	etag := "\"" + strconv.FormatUint(hasher.Sum64(), 16) + "\""
 
