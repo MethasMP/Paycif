@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"paysif/internal/usecase"
+	"strconv"
 	"strings"
 	"time"
 
@@ -143,16 +144,32 @@ func (h *TransferHandler) HandleGetLimits(c *gin.Context) {
 
 	// ETag & Cache-Control (Article Step 2)
 	// Create a unique fingerprint based on critical values, then hash it to a
-	// compact ETag (fnv64a) rather than hex-encoding the raw string.
-	fingerprint := fmt.Sprintf("%v-%v-%v-%v",
-		limits["max_daily_amount"],
-		limits["current_daily_total"],
-		limits["remaining_daily_amount"],
-		userIDStr)
-
+	// compact ETag (fnv64a) directly into the hasher without Sprintf allocations.
 	hasher := fnv.New64a()
-	hasher.Write([]byte(fingerprint))
-	etag := fmt.Sprintf("\"%x\"", hasher.Sum64())
+	var buf [32]byte
+
+	for _, key := range []string{"max_daily_amount", "current_daily_total", "remaining_daily_amount"} {
+		switch v := limits[key].(type) {
+		case float64:
+			hasher.Write(strconv.AppendFloat(buf[:0], v, 'f', -1, 64))
+		case float32:
+			hasher.Write(strconv.AppendFloat(buf[:0], float64(v), 'f', -1, 64))
+		case int64:
+			hasher.Write(strconv.AppendInt(buf[:0], v, 10))
+		case int:
+			hasher.Write(strconv.AppendInt(buf[:0], int64(v), 10))
+		default:
+			if v != nil {
+				hasher.Write([]byte(fmt.Sprint(v)))
+			}
+		}
+		hasher.Write([]byte{'-'})
+	}
+	if strUser, ok := userIDStr.(string); ok {
+		hasher.Write([]byte(strUser))
+	}
+
+	etag := "\"" + strconv.FormatUint(hasher.Sum64(), 16) + "\""
 
 	c.Header("ETag", etag)
 	c.Header("Cache-Control", "private, max-age=0, must-revalidate") // Private user data, validate always but save bandwidth
