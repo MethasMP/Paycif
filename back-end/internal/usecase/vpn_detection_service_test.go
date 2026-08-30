@@ -192,3 +192,10 @@ func TestBoundedLRUCache_CapacityEviction(t *testing.T) {
 	}
 }
 
+func BenchmarkVPNCacheKey(b *testing.B) {
+	ip := "192.168.1.100"
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = "vpn_check:" + ip
+	}
+}
