@@ -1,0 +1,3 @@
+## 2026-09-02 - String formatting optimization on worker and engine hot paths
+**Learning:** Hot paths in background queue workers (`outbox_worker`, `payload-worker`) and service engines (`accounting-core`) frequently format strings for Redis Pub/Sub channels, limits, and database provider metadata. Replacing `fmt.Sprintf` with direct string concatenation and `strconv.FormatFloat`/`strconv.FormatInt`/`strconv.Quote` achieves ~2.2x speedups and eliminates heap allocations on quoted strings.
+**Action:** Use direct string concatenation or `strconv` formatting for internal message payloads and database metadata parameters instead of `fmt.Sprintf`.

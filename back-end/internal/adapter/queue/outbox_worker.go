@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strconv"
 	"sync"
 	"time"
 
@@ -315,7 +316,7 @@ func (w *OutboxWorker) processPromptPayPayout(ctx context.Context, idempotencyKe
 			UPDATE transactions
 			SET status = 'FAILED', settlement_status = 'FAILED', provider_metadata = jsonb_set(provider_metadata, '{error}', $1)
 			WHERE id = $2
-		`, fmt.Sprintf(`"%s"`, payoutErr.Error()), txUUID)
+		`, strconv.Quote(payoutErr.Error()), txUUID)
 		if err != nil {
 			return fmt.Errorf("failed to update transaction status to failed: %w", err)
 		}
@@ -348,7 +349,7 @@ func (w *OutboxWorker) processPromptPayPayout(ctx context.Context, idempotencyKe
 		    settlement_status = $2::settlement_status_enum,
 		    status = $3
 		WHERE id = $4
-	`, fmt.Sprintf(`"%s"`, payoutResult.ExternalID), settlementStatus, payoutResult.Status, txUUID)
+	`, strconv.Quote(payoutResult.ExternalID), settlementStatus, payoutResult.Status, txUUID)
 	if fErr != nil {
 		return fmt.Errorf("failed to update transactions: %w", fErr)
 	}
