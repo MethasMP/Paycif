@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -134,4 +136,38 @@ func BenchmarkShardedLimitCache_CheckTransaction(b *testing.B) {
 			i++
 		}
 	})
+}
+
+func BenchmarkLimitMessage_Concatenation(b *testing.B) {
+	b.ReportAllocs()
+	remaining := int64(150000)
+	for i := 0; i < b.N; i++ {
+		_ = "Daily limit exceeded. Remaining: " + strconv.FormatFloat(float64(remaining)/100.0, 'f', 2, 64)
+	}
+}
+
+func BenchmarkLimitMessage_Sprintf(b *testing.B) {
+	b.ReportAllocs()
+	remaining := int64(150000)
+	for i := 0; i < b.N; i++ {
+		_ = fmt.Sprintf("Daily limit exceeded. Remaining: %.2f", float64(remaining)/100.0)
+	}
+}
+
+func BenchmarkLimitPayload_Concatenation(b *testing.B) {
+	b.ReportAllocs()
+	userID := "usr_12345678"
+	amount := int64(12500)
+	for i := 0; i < b.N; i++ {
+		_ = userID + ":" + strconv.FormatInt(amount, 10)
+	}
+}
+
+func BenchmarkLimitPayload_Sprintf(b *testing.B) {
+	b.ReportAllocs()
+	userID := "usr_12345678"
+	amount := int64(12500)
+	for i := 0; i < b.N; i++ {
+		_ = fmt.Sprintf("%s:%d", userID, amount)
+	}
 }

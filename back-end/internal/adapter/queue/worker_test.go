@@ -2,6 +2,8 @@ package queue
 
 import (
 	"context"
+	"fmt"
+	"strconv"
 	"testing"
 )
 
@@ -24,5 +26,21 @@ func TestWorker_Register(t *testing.T) {
 
 	if len(w.processors) != 1 {
 		t.Errorf("Expected 1 processor, got %d", len(w.processors))
+	}
+}
+
+func BenchmarkQuote_Strconv(b *testing.B) {
+	b.ReportAllocs()
+	extID := "ext_tx_9876543210"
+	for i := 0; i < b.N; i++ {
+		_ = strconv.Quote(extID)
+	}
+}
+
+func BenchmarkQuote_Sprintf(b *testing.B) {
+	b.ReportAllocs()
+	extID := "ext_tx_9876543210"
+	for i := 0; i < b.N; i++ {
+		_ = fmt.Sprintf(`"%s"`, extID)
 	}
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"log"
 	"net"
 	"os"
@@ -103,7 +102,7 @@ func (c *ShardedLimitCache) CheckTransaction(ctx context.Context, userID uuid.UU
 	// 1. Check transaction limit (amount in satang)
 	maxTxSatang := int64(MaxTransactionLimit * 100)
 	if amount > maxTxSatang {
-		return false, 0, fmt.Sprintf("Amount exceeds transaction limit of %.2f", MaxTransactionLimit), nil
+		return false, 0, "Amount exceeds transaction limit of " + strconv.FormatFloat(MaxTransactionLimit, 'f', 2, 64), nil
 	}
 
 	today := getTodayInt()
@@ -136,7 +135,7 @@ func (c *ShardedLimitCache) CheckTransaction(ctx context.Context, userID uuid.UU
 				if remaining < 0 {
 					remaining = 0
 				}
-				return false, remaining, fmt.Sprintf("Daily limit exceeded. Remaining: %.2f", float64(remaining)/100.0), nil
+				return false, remaining, "Daily limit exceeded. Remaining: " + strconv.FormatFloat(float64(remaining)/100.0, 'f', 2, 64), nil
 			}
 
 			if atomic.CompareAndSwapInt64(&entry.DailyTotal, currentTotal, currentTotal+amount) {
@@ -195,7 +194,7 @@ func (c *ShardedLimitCache) CheckTransaction(ctx context.Context, userID uuid.UU
 			if remaining < 0 {
 				remaining = 0
 			}
-			return false, remaining, fmt.Sprintf("Daily limit exceeded. Remaining: %.2f", float64(remaining)/100.0), nil
+			return false, remaining, "Daily limit exceeded. Remaining: " + strconv.FormatFloat(float64(remaining)/100.0, 'f', 2, 64), nil
 		}
 
 		if atomic.CompareAndSwapInt64(&entry.DailyTotal, currentTotal, currentTotal+amount) {
@@ -592,7 +591,7 @@ func (t *TransferExecutor) executeDoubleEntry(ctx context.Context, tx *sql.Tx, f
 	// Create transaction record
 	txnID := uuid.New()
 	_, err = tx.ExecContext(ctx, "INSERT INTO transactions (id, reference_id, description, settlement_status) VALUES ($1, $2, $3, 'SETTLED')",
-		txnID, fmt.Sprintf("transfer_%s", txnID), "Transfer")
+		txnID, "transfer_"+txnID.String(), "Transfer")
 	if err != nil {
 		return 0, 0, err
 	}
@@ -689,7 +688,7 @@ func (s *AccountingService) Transfer(ctx context.Context, in *pb.TransferRequest
 		userID := in.UserId
 		amount := in.Amount
 		go func() {
-			payload := fmt.Sprintf("%s:%d", userID, amount)
+			payload := userID + ":" + strconv.FormatInt(amount, 10)
 			_ = s.rdb.Publish(context.Background(), "user_limit_updates", payload).Err()
 		}()
 	}
