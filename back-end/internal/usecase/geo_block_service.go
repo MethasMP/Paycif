@@ -228,7 +228,7 @@ func TruncateIP(ip string) string {
 }
 
 func fetchCountryFromIPAPI(ctx context.Context, ip string) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/%s/country/", ipapiBaseURL, ip), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ipapiBaseURL+"/"+ip+"/country/", nil)
 	if err != nil {
 		return "", err
 	}
@@ -254,7 +254,7 @@ func fetchCountryFromIPAPI(ctx context.Context, ip string) (string, error) {
 }
 
 func fetchCountryFromIPWhois(ctx context.Context, ip string) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/%s", ipwhoisBaseURL, ip), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ipwhoisBaseURL+"/"+ip, nil)
 	if err != nil {
 		return "", err
 	}
@@ -289,7 +289,7 @@ func (s *GeoBlockService) ResolveCountry(ctx context.Context, ip string) (string
 	}
 
 	// 2. L2 Redis Cache check
-	redisKey := fmt.Sprintf("geo_country:%s", ip)
+	redisKey := "geo_country:" + ip
 	if val, found := CacheGet(ctx, redisKey); found {
 		setGeoL1(ip, val, 1*time.Hour)
 		return val, nil

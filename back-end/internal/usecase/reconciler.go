@@ -3,8 +3,8 @@ package usecase
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -126,7 +126,7 @@ func runReconciliationCycle(ctx context.Context, db *sql.DB, service *PaymentOrc
 
 		// 3. Process payment ledger credit (only if not already credited in a previous run)
 		if intent.Status == "PENDING" {
-			desc := fmt.Sprintf("Reconciled Deposit: %d satang", intent.Amount)
+			desc := "Reconciled Deposit: " + strconv.FormatInt(intent.Amount, 10) + " satang"
 			mockOrderNo := "rec_" + intent.ID.String()
 			if err := service.ProcessPayment(cycleCtx, intent.UserID, float64(intent.Amount)/100.0, desc, mockOrderNo); err != nil {
 				log.Printf("❌ [RECONCILER] Ledger credit failed for intent %s: %v", intent.ID, err)

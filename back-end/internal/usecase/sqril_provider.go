@@ -364,7 +364,7 @@ func (s *SqrilProvider) GetTransaction(ctx context.Context, transactionID string
 	}
 
 	result, err := s.cb.Execute(func() (interface{}, error) {
-		url := fmt.Sprintf("%s/getTransaction?transaction_id=%s", s.BaseURL, transactionID)
+		url := s.BaseURL + "/getTransaction?transaction_id=" + transactionID
 		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create getTransaction request: %w", err)

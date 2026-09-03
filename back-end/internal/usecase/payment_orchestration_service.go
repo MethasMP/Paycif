@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -106,7 +107,7 @@ type ExchangeRateResponse struct {
 
 // GetExchangeRate retrieves the latest rate for a currency pair.
 func (s *PaymentOrchestrationService) GetExchangeRate(ctx context.Context, fromCurr, toCurr string) (*ExchangeRateResponse, error) {
-	cacheKey := fmt.Sprintf("rate:%s:%s", fromCurr, toCurr)
+	cacheKey := "rate:" + fromCurr + ":" + toCurr
 
 	if val, ok := s.localRateCache.Load(cacheKey); ok {
 		item := val.(localCacheItem)
@@ -173,7 +174,7 @@ func (s *PaymentOrchestrationService) ProcessPayment(ctx context.Context, userID
 			INSERT INTO transactions (reference_id, description, metadata)
 			VALUES ($1, $2, $3)
 			RETURNING id
-		`, referenceID, fmt.Sprintf("Payment to %s", merchant), fmt.Sprintf(`{"merchant": "%s", "amount": %f}`, merchant, amount)).Scan(&txID)
+		`, referenceID, "Payment to "+merchant, `{"merchant": "`+merchant+`", "amount": `+strconv.FormatFloat(amount, 'f', -1, 64)+`}`).Scan(&txID)
 
 		if err != nil {
 			var pgErr *pgconn.PgError

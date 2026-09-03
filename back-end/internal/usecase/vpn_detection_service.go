@@ -184,7 +184,7 @@ func (s *VPNDetectionService) IsSuspiciousWithHeaders(ctx context.Context, ip st
 	}
 
 	// 2. L2 Redis Cache Check
-	redisKey := fmt.Sprintf("vpn_check:%s", ip)
+	redisKey := "vpn_check:" + ip
 	if cachedVal, found := CacheGet(ctx, redisKey); found {
 		isSuspicious := cachedVal == "yes"
 		// Default TTL for cached hit
@@ -258,7 +258,7 @@ func (s *VPNDetectionService) checkProxycheck(ctx context.Context, ip string) (b
 			return false, fmt.Errorf("PROXYCHECK_API_KEY not set")
 		}
 
-		url := fmt.Sprintf("%s/%s?key=%s&vpn=1&asn=1", proxycheckBaseURL, ip, proxycheckAPIKey)
+		url := proxycheckBaseURL + "/" + ip + "?key=" + proxycheckAPIKey + "&vpn=1&asn=1"
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 		if err != nil {
 			return false, err
@@ -359,7 +359,7 @@ func (s *VPNDetectionService) cacheResult(ctx context.Context, ip string, isSusp
 	if isSuspicious {
 		cacheValStr = "yes"
 	}
-	redisKey := fmt.Sprintf("vpn_check:%s", ip)
+	redisKey := "vpn_check:" + ip
 	CacheSet(ctx, redisKey, cacheValStr, ttl)
 }
 
