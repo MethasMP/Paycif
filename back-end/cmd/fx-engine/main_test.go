@@ -29,7 +29,7 @@ func TestFXEngineServer_FindRate(t *testing.T) {
 		ExpiresAt:   time.Now().Unix() + 3600,
 		Source:      "ECB",
 	})
-	rate, src, _, ok = srv.findRate("USD", "EUR")
+	_, _, _, ok = srv.findRate("USD", "EUR")
 	if !ok {
 		t.Fatalf("expected inverse rate for USD:EUR")
 	}
@@ -41,7 +41,7 @@ func TestFXEngineServer_FindRate(t *testing.T) {
 		ExpiresAt:   time.Now().Unix() + 3600,
 		Source:      "ECB",
 	})
-	rate, src, _, ok = srv.findRate("USD", "THB")
+	_, src, _, ok = srv.findRate("USD", "THB")
 	if !ok {
 		t.Fatalf("expected cross rate for USD:THB")
 	}
@@ -65,7 +65,7 @@ func TestFXEngineServer_PreValidateTransfer_LimitExceeded(t *testing.T) {
 
 	// Fill daily limit
 	uid, _ := uuid.Parse(userID)
-	srv.limitCache.CheckAndReserveLimit(ctx, uid, 1950000) // ฿19,500 reserved
+	_, _, _ = srv.limitCache.CheckAndReserveLimit(ctx, uid, 1950000) // ฿19,500 reserved
 
 	req := &pb.PreValidateTransferRequest{
 		UserId:    userID,
@@ -123,7 +123,7 @@ func BenchmarkFXEngineServer_PreValidateTransfer_LimitExceeded(b *testing.B) {
 	ctx := context.Background()
 
 	uid, _ := uuid.Parse(userID)
-	srv.limitCache.CheckAndReserveLimit(ctx, uid, 2000000) // Daily limit maxed
+	_, _, _ = srv.limitCache.CheckAndReserveLimit(ctx, uid, 2000000) // Daily limit maxed
 
 	req := &pb.PreValidateTransferRequest{
 		UserId:    userID,
