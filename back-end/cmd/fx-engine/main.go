@@ -408,7 +408,8 @@ func (s *FXEngineServer) findRate(from, to string) (decimal.Decimal, string, int
 			if ts2 < ts {
 				ts = ts2
 			}
-			return r1.Mul(r2), fmt.Sprintf("%s+%s-cross", src1, src2), ts, true
+			// Bolt optimization: Replace fmt.Sprintf with direct string concatenation on hot path
+			return r1.Mul(r2), src1 + "+" + src2 + "-cross", ts, true
 		}
 	}
 
@@ -614,13 +615,15 @@ func (s *FXEngineServer) PreValidateTransfer(ctx context.Context, in *pb.PreVali
 	if amountMajor > MaxTransactionLimit {
 		return &pb.PreValidateTransferResponse{
 			Valid:        false,
-			ErrorMessage: fmt.Sprintf("Amount exceeds transaction limit of %.2f", MaxTransactionLimit),
+			// Bolt optimization: Replace fmt.Sprintf with strconv.FormatFloat and string concatenation
+			ErrorMessage: "Amount exceeds transaction limit of " + strconv.FormatFloat(MaxTransactionLimit, 'f', 2, 64),
 		}, nil
 	}
 	if amountMajor < MinTransactionLimit {
 		return &pb.PreValidateTransferResponse{
 			Valid:        false,
-			ErrorMessage: fmt.Sprintf("Amount is below minimum requirement of %.2f", MinTransactionLimit),
+			// Bolt optimization: Replace fmt.Sprintf with strconv.FormatFloat and string concatenation
+			ErrorMessage: "Amount is below minimum requirement of " + strconv.FormatFloat(MinTransactionLimit, 'f', 2, 64),
 		}, nil
 	}
 
@@ -656,12 +659,14 @@ func (s *FXEngineServer) PreValidateTransfer(ctx context.Context, in *pb.PreVali
 	}
 
 	if !allowed {
+		remF64 := float64(remaining) / 100.0
 		return &pb.PreValidateTransferResponse{
 			Valid:                false,
 			SignatureValid:       true,
 			LimitsValid:          false,
-			ErrorMessage:         fmt.Sprintf("Daily limit exceeded. Remaining: %.2f", float64(remaining)/100.0),
-			RemainingDailyAmount: float64(remaining) / 100.0,
+			// Bolt optimization: Replace fmt.Sprintf with strconv.FormatFloat and string concatenation
+			ErrorMessage:         "Daily limit exceeded. Remaining: " + strconv.FormatFloat(remF64, 'f', 2, 64),
+			RemainingDailyAmount: remF64,
 		}, nil
 	}
 
@@ -927,7 +932,8 @@ func main() {
 					k := key.(string)
 					entry := val.(CachedRate)
 					rKey := "fx:rate:" + k
-					rVal := fmt.Sprintf("%s:%s", entry.Rate.String(), entry.Source)
+					// Bolt optimization: Replace fmt.Sprintf with string concatenation for Redis payload
+					rVal := entry.Rate.String() + ":" + entry.Source
 					pipe.SetEx(ctx, rKey, rVal, time.Duration(defaultTTL)*time.Second)
 					return true
 				})
