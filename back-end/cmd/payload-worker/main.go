@@ -202,7 +202,7 @@ func (w *PayloadWorker) processSingleEvent(ctx context.Context, ev *OutboxEvent)
 			return fmt.Errorf("sonic unmarshal TransferPayload failed: %w", err)
 		}
 
-		channel := fmt.Sprintf("wallet:%s", transfer.FromWallet)
+		channel := "wallet:" + transfer.FromWallet
 		if err := w.rdb.Publish(ctx, channel, ev.Payload).Err(); err != nil {
 			return fmt.Errorf("redis publish failed: %w", err)
 		}

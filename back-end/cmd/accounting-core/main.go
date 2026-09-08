@@ -592,7 +592,7 @@ func (t *TransferExecutor) executeDoubleEntry(ctx context.Context, tx *sql.Tx, f
 	// Create transaction record
 	txnID := uuid.New()
 	_, err = tx.ExecContext(ctx, "INSERT INTO transactions (id, reference_id, description, settlement_status) VALUES ($1, $2, $3, 'SETTLED')",
-		txnID, fmt.Sprintf("transfer_%s", txnID), "Transfer")
+		txnID, "transfer_"+txnID.String(), "Transfer")
 	if err != nil {
 		return 0, 0, err
 	}
@@ -689,7 +689,7 @@ func (s *AccountingService) Transfer(ctx context.Context, in *pb.TransferRequest
 		userID := in.UserId
 		amount := in.Amount
 		go func() {
-			payload := fmt.Sprintf("%s:%d", userID, amount)
+			payload := userID + ":" + strconv.FormatInt(amount, 10)
 			_ = s.rdb.Publish(context.Background(), "user_limit_updates", payload).Err()
 		}()
 	}
