@@ -102,6 +102,6 @@ type SafeCounter struct {
 	v int64
 }
 
-func (c *SafeCounter) Inc() int64 {
-	return atomic.AddInt64(&c.v, 1)
+func (c *SafeCounter) Inc() int {
+	return int(atomic.AddInt64(&c.v, 1))
 }

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -56,8 +57,8 @@ func TestSafeCounter_Inc(t *testing.T) {
 		<-done
 	}
 
-	if counter.v != expected {
-		t.Fatalf("expected counter value %d, got %d", expected, counter.v)
+	if atomic.LoadInt64(&counter.v) != expected {
+		t.Fatalf("expected counter value %d, got %d", expected, atomic.LoadInt64(&counter.v))
 	}
 }
 
