@@ -184,7 +184,7 @@ func (s *VPNDetectionService) IsSuspiciousWithHeaders(ctx context.Context, ip st
 	}
 
 	// 2. L2 Redis Cache Check
-	redisKey := "vpn_check:" + ip
+	redisKey := fmt.Sprintf("vpn_check:%s", ip)
 	if cachedVal, found := CacheGet(ctx, redisKey); found {
 		isSuspicious := cachedVal == "yes"
 		// Default TTL for cached hit
@@ -359,7 +359,7 @@ func (s *VPNDetectionService) cacheResult(ctx context.Context, ip string, isSusp
 	if isSuspicious {
 		cacheValStr = "yes"
 	}
-	redisKey := "vpn_check:" + ip
+	redisKey := fmt.Sprintf("vpn_check:%s", ip)
 	CacheSet(ctx, redisKey, cacheValStr, ttl)
 }
 
