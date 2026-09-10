@@ -28,7 +28,8 @@ func (p NfcPassportPayload) CalculateAuditHash() [32]byte {
 	h.Write(p.SOD)
 	h.Write(p.DocumentSignerCert)
 	var res [32]byte
-	copy(res[:], h.Sum(nil))
+	// h.Sum(res[:0]) writes directly to the res stack buffer, avoiding heap allocation.
+	h.Sum(res[:0])
 	return res
 }
 
@@ -49,19 +50,22 @@ func VerifyPassportNfcSignature(payload NfcPassportPayload) (*PassportIdentity, 
 		return nil, errors.New("NFC Payload missing DG1 (Text data)")
 	}
 
-	// 1. SOD and Certificate Chain Verification
+	// 1. Extract Identity from DG1 upfront (The source of truth)
+	// Parsing DG1 once upfront avoids redundant parsing calls later.
+	identity, err := parseDG1(payload.DG1)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse DG1: %w", err)
+	}
+
+	// 2. SOD and Certificate Chain Verification
 	// Passive Authentication: Ensures data hasn't been modified and honors the issuer's signature.
 	if len(payload.DocumentSignerCert) > 0 {
-		// Extract identity first to get nationality for CSCA lookup
-		id, err := parseDG1(payload.DG1)
-		if err == nil {
-			if err := VerifyDocumentSigner(payload.DocumentSignerCert, id.Nationality); err != nil {
-				return nil, fmt.Errorf("certificate chain verification failed: %w", err)
-			}
+		if err := VerifyDocumentSigner(payload.DocumentSignerCert, identity.Nationality); err != nil {
+			return nil, fmt.Errorf("certificate chain verification failed: %w", err)
 		}
 	}
 
-	// 2. Data Integrity Check (The Core of PA)
+	// 3. Data Integrity Check (The Core of PA)
 	// We verify that the Hash of DG1/DG2 matches what's signed in the SOD.
 	if len(payload.SOD) > 0 && string(payload.SOD[0:13]) == "MOCK_SOD_CMS:" {
 		slog.Info("🔍 Integrity Check: Validating DG hashes against SOD signature...")
@@ -80,9 +84,11 @@ func VerifyPassportNfcSignature(payload NfcPassportPayload) (*PassportIdentity, 
 			return nil, errors.New("unsupported public key for simulated SOD")
 		}
 
-		// Re-construct signed content used in simulator
-		signedContent := append(dg1Hash[:], dg2Hash[:]...)
-		hashedContent := sha256.Sum256(signedContent)
+		// Re-construct signed content using a stack-allocated buffer to avoid heap allocations.
+		var combined [64]byte
+		copy(combined[:32], dg1Hash[:])
+		copy(combined[32:], dg2Hash[:])
+		hashedContent := sha256.Sum256(combined[:])
 
 		err = rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hashedContent[:], signature)
 		if err != nil {
@@ -92,12 +98,6 @@ func VerifyPassportNfcSignature(payload NfcPassportPayload) (*PassportIdentity, 
 		slog.Info("✅ Passive Authentication Successful: Data integrity verified.")
 	}
 
-	// 3. Extract Identity from DG1 (The source of truth)
-	identity, err := parseDG1(payload.DG1)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse DG1: %w", err)
-	}
-
 	slog.Info("✅ NFC Passport Verified.", "name", identity.FirstName+" "+identity.LastName)
 	return identity, nil
 }
@@ -105,22 +105,24 @@ func VerifyPassportNfcSignature(payload NfcPassportPayload) (*PassportIdentity, 
 // parseDG1 extracts MRZ fields from physical DG1 bytes.
 // DG1 format: [Tag: 61] [Len] [Tag: 5F1F] [Len] [Exactly 88 or 90 characters of MRZ]
 func parseDG1(data []byte) (*PassportIdentity, error) {
-	// Simple scanner for the MRZ string within DG1
-	mrzStr := ""
+	// Simple scanner for the MRZ string within DG1 bytes (avoids large intermediate string allocation)
+	startIdx := -1
 	for i := 0; i < len(data)-44; i++ {
 		// Look for start of MRZ lines (e.g., P<THA)
 		if data[i] == 'P' && (data[i+1] == '<' || (data[i+1] >= 'A' && data[i+1] <= 'Z')) {
-			mrzStr = string(data[i:])
+			startIdx = i
 			break
 		}
 	}
 
-	if mrzStr == "" {
+	if startIdx == -1 {
 		return nil, errors.New("could not find MRZ string in DG1")
 	}
 
+	mrzBytes := data[startIdx:]
+
 	// Basic MRZ parser (TD3 - 2 lines of 44 chars)
-	if len(mrzStr) < 88 {
+	if len(mrzBytes) < 88 {
 		return nil, errors.New("MRZ string too short")
 	}
 
@@ -128,14 +130,13 @@ func parseDG1(data []byte) (*PassportIdentity, error) {
 	// Line 1: P<THA[LASTNAME]<<[FIRSTNAME]<<...
 	// Line 2: [DOC#][DIGIT][NAT][DOB][DIGIT][SEX][EXP][DIGIT]...
 
-	// This is a robust mock that emulates extracting from the physical MRZ
 	// Example Line 2: AA12345674THA9001015M3001013<<<<<<<<<<<<<<0
 	// Pos 0-9: DocNum, 10-13: Nationality, 13-19: DOB
 	return &PassportIdentity{
-		DocumentNumber: strings.TrimRight(mrzStr[44:53], "<"),
+		DocumentNumber: strings.TrimRight(string(mrzBytes[44:53]), "<"),
 		FirstName:      "SIMULATED",
 		LastName:       "USER",
-		Nationality:    mrzStr[54:57],
-		DateOfBirth:    mrzStr[57:63],
+		Nationality:    string(mrzBytes[54:57]),
+		DateOfBirth:    string(mrzBytes[57:63]),
 	}, nil
 }
