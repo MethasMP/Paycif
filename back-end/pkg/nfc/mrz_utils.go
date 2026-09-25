@@ -6,7 +6,9 @@ func CalculateMRZChecksum(data string) int {
 	weights := [3]int{7, 3, 1}
 	sum := 0
 
-	for i, char := range data {
+	// Optimize: iterate byte-by-byte over ASCII string instead of UTF-8 rune decoding
+	for i := 0; i < len(data); i++ {
+		char := data[i]
 		var val int
 		switch {
 		case char >= '0' && char <= '9':
