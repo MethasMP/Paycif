@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -21,9 +22,10 @@ type keyCacheEntry struct {
 
 // SignatureService handles Ed25519 signature verification via the Go verify-service.
 type SignatureService struct {
-	DB      *sql.DB
-	udsPath string
-	cache   sync.Map
+	DB         *sql.DB
+	udsPath    string
+	cache      sync.Map
+	httpClient *http.Client // Bolt: Reusable HTTP client for connection pooling over UDS
 }
 
 // NewSignatureService creates a new SignatureService injecting dependencies.
@@ -31,9 +33,26 @@ func NewSignatureService(db *sql.DB, udsPath string) *SignatureService {
 	if udsPath == "" {
 		udsPath = "/tmp/verify_service.sock"
 	}
+
+	// Bolt Optimization: Pre-construct shared http.Client with custom Unix domain socket Transport.
+	// Reusing the HTTP client enables socket connection reuse and avoids heap allocation on every request.
+	client := &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+				var d net.Dialer
+				return d.DialContext(ctx, "unix", udsPath)
+			},
+			MaxIdleConns:        100,
+			MaxIdleConnsPerHost: 10,
+			IdleConnTimeout:     90 * time.Second,
+		},
+		Timeout: 200 * time.Millisecond,
+	}
+
 	return &SignatureService{
-		DB:      db,
-		udsPath: udsPath,
+		DB:         db,
+		udsPath:    udsPath,
+		httpClient: client,
 	}
 }
 
@@ -77,14 +96,18 @@ type VerifyResponse struct {
 
 // VerifySignature delegates verification to the verify-service over Unix Domain Socket.
 func (s *SignatureService) VerifySignature(ctx context.Context, publicKeyB64, signatureB64, message string) (bool, error) {
-	client := &http.Client{
-		Transport: &http.Transport{
-			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
-				var d net.Dialer
-				return d.DialContext(ctx, "unix", s.udsPath)
+	client := s.httpClient
+	if client == nil {
+		// Fallback for struct literal initialization without NewSignatureService
+		client = &http.Client{
+			Transport: &http.Transport{
+				DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+					var d net.Dialer
+					return d.DialContext(ctx, "unix", s.udsPath)
+				},
 			},
-		},
-		Timeout: 200 * time.Millisecond,
+			Timeout: 200 * time.Millisecond,
+		}
 	}
 
 	verifyReq := VerifyRequest{
@@ -133,10 +156,13 @@ func (s *SignatureService) VerifyTimestampBucket(timestampBucketStr string) erro
 	if timestampBucketStr == "" {
 		return fmt.Errorf("missing timestamp bucket header")
 	}
-	var clientBucket int64
-	if _, err := fmt.Sscanf(timestampBucketStr, "%d", &clientBucket); err != nil {
+
+	// Bolt Optimization: Replaced fmt.Sscanf with strconv.ParseInt to eliminate reflection overhead and heap allocations.
+	clientBucket, err := strconv.ParseInt(timestampBucketStr, 10, 64)
+	if err != nil {
 		return fmt.Errorf("invalid timestamp bucket format")
 	}
+
 	currentBucket := time.Now().Unix() / 60
 	diff := currentBucket - clientBucket
 	if diff < -2 || diff > 2 {
