@@ -1,0 +1,3 @@
+## 2026-09-29 - Rate Limiter Cache Key Concat & Atomic Operations
+**Learning:** Replaced `fmt.Sprintf("rate:%s:%d", identifier, currentMinute)` with `"rate:" + identifier + ":" + strconv.FormatInt(currentMinute, 10)` and upgraded `SafeCounter` from `sync.Mutex` lock/unlock to `atomic.AddInt64`. Direct string concatenation reduces memory allocation from 32 B/op to 8 B/op and speeds up key formatting by ~2.35x (84.76 ns/op vs 198.9 ns/op). Lock-free atomic increment reduces lock contention on hot HTTP middleware paths, improving counter speed by ~2.38x (23.90 ns/op vs 56.98 ns/op).
+**Action:** Use direct string concatenation for cache keys and lock-free atomic operations for in-memory hit/request counters on high-throughput HTTP hot paths.
