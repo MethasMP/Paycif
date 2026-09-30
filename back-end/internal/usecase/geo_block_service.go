@@ -130,6 +130,7 @@ func IsInThailandCIDR(ipStr string) bool {
 	if err != nil {
 		return false
 	}
+	addr = addr.Unmap()
 	for _, subnet := range thCIDRBlocks {
 		if subnet.Contains(addr) {
 			return true
@@ -216,6 +217,7 @@ func TruncateIP(ip string) string {
 	if err != nil {
 		return "invalid"
 	}
+	addr = addr.Unmap()
 	if addr.Is4() {
 		b := addr.As4()
 		return fmt.Sprintf("%d.%d.%d.0", b[0], b[1], b[2])
@@ -225,7 +227,7 @@ func TruncateIP(ip string) string {
 		if err != nil {
 			return "invalid"
 		}
-		return p.Addr().String()
+		return p.Masked().Addr().String()
 	}
 	return "invalid"
 }
