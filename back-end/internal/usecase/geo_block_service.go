@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"strings"
 	"sync"
@@ -69,7 +69,7 @@ const geoAlertCooldown = 15 * time.Minute
 
 // Local CIDR Bounding Database for Thailand (L1.5 Geofence Filter)
 var (
-	thCIDRBlocks       []*net.IPNet
+	thCIDRBlocks       []netip.Prefix
 	thCIDRBlocksLoaded int32
 	thCIDRLoadMutex    sync.Mutex
 )
@@ -106,15 +106,15 @@ func LoadTHCIDRBlocks() {
 	}
 
 	lines := strings.Split(string(data), "\n")
-	var blocks []*net.IPNet
+	var blocks []netip.Prefix
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		_, ipNet, parseErr := net.ParseCIDR(line)
+		prefix, parseErr := netip.ParsePrefix(line)
 		if parseErr == nil {
-			blocks = append(blocks, ipNet)
+			blocks = append(blocks, prefix)
 		}
 	}
 
@@ -123,15 +123,15 @@ func LoadTHCIDRBlocks() {
 	log.Printf("✅ Loaded %d Thailand IP subnets into memory.", len(thCIDRBlocks))
 }
 
-// IsInThailandCIDR checks if client IP falls under Thailand network ranges.
+// IsInThailandCIDR checks if client IP falls under Thailand network ranges using net/netip for zero-allocation matching.
 func IsInThailandCIDR(ipStr string) bool {
 	LoadTHCIDRBlocks()
-	ip := net.ParseIP(ipStr)
-	if ip == nil {
+	addr, err := netip.ParseAddr(ipStr)
+	if err != nil {
 		return false
 	}
 	for _, subnet := range thCIDRBlocks {
-		if subnet.Contains(ip) {
+		if subnet.Contains(addr) {
 			return true
 		}
 	}
@@ -212,19 +212,22 @@ func IsLocalIP(ip string) bool {
 }
 
 func TruncateIP(ip string) string {
-	parsed := net.ParseIP(ip)
-	if parsed == nil {
+	addr, err := netip.ParseAddr(ip)
+	if err != nil {
 		return "invalid"
 	}
-	if v4 := parsed.To4(); v4 != nil {
-		return fmt.Sprintf("%d.%d.%d.0", v4[0], v4[1], v4[2])
+	if addr.Is4() {
+		b := addr.As4()
+		return fmt.Sprintf("%d.%d.%d.0", b[0], b[1], b[2])
 	}
-	v6 := parsed.To16()
-	if v6 == nil {
-		return "invalid"
+	if addr.Is6() {
+		p, err := addr.Prefix(48)
+		if err != nil {
+			return "invalid"
+		}
+		return p.Addr().String()
 	}
-	masked := net.CIDRMask(48, 128)
-	return parsed.Mask(masked).String()
+	return "invalid"
 }
 
 func fetchCountryFromIPAPI(ctx context.Context, ip string) (string, error) {
