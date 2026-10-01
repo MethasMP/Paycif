@@ -254,3 +254,10 @@ func TestIsLocalIP(t *testing.T) {
 		t.Errorf("expected 8.8.8.8 not to be treated as local")
 	}
 }
+
+func BenchmarkIsInThailandCIDR(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		IsInThailandCIDR("203.0.113.42")
+	}
+}
