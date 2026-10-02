@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -159,12 +158,4 @@ func BenchmarkSafeCounter_Atomic(b *testing.B) {
 			c.Inc()
 		}
 	})
-}
-
-type atomicCounter struct {
-	v int64
-}
-
-func (c *atomicCounter) Inc() int64 {
-	return atomic.AddInt64(&c.v, 1)
 }
