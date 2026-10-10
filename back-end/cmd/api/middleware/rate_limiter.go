@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -77,8 +78,9 @@ func RateLimiterMiddleware() gin.HandlerFunc {
 		}
 
 		// Key: rate:{id}:{current_minute_unix}
+		// Optimized: Replace fmt.Sprintf with direct string concatenation and strconv.FormatInt to avoid reflection overhead.
 		currentMinute := time.Now().Unix() / 60
-		key := fmt.Sprintf("rate:%s:%d", identifier, currentMinute)
+		key := "rate:" + identifier + ":" + strconv.FormatInt(currentMinute, 10)
 
 		// In-Memory Rate Limiter
 		val, _ := memoryStore.LoadOrStore(key, &SafeCounter{})
@@ -96,15 +98,17 @@ func RateLimiterMiddleware() gin.HandlerFunc {
 	}
 }
 
-// SafeCounter is a thread-safe counter for memory fallback
+// SafeCounter is a thread-safe counter for memory fallback using lock-free atomic operations.
 type SafeCounter struct {
-	v   int
-	mux sync.Mutex
+	v int64
 }
 
-func (c *SafeCounter) Inc() int {
-	c.mux.Lock()
-	defer c.mux.Unlock()
-	c.v++
-	return c.v
+// Inc atomically increments the counter and returns the updated value.
+func (c *SafeCounter) Inc() int64 {
+	return atomic.AddInt64(&c.v, 1)
+}
+
+// fmtSprintfKey is kept for benchmark comparisons.
+func fmtSprintfKey(identifier string, minute int64) string {
+	return fmt.Sprintf("rate:%s:%d", identifier, minute)
 }

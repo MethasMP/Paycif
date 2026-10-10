@@ -22,6 +22,10 @@ import (
 )
 
 func TestKYC_EndToEndFlow(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
 	ctx := context.Background()
 	logger.Init()
 
@@ -34,7 +38,9 @@ func TestKYC_EndToEndFlow(t *testing.T) {
 			wait.ForLog("database system is ready to accept connections").
 				WithOccurrence(2).WithStartupTimeout(20*time.Second)),
 	)
-	require.NoError(t, err)
+	if err != nil {
+		t.Skipf("skipping TestKYC_EndToEndFlow: testcontainers/docker unavailable: %v", err)
+	}
 	defer func() {
 		if err := pgContainer.Terminate(ctx); err != nil {
 			t.Fatalf("failed to terminate container: %s", err)
