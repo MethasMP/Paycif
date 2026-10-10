@@ -1,12 +1,12 @@
 package middleware
 
 import (
-	"fmt"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -77,10 +77,11 @@ func RateLimiterMiddleware() gin.HandlerFunc {
 		}
 
 		// Key: rate:{id}:{current_minute_unix}
+		// Optimized string concatenation to eliminate fmt.Sprintf heap allocation overhead
 		currentMinute := time.Now().Unix() / 60
-		key := fmt.Sprintf("rate:%s:%d", identifier, currentMinute)
+		key := "rate:" + identifier + ":" + strconv.FormatInt(currentMinute, 10)
 
-		// In-Memory Rate Limiter
+		// In-Memory Rate Limiter using atomic operations for lock-free counters
 		val, _ := memoryStore.LoadOrStore(key, &SafeCounter{})
 		counter := val.(*SafeCounter)
 
@@ -96,15 +97,12 @@ func RateLimiterMiddleware() gin.HandlerFunc {
 	}
 }
 
-// SafeCounter is a thread-safe counter for memory fallback
+// SafeCounter is a lock-free thread-safe counter for memory rate limiting.
 type SafeCounter struct {
-	v   int
-	mux sync.Mutex
+	v int64
 }
 
+// Inc atomically increments the counter and returns the new value.
 func (c *SafeCounter) Inc() int {
-	c.mux.Lock()
-	defer c.mux.Unlock()
-	c.v++
-	return c.v
+	return int(atomic.AddInt64(&c.v, 1))
 }
