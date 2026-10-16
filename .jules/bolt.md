@@ -1,0 +1,3 @@
+## 2026-10-16 - Rate Limiter Hot Path Optimization
+**Learning:** Replacing `fmt.Sprintf` key formatting with direct string concatenation (`strconv.FormatInt`) reduces formatting time by ~2.71x (87.40 ns/op vs 236.7 ns/op) and decreases heap allocations by 80% (8 B/op vs 40 B/op). Upgrading in-memory counter increments from `sync.Mutex` lock/unlock to lock-free `atomic.AddInt64` eliminates lock contention under concurrency (22.82 ns/op, 0 B/op).
+**Action:** On hot HTTP middleware request paths, prefer direct string concatenation/`strconv` formatting and lock-free atomic operations over `fmt.Sprintf` and mutex locking.
