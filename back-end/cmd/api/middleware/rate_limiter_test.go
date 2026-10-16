@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"sync"
-	"sync/atomic"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -114,12 +113,4 @@ func BenchmarkSafeCounter_Atomic(b *testing.B) {
 			_ = counter.Inc()
 		}
 	})
-}
-
-type atomicIncCounter struct {
-	v int64
-}
-
-func (c *atomicIncCounter) Inc() int {
-	return int(atomic.AddInt64(&c.v, 1))
 }
