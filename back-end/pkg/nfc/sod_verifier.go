@@ -1,6 +1,7 @@
 package nfc
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -10,6 +11,8 @@ import (
 	"log/slog"
 	"strings"
 )
+
+var mockSODPrefix = []byte("MOCK_SOD_CMS:")
 
 // NfcPassportPayload represents the raw cryptographically signed data read from the e-Passport NFC chip.
 type NfcPassportPayload struct {
@@ -21,6 +24,7 @@ type NfcPassportPayload struct {
 
 // CalculateAuditHash creates a unique fingerprint of the verification session.
 // This allows for future proof of verification without storing any raw PII (Zero-Knowledge Audit).
+// Bolt optimization: h.Sum(res[:0]) writes hash directly into res array, eliminating 32B heap allocation.
 func (p NfcPassportPayload) CalculateAuditHash() [32]byte {
 	h := sha256.New()
 	h.Write(p.DG1)
@@ -28,7 +32,7 @@ func (p NfcPassportPayload) CalculateAuditHash() [32]byte {
 	h.Write(p.SOD)
 	h.Write(p.DocumentSignerCert)
 	var res [32]byte
-	copy(res[:], h.Sum(nil))
+	h.Sum(res[:0])
 	return res
 }
 
@@ -63,12 +67,13 @@ func VerifyPassportNfcSignature(payload NfcPassportPayload) (*PassportIdentity, 
 
 	// 2. Data Integrity Check (The Core of PA)
 	// We verify that the Hash of DG1/DG2 matches what's signed in the SOD.
-	if len(payload.SOD) > 0 && string(payload.SOD[0:13]) == "MOCK_SOD_CMS:" {
+	// Bolt optimization: bytes.HasPrefix avoids string slice conversion allocations.
+	if len(payload.SOD) > 0 && bytes.HasPrefix(payload.SOD, mockSODPrefix) {
 		slog.Info("🔍 Integrity Check: Validating DG hashes against SOD signature...")
 
 		dg1Hash := sha256.Sum256(payload.DG1)
 		dg2Hash := sha256.Sum256(payload.DG2)
-		signature := payload.SOD[13:]
+		signature := payload.SOD[len(mockSODPrefix):]
 
 		dsCert, err := x509.ParseCertificate(payload.DocumentSignerCert)
 		if err != nil {
@@ -80,9 +85,11 @@ func VerifyPassportNfcSignature(payload NfcPassportPayload) (*PassportIdentity, 
 			return nil, errors.New("unsupported public key for simulated SOD")
 		}
 
-		// Re-construct signed content used in simulator
-		signedContent := append(dg1Hash[:], dg2Hash[:]...)
-		hashedContent := sha256.Sum256(signedContent)
+		// Bolt optimization: stack array avoids append heap allocation
+		var signedContent [64]byte
+		copy(signedContent[:32], dg1Hash[:])
+		copy(signedContent[32:], dg2Hash[:])
+		hashedContent := sha256.Sum256(signedContent[:])
 
 		err = rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hashedContent[:], signature)
 		if err != nil {
@@ -106,21 +113,22 @@ func VerifyPassportNfcSignature(payload NfcPassportPayload) (*PassportIdentity, 
 // DG1 format: [Tag: 61] [Len] [Tag: 5F1F] [Len] [Exactly 88 or 90 characters of MRZ]
 func parseDG1(data []byte) (*PassportIdentity, error) {
 	// Simple scanner for the MRZ string within DG1
-	mrzStr := ""
-	for i := 0; i < len(data)-44; i++ {
+	// Bolt optimization: scan byte slices directly without converting data to string
+	var mrzBytes []byte
+	for i := 0; i <= len(data)-44; i++ {
 		// Look for start of MRZ lines (e.g., P<THA)
 		if data[i] == 'P' && (data[i+1] == '<' || (data[i+1] >= 'A' && data[i+1] <= 'Z')) {
-			mrzStr = string(data[i:])
+			mrzBytes = data[i:]
 			break
 		}
 	}
 
-	if mrzStr == "" {
+	if len(mrzBytes) == 0 {
 		return nil, errors.New("could not find MRZ string in DG1")
 	}
 
 	// Basic MRZ parser (TD3 - 2 lines of 44 chars)
-	if len(mrzStr) < 88 {
+	if len(mrzBytes) < 88 {
 		return nil, errors.New("MRZ string too short")
 	}
 
@@ -131,6 +139,7 @@ func parseDG1(data []byte) (*PassportIdentity, error) {
 	// This is a robust mock that emulates extracting from the physical MRZ
 	// Example Line 2: AA12345674THA9001015M3001013<<<<<<<<<<<<<<0
 	// Pos 0-9: DocNum, 10-13: Nationality, 13-19: DOB
+	mrzStr := string(mrzBytes)
 	return &PassportIdentity{
 		DocumentNumber: strings.TrimRight(mrzStr[44:53], "<"),
 		FirstName:      "SIMULATED",
